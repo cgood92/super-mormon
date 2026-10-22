@@ -35,6 +35,13 @@ export function buildAuditorium(parent: THREE.Group) {
     if (solid) solids.push({ x, y, z, w, h, d });
     return mesh;
   }
+  // Cover exposed foundation between the seating banks, outer aisles and stage.
+  // This thin finish stays below the existing carpet tops at y=0.02.
+  const carpetBase = new THREE.Mesh(new THREE.PlaneGeometry(126, 98), carpet);
+  carpetBase.name = "auditorium continuous carpet";
+  carpetBase.rotation.x = -Math.PI / 2;
+  carpetBase.position.set(0, 0.005, -49);
+  group.add(carpetBase);
   // Rear cross aisles meet the foyer at precisely the foyer's floor elevations.
   for (const y of [0, 12, 24]) box(0, y - 0.6, -3, 124, 0.6, 6, carpet, true);
   box(-64, 0, -50, 2, 35.5, 100, cream, true);
@@ -90,7 +97,21 @@ export function buildAuditorium(parent: THREE.Group) {
         if (Math.abs(x) < 4.3 || Math.abs(Math.abs(x) - half * 0.66) < 1.15)
           continue;
         const curve = (-9 * (x / 60) ** 2 * row) / (rows - 1);
-        seats.push({ x, y, z: z + curve, angle: Math.atan2(x, 90 + z) });
+        const seatZ = z + curve;
+        const angle = Math.atan2(x, 90 + z);
+        // Include the rotated cushion and offset back in the stair clearance.
+        // Only audience seats are filtered; the continuous row slabs stay intact.
+        const extentX =
+          0.275 * Math.abs(Math.cos(angle)) + 0.32 * Math.abs(Math.sin(angle));
+        const extentZ =
+          0.275 * Math.abs(Math.sin(angle)) + 0.32 * Math.abs(Math.cos(angle));
+        if (
+          Math.abs(Math.abs(x) - 25) <= 3.5 + extentX &&
+          seatZ + extentZ >= -80.5 &&
+          seatZ - extentZ <= -69
+        )
+          continue;
+        seats.push({ x, y, z: seatZ, angle });
       }
       // Row ends receive small warm wood fascia. Seats themselves remain
       // passable so every place can be explored without tens of thousands of colliders.

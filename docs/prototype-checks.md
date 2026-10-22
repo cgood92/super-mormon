@@ -65,3 +65,11 @@ The measured N64 adapter is `0810:e501`, with two axes and ten buttons. Its buil
 Earlier browser visits using the previous small gallery kept resource counts stable across gallery → vision → gallery transitions after shadow-target cleanup. Those measurements predate the new Conference Center and do not establish its resource counts or physical-device performance.
 
 The next auditorium refinement follows the supplied front-stage photos: paired side stairs replace the central flight, and choir/presiding chairs face the audience. Browser input traversed both stair routes and checked the balcony trim from the stage side. A ray-based regression verifies that the cream and wood fascia no longer share coincident visible faces; another test verifies actual rendered chair backrest positions.
+
+## Ship adventures — October 22, 2026
+
+Sol agents implemented the shared vessel, Bountiful construction, ocean voyage, and gallery integration. An isolated browser profile completed the new stories through ordinary public controller input, without teleporting or changing runtime state: six individually aligned timbers, beach boarding stairs, ship exploration and helm completion; then below-deck brothers, return to Nephi, prayer, Liahona, and five sustained steering passages. All eight completion records persisted and post-arrival exploration remained playable. QA caught a final-timber snapshot failure while the completion dialog was open; a deferred-dialog regression covers the fix.
+
+The dedicated ground-floor movement studio was reached on foot. Both auditorium side-stair clearance and continuous front/side red carpet have geometry regressions; a browser route walked the center aisle to the right stage stair and onto the stage. Landscape viewport emulation at 852 × 393 had no page scrolling; this is not a physical-phone performance measurement.
+
+Final checks: 175 tests passed, production build passed, formatting passed. Ship model and new scenes load as separate chunks. Ship architecture and the child viewpoint are imagined; the scriptural sequence and fourth-day release follow 1 Nephi 17–18.

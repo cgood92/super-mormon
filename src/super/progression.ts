@@ -5,6 +5,8 @@ export const STORY_ORDER = [
   "trade",
   "night",
   "tree",
+  "bountiful",
+  "voyage",
 ] as const;
 export type StoryId = (typeof STORY_ORDER)[number];
 
@@ -15,6 +17,8 @@ export const STORY_TITLES: Record<StoryId, string> = {
   trade: "The Treasure Offer",
   night: "Jerusalem by Night",
   tree: "The Tree of Life",
+  bountiful: "Building the Ship",
+  voyage: "The Ocean Voyage",
 };
 
 export function isStoryId(value: unknown): value is StoryId {

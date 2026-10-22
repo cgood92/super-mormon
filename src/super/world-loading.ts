@@ -26,6 +26,14 @@ export async function prepareWorld(id: WorldId): Promise<PreparedWorld> {
       createTreeOfLifeScene: module.createTreeOfLifeScene,
     };
   }
+  if (id === "bountiful") {
+    const module = await import("./bountiful");
+    return { buildWorld: (_, scene) => module.buildBountiful(scene) };
+  }
+  if (id === "voyage") {
+    const module = await import("./voyage");
+    return { buildWorld: (_, scene) => module.buildVoyage(scene) };
+  }
   const module = await import("./jerusalem");
   const story =
     id === "trade" || id === "night"

@@ -82,10 +82,14 @@ export async function enter(id) {
   const p = snapshot().portals.find((p) => p.id === id);
   const side = p.facing === "east";
   if (side) {
-    await go(14, 17, 0.3);
-    await go(14, p.z, 0.3);
+    await go(0, 47, 0.3);
+    await go(70, 47, 0.3);
+    await go(70, p.z, 0.3);
     await go(p.x - 1.8, p.z, 0.25);
-  } else await go(p.x, p.z + 1.8, 0.25);
+  } else {
+    await go(p.x, 36, 0.3);
+    await go(p.x, p.z + 1.8, 0.25);
+  }
   const yaw = snapshot().cameraYaw;
   const dx = side ? 1 : 0,
     dz = side ? 0 : -1;

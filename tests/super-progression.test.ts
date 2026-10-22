@@ -38,7 +38,15 @@ test("scenes unlock in story order and completed scenes stay replayable", () => 
   assert.equal(nextStory(completed), "tree");
   assert.equal(canEnter("tree", completed), true);
   completed.add("tree");
+  assert.equal(nextStory(completed), "bountiful");
+  assert.equal(canEnter("bountiful", completed), true);
+  assert.equal(canEnter("voyage", completed), false);
+  completed.add("bountiful");
+  assert.equal(nextStory(completed), "voyage");
+  assert.equal(canEnter("voyage", completed), true);
+  completed.add("voyage");
   assert.equal(nextStory(completed), null);
+  assert.equal(canEnter("bountiful", completed), true);
 });
 
 test("older out-of-order saves keep completed replay access without opening gaps", () => {

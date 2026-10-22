@@ -1,11 +1,22 @@
 import * as THREE from "three";
+import { buildBountiful } from "./bountiful";
+import { buildVoyage } from "./voyage";
 import { buildJerusalem } from "./jerusalem";
 import { buildTreeOfLife } from "./tree-of-life";
 import { house } from "./gallery-worlds";
 import { gallery } from "./conference-center";
 import type { Climbable, PlayerState } from "./physics";
+import type { AdventureHooks, AdventureRuntime } from "./adventure";
 export type WorldId =
-  "hub" | "streets" | "house" | "palace" | "trade" | "night" | "tree";
+  | "hub"
+  | "streets"
+  | "house"
+  | "palace"
+  | "trade"
+  | "night"
+  | "tree"
+  | "bountiful"
+  | "voyage";
 export type Solid = {
   x: number;
   y: number;
@@ -20,6 +31,8 @@ export type WorldData = {
   subtitle: string;
   spawn: Point;
   solids: Solid[];
+  adventure?: (hooks: AdventureHooks) => AdventureRuntime;
+  actorParent?: THREE.Group;
   landmarks?: { name: string; x: number; y: number; z: number }[];
   portals?: {
     id: WorldId;
@@ -74,6 +87,10 @@ export function buildWorld(id: WorldId, scene: THREE.Scene): WorldData {
       return buildJerusalem("trade", scene);
     case "night":
       return buildJerusalem("night", scene);
+    case "bountiful":
+      return buildBountiful(scene);
+    case "voyage":
+      return buildVoyage(scene);
     case "tree":
       return buildTreeOfLife(scene);
   }

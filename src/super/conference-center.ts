@@ -277,23 +277,140 @@ export function gallery(scene: THREE.Scene): WorldData {
     portals.push(portal);
     solids.push(paintingCollider(portal));
   });
+  // Later chapters sit together in the open east foyer, with a clear south approach.
+  for (const [id, title, x] of [
+    ["bountiful", "BUILDING THE SHIP", 34],
+    ["voyage", "THE OCEAN VOYAGE", 44],
+  ] as const) {
+    const image = painting(group, x, 0.7, 15.3, "", 0xffffff);
+    image.onBeforeRender = () => {};
+    image.name = `${id} story painting`;
+    if (typeof document !== "undefined") {
+      const canvas = document.createElement("canvas");
+      canvas.width = 384;
+      canvas.height = 512;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        const ocean = id === "voyage";
+        ctx.fillStyle = ocean ? "#577c9a" : "#d6b77a";
+        ctx.fillRect(0, 0, 384, 512);
+        ctx.fillStyle = "#fff0c8";
+        ctx.beginPath();
+        ctx.arc(290, 88, 35, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = ocean ? "#255b78" : "#608a88";
+        ctx.fillRect(0, 270, 384, 242);
+        if (!ocean) {
+          ctx.fillStyle = "#d4b884";
+          ctx.beginPath();
+          ctx.moveTo(0, 290);
+          ctx.lineTo(384, 380);
+          ctx.lineTo(384, 512);
+          ctx.lineTo(0, 512);
+          ctx.fill();
+          ctx.fillStyle = "#52694c";
+          ctx.beginPath();
+          ctx.moveTo(0, 275);
+          ctx.lineTo(70, 105);
+          ctx.lineTo(135, 305);
+          ctx.fill();
+        }
+        ctx.fillStyle = "#714a30";
+        ctx.beginPath();
+        ctx.moveTo(72, 329);
+        ctx.lineTo(336, 312);
+        ctx.lineTo(292, 375);
+        ctx.lineTo(112, 375);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#392f29";
+        ctx.fillRect(198, 135, 8, 200);
+        ctx.fillStyle = ocean ? "#f8e9c8" : "#c5a470";
+        ctx.beginPath();
+        ctx.moveTo(212, 145);
+        ctx.lineTo(310, 295);
+        ctx.lineTo(212, 295);
+        ctx.closePath();
+        ctx.fill();
+        if (!ocean) {
+          ctx.strokeStyle = "#ead7a8";
+          ctx.lineWidth = 7;
+          for (let rib = 110; rib < 320; rib += 25) {
+            ctx.beginPath();
+            ctx.moveTo(rib, 325);
+            ctx.lineTo(rib + 12, 365);
+            ctx.stroke();
+          }
+          ctx.fillStyle = "#33495b";
+          ctx.fillRect(55, 354, 19, 48);
+          ctx.fillStyle = "#b87546";
+          ctx.beginPath();
+          ctx.arc(65, 344, 11, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#77543d";
+          ctx.fillRect(36, 406, 115, 12);
+        } else {
+          ctx.strokeStyle = "#c3dedc";
+          ctx.lineWidth = 4;
+          for (let wave = 395; wave < 510; wave += 34) {
+            ctx.beginPath();
+            ctx.moveTo(25, wave);
+            ctx.quadraticCurveTo(95, wave - 20, 170, wave);
+            ctx.quadraticCurveTo(240, wave + 20, 355, wave);
+            ctx.stroke();
+          }
+        }
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        (image.material as THREE.MeshBasicMaterial).map = texture;
+      }
+    }
+    label(group, title, x, 0.55, 16, 7, 0.52);
+    const portal = {
+      id,
+      x,
+      y: 0.59,
+      z: 15.58,
+      title,
+      facing: "north" as const,
+    };
+    portals.push(portal);
+    solids.push(paintingCollider(portal));
+  }
+  label(
+    group,
+    "THE JOURNEY CONTINUES · 1 NEPHI 17–18",
+    39,
+    6.8,
+    15.65,
+    20,
+    0.8,
+  );
   label(group, "THE BOOK OF MORMON · STORY GALLERY", 0, 6.8, 15.65, 25, 1);
-  // Unobtrusive optional movement room in the west side hall.
-  add(-82, 0, -48, 3.2, 2.25, 3.2, 0xa5b6a5, "practice ledge");
-  add(-84, 0, -64, 0.35, 3.6, 0.35, C.timber, "practice pole");
-  add(-75.6, 0, -47, 0.35, 1.4, 3.3, 0x879a91);
-  add(-72.4, 0, -47, 0.35, 1.4, 3.3, 0x879a91);
-  add(-74, 1.02, -47, 3.5, 0.38, 3.3, 0xc2c9be);
-  add(-78, 0, -60, 1.8, 1, 4.5, 0xb4c2b0);
-  add(-86, 0, -68, 0.55, 4.5, 5, 0x9dada6);
+  // Ground-floor movement studio: wide east doorway and clear hall passages at z=0/43.
+  add(-78, 0, 4, 20, 9.8, 0.35, C.pale, "movement studio north wall");
+  add(-78, 0, 40, 20, 9.8, 0.35, C.pale, "movement studio south wall");
+  add(-88, 0, 22, 0.35, 9.8, 36, C.pale, "movement studio west wall");
+  add(-68, 0, 15.5, 0.35, 9.8, 23, C.pale, "movement studio east north wall");
+  add(-68, 0, 37.5, 0.35, 9.8, 5, C.pale, "movement studio east south wall");
+  add(-68, 7.4, 31, 0.35, 2.4, 8, C.pale, "movement studio doorway lintel");
+  const studioSign = label(group, "MOVEMENT STUDIO", -67.78, 6.2, 31, 11, 1);
+  studioSign.rotation.y = Math.PI / 2;
+  studioSign.name = "movement studio entrance sign";
+  add(-82, 0, 30, 3.2, 2.25, 3.2, 0xa5b6a5, "practice ledge");
+  add(-84, 0, 14, 0.35, 3.6, 0.35, C.timber, "practice pole");
+  add(-75.6, 0, 14, 0.35, 1.4, 3.3, 0x879a91);
+  add(-72.4, 0, 14, 0.35, 1.4, 3.3, 0x879a91);
+  add(-74, 1.02, 14, 3.5, 0.38, 3.3, 0xc2c9be);
+  add(-78, 0, 18, 1.8, 1, 4.5, 0xb4c2b0);
+  add(-86, 0, 10, 0.55, 4.5, 5, 0x9dada6);
   const ring = new THREE.Mesh(
     new THREE.TorusGeometry(1.4, 0.06, 8, 48),
     new THREE.MeshBasicMaterial({ color: 0xd3aa56 }),
   );
   ring.rotation.x = -Math.PI / 2;
-  ring.position.set(-81, 0.07, -71);
+  ring.position.set(-81, 0.07, 7);
   group.add(ring);
-  label(group, "OPTIONAL MOVEMENT STUDIO", -78, 4, -40, 15, 0.8);
   for (const y of [12, 24])
     for (const x of [-62, -50, 50, 62])
       add(x, y, 20, 0.18, 1.1, 38, C.bronze, "escalator well balustrade");
@@ -456,6 +573,7 @@ export function gallery(scene: THREE.Scene): WorldData {
     subtitle: "Explore three floors, the auditorium and roof gardens",
     spawn: { x: 0, y: 0, z: 36, yaw: Math.PI },
     landmarks: [
+      { name: "Movement studio", x: -74, y: 0, z: 35 },
       { name: "Story gallery", x: 0, y: 0, z: 20 },
       { name: "Auditorium ground entrance", x: 0, y: 0, z: -2 },
       { name: "Auditorium second floor", x: 0, y: 12, z: -2 },
@@ -465,15 +583,15 @@ export function gallery(scene: THREE.Scene): WorldData {
     solids,
     portals,
     climbables: [
-      { id: "gallery-pole", x: -84, z: -64, y: 0, height: 3.6, radius: 0.2 },
+      { id: "gallery-pole", x: -84, z: 14, y: 0, height: 3.6, radius: 0.2 },
     ],
     tokens: [
-      { id: "arch", x: -74, y: 0.4, z: -47 },
-      { id: "ledge", x: -82, y: 2.75, z: -48 },
-      { id: "pole", x: -84, y: 4.05, z: -64 },
-      { id: "jump", x: -78, y: 1.5, z: -60 },
-      { id: "wall", x: -84.8, y: 2.7, z: -68 },
-      { id: "explore", x: -73, y: 0.55, z: -67 },
+      { id: "arch", x: -74, y: 0.4, z: 14 },
+      { id: "ledge", x: -82, y: 2.75, z: 30 },
+      { id: "pole", x: -84, y: 4.05, z: 14 },
+      { id: "jump", x: -78, y: 1.5, z: 18 },
+      { id: "wall", x: -84.8, y: 2.7, z: 10 },
+      { id: "explore", x: -73, y: 0.55, z: 11 },
     ],
     carryables: [
       {
@@ -481,12 +599,12 @@ export function gallery(scene: THREE.Scene): WorldData {
         name: "Practice bundle",
         x: -73,
         y: 0.3,
-        z: -70,
+        z: 8,
       },
     ],
-    delivery: { x: -81, y: 0, z: -71, radius: 1.4 },
+    delivery: { x: -81, y: 0, z: 7, radius: 1.4 },
     tutorials: practiceLessons(),
-    practiceBounds: { minX: -87, maxX: -69, minZ: -74, maxZ: -39 },
+    practiceBounds: { minX: -87, maxX: -69, minZ: 4, maxZ: 39 },
     goal: { x: 0, y: 0, z: 17.5, radius: 3 },
     bounds: { minX: -89, maxX: 89, minZ: -104, maxZ: 54 },
     dispose() {
@@ -501,7 +619,7 @@ export function gallery(scene: THREE.Scene): WorldData {
 
 function practiceLessons(): NonNullable<WorldData["tutorials"]> {
   return [
-    ["arch", "Crawl", "Use {crouch} and move beneath the low arch.", -74, -44],
+    ["arch", "Crawl", "Use {crouch} and move beneath the low arch.", -74, -61],
     [
       "ledge",
       "Jump and climb",
@@ -564,7 +682,7 @@ function practiceLessons(): NonNullable<WorldData["tutorials"]> {
     instruction: String(instruction),
     x: Number(x),
     y: 0,
-    z: Number(z),
+    z: Number(z) + 78,
     radius: 3,
   }));
 }

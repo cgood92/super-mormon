@@ -130,12 +130,14 @@ test("gallery movement studio is reachable through the west hallway", () => {
   for (const [x, z] of [
     [-5, 36],
     [-5, 47],
-    [-72, 47],
-    [-72, -40],
+    [-65, 47],
+    [-65, 31],
+    [-67, 31],
+    [-74, 31],
   ] as const)
     go(player, x, z, data.solids);
   assert.ok(
-    player.x < -69 && player.z < -39,
+    player.x < -69 && player.z >= 4 && player.z <= 39,
     "player reached the side practice room",
   );
   assert.equal(data.tutorials?.length, 9);

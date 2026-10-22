@@ -1,3 +1,4 @@
+import type { AdventureRuntime } from "./super/adventure";
 import * as T from "three";
 import "./style.css";
 import { Input } from "./super/input";
@@ -110,6 +111,7 @@ const menuNavigation = new MenuNavigation();
 let pauseMenuOpen = false,
   splashTime = 0;
 let storyScene: ReturnType<typeof createStoryScene> | null = null;
+let adventure: AdventureRuntime | null = null;
 let treeScene: ReturnType<typeof createTreeOfLifeScene> | null = null;
 let storyCheckpoint: { x: number; y: number; z: number; yaw?: number } | null =
   null;
@@ -542,6 +544,8 @@ function updatePracticeLesson() {
     `Tokens ${bonusCollected.size} / ${world.tokens?.length ?? 0} · ${learnedMoves.size} moves tried`;
 }
 function disposeScene() {
+  adventure?.dispose();
+  adventure = null;
   treeScene?.dispose();
   treeScene = null;
   storyScene?.dispose();
@@ -618,12 +622,16 @@ async function load(id: WorldId) {
         ? "laman"
         : "nephi",
   );
-  scene.add(avatar.group);
+  (world.actorParent ?? scene).add(avatar.group);
   avatar.update(0, player);
   follow.reset(
     player,
     player.yaw,
-    id === "tree" ? "streets" : id === "hub" ? "conference" : id,
+    id === "tree" || id === "bountiful" || id === "voyage"
+      ? "streets"
+      : id === "hub"
+        ? "conference"
+        : id,
   );
   levelTime = 0;
   guardsActive = id === "streets";
@@ -664,7 +672,7 @@ async function load(id: WorldId) {
     scene.add(g);
     treasureMeshes.set(t.id, g);
   }
-  if (id !== "hub" && id !== "tree")
+  if (id !== "hub" && id !== "tree" && !world.adventure)
     goalMarker = marker(world.goal.x, world.goal.y, world.goal.z);
   const spawnGuards =
     id === "trade" || id === "night"
@@ -713,9 +721,13 @@ async function load(id: WorldId) {
         ? "1 NEPHI 1–2 · ABOUT 600 BC"
         : id === "tree"
           ? "1 NEPHI 8 · LEHI’S VISION"
-          : id === "night"
-            ? "1 NEPHI 4 · ABOUT 600 BC"
-            : "1 NEPHI 3 · ABOUT 600 BC";
+          : id === "bountiful"
+            ? "1 NEPHI 17 · BUILDING THE SHIP"
+            : id === "voyage"
+              ? "1 NEPHI 18 · THE OCEAN VOYAGE"
+              : id === "night"
+                ? "1 NEPHI 4 · ABOUT 600 BC"
+                : "1 NEPHI 3 · ABOUT 600 BC";
   el("seal-count").textContent =
     `Stories ${completed.size} / ${STORY_ORDER.length}`;
   if (id === "trade" || id === "night") {
@@ -757,6 +769,20 @@ async function load(id: WorldId) {
       setMarker: () => {},
     });
   }
+  adventure =
+    world.adventure?.({
+      dialog: (kicker, title, body, next) =>
+        modal(kicker, title, body, [{ label: "Continue", run: next }]),
+      toast: (text) => message(text, 4),
+      complete,
+      setAvatar: (role) => {
+        avatar.dispose();
+        avatar = createCharacter("nephi");
+        avatar.group.scale.setScalar(role === "child" ? 0.65 : 1);
+        (world.actorParent ?? scene).add(avatar.group);
+        avatar.update(0, player);
+      },
+    }) ?? null;
   diagnostics.recordScene(id);
   transition = false;
   el("curtain").classList.remove("closed");
@@ -778,7 +804,11 @@ async function load(id: WorldId) {
                 ? "Enter the city and search its moonlit streets."
                 : id === "tree"
                   ? "Take your time. Follow the path toward the tree."
-                  : "Find the blue door. Watch the streets.",
+                  : id === "bountiful"
+                    ? "Explore the shore. Speak with Nephi and help build the ship."
+                    : id === "voyage"
+                      ? "Explore the ship and meet the family aboard."
+                      : "Find the blue door. Watch the streets.",
       4,
     );
 }
@@ -823,6 +853,24 @@ function complete() {
   sound("win");
   const name = worldId;
   const next = nextStory(completed);
+  if (name === "bountiful" || name === "voyage") {
+    modal(
+      name === "bountiful" ? "1 NEPHI 17" : "1 NEPHI 18",
+      name === "bountiful" ? "The ship is ready." : "A new shore.",
+      name === "bountiful"
+        ? "The family has built a ship together. Stay and explore the shore and the completed vessel."
+        : "The family has crossed the ocean. Stay and explore the ship and the promised land.",
+      [
+        { label: "Stay and explore", run: () => {} },
+        {
+          label: "Return to the gallery",
+          run: () => warp("hub"),
+          secondary: true,
+        },
+      ],
+    );
+    return;
+  }
   if (name === "tree") {
     modal(
       "LEHI’S VISION · 1 NEPHI 8",
@@ -932,7 +980,11 @@ function resetCaughtCheckpoint() {
   follow.reset(
     player,
     player.yaw,
-    worldId === "tree" ? "streets" : worldId === "hub" ? "conference" : worldId,
+    worldId === "tree" || worldId === "bountiful" || worldId === "voyage"
+      ? "streets"
+      : worldId === "hub"
+        ? "conference"
+        : worldId,
   );
   for (const object of carryObjects) if (object.held) resetCarryObject(object);
   caughtGrace = 3.4;
@@ -1081,9 +1133,13 @@ function update(dt: number) {
   levelTime += dt;
   app.classList.toggle("chapter-faded", levelTime >= 10);
   caughtGrace = Math.max(0, caughtGrace - dt);
+  const movementLocked = !!adventure?.movementLocked?.();
+  if (movementLocked) player.vx = player.vz = 0;
   const events = stepPlayer(
     player,
-    state,
+    movementLocked
+      ? { ...state, x: 0, y: 0, jump: false, jumpHeld: false }
+      : state,
     dt,
     follow.yaw,
     world.solids,
@@ -1096,7 +1152,21 @@ function update(dt: number) {
     player.x = T.MathUtils.clamp(player.x, b.minX + 0.35, b.maxX - 0.35);
     player.z = T.MathUtils.clamp(player.z, b.minZ + 0.35, b.maxZ - 0.35);
   }
+  let adventureCarrying = false;
   let treePrompt = "";
+  if (adventure) {
+    const result = adventure.update(dt, player, state);
+    treePrompt =
+      result.prompt && worldId === "bountiful"
+        ? `{action} · ${result.prompt}`
+        : result.prompt;
+    adventureCarrying = !!result.carrying;
+    if (storyObjective !== result.objective) {
+      storyObjective = result.objective;
+      updateObjective();
+    }
+    if (paused || transition) return;
+  }
   if (treeScene) {
     const result = treeScene.update(dt, player, {
       interact: state.interact,
@@ -1121,6 +1191,7 @@ function update(dt: number) {
   avatar.update(dt, {
     ...player,
     carrying:
+      adventureCarrying ||
       carryObjects.some((object) => object.held) ||
       !!(storyScene?.snapshot() as { treasureHeld?: boolean } | undefined)
         ?.treasureHeld ||
@@ -1137,7 +1208,11 @@ function update(dt: number) {
       recenter: state.recenter,
       zoom: state.cameraZoom,
     },
-    worldId === "tree" ? "streets" : worldId === "hub" ? "conference" : worldId,
+    worldId === "tree" || worldId === "bountiful" || worldId === "voyage"
+      ? "streets"
+      : worldId === "hub"
+        ? "conference"
+        : worldId,
   );
   app.classList.toggle("camera-obstructed", follow.obstructed);
   for (const entry of wavingExtras)
@@ -1463,6 +1538,7 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has("playtest"))
         cameraObstructed: follow.obstructed,
         story: storyScene?.snapshot(),
         vision: treeScene?.snapshot(),
+        adventure: adventure?.snapshot(),
         tutorials: world.tutorials,
         practiceBounds: world.practiceBounds,
         learnedMoves: [...learnedMoves],

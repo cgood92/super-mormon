@@ -16,7 +16,7 @@ test("quiet exploration areas have location hints without story entry prompts", 
     "Level 3 · Art Hallways",
   );
   assert.equal(
-    conferenceLocation({ x: -78, y: 0, z: -50 }).name,
+    conferenceLocation({ x: -78, y: 0, z: 20 }).name,
     "Movement Studio",
   );
   assert.equal(conferenceLocation({ x: 0, y: 0, z: 36 }).name, "Story Gallery");

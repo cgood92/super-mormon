@@ -5,9 +5,9 @@ import { gallery, CONFERENCE_ESCALATORS } from "../src/super/conference-center";
 import { createPlayer, stepPlayer } from "../src/super/physics";
 import { canJumpIntoPainting } from "../src/super/gallery-entry";
 
-test("Conference Center has six reachable canvases together and nine optional lessons", () => {
+test("Conference Center has eight reachable canvases and nine optional lessons", () => {
   const world = gallery(new THREE.Scene());
-  assert.equal(world.portals?.length, 6);
+  assert.equal(world.portals?.length, 8);
   assert.equal(world.tutorials?.length, 9);
   for (const portal of world.portals!) {
     const player = createPlayer(world.spawn.x, 0, world.spawn.z);
@@ -252,5 +252,69 @@ test("auditorium foyer wall keeps its central and side doorways open on all floo
       assert.ok(doorway.z < -2.4, `open door ${x},${y}: ${doorway.z}`);
     }
   }
+  world.dispose?.();
+});
+
+test("movement studio near spawn has a walk-in doorway and contains every practice activity", () => {
+  const world = gallery(new THREE.Scene());
+  assert.deepEqual(world.practiceBounds, {
+    minX: -87,
+    maxX: -69,
+    minZ: 4,
+    maxZ: 39,
+  });
+  for (const activity of [
+    ...world.tutorials!,
+    ...world.tokens!,
+    ...world.carryables!,
+    world.delivery!,
+  ]) {
+    assert.ok(activity.x >= -87 && activity.x <= -69);
+    assert.ok(activity.z >= 4 && activity.z <= 39);
+  }
+  const player = createPlayer(world.spawn.x, 0, world.spawn.z);
+  function walk(x: number, z: number) {
+    for (let i = 0; i < 1500; i++) {
+      const dx = x - player.x,
+        dz = z - player.z;
+      const length = Math.hypot(dx, dz);
+      if (length < 0.12) break;
+      stepPlayer(
+        player,
+        {
+          x: -dx / length,
+          y: dz / length,
+          jump: false,
+          jumpHeld: false,
+        },
+        1 / 60,
+        0,
+        world.solids,
+      );
+    }
+    assert.ok(
+      Math.hypot(player.x - x, player.z - z) < 0.18,
+      `studio walk to ${x},${z}: ${player.x},${player.y},${player.z}`,
+    );
+    assert.ok(Math.abs(player.y) < 0.1, "walk remains on ground floor");
+  }
+  // Cross behind the escalator, then enter through the open welcome space.
+  for (const [x, z] of [
+    [-5, 36],
+    [-5, 47],
+    [-65, 47],
+    [-65, 31],
+    [-67, 31],
+    [-69.5, 31],
+    [-74, 31],
+    [-69.5, 35],
+    [-74, 35],
+    [-80, 35],
+    [-80, 23],
+    [-72, 23],
+    [-72, 8],
+    [-81, 6],
+  ])
+    walk(x, z);
   world.dispose?.();
 });
