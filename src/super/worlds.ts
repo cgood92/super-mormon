@@ -691,22 +691,118 @@ function palace(scene: THREE.Scene): WorldData {
   };
 }
 
+// The same plaster houses, flat parapets and western lanes as the daytime city.
+// Two offset courtyard blocks break the central sightline; 4–6 m crossings
+// connect both sides, so companions can follow entirely at ground level.
+function storyNeighborhood(
+  add: ReturnType<typeof makeWorld>["add"],
+  decor: ReturnType<typeof makeWorld>["decor"],
+  group: THREE.Group,
+) {
+  for (const [x, z, w, d, h, color] of [
+    [-27, 14, 10, 10, 4.2, 0xbfa17d],
+    [27, 14, 10, 10, 5, 0xd9bd94],
+    [-27, -1, 10, 10, 5.4, 0xd8b18a],
+    [24, -3, 18, 10, 4.3, 0xb68e69],
+    [-27, -15, 10, 10, 5, 0xcfad86],
+    [27, -18, 10, 10, 5.4, 0xc49a70],
+    [0, 14, 18, 12, 4.6, 0xcfad86],
+    [-7, -3, 20, 10, 5.2, 0xd1ac84],
+    [-8, -24, 14, 6, 5.4, 0xc39b72],
+    [-27, 31, 10, 10, 5.1, 0xd1ac84],
+    [27, 31, 10, 10, 5.6, 0xe0bd91],
+  ])
+    cityBlock(add, decor, group, x, z, w, d, h, color);
+  // Familiar indigo doorway and palm mark the west lane, as at Lehi's house.
+  decor(-21.94, 0, -15, 0.12, 2.8, 2.8, palette.indigo, "western indigo door");
+  datePalm(group, -19.5, 24, 4.8);
+  add(-19.5, 0, 24, 0.32, 4.8, 0.32, palette.timber, "palm trunk");
+  for (const z of [-12, 4, 24])
+    decor(6, 0.01, z, 3, 0.035, 0.14, 0xa78968, "paving seam");
+}
+
+function rockCave(
+  add: ReturnType<typeof makeWorld>["add"],
+  group: THREE.Group,
+) {
+  const rock = (
+    x: number,
+    y: number,
+    z: number,
+    w: number,
+    h: number,
+    d: number,
+    seed: number,
+  ) => {
+    const geometry = new THREE.IcosahedronGeometry(1, 1);
+    const positions = geometry.attributes.position;
+    for (let i = 0; i < positions.count; i++) {
+      const uneven =
+        1 +
+        0.12 *
+          Math.sin(
+            positions.getX(i) * 17 +
+              positions.getY(i) * 11 +
+              positions.getZ(i) * 7 +
+              seed,
+          );
+      positions.setXYZ(
+        i,
+        positions.getX(i) * uneven,
+        positions.getY(i) * uneven,
+        positions.getZ(i) * uneven,
+      );
+    }
+    geometry.computeVertexNormals();
+    const mesh = new THREE.Mesh(
+      geometry,
+      new THREE.MeshStandardMaterial({
+        color: seed % 2 ? 0x796956 : 0x625748,
+        roughness: 1,
+        flatShading: true,
+      }),
+    );
+    mesh.position.set(x, y, z);
+    mesh.scale.set(w, h, d);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.name = "weathered cave rock";
+    group.add(mesh);
+  };
+  // A broad mouth opens into a real 18 m chamber. Collision stays behind
+  // the visible rock faces, leaving a clear floor beneath the high ceiling.
+  for (const [x, z, w, d] of [
+    [-16, 67, 3, 18],
+    [0, 67, 3, 18],
+    [-8, 79, 19, 3],
+  ] as const) {
+    add(x, 0, z, w, 9, d, 0x625748, "cave bedrock").visible = false;
+    rock(x, 3.8, z, w * 0.9, 6, d * 0.75, x + z);
+  }
+  add(-8, 7, 69, 19, 3, 22, 0x625748, "cave ceiling").visible = false;
+  rock(-8, 9.4, 69, 12, 3.6, 13, 3);
+  rock(-17, 2, 58, 4, 4, 5, 4);
+  rock(1, 2, 59, 4, 5, 5, 5);
+  const shade = new THREE.Mesh(
+    new THREE.PlaneGeometry(14, 18),
+    new THREE.MeshStandardMaterial({ color: 0x433b31, roughness: 1 }),
+  );
+  shade.rotation.x = -Math.PI / 2;
+  shade.position.set(-8, 0.015, 69);
+  shade.name = "cave interior floor";
+  group.add(shade);
+}
+
 function trade(scene: THREE.Scene): WorldData {
   const { group, add, decor, finish } = makeWorld(scene, "jerusalem");
-  decor(0, -0.5, 20, 50, 0.5, 100, 0xc4a780, "stone road and desert");
-  add(-24, 0, 6, 0.9, 7, 68, 0xa98b69, "western city wall");
-  add(24, 0, 6, 0.9, 7, 68, 0xa98b69, "eastern city wall");
-  add(0, 0, -28, 49, 7, 0.9, 0xa98b69, "northern city wall");
-  add(-14, 0, 40, 20, 7, 0.9, 0xa98b69, "southern gate wall");
-  add(14, 0, 40, 20, 7, 0.9, 0xa98b69, "southern gate wall");
+  decor(0, -0.5, 24, 80, 0.5, 120, 0xc4a780, "stone road and desert");
+  add(-36, 0, 6, 0.9, 7, 68, 0xa98b69, "western city wall");
+  add(36, 0, 6, 0.9, 7, 68, 0xa98b69, "eastern city wall");
+  add(0, 0, -28, 73, 7, 0.9, 0xa98b69, "northern city wall");
+  add(-20, 0, 40, 32, 7, 0.9, 0xa98b69, "southern gate wall");
+  add(20, 0, 40, 32, 7, 0.9, 0xa98b69, "southern gate wall");
   add(0, 5.6, 40, 8, 1.4, 0.9, 0xa98b69, "gate lintel");
-  for (const [x, z, w, d, h] of [
-    [-17, 12, 9, 13, 5],
-    [17, 10, 9, 14, 5.6],
-    [-17, 29, 9, 9, 5.2],
-    [17, 28, 9, 10, 4.6],
-  ] as const)
-    cityBlock(add, decor, group, x, z, w, d, h, 0xc6a17b);
+  storyNeighborhood(add, decor, group);
   // Laban stands in an open audience court. Tables suggest the family's offer.
   for (const x of [-8, 8]) {
     column(group, x, -20, 5.4, 0.48, palette.paleStone);
@@ -726,28 +822,25 @@ function trade(scene: THREE.Scene): WorldData {
     [11, 67, 5],
   ] as const)
     decor(x, 0, z, w, 1.1, 2.8, 0x977f66, "desert boulder");
-  add(-13.7, 0, 66, 2.3, 4.3, 5.5, 0x806d5b, "cave west rock");
-  add(-2.3, 0, 66, 2.3, 4.3, 5.5, 0x806d5b, "cave east rock");
-  decor(-8, 4, 66, 14, 1.2, 5.5, 0x806d5b, "cave roof");
-  decor(-8, 0, 68.5, 8.7, 4, 0.2, 0x493d35, "cave shadow");
+  rockCave(add, group);
   return {
     name: "The Treasure Offer",
     subtitle:
       "Offer the family's treasures to Laban, then escape through the south gate",
-    spawn: { x: 0, y: 0, z: 12, yaw: Math.PI },
+    spawn: { x: 0, y: 0, z: 25, yaw: Math.PI },
     story: {
       laban: { x: 0, y: 0, z: -20 },
       gate: { x: 0, y: 0, z: 40 },
-      cave: { x: -8, y: 0, z: 64 },
+      cave: { x: -8, y: 0, z: 72 },
       brothers: { x: 0, y: 0, z: 43 },
     },
     goal: { x: 0, y: 0, z: -20, radius: 3 },
-    escapeGoal: { x: -8, y: 0, z: 64, radius: 3 },
+    escapeGoal: { x: -8, y: 0, z: 72, radius: 3 },
     pursuers: [
-      { x: -7, y: 0, z: -24 },
-      { x: 7, y: 0, z: -24 },
+      { x: -4, y: 0, z: -17 },
+      { x: 7, y: 0, z: -19 },
     ],
-    bounds: { minX: -23.2, maxX: 23.2, minZ: -27.2, maxZ: 70 },
+    bounds: { minX: -35.2, maxX: 35.2, minZ: -27.2, maxZ: 77 },
     ...finish(),
   };
 }
@@ -774,13 +867,7 @@ function night(scene: THREE.Scene): WorldData {
   add(-21, 0, 28, 30, 8, 0.9, 0x74767d, "gate wall");
   add(21, 0, 28, 30, 8, 0.9, 0x74767d, "gate wall");
   add(0, 6.6, 28, 12, 1.4, 0.9, 0x74767d, "gate lintel");
-  for (const [x, z, w, d, h] of [
-    [-29, 9, 10, 12, 5.2],
-    [29, 10, 10, 13, 5.6],
-    [-29, -13, 10, 13, 6],
-    [29, -12, 10, 13, 5],
-  ] as const)
-    cityBlock(add, decor, group, x, z, w, d, h, 0x85858a);
+  storyNeighborhood(add, decor, group);
   // Open crossings connect the gate, Laban's position, and the treasury.
   for (const [x, z] of [
     [-10, 14],
@@ -809,14 +896,18 @@ function night(scene: THREE.Scene): WorldData {
       "Find the plates in the sleeping city and return to your brothers",
     spawn: { x: 0, y: 0, z: 42, yaw: Math.PI },
     story: {
-      laban: { x: -18, y: 0, z: -12 },
+      laban: { x: -19.5, y: 0, z: -14 },
       treasury: { x: 14, y: 0, z: -17 },
       plates: { x: 14, y: 0, z: -22 },
       gate: { x: 0, y: 0, z: 28 },
       brothers: { x: 0, y: 0, z: 43 },
     },
-    goal: { x: -18, y: 0, z: -12, radius: 3 },
+    goal: { x: -19.5, y: 0, z: -14, radius: 3 },
     escapeGoal: { x: 0, y: 0, z: 43, radius: 3 },
+    pursuers: [
+      { x: -19.5, y: 0, z: 7 },
+      { x: 10, y: 0, z: -11 },
+    ],
     bounds: { minX: -35.2, maxX: 35.2, minZ: -29.2, maxZ: 48 },
     ...finish(),
   };

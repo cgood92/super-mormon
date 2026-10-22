@@ -43,8 +43,8 @@ Jump toward a painting to enter its scene. The five stories unlock in order: **J
 - **Jerusalem:** play as Lehi, find his blue door, and avoid pursuers. Optional stairs and ledges offer higher routes.
 - **Laban’s palace:** play as Laman, approach Laban and talk, then flee through the gate to the brothers outside the city. Guards and the obstacle route are imagined gameplay.
 - **Lehi’s house:** play as Nephi, explore the rooms and upper gallery, gather five treasures, and return to the entrance. Furniture blocks movement and can also be jumped onto.
-- **The Treasure Offer:** bring the family’s treasures to Laban. When he seizes them and sends his servants after the brothers, escape through the gate together and lead all three brothers to the cave. A brief dialogue bridges to the angel’s encouragement and Nephi’s resolve to return.
-- **Jerusalem by Night:** return as Nephi and find Laban. A brief scripture recap describes his death without depicting violence. Wear Laban’s garments, speak with Zoram at the treasury, take the brass plates, and escort Zoram through the gate to the waiting brothers.
+- **The Treasure Offer:** Nephi and his brothers carry gold and silver to Laban. He seizes their treasure; escape his servants through winding Jerusalem streets and gather inside a deep rock cave. Two ground routes let the brothers follow around the buildings. A brief dialogue bridges to the angel’s encouragement and Nephi’s resolve to return.
+- **Jerusalem by Night:** search the neighborhood’s alleys for Laban. A brief scripture recap describes his death without depicting violence. Wear Laban’s garments, find Zoram and the treasury, then carry the brass plates back to the waiting brothers. Guards notice you only at close range, move slowly, and give up quickly; the disguise ends their pursuit.
 
 Pause offers restart and return-to-gallery controls. Completed adventures are saved locally under `super-mormon-v1`.
 

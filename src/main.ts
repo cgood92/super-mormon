@@ -1015,6 +1015,8 @@ function update(dt: number) {
     ...player,
     carrying:
       carryObjects.some((object) => object.held) ||
+      !!(storyScene?.snapshot() as { treasureHeld?: boolean } | undefined)
+        ?.treasureHeld ||
       (worldId === "night" &&
         !!(storyScene?.snapshot() as { plates?: boolean } | undefined)?.plates),
   });

@@ -212,37 +212,117 @@ test("gallery movement studio has an open left entry and solid practice surfaces
     );
 });
 
-test("the treasure offer has an open route from Laban through the gate to the cave", () => {
+test("treasure offer has two walkable winding escapes and a deep standing cave", () => {
   const { data } = world("trade");
   assert.ok(data.story?.cave);
-  const player = createPlayer(data.spawn.x, 0, data.spawn.z);
-  for (const [x, z] of [
-    [0, 0],
+  const approach = [
+    [12, 25],
+    [12, 4],
+    [7, 4],
+    [7, -11],
+    [0, -11],
     [0, -20],
-    [0, 5],
-    [0, 40],
-    [-8, 50],
-    [-8, 64],
-  ] as const)
-    go(player, x, z, data.solids, 1.3);
-  assert.ok(Math.hypot(player.x + 8, player.z - 64) < 1.3);
+  ];
+  const escapes = [
+    [
+      [0, -11],
+      [7, -11],
+      [7, 4],
+      [12, 4],
+      [12, 24],
+      [0, 24],
+    ],
+    [
+      [0, -11],
+      [-19.5, -11],
+      [-19.5, 4],
+      [-12, 4],
+      [-12, 24],
+      [0, 24],
+    ],
+  ];
+  for (const escape of escapes) {
+    const player = createPlayer(data.spawn.x, 0, data.spawn.z);
+    for (const [x, z] of [
+      ...approach,
+      ...escape,
+      [0, 40],
+      [-8, 52],
+      [-8, 62],
+      [-8, 72],
+    ]) {
+      go(player, x, z, data.solids, 0.35);
+      assert.ok(
+        player.y < 0.05,
+        "companions can follow without climbing or jumping",
+      );
+    }
+    assert.ok(
+      Math.hypot(player.x - data.story.cave.x, player.z - data.story.cave.z) <
+        0.5,
+    );
+  }
+  // A straight sprint down the former empty avenue now reaches a house.
+  const sprint = createPlayer(0, 0, -11);
+  for (let frame = 0; frame < 240; frame++)
+    stepPlayer(
+      sprint,
+      { x: 0, y: 1, jump: false, jumpHeld: false },
+      1 / 60,
+      0,
+      data.solids,
+    );
+  assert.ok(sprint.z < 8, "escaping requires choosing a side street");
+  for (const z of [59, 64, 69, 72, 75]) {
+    assert.ok(
+      standingClear(-8, 0, z, data.solids),
+      `standing clearance at cave z=${z}`,
+    );
+    assert.ok(
+      standingClear(-8, 3, z, data.solids),
+      `camera clearance at cave z=${z}`,
+    );
+  }
 });
 
-test("night route reaches Laban, the treasury, plates and brothers", () => {
+test("night alleys reach Laban, treasury, plates and brothers without jumps", () => {
   const { data } = world("night");
   assert.ok(data.story?.treasury && data.story.plates);
   const player = createPlayer(data.spawn.x, 0, data.spawn.z);
   for (const [x, z] of [
     [0, 28],
-    [0, 0],
-    [-18, -12],
-    [0, -12],
+    [-12, 24],
+    [-12, 4],
+    [-19.5, 4],
+    [-19.5, -14],
+    [-19.5, -11],
+    [7, -11],
     [14, -17],
     [14, -22],
-    [0, -12],
-    [0, 28],
+    [7, -20],
+    [7, 4],
+    [12, 4],
+    [12, 24],
+    [0, 25],
     [0, 43],
-  ] as const)
-    go(player, x, z, data.solids, 1.4);
-  assert.ok(Math.hypot(player.x, player.z - 43) < 1.4);
+  ]) {
+    go(player, x, z, data.solids, 0.35);
+    assert.ok(player.y < 0.05, "Zoram's entire exit stays at ground level");
+  }
+  assert.ok(Math.hypot(player.x, player.z - 43) < 0.5);
+});
+
+test("story participants and guards stand clear of the Jerusalem buildings", () => {
+  for (const id of ["trade", "night"] as const) {
+    const { data } = world(id);
+    for (const point of [
+      data.spawn,
+      ...Object.values(data.story ?? {}),
+      ...(data.pursuers ?? []),
+    ])
+      assert.ok(
+        standingClear(point.x, point.y, point.z, data.solids),
+        `${id} actor at ${point.x}, ${point.z} overlaps scenery`,
+      );
+  }
 });

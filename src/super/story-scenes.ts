@@ -5,6 +5,7 @@ import {
   type CharacterState,
 } from "./character";
 import type { PlayerState } from "./physics";
+import { hasLineOfSight } from "./interactions";
 import type { Point, Solid, WorldData } from "./worlds";
 
 export type StorySceneId = "trade" | "night";
@@ -221,6 +222,82 @@ function book(scene: T.Scene) {
   };
 }
 
+// Each parcel is its own original low-poly arrangement of cloth, coins and vessels.
+// Place it above and beside the forearms so the rear camera can see the cargo.
+function treasureParcel(scene: T.Scene, variant: number) {
+  const group = new T.Group();
+  group.name = `family-treasure-${variant}`;
+  const materials = [
+    new T.MeshStandardMaterial({ color: 0xa74e37, roughness: 0.9 }),
+    new T.MeshStandardMaterial({
+      color: 0xf0c957,
+      metalness: 0.65,
+      roughness: 0.28,
+    }),
+    new T.MeshStandardMaterial({
+      color: 0xdce5ef,
+      metalness: 0.75,
+      roughness: 0.25,
+    }),
+  ];
+  const geometries: T.BufferGeometry[] = [];
+  const add = (
+    geometry: T.BufferGeometry,
+    material: number,
+    x: number,
+    y: number,
+    z: number,
+  ) => {
+    geometries.push(geometry);
+    const mesh = new T.Mesh(geometry, materials[material]);
+    mesh.position.set(x, y, z);
+    group.add(mesh);
+    return mesh;
+  };
+  add(new T.BoxGeometry(1.04, 0.19, 0.62), 0, 0, 0, 0);
+  add(
+    new T.CylinderGeometry(0.22, 0.13, 0.42, 7),
+    1 + (variant % 2),
+    -0.26,
+    0.29,
+    0,
+  );
+  add(
+    new T.CylinderGeometry(0.19, 0.1, 0.3, 6),
+    2 - (variant % 2),
+    0.27,
+    0.23,
+    0.03,
+  );
+  for (let i = 0; i < 4; i++)
+    add(
+      new T.CylinderGeometry(0.12, 0.12, 0.045, 8),
+      1,
+      0.06,
+      0.12 + i * 0.045,
+      -0.17,
+    );
+  scene.add(group);
+  return {
+    group,
+    carry(state: Pick<CharacterState, "x" | "y" | "z" | "yaw">) {
+      const side = 0.22,
+        forward = 0.78;
+      group.position.set(
+        state.x + Math.cos(state.yaw) * side + Math.sin(state.yaw) * forward,
+        state.y + 1.22,
+        state.z - Math.sin(state.yaw) * side + Math.cos(state.yaw) * forward,
+      );
+      group.rotation.y = state.yaw;
+    },
+    dispose() {
+      scene.remove(group);
+      geometries.forEach((geometry) => geometry.dispose());
+      materials.forEach((material) => material.dispose());
+    },
+  };
+}
+
 export function createStoryScene(
   id: StorySceneId,
   scene: T.Scene,
@@ -303,6 +380,15 @@ export function createStoryScene(
         ];
   const guards = guardPoints.map((p) => makeActor(scene, "guard", p));
   actors.push(...guards);
+  const treasure =
+    id === "trade"
+      ? Array.from({ length: 4 }, (_, i) => treasureParcel(scene, i))
+      : [];
+  for (const brother of brothers) brother.state.carrying = id === "trade";
+  // Initial NPC parcels are visible even before the first simulation frame.
+  treasure.slice(1).forEach((parcel, i) => parcel.carry(brothers[i].state));
+  if (treasure[0])
+    treasure[0].carry({ ...world.spawn, yaw: world.spawn.yaw ?? 0 });
   const plates = book(scene);
   if (id === "night" && story.plates) {
     plates.group.position.set(
@@ -355,6 +441,8 @@ export function createStoryScene(
       if (phase === "done")
         return { prompt: "", objective: "Journey complete" };
       const p = { x: player.x, z: player.z };
+      const reachable = (target: Point, radius: number) =>
+        near(p, target, radius) && hasLineOfSight(player, target, world.solids);
       if (id === "trade" && phase === "flee" && crossedGate(p)) {
         passedGate = true;
         advance("cave");
@@ -374,13 +462,22 @@ export function createStoryScene(
         hooks.toast("The city gate is behind you. Find your brothers outside.");
       }
       if (!dialogueOpen && input.interact) {
-        if (phase === "offer" && near(p, story.laban, 3.4)) {
+        if (phase === "offer" && reachable(story.laban, 3.4)) {
           speak(
             "1 Nephi 3:22–27",
             "Laban refuses",
             "The brothers offer their family's gold, silver, and precious things for the brass plates. Laban refuses and seizes their property. His servants pursue them.",
             () => {
               advance("flee");
+              for (const brother of brothers) brother.state.carrying = false;
+              treasure.forEach((parcel, i) => {
+                parcel.group.position.set(
+                  story.laban.x + (i - 1.5) * 0.95,
+                  story.laban.y + 0.18,
+                  story.laban.z + 1.1,
+                );
+                parcel.group.rotation.y = (i - 1.5) * 0.24;
+              });
               guardGrace = 2.3;
               checkpoint = {
                 x: story.laban.x,
@@ -389,7 +486,9 @@ export function createStoryScene(
                 yaw: 0,
               };
               hooks.checkpoint(checkpoint);
-              hooks.toast("Escape with your brothers!");
+              hooks.toast(
+                "Laban seized your treasure! His guards are pursuing you — escape!",
+              );
             },
           );
         } else if (
@@ -406,7 +505,7 @@ export function createStoryScene(
               hooks.complete();
             },
           );
-        } else if (phase === "laban" && near(p, story.laban, 3.4)) {
+        } else if (phase === "laban" && reachable(story.laban, 3.4)) {
           speak(
             "1 Nephi 4:6–19",
             "A difficult account",
@@ -424,7 +523,7 @@ export function createStoryScene(
               guardGrace = 2;
             },
           );
-        } else if (phase === "zoram" && zoram && near(p, zoram.state, 3.2)) {
+        } else if (phase === "zoram" && zoram && reachable(zoram.state, 3.2)) {
           speak(
             "1 Nephi 4:20–26",
             "Meet Zoram",
@@ -434,7 +533,7 @@ export function createStoryScene(
         } else if (
           phase === "plates" &&
           story.plates &&
-          near(p, story.plates, 2.8) &&
+          reachable(story.plates, 2.8) &&
           (!zoram || near(zoram.state, story.plates, 4))
         ) {
           plates.group.visible = true;
@@ -465,14 +564,26 @@ export function createStoryScene(
           trail.unshift({ ...p });
         if (trail.length > 160) trail.length = 160;
         for (let i = 0; i < brothers.length; i++) {
-          let pathLength = 0,
-            target = trail[trail.length - 1] ?? p;
+          const spacing = 3 + i * 2.1;
+          let pathLength = 0;
+          const oldest = trail[trail.length - 1] ?? p;
+          // Before enough breadcrumbs exist, extend the tail behind Nephi.
+          // Distinct distances preserve the procession while waiting at spawn.
+          let target = {
+            x: oldest.x - Math.sin(player.yaw) * spacing,
+            z: oldest.z - Math.cos(player.yaw) * spacing,
+          };
           for (let k = 1; k < trail.length; k++) {
             pathLength += distance(trail[k - 1], trail[k]);
-            if (pathLength >= 3 + i * 2.1) {
+            if (pathLength >= spacing) {
               target = trail[k];
               break;
             }
+            const remaining = spacing - pathLength;
+            target = {
+              x: oldest.x - Math.sin(player.yaw) * remaining,
+              z: oldest.z - Math.cos(player.yaw) * remaining,
+            };
           }
           stepActor(brothers[i], target, dt, 5.6, world);
         }
@@ -480,21 +591,36 @@ export function createStoryScene(
         stepActor(zoram, story.plates, dt, 3.8, world);
       else if (zoram && phase === "escape")
         stepActor(zoram, { x: player.x, z: player.z }, dt, 5.0, world);
+      if (phase === "offer") {
+        treasure[0]?.carry(player);
+        treasure
+          .slice(1)
+          .forEach((parcel, i) => parcel.carry(brothers[i].state));
+      }
       guardGrace = Math.max(0, guardGrace - dt);
       const pursuit = id === "trade" && (phase === "flee" || phase === "cave");
       for (let i = 0; i < guards.length; i++) {
         const guard = guards[i];
         const active =
           (pursuit && (phase === "flee" || near(guard.state, p, 13))) ||
-          (id === "night" && phase === "laban" && near(guard.state, p, 7));
-        if (active) stepActor(guard, p, dt, 4.5, world);
-        else guard.rig.update(dt, guard.state);
+          (id === "night" &&
+            phase === "laban" &&
+            near(guard.state, p, 3.5) &&
+            near(guardPoints[i], p, 6) &&
+            hasLineOfSight(guard.state, player, world.solids));
+        if (active) stepActor(guard, p, dt, id === "night" ? 2.2 : 4.5, world);
+        else {
+          guard.state.runSpeed = 0;
+          guard.state.move = "idle";
+          guard.rig.update(dt, guard.state);
+        }
         if (
           active &&
           guardGrace <= 0 &&
           !catchPending &&
           Math.abs(player.y - guard.state.y) < 1.2 &&
-          near(guard.state, p, 1.05)
+          near(guard.state, p, 1.05) &&
+          hasLineOfSight(guard.state, player, world.solids)
         ) {
           catchPending = true;
           hooks.caught();
@@ -502,9 +628,9 @@ export function createStoryScene(
       }
       if (id === "night" && phase === "escape") {
         plates.group.position.set(
-          player.x + Math.cos(player.yaw) * 0.48,
+          player.x + Math.sin(player.yaw) * 0.65,
           player.y + 0.98,
-          player.z - Math.sin(player.yaw) * 0.48,
+          player.z + Math.cos(player.yaw) * 0.65,
         );
         plates.group.rotation.y = player.yaw;
       }
@@ -528,13 +654,13 @@ export function createStoryScene(
         done: "Journey complete",
       };
       let prompt = "";
-      if (phase === "offer" && near(p, story.laban, 3.4))
+      if (phase === "offer" && reachable(story.laban, 3.4))
         prompt = "Speak with Laban";
-      if (phase === "laban" && near(p, story.laban, 3.4))
+      if (phase === "laban" && reachable(story.laban, 3.4))
         prompt = "Examine Laban";
-      if (phase === "zoram" && zoram && near(p, zoram.state, 3.2))
+      if (phase === "zoram" && zoram && reachable(zoram.state, 3.2))
         prompt = "Speak with Zoram";
-      if (phase === "plates" && story.plates && near(p, story.plates, 2.8))
+      if (phase === "plates" && story.plates && reachable(story.plates, 2.8))
         prompt =
           !zoram || near(zoram.state, story.plates, 4)
             ? "Take the brass plates"
@@ -586,6 +712,18 @@ export function createStoryScene(
         id,
         phase,
         passedGate,
+        treasureHeld: id === "trade" && phase === "offer",
+        treasure: treasure.map((parcel) => ({
+          x: parcel.group.position.x,
+          y: parcel.group.position.y,
+          z: parcel.group.position.z,
+          yaw: parcel.group.rotation.y,
+        })),
+        guards: guards.map((guard) => ({
+          x: guard.state.x,
+          z: guard.state.z,
+          speed: guard.state.runSpeed,
+        })),
         checkpoint: copyPoint(checkpoint),
         plates: id === "night" && (phase === "escape" || phase === "done"),
         brothers: brothers.map((a) => ({ x: a.state.x, z: a.state.z })),
@@ -595,6 +733,7 @@ export function createStoryScene(
     dispose(): void {
       for (const actor of actors) actor.rig.dispose();
       plates.dispose();
+      treasure.forEach((parcel) => parcel.dispose());
     },
   };
 }

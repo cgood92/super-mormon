@@ -174,3 +174,152 @@ test("NPC route goes around a wall through an opening", () => {
     ),
   );
 });
+
+function hooksForTest() {
+  const dialogs: (() => void)[] = [];
+  const toasts: string[] = [];
+  let catches = 0;
+  return {
+    dialogs,
+    toasts,
+    get catches() {
+      return catches;
+    },
+    hooks: {
+      dialog: (_k: string, _t: string, _b: string, next: () => void) =>
+        dialogs.push(next),
+      toast: (text: string) => toasts.push(text),
+      complete: () => {},
+      checkpoint: () => {},
+      setMarker: () => {},
+      setDisguise: () => {},
+      caught: () => {
+        catches++;
+      },
+    },
+  };
+}
+
+test("four treasure parcels follow their carriers, then stay seized by Laban", () => {
+  const scene = new T.Scene(),
+    world = fixture(),
+    events = hooksForTest();
+  const mission = createStoryScene("trade", scene, world, events.hooks);
+  const player = createPlayer(0, 0, -20);
+  player.yaw = Math.PI / 2;
+  mission.update(0.1, player, { interact: true });
+  let state = mission.snapshot() as {
+    treasureHeld: boolean;
+    treasure: { x: number; y: number; z: number }[];
+  };
+  assert.equal(state.treasureHeld, true);
+  assert.equal(state.treasure.length, 4);
+  assert.ok(Math.abs(state.treasure[0].x - 0.78) < 0.001);
+  assert.ok(state.treasure.every((item) => item.y > 1));
+  events.dialogs.shift()!();
+  state = mission.snapshot() as typeof state;
+  assert.equal(state.treasureHeld, false);
+  const seized = state.treasure;
+  assert.ok(
+    seized.every((item) => Math.abs(item.z - world.story!.laban.z) < 2),
+  );
+  assert.ok(events.toasts.some((toast) => toast.includes("seized")));
+  player.x = 20;
+  mission.update(0.1, player, { interact: false });
+  assert.deepEqual((mission.snapshot() as typeof state).treasure, seized);
+  mission.respawn(player);
+  assert.equal((mission.snapshot() as typeof state).treasureHeld, false);
+  mission.dispose();
+  assert.equal(
+    scene.children.filter((item) => item.name.startsWith("family-treasure-"))
+      .length,
+    0,
+  );
+});
+
+test("night guards detect at short range, move slowly, and stop outside their leash", () => {
+  const world = fixture();
+  world.pursuers = [{ x: 0, y: 0, z: 0 }];
+  const events = hooksForTest();
+  const mission = createStoryScene("night", new T.Scene(), world, events.hooks);
+  const player = createPlayer(5, 0, 0);
+  for (let i = 0; i < 30; i++) mission.update(0.1, player, { interact: false });
+  type Guards = { guards: { x: number; z: number; speed: number }[] };
+  assert.equal((mission.snapshot() as Guards).guards[0].x, 0);
+  player.x = 3;
+  mission.update(0.1, player, { interact: false });
+  const pursuing = (mission.snapshot() as Guards).guards[0];
+  assert.ok(pursuing.speed > 0 && pursuing.speed <= 2.2 + 0.001);
+  player.x = 7;
+  mission.update(0.1, player, { interact: false });
+  assert.equal((mission.snapshot() as Guards).guards[0].speed, 0);
+  mission.dispose();
+  const tradeEvents = hooksForTest();
+  const trade = createStoryScene(
+    "trade",
+    new T.Scene(),
+    world,
+    tradeEvents.hooks,
+  );
+  player.x = 0;
+  player.z = -20;
+  trade.update(0.1, player, { interact: true });
+  tradeEvents.dialogs.shift()!();
+  player.x = 3;
+  player.z = 0;
+  trade.update(0.1, player, { interact: false });
+  assert.ok((trade.snapshot() as Guards).guards[0].speed > pursuing.speed);
+  trade.dispose();
+});
+
+test("courtyard walls block guard contact and Laban prompts and dialogue", () => {
+  const world = fixture();
+  world.pursuers = [{ x: 0, y: 0, z: 0 }];
+  world.solids = [{ x: 0.45, y: 0, z: 0, w: 0.2, h: 4, d: 6 }];
+  const events = hooksForTest();
+  const mission = createStoryScene("night", new T.Scene(), world, events.hooks);
+  const player = createPlayer(0.9, 0, 0);
+  for (let i = 0; i < 40; i++) mission.update(0.1, player, { interact: false });
+  assert.equal(events.catches, 0);
+  world.story!.laban.x = 0;
+  world.story!.laban.z = 0;
+  const result = mission.update(0.1, player, { interact: true });
+  assert.equal(result.prompt, "");
+  assert.equal(events.dialogs.length, 0);
+  mission.dispose();
+});
+
+test("brothers keep distinct procession positions before enough breadcrumbs exist", () => {
+  const world = fixture();
+  world.spawn.yaw = Math.PI;
+  const events = hooksForTest();
+  const mission = createStoryScene("trade", new T.Scene(), world, events.hooks);
+  const player = createPlayer(world.spawn.x, 0, world.spawn.z);
+  player.yaw = Math.PI;
+  for (let i = 0; i < 90; i++) mission.update(0.1, player, { interact: false });
+  const state = mission.snapshot() as {
+    brothers: { x: number; z: number }[];
+    treasure: { x: number; z: number }[];
+  };
+  for (let i = 0; i < state.brothers.length; i++) {
+    const brother = state.brothers[i];
+    assert.ok(Math.hypot(brother.x - player.x, brother.z - player.z) > 2);
+    for (let j = i + 1; j < state.brothers.length; j++)
+      assert.ok(
+        Math.hypot(
+          brother.x - state.brothers[j].x,
+          brother.z - state.brothers[j].z,
+        ) > 1.2,
+      );
+  }
+  assert.equal(state.treasure.length, 4);
+  for (let i = 0; i < state.treasure.length; i++)
+    for (let j = i + 1; j < state.treasure.length; j++)
+      assert.ok(
+        Math.hypot(
+          state.treasure[i].x - state.treasure[j].x,
+          state.treasure[i].z - state.treasure[j].z,
+        ) > 1,
+      );
+  mission.dispose();
+});
