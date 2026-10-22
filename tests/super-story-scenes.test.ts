@@ -323,3 +323,80 @@ test("brothers keep distinct procession positions before enough breadcrumbs exis
       );
   mission.dispose();
 });
+
+test("night Laban transfers his armor only after confirmation and remains covered after respawn", () => {
+  const scene = new T.Scene(),
+    world = fixture(),
+    events = hooksForTest();
+  const mission = createStoryScene("night", scene, world, events.hooks);
+  const before = scene.getObjectByName("laban-character")!;
+  assert.ok(before.getObjectByName("guard-cuirass"));
+  let disposed = 0;
+  before.traverse((object) => {
+    if (object instanceof T.Mesh)
+      object.geometry.addEventListener("dispose", () => disposed++);
+  });
+  const player = createPlayer(0, 0, -20);
+  mission.update(0.016, player, { interact: true });
+  assert.equal(scene.getObjectByName("laban-undressed-character"), undefined);
+  const position = before.position.clone(),
+    rotation = before.rotation.clone();
+  events.dialogs.shift()!();
+  const after = scene.getObjectByName("laban-undressed-character")!;
+  assert.ok(after.getObjectByName("modesty-linen"));
+  assert.ok(after.getObjectByName("bare-torso"));
+  assert.equal(after.getObjectByName("guard-cuirass"), undefined);
+  assert.equal(scene.getObjectByName("laban-character"), undefined);
+  assert.ok(disposed > 0);
+  assert.deepEqual(after.position, position);
+  assert.deepEqual(after.rotation.toArray(), rotation.toArray());
+  mission.respawn(player);
+  assert.equal(scene.getObjectByName("laban-undressed-character"), after);
+  let afterDisposed = 0;
+  after.traverse((object) => {
+    if (object instanceof T.Mesh)
+      object.geometry.addEventListener("dispose", () => afterDisposed++);
+  });
+  mission.dispose();
+  assert.ok(afterDisposed > 0);
+  assert.equal(scene.children.length, 0);
+});
+
+test("trade pursuit waits through idle refusal and retry until the player moves", () => {
+  const world = fixture();
+  world.pursuers = [{ x: 0, y: 0, z: -15 }];
+  const events = hooksForTest();
+  const mission = createStoryScene("trade", new T.Scene(), world, events.hooks);
+  const player = createPlayer(0, 0, -20);
+  mission.update(0.1, player, { interact: true });
+  events.dialogs.shift()!();
+  type Snapshot = {
+    pursuitArmed: boolean;
+    guards: { x: number; z: number; speed: number }[];
+  };
+  const state = () => mission.snapshot() as Snapshot;
+  for (let i = 0; i < 120; i++)
+    mission.update(0.1, player, { interact: false });
+  assert.equal(state().pursuitArmed, false);
+  assert.deepEqual(state().guards, [{ x: 0, z: -15, speed: 0 }]);
+  assert.equal(events.catches, 0);
+  player.x += 0.3;
+  mission.update(0.1, player, { interact: false });
+  assert.equal(state().pursuitArmed, true);
+  assert.ok(state().guards[0].speed > 0);
+  for (let i = 0; i < 60; i++) mission.update(0.1, player, { interact: false });
+  assert.equal(events.catches, 1);
+  mission.respawn(player);
+  const retryGuards = state().guards;
+  for (let i = 0; i < 120; i++)
+    mission.update(0.1, player, { interact: false });
+  assert.equal(state().pursuitArmed, false);
+  assert.deepEqual(state().guards, retryGuards);
+  assert.equal(events.catches, 1);
+  player.x += 0.3;
+  mission.update(0.1, player, { interact: false });
+  assert.equal(state().pursuitArmed, true);
+  assert.ok(state().guards[0].speed > 0);
+  assert.equal(events.catches, 1);
+  mission.dispose();
+});

@@ -178,3 +178,55 @@ test("forced crouch stays compact during airborne moves under a ceiling", () => 
     character.dispose();
   }
 });
+
+test("Laban's official garments match Nephi's disguise and leave a modest linen covering", () => {
+  const laban = createCharacter("laban"),
+    disguise = createCharacter("nephi-disguised"),
+    undressed = createCharacter("laban-undressed");
+  for (const name of ["guard-cuirass", "tunic"]) {
+    const material = (rig: typeof laban) =>
+      (
+        (rig.group.getObjectByName(name) as T.Mesh)
+          .material as T.MeshStandardMaterial
+      ).color.getHex();
+    assert.equal(material(laban), material(disguise));
+  }
+  assert.ok(laban.group.getObjectByName("beard"));
+  assert.equal(undressed.group.getObjectByName("guard-cuirass"), undefined);
+  assert.ok(undressed.group.getObjectByName("bare-torso"));
+  const linen = undressed.group.getObjectByName("modesty-linen") as T.Mesh;
+  assert.ok((linen.geometry as T.CylinderGeometry).parameters.height >= 0.65);
+  assert.equal(undressed.group.getObjectByName("cloak")!.visible, false);
+  laban.dispose();
+  disguise.dispose();
+  undressed.dispose();
+});
+
+test("Sariah has an adult face, ankle length robe and pale linen head covering", () => {
+  const sariah = createCharacter("sariah");
+  assert.equal(sariah.group.getObjectByName("beard"), undefined);
+  const robe = sariah.group.getObjectByName("long-robe") as T.Mesh;
+  assert.ok(robe);
+  assert.ok((robe.geometry as T.CylinderGeometry).parameters.height >= 0.9);
+  const veil = sariah.group.getObjectByName("linen-head-covering")!;
+  assert.ok(veil && veil.children.length >= 4);
+  const material = (veil.children[0] as T.Mesh)
+    .material as T.MeshStandardMaterial;
+  assert.equal(material.color.getHex(), 0xe8dfcb);
+  sariah.update(1 / 60, standing);
+  assert.ok(bounds(sariah).min.y >= -0.02);
+  assert.ok(bounds(sariah).max.y < 1.7);
+  sariah.dispose();
+  assert.equal(sariah.group.children.length, 0);
+});
+
+test("pointing figures use a forward gesture distinct from the family's wave", () => {
+  const actor = createCharacter("laman");
+  actor.update(1 / 60, { ...standing, move: "idle", pointing: true });
+  const arm = actor.group.getObjectByName("right-arm")!;
+  assert.ok(arm.rotation.x < -1.3);
+  assert.ok(Math.abs(arm.rotation.z) < 0.3);
+  actor.update(1 / 60, { ...standing, move: "idle", wave: true });
+  assert.ok(arm.rotation.z > 2.3);
+  actor.dispose();
+});

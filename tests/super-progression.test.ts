@@ -35,6 +35,9 @@ test("scenes unlock in story order and completed scenes stay replayable", () => 
   assert.equal(nextStory(completed), "night");
   assert.equal(prerequisite("night", completed), null);
   completed.add("night");
+  assert.equal(nextStory(completed), "tree");
+  assert.equal(canEnter("tree", completed), true);
+  completed.add("tree");
   assert.equal(nextStory(completed), null);
 });
 

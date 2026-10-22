@@ -1,7 +1,15 @@
 import * as T from "three";
 
 export type CharacterRole =
-  "nephi" | "nephi-disguised" | "sam" | "lehi" | "laman" | "guard";
+  | "nephi"
+  | "nephi-disguised"
+  | "sam"
+  | "lehi"
+  | "laman"
+  | "guard"
+  | "laban"
+  | "laban-undressed"
+  | "sariah";
 export type CharacterMove =
   | "idle"
   | "run"
@@ -32,6 +40,7 @@ export type CharacterState = {
   jumpStage?: number;
   carrying?: boolean;
   wave?: boolean;
+  pointing?: boolean;
 };
 
 const PALETTE: Record<
@@ -85,6 +94,30 @@ const PALETTE: Record<
     skin: 0xa97450,
     beard: true,
   },
+  sariah: {
+    tunic: 0xb5a78a,
+    mantle: 0x7e8b83,
+    trim: 0x897253,
+    hair: 0x4b392d,
+    skin: 0xb98560,
+    beard: false,
+  },
+  laban: {
+    tunic: 0x373039,
+    mantle: 0x514038,
+    trim: 0x392b25,
+    hair: 0x2e221e,
+    skin: 0xa97450,
+    beard: true,
+  },
+  "laban-undressed": {
+    tunic: 0xddd2b7,
+    mantle: 0xddd2b7,
+    trim: 0xddd2b7,
+    hair: 0x2e221e,
+    skin: 0xa97450,
+    beard: true,
+  },
   guard: {
     tunic: 0x373039,
     mantle: 0x514038,
@@ -106,7 +139,8 @@ export function createCharacter(role: CharacterRole): {
   dispose(): void;
 } {
   const colors = PALETTE[role];
-  const armored = role === "guard" || role === "nephi-disguised";
+  const armored =
+    role === "guard" || role === "nephi-disguised" || role === "laban";
   const youngFace =
     role === "nephi" || role === "nephi-disguised" || role === "sam";
   const group = new T.Group();
@@ -210,22 +244,51 @@ export function createCharacter(role: CharacterRole): {
     return object;
   };
 
+  const undressed = role === "laban-undressed";
   // Short walking tunic, open cloak, and visible shins keep the stride readable.
-  cylinder(body, 0.32, 0.43, 0.66, 8, tunic, 0, 1.1, 0);
-  cylinder(body, 0.39, 0.49, 0.48, 8, tunic, 0, 0.72, 0);
-  box(body, 0.78, 0.095, 0.12, trim, 0, 0.96, 0.08); // leather belt
-  box(body, 0.12, 0.13, 0.075, mat(0xc4a774, 0.65), 0, 0.96, 0.16); // buckle
-  const frontSash = box(
+  cylinder(
     body,
-    0.105,
-    0.51,
-    0.055,
-    guardRed ?? trim,
-    -0.17,
-    0.69,
-    0.31,
+    0.32,
+    0.43,
+    0.66,
+    8,
+    undressed ? skin : tunic,
+    0,
+    1.1,
+    0,
+    undressed ? "bare-torso" : "tunic",
   );
-  frontSash.rotation.z = -0.11;
+  cylinder(
+    body,
+    0.39,
+    0.49,
+    role === "sariah" ? 0.91 : undressed ? 0.65 : 0.48,
+    8,
+    tunic,
+    0,
+    role === "sariah" ? 0.51 : 0.72,
+    0,
+    role === "sariah"
+      ? "long-robe"
+      : undressed
+        ? "modesty-linen"
+        : "tunic-skirt",
+  );
+  if (!undressed) {
+    box(body, 0.78, 0.095, 0.12, trim, 0, 0.96, 0.08); // leather belt
+    box(body, 0.12, 0.13, 0.075, mat(0xc4a774, 0.65), 0, 0.96, 0.16); // buckle
+    const frontSash = box(
+      body,
+      0.105,
+      0.51,
+      0.055,
+      guardRed ?? trim,
+      -0.17,
+      0.69,
+      0.31,
+    );
+    frontSash.rotation.z = -0.11;
+  }
   if (armored) {
     // A broad leather cuirass and diagonal red sash read clearly at game scale.
     const chest = box(body, 0.67, 0.43, 0.12, guardLeather!, 0, 1.23, 0.295);
@@ -253,6 +316,7 @@ export function createCharacter(role: CharacterRole): {
   cloak.name = "cloak";
   cloak.position.set(0, 1.37, -0.11);
   body.add(cloak);
+  cloak.visible = !undressed;
   const back = box(cloak, 0.82, 1.01, 0.105, mantle, 0, -0.43, -0.35);
   back.rotation.x = -0.16;
   for (const side of [-1, 1]) {
@@ -268,7 +332,7 @@ export function createCharacter(role: CharacterRole): {
     );
     panel.rotation.z = side * 0.1;
   }
-  cylinder(body, 0.39, 0.41, 0.15, 8, mantle, 0, 1.39, 0); // draped collar
+  if (!undressed) cylinder(body, 0.39, 0.41, 0.15, 8, mantle, 0, 1.39, 0); // draped collar
   cylinder(body, 0.18, 0.17, 0.11, 8, skin, 0, 1.46, 0);
 
   const legs: T.Group[] = [];
@@ -291,7 +355,17 @@ export function createCharacter(role: CharacterRole): {
     arm.rotation.z = side * (armored ? 0.2 : -0.12);
     body.add(arm);
     arms.push(arm);
-    cylinder(arm, 0.155, 0.12, 0.37, 7, tunic, side * 0.025, -0.17, 0);
+    cylinder(
+      arm,
+      0.155,
+      0.12,
+      0.37,
+      7,
+      undressed ? skin : tunic,
+      side * 0.025,
+      -0.17,
+      0,
+    );
     cylinder(arm, 0.098, 0.078, 0.31, 7, skin, side * 0.035, -0.48, 0.015);
     sphere(arm, 0.09, skin, side * 0.04, -0.65, 0.028, 0.95, 1.15, 0.85);
   }
@@ -299,7 +373,17 @@ export function createCharacter(role: CharacterRole): {
   const head = new T.Group();
   head.position.set(0, 1.64, 0.025);
   body.add(head);
-  sphere(head, 0.255, skin, 0, 0, 0, 0.88, 1.1, 0.86);
+  sphere(
+    head,
+    0.255,
+    skin,
+    0,
+    0,
+    0,
+    role === "sariah" ? 0.83 : 0.88,
+    1.1,
+    role === "sariah" ? 0.82 : 0.86,
+  );
   for (const side of [-1, 1]) {
     sphere(head, 0.055, skin, side * 0.225, 0.005, -0.005, 0.55, 1, 0.6);
     sphere(
@@ -328,7 +412,11 @@ export function createCharacter(role: CharacterRole): {
   }
   mesh(
     head,
-    new T.ConeGeometry(youngFace ? 0.052 : 0.067, 0.14, 5),
+    new T.ConeGeometry(
+      role === "sariah" ? 0.055 : youngFace ? 0.052 : 0.067,
+      0.14,
+      5,
+    ),
     skin,
     0,
     -0.055,
@@ -377,6 +465,26 @@ export function createCharacter(role: CharacterRole): {
       cheek.rotation.z = side * -0.14;
     }
     box(head, 0.07, 0.13, 0.065, guardBronze!, 0, 0.075, 0.248);
+  } else if (role === "sariah") {
+    const linen = mat(0xe8dfcb);
+    const veil = new T.Group();
+    veil.name = "linen-head-covering";
+    head.add(veil);
+    box(veil, 0.52, 0.085, 0.4, linen, 0, 0.235, -0.025);
+    box(veil, 0.52, 0.6, 0.065, linen, 0, -0.035, -0.225);
+    for (const side of [-1, 1]) {
+      const fold = box(
+        veil,
+        0.085,
+        0.56,
+        0.29,
+        linen,
+        side * 0.25,
+        -0.015,
+        -0.045,
+      );
+      fold.rotation.z = side * -0.08;
+    }
   } else if (role === "lehi") {
     box(head, 0.47, 0.085, 0.26, mantle, 0, 0.225, 0.03);
   }
@@ -527,6 +635,12 @@ export function createCharacter(role: CharacterRole): {
       if (state.wave && move === "idle" && !state.carrying) {
         arms[1].rotation.z = 2.55 + Math.sin(phase * 3.1) * 0.13;
         arms[1].rotation.x = -0.25 + Math.sin(phase * 5.4) * 0.15;
+      }
+      if (state.pointing && move === "idle") {
+        arms[1].rotation.x = -1.45 + Math.sin(phase * 2) * 0.08;
+        arms[1].rotation.z = 0.12;
+        body.rotation.x = 0.1;
+        head.rotation.x = 0.12;
       }
     },
     dispose() {

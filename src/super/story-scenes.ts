@@ -311,18 +311,18 @@ export function createStoryScene(
   let dialogueOpen = false;
   let passedGate = false;
   let guardGrace = 2.5;
+  let pursuitArmed = false;
+  let pursuitStart = { x: world.spawn.x, z: world.spawn.z };
   let catchPending = false;
   let checkpoint = copyPoint(world.spawn);
   let trail: { x: number; z: number }[] = [];
   const actors: Actor[] = [];
-  const laban = makeActor(
-    scene,
-    id === "trade" ? "guard" : "laman",
-    story.laban,
-  );
+  const laban = makeActor(scene, "laban", story.laban);
   if (id === "night") {
-    laban.state.y = 0.27;
+    laban.state.y = story.laban.y + 0.27;
     laban.rig.group.rotation.x = -Math.PI / 2;
+    laban.rig.group.rotation.z = 0.3;
+    laban.rig.update(0, laban.state);
   }
   actors.push(laban);
   const brothers =
@@ -479,10 +479,12 @@ export function createStoryScene(
                 parcel.group.rotation.y = (i - 1.5) * 0.24;
               });
               guardGrace = 2.3;
+              pursuitArmed = false;
+              pursuitStart = { ...p };
               checkpoint = {
                 x: story.laban.x,
                 y: 0,
-                z: story.laban.z + 5,
+                z: story.laban.z + 8,
                 yaw: 0,
               };
               hooks.checkpoint(checkpoint);
@@ -513,6 +515,12 @@ export function createStoryScene(
             () => {
               advance("zoram");
               hooks.setDisguise(true);
+              const previousRig = laban.rig;
+              laban.rig = createCharacter("laban-undressed");
+              laban.rig.group.rotation.copy(previousRig.group.rotation);
+              laban.rig.update(0, laban.state);
+              scene.add(laban.rig.group);
+              previousRig.dispose();
               checkpoint = {
                 x: story.laban.x,
                 y: 0,
@@ -597,8 +605,13 @@ export function createStoryScene(
           .slice(1)
           .forEach((parcel, i) => parcel.carry(brothers[i].state));
       }
-      guardGrace = Math.max(0, guardGrace - dt);
-      const pursuit = id === "trade" && (phase === "flee" || phase === "cave");
+      const tradePursuit =
+        id === "trade" && (phase === "flee" || phase === "cave");
+      if (tradePursuit && !pursuitArmed && distance(p, pursuitStart) > 0.12)
+        pursuitArmed = true;
+      if (!tradePursuit || pursuitArmed)
+        guardGrace = Math.max(0, guardGrace - dt);
+      const pursuit = tradePursuit && pursuitArmed;
       for (let i = 0; i < guards.length; i++) {
         const guard = guards[i];
         const active =
@@ -683,6 +696,8 @@ export function createStoryScene(
       player.yaw = checkpoint.yaw ?? player.yaw;
       player.vx = player.vy = player.vz = 0;
       guardGrace = 3.5;
+      pursuitArmed = false;
+      pursuitStart = { x: player.x, z: player.z };
       catchPending = false;
       for (let i = 0; i < guards.length; i++) {
         guards[i].state.x = guardPoints[i].x;
@@ -712,6 +727,7 @@ export function createStoryScene(
         id,
         phase,
         passedGate,
+        pursuitArmed,
         treasureHeld: id === "trade" && phase === "offer",
         treasure: treasure.map((parcel) => ({
           x: parcel.group.position.x,

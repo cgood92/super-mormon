@@ -80,9 +80,10 @@ export async function enter(id) {
   document.querySelector("#home").click();
   await new Promise((r) => setTimeout(r, 750));
   const p = snapshot().portals.find((p) => p.id === id);
-  const side = id === "trade" || id === "night";
+  const side = p.facing === "east";
   if (side) {
     await go(14, 17, 0.3);
+    await go(14, p.z, 0.3);
     await go(p.x - 1.8, p.z, 0.25);
   } else await go(p.x, p.z + 1.8, 0.25);
   const yaw = snapshot().cameraYaw;
@@ -135,29 +136,41 @@ export async function houseReturn() {
   return snapshot();
 }
 export async function streets() {
-  await go(0, -8, 0.15);
-  await go(-20, -8, 0.2);
-  await go(-21.5, -15, 0.4);
+  for (const [x, z] of [
+    [-12, 25],
+    [-19.5, 25],
+    [-19.5, -15],
+    [-21, -15],
+  ])
+    await go(x, z, 0.5, 16000);
   return snapshot();
 }
 export async function palaceApproach() {
-  await go(-8, 22, 0.3);
-  await go(-8, -7, 0.3);
-  await go(0, -17, 0.6);
+  for (const [x, z] of [
+    [12, 25],
+    [12, 6],
+    [6, 6],
+    [6, -6],
+    [0, -6],
+    [0, -15],
+    [0, -18],
+  ])
+    await go(x, z, 0.5, 16000);
   await press();
   return snapshot();
 }
 export async function palaceEscape() {
   document.querySelector("#modal-buttons button")?.click();
-  for (const z of [0.5, 10.4, 21.5]) {
-    await go(0, z, 0.2);
-    pad.axes[1] = -1;
-    pad.buttons[0].pressed = true;
-    await new Promise((r) => setTimeout(r, 700));
-    pad.buttons[0].pressed = false;
-    stop();
-    await new Promise((r) => setTimeout(r, 150));
-  }
-  await go(0, 38, 0.6, 20000);
+  for (const [x, z] of [
+    [0, -14],
+    [0, -6],
+    [6, -6],
+    [6, 6],
+    [12, 6],
+    [12, 25],
+    [0, 25],
+    [0, 43],
+  ])
+    await go(x, z, 0.6, 18000);
   return snapshot();
 }

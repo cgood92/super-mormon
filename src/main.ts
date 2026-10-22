@@ -5,6 +5,8 @@ import { createControllerSetup } from "./super/controller-setup";
 import { resolveControllerProfile } from "./super/gamepad";
 import { MenuNavigation } from "./super/menu";
 import { createStoryScene } from "./super/story-scenes";
+import { createTreeOfLifeScene } from "./super/tree-of-life";
+import { canJumpIntoPainting } from "./super/gallery-entry";
 import {
   renderControlText,
   renderControlLegend,
@@ -45,7 +47,7 @@ import {
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `<div id="viewport" data-look></div><div class="vignette"></div>
-<header class="hud"><button class="gallery-home" id="home" aria-label="Return to the gallery" title="Return to gallery">⌂</button><div class="world-title"><span id="chapter-label">THE CONFERENCE CENTER</span><h1 id="world-name">The Gallery</h1></div><div class="hud-actions"><span id="seal-count" title="Stories completed">Stories 0 / 5</span><button id="pause" aria-label="Pause game">Ⅱ</button></div></header>
+<header class="hud"><button class="gallery-home" id="home" aria-label="Return to the gallery" title="Return to gallery">⌂</button><div class="world-title"><span id="chapter-label">THE CONFERENCE CENTER</span><h1 id="world-name">The Gallery</h1></div><div class="hud-actions"><span id="seal-count" title="Stories completed">Stories 0 / 6</span><button id="pause" aria-label="Pause game">Ⅱ</button></div></header>
 <div class="objective"><span class="objective-dot"></span><span id="objective">Find a painting. Take a running jump.</span></div>
 <div id="collect-count" class="collect-count" hidden></div><div id="prompt" class="prompt" aria-live="polite"></div><div id="toast" class="toast" role="status"></div>
 <div class="touch-controls"><div class="stick" data-stick aria-label="Movement thumbstick"><i></i><span>MOVE</span></div><div class="touch-actions"><button class="crouch" data-crouch aria-pressed="false" aria-label="Toggle crouch or crawl">Z<small>CROUCH</small></button><button class="action" data-action aria-label="Talk, search, pick up or throw">B<small>ACTION</small></button><button class="jump" data-jump aria-label="Jump">A<small>JUMP</small></button></div><button class="camera-button" data-recenter aria-label="Center camera">↻</button></div>
@@ -99,6 +101,7 @@ const menuNavigation = new MenuNavigation();
 let pauseMenuOpen = false,
   splashTime = 0;
 let storyScene: ReturnType<typeof createStoryScene> | null = null;
+let treeScene: ReturnType<typeof createTreeOfLifeScene> | null = null;
 let storyCheckpoint: { x: number; y: number; z: number; yaw?: number } | null =
   null;
 let storyObjective = "";
@@ -163,7 +166,7 @@ function saveProgress() {
   }
 }
 function sound(kind: "jump" | "collect" | "caught" | "portal" | "win") {
-  if (!soundOn) return;
+  if (!soundOn || worldId === "tree") return;
   try {
     audio ??= new AudioContext();
     void audio.resume();
@@ -419,15 +422,14 @@ function decorateGalleryProgress() {
     const plaque = label(
       badge,
       "LOCKED",
-      portal.id === "trade" || portal.id === "night" ? 18.05 : portal.x + 0.75,
+      portal.facing === "east" ? 18.05 : portal.x + 0.75,
       4.55,
-      portal.id === "trade" || portal.id === "night" ? portal.z : -20.63,
+      portal.facing === "east" ? portal.z : -20.63,
       1.55,
       0.5,
     );
     plaque.renderOrder = 2;
-    if (portal.id === "trade" || portal.id === "night")
-      plaque.rotation.y = -Math.PI / 2;
+    if (portal.facing === "east") plaque.rotation.y = -Math.PI / 2;
     scene.add(badge);
   }
 }
@@ -529,6 +531,8 @@ function updatePracticeLesson() {
     `Tokens ${bonusCollected.size} / ${world.tokens?.length ?? 0} · ${learnedMoves.size} moves tried`;
 }
 function disposeScene() {
+  treeScene?.dispose();
+  treeScene = null;
   storyScene?.dispose();
   storyScene = null;
   wavingExtras = [];
@@ -537,6 +541,7 @@ function disposeScene() {
   for (const g of guards) g.actor.dispose();
   extras = [];
   guards = [];
+  world.dispose?.();
   scene.traverse((o) => {
     if (o instanceof T.Mesh) {
       o.geometry.dispose();
@@ -570,11 +575,15 @@ function load(id: WorldId) {
   player = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
   player.yaw = world.spawn.yaw ?? Math.PI;
   avatar = createCharacter(
-    id === "streets" ? "lehi" : id === "palace" ? "laman" : "nephi",
+    id === "streets" || id === "tree"
+      ? "lehi"
+      : id === "palace"
+        ? "laman"
+        : "nephi",
   );
   scene.add(avatar.group);
   avatar.update(0, player);
-  follow.reset(player, player.yaw, id);
+  follow.reset(player, player.yaw, id === "tree" ? "streets" : id);
   levelTime = 0;
   guardsActive = id === "streets";
   caughtGrace = 3;
@@ -614,7 +623,7 @@ function load(id: WorldId) {
     scene.add(g);
     treasureMeshes.set(t.id, g);
   }
-  if (id !== "hub")
+  if (id !== "hub" && id !== "tree")
     goalMarker = marker(world.goal.x, world.goal.y, world.goal.z);
   const spawnGuards =
     id === "trade" || id === "night"
@@ -636,7 +645,8 @@ function load(id: WorldId) {
   }
   if (id === "palace") {
     const laban = createCharacter("guard");
-    laban.group.position.set(0, 0.8, -21.1);
+    const audience = world.story!.laban;
+    laban.group.position.set(audience.x, audience.y, audience.z);
     laban.group.scale.setScalar(1);
     scene.add(laban.group);
     extras.push(laban);
@@ -660,9 +670,11 @@ function load(id: WorldId) {
       ? "SALT LAKE CITY · THE CONFERENCE CENTER"
       : id === "streets"
         ? "1 NEPHI 1–2 · ABOUT 600 BC"
-        : id === "night"
-          ? "1 NEPHI 4 · ABOUT 600 BC"
-          : "1 NEPHI 3 · ABOUT 600 BC";
+        : id === "tree"
+          ? "1 NEPHI 8 · LEHI’S VISION"
+          : id === "night"
+            ? "1 NEPHI 4 · ABOUT 600 BC"
+            : "1 NEPHI 3 · ABOUT 600 BC";
   el("seal-count").textContent =
     `Stories ${completed.size} / ${STORY_ORDER.length}`;
   if (id === "trade" || id === "night") {
@@ -691,6 +703,19 @@ function load(id: WorldId) {
       caught: beginCaughtTransition,
     });
   }
+  if (id === "tree") {
+    storyObjective = "Find the iron rod beside the narrow path.";
+    treeScene = createTreeOfLifeScene(scene, world, {
+      dialog: (kicker, title, body, onContinue) =>
+        modal(kicker, title, body, [{ label: "Continue", run: onContinue }]),
+      toast: (text) => message(text, 4),
+      complete,
+      checkpoint: (point) => {
+        storyCheckpoint = { ...point };
+      },
+      setMarker: () => {},
+    });
+  }
   updateCollectionHud();
   updateObjective();
   if (started)
@@ -707,7 +732,9 @@ function load(id: WorldId) {
               ? "Your brothers will follow. Bring the treasures to Laban."
               : id === "night"
                 ? "Enter the city and search its moonlit streets."
-                : "Find the blue door. Watch the streets.",
+                : id === "tree"
+                  ? "Take your time. Follow the path toward the tree."
+                  : "Find the blue door. Watch the streets.",
       4,
     );
 }
@@ -750,6 +777,22 @@ function complete() {
   sound("win");
   const name = worldId;
   const next = nextStory(completed);
+  if (name === "tree") {
+    modal(
+      "LEHI’S VISION · 1 NEPHI 8",
+      "Come and share the joy.",
+      "Sariah, Nephi, and Sam have come to the tree. Stay and explore the garden, the fountain, and the overlook at your own pace.",
+      [
+        { label: "Stay in the garden", run: () => {} },
+        {
+          label: "Return to the gallery",
+          run: () => warp("hub"),
+          secondary: true,
+        },
+      ],
+    );
+    return;
+  }
   modal(
     "A MEMORY FOR THE JOURNEY",
     name === "house"
@@ -841,7 +884,8 @@ function resetCaughtCheckpoint() {
   }
   storyScene?.respawn(player);
   avatar.update(0, player);
-  follow.reset(player, player.yaw, worldId);
+  treeScene?.respawn(player);
+  follow.reset(player, player.yaw, worldId === "tree" ? "streets" : worldId);
   for (const object of carryObjects) if (object.held) resetCarryObject(object);
   caughtGrace = 3.4;
 }
@@ -1003,6 +1047,19 @@ function update(dt: number) {
     player.x = T.MathUtils.clamp(player.x, b.minX + 0.35, b.maxX - 0.35);
     player.z = T.MathUtils.clamp(player.z, b.minZ + 0.35, b.maxZ - 0.35);
   }
+  let treePrompt = "";
+  if (treeScene) {
+    const result = treeScene.update(dt, player, {
+      interact: state.interact,
+      crouch: state.crouch,
+    });
+    treePrompt = result.prompt;
+    if (storyObjective !== result.objective) {
+      storyObjective = result.objective;
+      updateObjective();
+    }
+    if (paused || transition) return;
+  }
   stepCarryObjects(carryObjects, player, dt, world.solids);
   const held = carryObjects.find((object) => object.held);
   if (held && state.interact) {
@@ -1030,7 +1087,7 @@ function update(dt: number) {
       recenter: state.recenter,
       zoom: state.cameraZoom,
     },
-    worldId,
+    worldId === "tree" ? "streets" : worldId,
   );
   app.classList.toggle("camera-obstructed", follow.obstructed);
   for (const entry of wavingExtras)
@@ -1042,7 +1099,7 @@ function update(dt: number) {
     new T.Vector3(player.x, player.y + 1.05, player.z),
   );
   avatar.group.visible = distCam > 0.7;
-  let prompt = "";
+  let prompt = treePrompt;
   for (const object of carryObjects) {
     const mesh = carryMeshes.get(object.id)!;
     mesh.position.set(object.x, object.y, object.z);
@@ -1105,11 +1162,7 @@ function update(dt: number) {
         : completed.has(p.id)
           ? `${p.title} · {jump} to replay`
           : `${p.title} · {jump} into the painting`;
-      if (
-        (player.y > p.y + 0.45 &&
-          Math.hypot(player.x - p.x, player.z - p.z) < 1.2) ||
-        state.interact
-      ) {
+      if (canJumpIntoPainting(player, p)) {
         if (canEnter(p.id, completed)) warp(p.id);
         else message(`Finish ${STORY_TITLES[prior!]} to unlock ${p.title}.`, 3);
         return;
@@ -1145,7 +1198,11 @@ function update(dt: number) {
     }
   }
   if (worldId === "palace") {
-    if (!guardsActive && near(world.goal, 3.7, 2)) {
+    if (
+      !guardsActive &&
+      near(world.goal, 3.7, 2) &&
+      hasLineOfSight(player, world.story!.laban, world.solids)
+    ) {
       prompt = "Laban · {action} to speak";
       if (state.interact) {
         modal(
@@ -1160,8 +1217,10 @@ function update(dt: number) {
                 caughtGrace = 3.8;
                 for (const g of guards) {
                   g.actor.group.visible = true;
-                  g.state.x = player.x + (g === guards[0] ? -3 : 3);
-                  g.state.z = player.z - 7;
+                  const p = world.pursuers![guards.indexOf(g)];
+                  g.state.x = p.x;
+                  g.state.y = p.y;
+                  g.state.z = p.z;
                 }
                 if (goalMarker) {
                   goalMarker.position.set(
@@ -1180,7 +1239,11 @@ function update(dt: number) {
         return;
       }
     }
-    if (guardsActive && near(world.escapeGoal ?? world.goal, 3.1)) {
+    if (
+      guardsActive &&
+      near(world.escapeGoal ?? world.goal, 3.1) &&
+      player.z > world.story!.gate.z + 1
+    ) {
       complete();
       return;
     }
@@ -1340,6 +1403,7 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has("playtest"))
         cameraYaw: follow.yaw,
         cameraObstructed: follow.obstructed,
         story: storyScene?.snapshot(),
+        vision: treeScene?.snapshot(),
         tutorials: world.tutorials,
         practiceBounds: world.practiceBounds,
         learnedMoves: [...learnedMoves],

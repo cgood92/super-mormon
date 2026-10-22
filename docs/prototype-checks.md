@@ -1,54 +1,57 @@
 # Super Mormon prototype checks
 
-This prototype replaces the earlier mini-game catalog. Source modules are `src/super/physics.ts`, `input.ts`, `character.ts`, `camera.ts`, `interactions.ts`, `art.ts`, `worlds.ts`, and the application in `src/main.ts`.
+## Current implementation
 
-## Verified
+- Six physical gallery canvases unlock in story order: Jerusalem Streets → Laban’s Palace → Lehi’s House → The Treasure Offer → Jerusalem by Night → The Tree of Life. Each canvas blocks walking; entry requires airborne contact with its front. Locked scenes retain their prompts and remain inaccessible.
+- Streets, Palace, Treasure Offer, and Night use the exact same Jerusalem geometry from `src/super/jerusalem.ts`. All four contain Lehi’s house exterior, the palace audience hall, corridor exits, city gate, and an interior treasury. Lighting, actors, and story objectives vary. The explorable house interior remains a separate scene.
+- In the night story, Nephi receives Laban’s actual outer garments. The visible Laban rig changes to modest linen underclothing as Nephi takes on the matching outfit. His death remains a brief text recap rather than an interactive act.
+- Treasure Offer servants wait until the player moves after the refusal or a checkpoint return before pursuit arms. Treasure seizure persists after a catch.
+- The Tree of Life is a peaceful interactive adaptation as Lehi. E / B toggles holding the rod; normal walking supplies forward motion, with bounded lateral assistance. Follow the winding path through localized mist, partake of the white fruit, and beckon to Sariah, Nephi, and Sam. The family welcome completes the mission and leaves the garden open for free exploration. Laman and Lemuel remain apart and do not partake.
+- The tree has spreading branches, luminous foliage, and individual white fruit. The spacious building is elevated across a separated gulf, with silent pointing figures. A safe overlook and clear living fountain offer optional reflection. There are no coins, combat, or timers in this scene. Entering the gulf gently returns the player to a saved safe point without resetting progress.
+- The existing `src/super/camera.ts` is unchanged; Tree of Life selects its existing streets preset. World disposal releases the mist texture, meshes, materials, and lights and restores prior background/fog; runtime disposal removes and releases character rigs.
 
-- 105 automated tests: analog camera-relative movement, acceleration and stopping, variable-height jumping, coyote time and jump buffering, short stairs, walls, raised platforms, ceiling clearance, touch and controller edges, lost pointer capture, key repeat, native modal button activation, character animation and height, camera obstruction and lateral movement without spiraling, world routes, chronological unlocking, advanced jumps, crouch collision and visual bounds, ledge/pole traversal, carry-object physics, N64 profile validation, capture/release behavior, controller glyphs, menu navigation, and story mission phases.
-- Gallery launch points and real browser running-jump entry through paintings into all three scenes.
-- House controller playthrough: four lower treasures, upper gallery and fifth treasure, entrance completion, saved progress, and return to gallery. Uses the real `Input` polling and frame loop; no teleporting or direct changes to runtime state.
-- Lehi street controller playthrough to his door, including guard pursuit and completion.
-- Laman controller playthrough: approach around the benches, dialogue remains visible, escape by jumping all three low obstacles, reach brothers beyond the gate, completion.
-- Browser checks caught and fixed reversed camera-relative strafing, excessive continuous orbit speed, camera spiraling, a blocked roof landing, tall-chest line of sight, and focused-button Space behavior.
-- Mobile touch viewport 667×375: full-viewport gameplay, no page scrolling, visible movement/jump/action/recenter controls and objectives. No browser console errors or warnings in the final layout check.
-- Production TypeScript/Vite build and Prettier checks pass.
-- October 21 feedback: new scene paintings load successfully; locked painting prompt blocks entry on a fresh save; real controller street completion unlocks palace, house remains locked, palace completion unlocks house and browser enters it. Completed legacy saves retain replay access.
-- Caught sequence observed in the browser through all three phases (caught, wipe, safe spot), followed by restored controls and checkpoint state. Uses one soft transition rather than repeated flashing; reduced-motion styles remove animated transitions.
+## Latest browser verification
 
-## Advanced moves, October 21
+The following checks were performed against the revised implementation using normal browser input:
 
-- Browser keyboard/controller input confirms crouch/crawl through the gallery arch, forced crouch after release under its ceiling, long jump, backflip, side somersault, consecutive jump/double/triple chain, wall kick, practice-block ledge traversal, pole climbing and jump detach. No runtime teleport or state setters used.
-- Optional gallery discovery tokens collected through crawling, pole climbing, jumping and ledge traversal. Carrying, throwing with an airborne trajectory, picking up again, crouch-setting-down and completing the delivery ring were played through.
-- Fresh house controller regression: four lower treasures, stairs, fifth upper treasure, return and completion all work with the advanced movement engine.
-- Streets and palace controller regressions also complete: Lehi reaches his blue door; Laman speaks with Laban, jumps the three benches, and reaches his brothers.
-- Mobile 667×375 landscape: no page overflow; crouch toggles through the actual button, button state is visible, and the moves guide fits without internal scrolling. No browser warnings or errors in this check. Physical phone comfort remains a playtest question.
-- Review fixes include visible ledge hang before automatic pull-up, forced-crouch crawl speed and animation, climb ceiling collision, NPC traversal opt-out, swept ledge pull clearance, and a minimum long-jump boost for touch crouch toggle.
+- Stand against a gallery painting: it physically stops movement and does not enter. Jump while touching its front: the unlocked scene opens.
+- Lehi reaches his home through the revised shared city.
+- Laman approaches the palace audience, speaks with Laban, and escapes through the palace/city route.
+- Tree of Life: complete the full iron-rod route through the mists, partake of the fruit, invite the family, and continue exploring after completion. Reach the fountain and open its reflection dialogue.
 
-## Playtest driver
+The revised Treasure Offer completed through the shared palace’s western corridor, city gate and deep cave with all three brothers. A fresh refusal followed by 11 seconds idle left guards at their spawns with pursuit unarmed; moving then began the escape normally. The checkpoint-idle regression also covers the retry case.
 
-`tests/super-playthrough.js` supplies legal virtual controller input and observes a read-only runtime snapshot. Use a preview URL with `?playtest` to enable the snapshot, then import the driver from the Vite development server. The world/physics tests also exercise the actual level solids directly.
+The revised nighttime scene completed through normal input: Laban outside the palace, the garment transfer, Zoram in the separate treasury, brass plates, and the return through the same corridors and city gate with Zoram following. These checks used isolated test saves with earlier stories completed; no runtime teleporting was used. The Tree of Life opening was also checked at 667×375 with no page overflow or clipped buttons.
 
-Physical phone and controller testing is still useful for judging comfort and game feel. The splash automatically enters the gallery; browser-native full screen and orientation locking require a user gesture and device support. Full screen remains available in Pause. The hub is an imagined Conference Center gallery; ancient routes, buildings, treasure placements and guard encounters are artistic gameplay adaptations. No Nintendo assets or level layouts are used.
+## Automated checks
 
-## N64 controller mapping
+Run `npm test`, `npm run build`, and `npm run format:check` for the current result. Tests cover:
 
-The connected physical device reports `usb gamepad (Vendor: 0810 Product: e501)` with two axes, ten buttons, and an empty browser mapping. The user's saved calibration was read from the local and deployed game origins: A=5, B=4, Z=8, Start=9, R=7, C-left=3, C-right=1, C-up=0, C-down=2. That measured profile is now the built-in default for the matching ID and button/axis counts. Browser-saved calibration takes priority; other raw adapters retain setup because the chipset ID alone does not establish button labels.
+- Camera-relative movement, acceleration/stopping, variable jumps, coyote time, buffering, stairs, walls, raised platforms, and ceiling clearance.
+- Long jumps, backflips, side somersaults, jump chains, wall kicks, crouch/crawl clearance, ledge traversal, pole climbing, and carried-object physics.
+- Controller and touch input edges, lost pointer capture, key repeat, modal activation, N64 calibration and glyphs, and menu navigation.
+- Character proportions, animation, modest garment transfer, chronological unlocking, physical painting collision and airborne contact entry, shared Jerusalem geometry, city/palace/treasury routes, and story phases.
+- Tree of Life spacing and separated waters; holding the rod without autonomous movement; bounded correction; checkpoint rescue preserving progression; actual player physics walking the full rod route; fruit and family completion; and continued walking to the fountain and overlook.
 
-Earlier browser testing used a virtual raw controller with deliberately scrambled button indices. The complete nine-button setup was played through with fresh presses/releases and saved with the mapped A button. Gameplay then verified A jump, B with no camera change, Z crouch, Start pause, C-left 45-degree orbit, C-up closer camera with no jump, and C-down with no crouch. The dialog fits 667×375 without scrolling.
+All 113 automated tests pass, including the three dedicated Tree of Life tests. The production build, formatting checks, and diff whitespace check pass.
 
-## Latest feedback and new missions
+## Scriptural treatment
 
-- Mobile startup: after the splash, a two-button dialog offers Enter Full Screen (recommended) or Continue. Browser checks at 667×375 and 390×844 show no page overflow; a real button click enters native fullscreen and requests landscape, while Continue resumes play. Desktop 1728×997 enters the gallery directly.
-- Automatic splash enters the gallery without a start button. Chapter heading fades after ten seconds, and the objective moves upward and grows. Stories, Treasures and Tokens have text labels.
-- A virtual raw pad matching the measured adapter, with no saved calibration, selects N64 glyphs and jumps using button 5. Keyboard glyphs disappear on connection and return on disconnect. Blue A, green B and yellow C shapes are rendered; joystick down selects Moves & practice and A opens it.
-- The left studio is reachable through its open doorway. Nearby lessons explain the actual buttons for crawl, ledge, pole, jump chains, wall kicks, carrying, long jump, backflip and side somersault. Mobile 667×375 gameplay, lesson and Pause layouts fit without page scrolling.
-- Real browser controller-input playthrough of The Treasure Offer: approach Laban with three following brothers, refusal dialogue, servant pursuit, crossing the city gate, gathering in the cave, completion and unlocking Jerusalem by Night. The revised neighborhood requires turns through side streets while servants pursue from Laban’s court.
-- Real browser controller-input playthrough of Jerusalem by Night: enter the gate, find Laban, brief scripture recap and disguise, speak to Zoram, wait for him at the records, collect and carry the brass plates, return through the gate with Zoram, rejoin the brothers and complete the scene. The isolated test save began with the three legacy scenes completed; trade and night were completed through movement and actions without runtime teleporting.
-- Review and regression checks cover gate crossing before completion, companion arrival before gathering, NPC routes around walls, airborne clearance of guards, younger clean-shaven Nephi, waving brothers, eased C-camera steps, and camera collision during orbit/zoom easing.
+This is an artistic adaptation, not a literal claim that Lehi himself followed the rod. The rod mechanic adapts the experience of people in his vision for exploration.
 
-## Denser Jerusalem and carried treasure
+- [1 Nephi 8](https://www.churchofjesuschrist.org/study/scriptures/bofm/1-ne/8?lang=eng): white fruit, joy, family invitation, rod, mist, and mocking figures in an elevated building. Sariah, Nephi, and Sam partake; Laman and Lemuel do not.
+- [1 Nephi 11:21–25](https://www.churchofjesuschrist.org/study/scriptures/bofm/1-ne/11?lang=eng): the tree and living waters represent God’s love. The scene places its clear fountain near the tree.
+- [1 Nephi 12:18](https://www.churchofjesuschrist.org/study/scriptures/bofm/1-ne/12?lang=eng): the great gulf separates the building from the tree.
+- [1 Nephi 15:23–28](https://www.churchofjesuschrist.org/study/scriptures/bofm/1-ne/15?lang=eng): the rod represents God’s word; the river water represents filthiness. The scene distinguishes the dark river/gulf from the clear living fountain.
 
-- Browser controller-input playthrough confirms four separate carried treasure parcels on approach, transfer to Laban’s court on refusal, empty hands during pursuit, the winding eastern escape, and all three brothers following into the deeper rock cave. The western route is also verified through the actual player physics.
-- Both story scenes share a denser Jerusalem neighborhood with plaster dwellings, flat roofs, palms and an indigo doorway. The cave uses irregular faceted rock sides and roof around a walkable chamber, with a darker interior floor.
-- The nighttime browser playthrough searches the western alleys for Laban, crosses the neighborhood to Zoram and the treasury, then returns through the winding streets and gate with the plates and Zoram. Both missions completed without runtime teleporting. No browser errors or warnings were observed.
-- Regression coverage includes distinct idle follower positions, treasure seizure persisting after a catch, slower short-range night guards with a short leash, wall-aware prompts/interactions/detection/contact, clear actor spawns, two walkable daytime escape routes, cave clearance and the complete nighttime ground route.
+The earlier Jerusalem stories distinguish Laman’s threatened first visit in 1 Nephi 3:11–14 from the servants’ pursuit after the treasure offer in 3:22–27. Guard placements, architecture, routes, furniture, and specific treasure hiding places are invented. The night sequence follows 1 Nephi 4 through the recap, garments, records, Zoram, and return.
+
+## Previous device and movement checks
+
+Earlier checks verified advanced movement and the Movement Studio through real input: crawl under the arch, forced crouch beneath a ceiling, long jump, backflip, side somersault, jump chains, wall kick, ledge traversal, pole detach, carrying, throwing, setting down, and optional delivery. These checks predate the current story geometry changes.
+
+Mobile checks at 667×375 and 390×844 found no page overflow. The splash offers Enter Full Screen or Continue on mobile; native full screen and orientation locking depend on browser support and a user gesture. Physical phone comfort remains a playtest question.
+
+The measured N64 adapter is `0810:e501`, with two axes and ten buttons. Its built-in mapping is A=5, B=4, Z=8, Start=9, R=7, C-left=3, C-right=1, C-up=0, C-down=2. Browser-saved calibration takes priority. Earlier virtual-controller checks verified setup with scrambled indices, menu navigation, jump/action/crouch/pause, camera steps, and zoom.
+
+`tests/super-playthrough.js` supplies legal virtual-controller input and reads a runtime snapshot. Open a preview with `?playtest` and import the driver from the development server. Physical phone and controller playtests remain useful for comfort and game feel.

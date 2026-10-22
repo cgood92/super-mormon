@@ -89,72 +89,10 @@ test("house route reaches the upper gallery and every treasure has a clear appro
   }
 });
 
-test("Jerusalem alley leads from spawn to Lehi’s door", () => {
-  const { data } = world("streets");
-  const player = createPlayer(data.spawn.x, data.spawn.y, data.spawn.z);
-  for (const [x, z] of [
-    [0, -7],
-    [-20, -7],
-    [-21.5, -15],
-  ] as const)
-    go(player, x, z, data.solids);
-  assert.ok(Math.hypot(player.x - data.goal.x, player.z - data.goal.z) < 1);
-});
-
-test("Jerusalem roof stairs provide a climbable optional route", () => {
-  const { data } = world("streets");
-  const player = createPlayer(data.spawn.x, data.spawn.y, data.spawn.z);
-  go(player, 8, 23, data.solids);
-  go(player, 8, 9, data.solids);
-  assert.ok(player.y >= 4.1, `roof landing feet are ${player.y}`);
-});
-
-test("palace allows approach to Laban and escape beyond the city gate", () => {
-  const { data } = world("palace");
-  const player = createPlayer(data.spawn.x, data.spawn.y, data.spawn.z);
-  // The benches offer broad routes around either side during both legs.
-  for (const [x, z] of [
-    [9, 18],
-    [9, -6],
-    [0, -18],
-  ] as const)
-    go(player, x, z, data.solids, 1.3);
-  assert.ok(player.y >= 0.39, `dais was not climbed: ${player.y}`);
-  for (const [x, z] of [
-    [-9, -6],
-    [-9, 27],
-    [0, 39],
-  ] as const)
-    go(player, x, z, data.solids);
-  assert.ok(player.z > 28, "brothers should be beyond the gate");
-});
-
-test("palace cedar bench can be jumped during escape", () => {
-  const { data } = world("palace");
-  const player = createPlayer(-2, 0, -4);
-  go(player, -2, -0.6, data.solids, 0.2);
-  let rose = false;
-  for (let frame = 0; frame < 85; frame++) {
-    stepPlayer(
-      player,
-      { x: 0, y: 1, jump: frame === 0, jumpHeld: frame < 25 },
-      1 / 60,
-      0,
-      data.solids,
-    );
-    if (player.y > 0.85) rose = true;
-  }
-  assert.ok(rose, "jump rises above the cedar bench");
-  assert.ok(
-    player.z > 4.1,
-    `bench stopped the jump at z=${player.z.toFixed(2)}`,
-  );
-});
-
 test("gallery paintings have reachable jump launch points close to their planes", () => {
   const { data } = world("hub");
   for (const portal of data.portals ?? []) {
-    const side = portal.id === "trade" || portal.id === "night";
+    const side = portal.facing === "east";
     assert.ok(
       standingClear(
         side ? portal.x - 0.7 : portal.x,
@@ -205,124 +143,152 @@ test("gallery movement studio has an open left entry and solid practice surfaces
       data.solids.some(
         (solid) =>
           solid.h < 0.3 &&
-          Math.abs(solid.x - portal.x) < (portal.x > 15 ? 1 : 0.1) &&
-          Math.abs(solid.z - portal.z) < 2.5,
+          Math.abs(
+            solid.x - (portal.facing === "east" ? portal.x - 0.6 : portal.x),
+          ) <
+            solid.w / 2 &&
+          Math.abs(
+            solid.z - (portal.facing === "east" ? portal.z : portal.z + 0.6),
+          ) <
+            solid.d / 2,
       ),
       `${portal.id} painting has a solid platform`,
     );
 });
 
-test("treasure offer has two walkable winding escapes and a deep standing cave", () => {
-  const { data } = world("trade");
-  assert.ok(data.story?.cave);
-  const approach = [
-    [12, 25],
-    [12, 4],
-    [7, 4],
-    [7, -11],
-    [0, -11],
-    [0, -20],
-  ];
-  const escapes = [
-    [
-      [0, -11],
-      [7, -11],
-      [7, 4],
-      [12, 4],
-      [12, 24],
-      [0, 24],
-    ],
-    [
-      [0, -11],
-      [-19.5, -11],
-      [-19.5, 4],
-      [-12, 4],
-      [-12, 24],
-      [0, 24],
-    ],
-  ];
-  for (const escape of escapes) {
-    const player = createPlayer(data.spawn.x, 0, data.spawn.z);
-    for (const [x, z] of [
-      ...approach,
-      ...escape,
-      [0, 40],
-      [-8, 52],
-      [-8, 62],
-      [-8, 72],
-    ]) {
-      go(player, x, z, data.solids, 0.35);
-      assert.ok(
-        player.y < 0.05,
-        "companions can follow without climbing or jumping",
-      );
-    }
-    assert.ok(
-      Math.hypot(player.x - data.story.cave.x, player.z - data.story.cave.z) <
-        0.5,
-    );
-  }
-  // A straight sprint down the former empty avenue now reaches a house.
-  const sprint = createPlayer(0, 0, -11);
-  for (let frame = 0; frame < 240; frame++)
-    stepPlayer(
-      sprint,
-      { x: 0, y: 1, jump: false, jumpHeld: false },
-      1 / 60,
-      0,
-      data.solids,
-    );
-  assert.ok(sprint.z < 8, "escaping requires choosing a side street");
-  for (const z of [59, 64, 69, 72, 75]) {
-    assert.ok(
-      standingClear(-8, 0, z, data.solids),
-      `standing clearance at cave z=${z}`,
-    );
-    assert.ok(
-      standingClear(-8, 3, z, data.solids),
-      `camera clearance at cave z=${z}`,
-    );
+test("all four Jerusalem visits preserve exact city and palace collision geometry", () => {
+  const base = world("streets").data;
+  for (const id of ["palace", "trade", "night"] as const) {
+    const data = world(id).data;
+    assert.deepEqual(data.solids, base.solids);
+    assert.deepEqual(data.bounds, base.bounds);
   }
 });
 
-test("night alleys reach Laban, treasury, plates and brothers without jumps", () => {
-  const { data } = world("night");
-  assert.ok(data.story?.treasury && data.story.plates);
+test("shared streets reach Lehi's indigo door and optional roof stairs", () => {
+  const { data } = world("streets");
   const player = createPlayer(data.spawn.x, 0, data.spawn.z);
   for (const [x, z] of [
-    [0, 28],
-    [-12, 24],
-    [-12, 4],
-    [-19.5, 4],
-    [-19.5, -14],
-    [-19.5, -11],
-    [7, -11],
-    [14, -17],
-    [14, -22],
-    [7, -20],
-    [7, 4],
-    [12, 4],
-    [12, 24],
+    [-12, 25],
+    [-19.5, 25],
+    [-19.5, -15],
+    [-21, -15],
+  ])
+    go(player, x, z, data.solids, 0.3);
+  assert.ok(Math.hypot(player.x - data.goal.x, player.z - data.goal.z) < 1);
+  const climber = createPlayer(12, 0, 25);
+  for (const [x, z] of [
+    [19, 25],
+    [19, 10],
+  ])
+    go(climber, x, z, data.solids, 0.3);
+  assert.ok(climber.y >= 4.1);
+});
+
+test("audience hall has an accessible dais and two ground-level exits into the city", () => {
+  for (const id of ["palace", "trade"] as const)
+    for (const west of [false, true]) {
+      const { data } = world(id);
+      const p = createPlayer(data.spawn.x, 0, data.spawn.z);
+      for (const [x, z] of [
+        [12, 25],
+        [12, 6],
+        [6, 6],
+        [6, -6],
+        [0, -6],
+        [0, -15],
+        [0, -18],
+      ])
+        go(p, x, z, data.solids, 0.3);
+      assert.ok(p.y >= 0.79);
+      const route = west
+        ? [
+            [-6, -14],
+            [-15, -14],
+            [-15, -6],
+            [-19.5, -6],
+            [-19.5, 25],
+            [0, 25],
+          ]
+        : [
+            [0, -14],
+            [0, -6],
+            [6, -6],
+            [6, 6],
+            [12, 6],
+            [12, 25],
+            [0, 25],
+          ];
+      for (const [x, z] of [
+        ...route,
+        [0, 40],
+        [0, 46],
+        [-8, 54],
+        [-8, 62],
+        [-8, 72],
+      ])
+        go(p, x, z, data.solids, 0.3);
+      assert.ok(p.y < 0.05);
+    }
+});
+
+test("night Laban is in the city; Zoram and plates occupy the separate palace treasury", () => {
+  const { data } = world("night");
+  assert.ok(data.story?.treasury && data.story.plates);
+  const p = createPlayer(data.spawn.x, 0, data.spawn.z);
+  for (const [x, z] of [
+    [0, 40],
+    [0, 25],
+    [-19.5, 25],
+    [-19.5, -6],
+    [-15, -6],
+    [-15, -14],
+    [-6, -14],
+    [6, -14],
+    [10, -14],
+    [14, -14],
+    [14, -21],
+    [14, -24],
+    [14, -21],
+    [14, -14],
+    [6, -14],
+    [0, -14],
+    [0, -6],
+    [6, -6],
+    [6, 6],
+    [12, 6],
+    [12, 25],
     [0, 25],
     [0, 43],
   ]) {
-    go(player, x, z, data.solids, 0.35);
-    assert.ok(player.y < 0.05, "Zoram's entire exit stays at ground level");
+    go(p, x, z, data.solids, 0.3);
+    assert.ok(p.y < 0.05, "Zoram can follow the entire route on foot");
   }
-  assert.ok(Math.hypot(player.x, player.z - 43) < 0.5);
+  assert.ok(data.story.laban.z > -9);
+  for (const point of [data.story.treasury, data.story.plates])
+    assert.ok(point.x > 8 && point.z < -18);
 });
 
-test("story participants and guards stand clear of the Jerusalem buildings", () => {
-  for (const id of ["trade", "night"] as const) {
+test("Jerusalem actors and deep cave have full standing clearance within bounds", () => {
+  for (const id of ["streets", "palace", "trade", "night"] as const) {
     const { data } = world(id);
-    for (const point of [
+    for (const p of [
       data.spawn,
       ...Object.values(data.story ?? {}),
       ...(data.pursuers ?? []),
-    ])
+    ]) {
       assert.ok(
-        standingClear(point.x, point.y, point.z, data.solids),
-        `${id} actor at ${point.x}, ${point.z} overlaps scenery`,
+        standingClear(p.x, p.y, p.z, data.solids),
+        `${id} actor at ${p.x},${p.z} overlaps scenery`,
       );
+      assert.ok(
+        p.x > data.bounds!.minX &&
+          p.x < data.bounds!.maxX &&
+          p.z > data.bounds!.minZ &&
+          p.z < data.bounds!.maxZ,
+      );
+    }
+    for (const z of [59, 64, 69, 72, 75])
+      for (const y of [0, 3]) assert.ok(standingClear(-8, y, z, data.solids));
   }
 });
