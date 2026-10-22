@@ -4,8 +4,8 @@ import { Input } from "./super/input";
 import { createControllerSetup } from "./super/controller-setup";
 import { resolveControllerProfile } from "./super/gamepad";
 import { MenuNavigation } from "./super/menu";
-import { createStoryScene } from "./super/story-scenes";
-import { createTreeOfLifeScene } from "./super/tree-of-life";
+import type { createStoryScene } from "./super/story-scenes";
+import type { createTreeOfLifeScene } from "./super/tree-of-life";
 import { canJumpIntoPainting } from "./super/gallery-entry";
 import {
   renderControlText,
@@ -32,7 +32,9 @@ import {
 } from "./super/physics";
 import { createCharacter } from "./super/character";
 import { FollowCamera } from "./super/camera";
-import { buildWorld, type WorldData, type WorldId } from "./super/worlds";
+import type { WorldData, WorldId } from "./super/worlds";
+import { prepareWorld } from "./super/world-loading";
+import { createPerformanceDiagnostics } from "./super/performance";
 import { label } from "./super/art";
 import {
   canEnter,
@@ -56,7 +58,8 @@ app.innerHTML = `<div id="viewport" data-look></div><div class="vignette"></div>
 <div class="orientation-hint">↻ Best played with your phone sideways</div><div id="curtain"></div>
 <div id="caught-overlay" class="caught-overlay" aria-live="assertive" aria-atomic="true" hidden><div class="caught-wipe"></div><div class="caught-card"><span class="caught-symbol" aria-hidden="true">↺</span><strong id="caught-heading">Caught!</strong><span id="caught-detail">Let’s try again.</span></div></div>
 <section id="title-screen" class="screen splash-screen" aria-label="Super Mormon"><div class="splash-logo">SUPER<br><em>MORMON</em><small>STEP INTO THE STORY</small></div></section>
-<section id="modal" class="screen modal-screen" hidden><div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title"><span class="eyebrow" id="modal-kicker"></span><h2 id="modal-title"></h2><p id="modal-body"></p><div id="modal-hint" class="modal-hint"></div><div id="modal-buttons"></div></div></section>`;
+<section id="modal" class="screen modal-screen" hidden><div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title"><span class="eyebrow" id="modal-kicker"></span><h2 id="modal-title"></h2><p id="modal-body"></p><div id="modal-hint" class="modal-hint"></div><div id="modal-buttons"></div></div></section>
+<section id="load-error" class="screen modal-screen" hidden><div class="modal-card" role="alertdialog" aria-modal="true" aria-labelledby="load-error-title"><h2 id="load-error-title">The gallery could not load.</h2><p>Check your connection, then try again.</p><div><button class="primary" id="load-retry">Try again</button></div></div></section>`;
 const el = <E extends HTMLElement>(id: string) =>
   document.getElementById(id) as E;
 const renderer = new T.WebGLRenderer({
@@ -73,6 +76,11 @@ el("viewport").append(renderer.domElement);
 const camera = new T.PerspectiveCamera(58, 1, 0.08, 150),
   follow = new FollowCamera(camera),
   input = new Input(document);
+const diagnostics = createPerformanceDiagnostics(renderer, {
+  enabled:
+    import.meta.env.DEV &&
+    new URLSearchParams(location.search).has("performance"),
+});
 let scene = new T.Scene(),
   world: WorldData,
   worldId: WorldId = "hub",
@@ -554,10 +562,35 @@ function disposeScene() {
   });
   scene.clear();
 }
-function load(id: WorldId) {
+let loadGeneration = 0;
+async function load(id: WorldId) {
   if (isStoryId(id) && !canEnter(id, completed)) {
     id = "hub";
   }
+  const generation = ++loadGeneration;
+  transition = true;
+  input.reset();
+  el("load-error").hidden = true;
+  el("curtain").classList.add("closed");
+  let prepared: Awaited<ReturnType<typeof prepareWorld>>;
+  try {
+    prepared = await prepareWorld(id);
+  } catch (error) {
+    if (generation !== loadGeneration) return;
+    transition = !world;
+    el("curtain").classList.remove("closed");
+    el("load-error").hidden = !!world;
+    if (!world) {
+      el("load-retry").onclick = () => void load(id);
+      el("load-retry").focus();
+    } else {
+      message("This scene could not load. Please try again.", 6);
+    }
+    console.error(error);
+    return;
+  }
+  if (generation !== loadGeneration) return;
+  const { buildWorld, createStoryScene, createTreeOfLifeScene } = prepared;
   clearCaughtTransition();
   paused = false;
   el("modal").hidden = true;
@@ -682,7 +715,7 @@ function load(id: WorldId) {
       id === "trade"
         ? "Bring the family’s treasures to Laban."
         : "Search Jerusalem for Laban.";
-    storyScene = createStoryScene(id, scene, world, {
+    storyScene = createStoryScene!(id, scene, world, {
       dialog: (kicker, title, body, onContinue) =>
         modal(kicker, title, body, [{ label: "Continue", run: onContinue }]),
       toast: (text) => message(text, 3),
@@ -705,7 +738,7 @@ function load(id: WorldId) {
   }
   if (id === "tree") {
     storyObjective = "Find the iron rod beside the narrow path.";
-    treeScene = createTreeOfLifeScene(scene, world, {
+    treeScene = createTreeOfLifeScene!(scene, world, {
       dialog: (kicker, title, body, onContinue) =>
         modal(kicker, title, body, [{ label: "Continue", run: onContinue }]),
       toast: (text) => message(text, 4),
@@ -716,6 +749,9 @@ function load(id: WorldId) {
       setMarker: () => {},
     });
   }
+  diagnostics.recordScene(id);
+  transition = false;
+  el("curtain").classList.remove("closed");
   updateCollectionHud();
   updateObjective();
   if (started)
@@ -830,9 +866,7 @@ function warp(id: WorldId) {
   sound("portal");
   el("curtain").classList.add("closed");
   setTimeout(() => {
-    load(id);
-    el("curtain").classList.remove("closed");
-    transition = false;
+    void load(id);
   }, 330);
 }
 function clearCaughtTransition() {
@@ -1051,6 +1085,7 @@ function update(dt: number) {
   if (treeScene) {
     const result = treeScene.update(dt, player, {
       interact: state.interact,
+      holdRod: state.interactHeld,
       crouch: state.crouch,
     });
     treePrompt = result.prompt;
@@ -1334,7 +1369,7 @@ resize();
 refreshControlHints();
 load("hub");
 function startGame() {
-  if (started) return;
+  if (started || !world) return;
   started = true;
   el("title-screen").hidden = true;
   input.reset();
@@ -1382,7 +1417,7 @@ function frame(now: number) {
   const dt = Math.min((now - previous) / 1000, 0.04);
   previous = now;
   update(dt);
-  if (!started)
+  if (!started && world)
     follow.update(
       dt,
       player,
@@ -1391,13 +1426,16 @@ function frame(now: number) {
       "hub",
     );
   renderer.render(scene, camera);
+  diagnostics.sampleFrame(now);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 if (import.meta.env.DEV || new URLSearchParams(location.search).has("playtest"))
   Object.assign(window, {
     superMormon: {
+      performance: () => diagnostics.snapshot(),
       snapshot: () => ({
+        performance: diagnostics.snapshot(),
         world: worldId,
         player: { ...player },
         cameraYaw: follow.yaw,

@@ -49,7 +49,10 @@ function makeWorld(
     name = "",
   ) => box(group, x, ybase, z, w, h, d, color, name);
   const finish = () => {
+    let disposed = false;
     const dispose = () => {
+      if (disposed) return;
+      disposed = true;
       group.traverse((object) => {
         if (!(object instanceof THREE.Mesh)) return;
         object.geometry.dispose();
@@ -66,7 +69,12 @@ function makeWorld(
         }
       });
       scene.remove(group);
-      for (const light of lighting) scene.remove(light);
+      for (const light of lighting) {
+        light.traverse((object) => {
+          if (object instanceof THREE.Light) object.dispose();
+        });
+        scene.remove(light);
+      }
       scene.background = priorBackground;
       scene.fog = priorFog;
     };

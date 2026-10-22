@@ -108,6 +108,7 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
   group.name = "Lehi’s vision — Tree of Life";
   scene.add(group);
   const solids: WorldData["solids"] = [];
+  const climbables: NonNullable<WorldData["climbables"]> = [];
   const solid = (
     x: number,
     y: number,
@@ -134,7 +135,7 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
     p(-20, -44),
   ];
   const tree = p(-20, -52),
-    fruit = p(-20, -45),
+    fruit = p(-20, -52),
     fountain = p(-49, -60),
     overlook = p(21, -28),
     building = p(67, -27, 15),
@@ -142,7 +143,7 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
   // The entire western bank is gently walkable; obstacles never wall off exploration.
   box(group, -36, -0.65, 0, 130, 0.65, 210, 0x778366, "wide field");
   box(group, 67, -0.65, 0, 38, 0.65, 210, 0x7e8176, "far shore");
-  box(group, 37, -6, 0, 23, 0.45, 210, 0x354b50, "dark river in the gulf");
+  box(group, 37, -0.25, 0, 23, 0.2, 210, 0x354b50, "dark river in the gulf");
   for (const x of [26, 48])
     for (let z = -100; z < 105; z += 9)
       oval(group, x, -4, z, 3, 5.7, 6, 0x6d6e61, "gulf cliff face");
@@ -231,7 +232,7 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
     (leaves.material as T.MeshStandardMaterial).emissiveIntensity = 0.16;
     for (let j = 0; j < 4; j++) {
       const fruitMesh = new T.Mesh(
-        new T.IcosahedronGeometry(0.24, 2),
+        new T.IcosahedronGeometry(0.4, 2),
         new T.MeshStandardMaterial({
           color: 0xffffff,
           emissive: 0xf3f5da,
@@ -311,8 +312,7 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
   spring.position.set(fountain.x, 1.05, fountain.z);
   group.add(spring);
   // Elevated architecture is separated by a broad gulf, never a challenge to enter.
-  box(
-    group,
+  solid(
     building.x,
     15,
     building.z,
@@ -324,19 +324,17 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
   );
   for (let floor = 0; floor < 3; floor++) {
     const y = 16.2 + floor * 5.2;
-    box(
-      group,
-      building.x,
+    solid(
+      building.x + 2.5,
       y,
       building.z + 11.7,
-      30,
+      25,
       1,
       1.2,
       0xbba89e,
       "balcony parapet",
     );
-    box(
-      group,
+    solid(
       building.x,
       y + 4.6,
       building.z,
@@ -347,11 +345,10 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
       "broad suspended storey",
     );
     for (const x of [54, 61, 68, 75, 81]) {
-      box(group, x, y, building.z, 1.2, 4.7, 1.2, 0xc5b99f, "building column");
-      box(group, x, y, building.z + 11, 1, 4.7, 1, 0xc5b99f, "balcony column");
+      solid(x, y, building.z, 1.2, 4.7, 1.2, 0xc5b99f, "building column");
+      solid(x, y, building.z + 11, 1, 4.7, 1, 0xc5b99f, "balcony column");
     }
-    box(
-      group,
+    solid(
       building.x,
       y,
       building.z - 10.5,
@@ -362,6 +359,54 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
       "distant facade",
     );
   }
+  // This crossing and stair are exploratory interpretation, not details in the vision.
+  solid(
+    37,
+    -0.3,
+    5,
+    26,
+    0.3,
+    5,
+    0x9c9988,
+    "ravine crossing — artistic interpretation",
+  );
+  for (let i = 0; i < 42; i++) {
+    solid(
+      53,
+      0,
+      20 - i * 0.7,
+      5,
+      (i + 1) * (16.2 / 42),
+      0.75,
+      0xa49b89,
+      "returnable eastern stair",
+    );
+  }
+  solid(53, 16.1, -13.5, 5, 0.1, 8, 0xb9a49c, "building entry landing");
+  climbables.push({
+    id: "living-tree",
+    x: tree.x,
+    z: tree.z,
+    y: 0,
+    height: 11,
+    radius: 1.1,
+  });
+  climbables.push({
+    id: "eastern-return-vine",
+    x: 50.5,
+    z: -26,
+    y: 0,
+    height: 17,
+    radius: 0.4,
+  });
+  limb(
+    group,
+    new T.Vector3(50.5, 0, -26),
+    new T.Vector3(50.5, 17, -26),
+    0.13,
+    0.13,
+    0x727c57,
+  ).name = "climbable return vine";
   // A low stone edge makes the overlook legible without creating a wall along the route.
   for (const z of [-35, -31, -27, -23, -19])
     solid(24, 0, z, 0.65, 1.05, 3.7, 0xa4a38b, "safe overlook edge");
@@ -465,18 +510,18 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
       const i = (y * size + x) * 4,
         r = Math.hypot((x - 15.5) / 15.5, (y - 15.5) / 15.5);
       bytes[i] = bytes[i + 1] = bytes[i + 2] = 113;
-      bytes[i + 3] = Math.round(Math.max(0, 1 - r) ** 2 * 120);
+      bytes[i + 3] = Math.round(Math.max(0, 1 - r) ** 1.2 * 220);
     }
   const tex = new T.DataTexture(bytes, size, size);
   tex.needsUpdate = true;
-  for (let i = 0; i < 26; i++) {
+  for (let i = 0; i < 62; i++) {
     const sprite = new T.Sprite(
       new T.SpriteMaterial({
         map: tex,
         color: 0x738184,
         transparent: true,
         depthWrite: false,
-        opacity: 0.72,
+        opacity: 0.9,
       }),
     );
     sprite.position.set(
@@ -484,7 +529,7 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
       2 + (i % 4) * 1.7,
       5 + ((i * 11.3) % 41),
     );
-    sprite.scale.set(20, 11, 1);
+    sprite.scale.set(24, 14, 1);
     mist.add(sprite);
   }
   const reflections = [
@@ -525,6 +570,7 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
     subtitle: "Lehi’s vision · Hold fast and share the joy",
     spawn: { ...p(-42, 87), yaw: Math.PI },
     solids,
+    climbables,
     goal: { ...fruit, radius: 4 },
     bounds: { minX: -95, maxX: 89, minZ: -100, maxZ: 101 },
     treeData: {
@@ -546,6 +592,7 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
       for (const child of added) {
         scene.remove(child);
         child.traverse((o) => {
+          if (o instanceof T.Light) o.dispose();
           if (o instanceof T.Mesh || o instanceof T.Sprite) {
             if (o instanceof T.Mesh) o.geometry.dispose();
             for (const m of Array.isArray(o.material)
@@ -569,8 +616,7 @@ export function createTreeOfLifeScene(
 ) {
   const data = (world as TreeWorldData).treeData;
   if (!data) throw new Error("Tree of Life metadata is required");
-  let phase: "opening" | "rod" | "journey" | "fruit" | "invite" | "done" =
-      "opening",
+  let phase: "opening" | "rod" | "journey" | "fruit" | "done" = "opening",
     holdingRod = false,
     dialogOpen = false,
     disposed = false,
@@ -584,13 +630,85 @@ export function createTreeOfLifeScene(
     state: CharacterState;
     mock: boolean;
     home: Point;
+    behavior?: "press" | "lost" | "eat";
   }[] = [];
+  // Crowd silhouettes share four draw calls; only named family use detailed rigs.
+  const crowdParts = [
+    new T.InstancedMesh(
+      new T.CylinderGeometry(0.22, 0.34, 1.15, 6),
+      material(0xa49377),
+      108,
+    ),
+    new T.InstancedMesh(
+      new T.IcosahedronGeometry(0.22, 1),
+      material(0xb99978),
+      108,
+    ),
+    new T.InstancedMesh(
+      new T.BoxGeometry(0.14, 0.65, 0.14),
+      material(0xa49377),
+      108,
+    ),
+  ];
+  crowdParts.push(
+    new T.InstancedMesh(
+      new T.IcosahedronGeometry(0.15, 1),
+      new T.MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: 0xe7ebbc,
+        emissiveIntensity: 0.5,
+      }),
+      108,
+    ),
+  );
+  for (const part of crowdParts) {
+    part.frustumCulled = false;
+    scene.add(part);
+  }
+  let crowdIndex = 0;
+  const transform = new T.Object3D();
   const makeActor = (
     role: Parameters<typeof createCharacter>[0],
     point: Point,
     mock = false,
+    crowd = false,
   ) => {
-    const rig = createCharacter(role);
+    const index = crowdIndex;
+    if (mock || crowd) crowdIndex++;
+    const rig =
+      mock || crowd
+        ? ({
+            group: new T.Group(),
+            update(_dt: number, state: CharacterState) {
+              for (let part = 0; part < crowdParts.length; part++) {
+                transform.position.set(
+                  state.x,
+                  state.y + [0.7, 1.5, 1.1, 1.15][part],
+                  state.z,
+                );
+                transform.rotation.set(
+                  0,
+                  state.yaw,
+                  part === 2 ? (state.pointing ? -1.45 : 0.2) : 0,
+                );
+                if (part === 2) {
+                  transform.position.x += state.pointing ? -0.45 : 0.28;
+                }
+                transform.scale.setScalar(
+                  part === 3 && !state.carrying ? 0 : 1,
+                );
+                if (part === 3) {
+                  transform.position.x += 0.3;
+                  transform.position.z += 0.3;
+                }
+                transform.updateMatrix();
+                crowdParts[part].setMatrixAt(index, transform.matrix);
+                crowdParts[part].instanceMatrix.needsUpdate = true;
+              }
+            },
+            dispose() {},
+          } as ReturnType<typeof createCharacter>)
+        : createCharacter(role);
     scene.add(rig.group);
     const state: CharacterState = {
       ...point,
@@ -604,6 +722,7 @@ export function createTreeOfLifeScene(
     actors.push({ rig, state, mock, home: { ...point } });
     return rig;
   };
+  makeActor("lehi", p(-25, -47)).group.name = "Lehi — dreamer and father";
   const sariah = makeActor("sariah", p(-9, -37));
   sariah.group.name = "Sariah";
   makeActor("nephi", p(-7, -34)).group.name = "Nephi";
@@ -611,12 +730,43 @@ export function createTreeOfLifeScene(
   // Laman and Lemuel remain apart; this scene never depicts them taking the fruit.
   makeActor("laman", p(8, 65)).group.name = "Laman";
   makeActor("laman", p(12, 68)).group.name = "Lemuel";
-  for (let i = 0; i < 9; i++)
+  for (let i = 0; i < 36; i++)
     makeActor(
       i % 2 ? "guard" : "laman",
-      p(54 + (i % 3) * 8, -15, 17.2 + Math.floor(i / 3) * 5.2),
+      p(
+        55 + (i % 6) * 4.5,
+        -18 + (Math.floor(i / 6) % 2) * 3,
+        16.2 + Math.floor(i / 12) * 5.2,
+      ),
       true,
     ).group.name = "people pointing from the spacious building";
+  for (let i = 0; i < 72; i++) {
+    const mode = i % 4 === 0 ? "lost" : i % 4 === 1 ? "eat" : "press";
+    const route = data.path[i % data.path.length];
+    const point =
+      mode === "eat"
+        ? p(data.tree.x + 3 + (i % 5), data.tree.z + (i % 7) - 3)
+        : mode === "lost"
+          ? p(-75 + (i % 13), 12 + (i % 40))
+          : p(route.x - 2 - (i % 3), route.z + (i % 5));
+    makeActor(i % 2 ? "sam" : "sariah", point, false, true).group.name =
+      `vision crowd — ${mode}`;
+    actors[actors.length - 1].behavior = mode;
+    if (mode === "eat") actors[actors.length - 1].state.z += 12;
+  }
+  const familyWords: Record<string, string> = {
+    "Lehi — dreamer and father":
+      "Lehi desired his family to share the joy of the fruit. His concern continued for those who would not come. — 1 Nephi 8:12–18, 35–37",
+    Sariah:
+      "Sariah came with Nephi and Sam and partook of the fruit. Imagine the joy of finding loved ones at the tree. — 1 Nephi 8:14–16",
+    Nephi:
+      "Nephi came and partook. Later he sought to understand the vision and learned of the love of God. — 1 Nephi 8:16; 11:21–23",
+    Sam: "Sam came with Sariah and Nephi to share the fruit. Quiet faith can lead toward the same joy. — 1 Nephi 8:16",
+    Laman:
+      "Lehi saw that Laman would not come to partake. The vision records his choice; this short reflection does not invent his words. — 1 Nephi 8:17–18",
+    Lemuel:
+      "Lemuel also would not come. Lehi still cared deeply for his sons and exhorted them with a tender parent's concern. — 1 Nephi 8:18, 35–37",
+  };
   const say = (title: string, body: string, next: () => void) => {
     dialogOpen = true;
     hooks.dialog("LEHI’S VISION · 1 NEPHI 8", title, body, () => {
@@ -648,7 +798,7 @@ export function createTreeOfLifeScene(
     update(
       dt: number,
       player: PlayerState,
-      input: { interact: boolean; crouch?: boolean },
+      input: { interact: boolean; holdRod?: boolean; crouch?: boolean },
     ) {
       dt = Number.isFinite(dt) ? Math.max(0, Math.min(0.1, dt)) : 0;
       time += dt;
@@ -665,39 +815,55 @@ export function createTreeOfLifeScene(
         );
       const route = nearestRoute(player, data.path);
       if (
-        (player.x >= data.river.minX - 0.45 || player.y < -3) &&
+        player.x > data.river.minX &&
+        player.x < data.river.maxX &&
+        Math.abs(player.z - 5) > 2.3 &&
         !rescueCooldown
       ) {
+        restore(player);
+        holdingRod = false;
+        rescueCooldown = 0.5;
+        hooks.toast(
+          "The river is deep. Follow the visible crossing to reach the far bank.",
+        );
+      }
+      if (player.y < -8 && !rescueCooldown) {
         restore(player);
         rescueCooldown = 2;
         hooks.toast("Return gently to firm ground. Your journey continues.");
       }
-      if (
-        holdingRod &&
-        route.distance < 4 &&
-        Math.hypot(player.vx, player.vz) > 0.2 &&
-        player.grounded
-      ) {
-        // Only lateral assistance; normal physics/input supplies all forward movement.
-        const amount = Math.min(route.distance, dt * 2.5);
-        if (route.distance > 0.02) {
-          player.x += ((route.x - player.x) / route.distance) * amount;
-          player.z += ((route.z - player.z) / route.distance) * amount;
-        }
-        if (route.progress > progress) {
-          progress = route.progress;
-          if (progress > 0.15 && distance(player, checkpoint) > 12)
-            save(p(route.x, route.z));
-        }
+      if (input.holdRod !== undefined) {
+        holdingRod =
+          input.holdRod && (holdingRod || route.distance < 3) && !dialogOpen;
+        if (holdingRod && (phase === "rod" || phase === "journey"))
+          phase = "journey";
+      }
+      if (holdingRod) {
+        player.x = route.x;
+        player.z = route.z;
+        // Remove velocity perpendicular to the rod; walking along it remains player controlled.
+        const next = nearestRoute(
+          {
+            x: route.x + player.vx * 0.02,
+            y: 0,
+            z: route.z + player.vz * 0.02,
+          },
+          data.path,
+        );
+        player.vx = (next.x - route.x) / 0.02;
+        player.vz = (next.z - route.z) / 0.02;
+        if (phase === "journey") hooks.setMarker(data.fruit);
+        progress = Math.max(progress, route.progress);
+        if (progress > 0.15 && distance(player, checkpoint) > 12)
+          save(p(route.x, route.z));
       }
       if (
         phase === "journey" &&
         progress > 0.94 &&
-        distance(player, data.fruit) < 6
+        distance(player, data.tree) < 12
       ) {
         phase = "fruit";
-        holdingRod = false;
-        save(data.fruit);
+        save(p(data.tree.x, data.tree.z + 3));
         hooks.setMarker(data.fruit);
         hooks.toast("The darkness gives way. The tree stands before you.");
       }
@@ -708,23 +874,13 @@ export function createTreeOfLifeScene(
         route.distance < 3
       ) {
         prompt = holdingRod
-          ? "{action} Release the iron rod"
-          : "{action} Hold the iron rod";
-        if (input.interact) {
-          holdingRod = !holdingRod;
-          if (holdingRod) {
-            phase = "journey";
-            hooks.toast(
-              "Hold fast. Walk along the path; the rod will help steady your steps.",
-            );
-            hooks.setMarker(data.fruit);
-          }
-        }
+          ? "Hold {action} to stay attached to the iron rod"
+          : "Hold {action} to grasp the iron rod";
       }
       if (
         !dialogOpen &&
-        phase === "fruit" &&
-        distance(player, data.fruit) < 4
+        (phase === "fruit" || phase === "rod" || phase === "journey") &&
+        distance(player, data.tree) < 4.5
       ) {
         prompt = "{action} Partake of the white fruit";
         if (input.interact)
@@ -732,31 +888,28 @@ export function createTreeOfLifeScene(
             "Joy at the tree",
             "Lehi tasted the fruit and felt a joy he wanted his family to share. Nephi later learned that the tree represents the love of God, revealed through Jesus Christ. — 1 Nephi 8:10–12; 11:21–23",
             () => {
-              phase = "invite";
-              hooks.setMarker(data.family);
-            },
-          );
-      } else if (
-        !dialogOpen &&
-        phase === "invite" &&
-        distance(player, data.fruit) < 10
-      ) {
-        prompt = "{action} Beckon to your family";
-        if (input.interact)
-          say(
-            "Come and share this joy",
-            "Lehi called to Sariah, Nephi, and Sam. They came and partook of the fruit. Laman and Lemuel would not come. Lehi continued to care deeply for his family. Stay awhile, explore the garden, and reflect on the love of God. — 1 Nephi 8:14–18, 35–37",
-            () => {
               phase = "done";
-              save(data.fruit);
+              save(p(data.tree.x, data.tree.z + 3));
               hooks.complete();
             },
           );
       }
-      if (
-        !dialogOpen &&
-        (phase === "fruit" || phase === "invite" || phase === "done")
-      )
+      if (!dialogOpen) {
+        const person = actors.find(
+          (a) =>
+            familyWords[a.rig.group.name] && distance(player, a.state) < 2.5,
+        );
+        if (person) {
+          prompt = `{action} Reflect with ${person.rig.group.name.split(" —")[0]}`;
+          if (input.interact)
+            say(
+              person.rig.group.name,
+              familyWords[person.rig.group.name],
+              () => {},
+            );
+        }
+      }
+      if (!dialogOpen && (phase === "fruit" || phase === "done"))
         for (const spot of data.reflections)
           if (distance(player, spot.point) < 5) {
             prompt = "{action} Reflect";
@@ -770,36 +923,48 @@ export function createTreeOfLifeScene(
           }
       for (let i = 0; i < actors.length; i++) {
         const a = actors[i];
-        if (i < 3 && phase === "done") {
-          const target = p(
-              data.tree.x + 5 + i * 2,
-              data.tree.z + 4 + (i % 2) * 3,
-            ),
-            dx = target.x - a.state.x,
+        if (a.behavior) {
+          const target =
+            a.behavior === "lost"
+              ? p(
+                  a.home.x + Math.sin(time * 0.3 + i) * 5,
+                  a.home.z + Math.cos(time * 0.25 + i) * 5,
+                )
+              : a.behavior === "press"
+                ? data.path[
+                    Math.min(
+                      data.path.length - 1,
+                      Math.floor((time * 0.13 + i) % data.path.length),
+                    )
+                  ]
+                : a.home;
+          const dx = target.x - a.state.x,
             dz = target.z - a.state.z,
-            d = Math.hypot(dx, dz),
-            speed = d > 0.25 ? Math.min(2.1, d / Math.max(dt, 0.001)) : 0;
-          a.state.vx = d ? (dx / d) * speed : 0;
-          a.state.vz = d ? (dz / d) * speed : 0;
-          a.state.x += a.state.vx * dt;
-          a.state.z += a.state.vz * dt;
+            d = Math.hypot(dx, dz);
+          const speed = d > 0.4 ? (a.behavior === "lost" ? 0.65 : 1.1) : 0;
+          a.state.x += d ? (dx / d) * speed * dt : 0;
+          a.state.z += d ? (dz / d) * speed * dt : 0;
           a.state.runSpeed = speed;
-          if (speed) a.state.yaw = Math.atan2(a.state.vx, a.state.vz);
+          if (speed) a.state.yaw = Math.atan2(dx, dz);
+          a.state.carrying = a.behavior === "eat";
         }
         a.state.pointing = a.mock;
-        a.state.wave = (phase === "invite" || phase === "done") && i < 3;
+        a.state.wave = !a.mock && !a.behavior && distance(player, a.state) < 7;
         a.rig.update(dt, a.state);
       }
       const inMist =
-        player.z > 0 && player.z < 48 && player.x > -62 && player.x < -23;
+        player.z > -15 &&
+        player.z < 75 &&
+        player.x < data.river.minX &&
+        distance(player, data.tree) > 22;
       if (scene.fog instanceof T.Fog) {
-        const target = inMist ? 24 : 149;
+        const target = inMist ? (route.distance > 3 ? 11 : 17) : 149;
         scene.fog.far = T.MathUtils.lerp(
           scene.fog.far,
           target,
           1 - Math.exp(-dt * 2),
         );
-        scene.fog.near = inMist ? 5 : 82;
+        scene.fog.near = inMist ? 7 : 82;
         scene.fog.color.lerp(
           new T.Color(inMist ? 0x536364 : 0xbdcfd5),
           1 - Math.exp(-dt * 2),
@@ -815,9 +980,7 @@ export function createTreeOfLifeScene(
                 ? "Hold fast and follow the path through the mist"
                 : phase === "fruit"
                   ? "Partake of the fruit of the tree"
-                  : phase === "invite"
-                    ? "Invite your family to share the joy"
-                    : "Explore and reflect on the love of God",
+                  : "Explore and reflect on the love of God",
         prompt,
       };
     },
@@ -836,6 +999,12 @@ export function createTreeOfLifeScene(
     dispose() {
       if (disposed) return;
       disposed = true;
+      for (const part of crowdParts) {
+        scene.remove(part);
+        part.dispose();
+        part.geometry.dispose();
+        (part.material as T.Material).dispose();
+      }
       for (const a of actors) {
         scene.remove(a.rig.group);
         a.rig.dispose();

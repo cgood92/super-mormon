@@ -9,6 +9,21 @@ function key(type: string, code: string) {
   return event;
 }
 
+test("held action remains active after its edge and releases or resets", () => {
+  const target = new EventTarget();
+  const input = new Input(target);
+  target.dispatchEvent(key("keydown", "KeyE"));
+  assert.equal(input.latest().interact, true);
+  assert.equal(input.latest().interactHeld, true);
+  assert.equal(input.latest().interact, false);
+  target.dispatchEvent(key("keyup", "KeyE"));
+  assert.equal(input.latest().interactHeld, false);
+  target.dispatchEvent(key("keydown", "KeyE"));
+  input.reset();
+  assert.equal(input.latest().interactHeld, false);
+  input.dispose();
+});
+
 test("device follows connected N64, generic pad, touch, and keyboard presence", () => {
   const priorNavigator = Object.getOwnPropertyDescriptor(
     globalThis,

@@ -220,19 +220,32 @@ export function painting(
 ): THREE.Mesh {
   box(group, x, y - 0.2, z + 0.08, 3.9, 4.9, 0.24, palette.brass);
   box(group, x, y - 0.2, z + 0.2, 3.55, 4.55, 0.12, 0x3f322e);
-  const texture =
-    typeof document === "undefined"
-      ? undefined
-      : new THREE.TextureLoader().load(file);
-  if (texture) texture.colorSpace = THREE.SRGBColorSpace;
-  const image = new THREE.Mesh(
-    new THREE.PlaneGeometry(3.36, 4.36),
-    new THREE.MeshBasicMaterial({
-      ...(texture ? { map: texture } : {}),
-      color: tint,
-      side: THREE.DoubleSide,
-    }),
-  );
+  const material = new THREE.MeshBasicMaterial({
+    color: tint,
+    side: THREE.DoubleSide,
+  });
+  const image = new THREE.Mesh(new THREE.PlaneGeometry(3.36, 4.36), material);
+  let requested = false;
+  let disposed = false;
+  let texture: THREE.Texture | undefined;
+  material.addEventListener("dispose", () => {
+    disposed = true;
+    texture?.dispose();
+  });
+  // Three calls this only for paintings inside the camera frustum.
+  image.onBeforeRender = () => {
+    if (requested || disposed || typeof document === "undefined") return;
+    requested = true;
+    texture = new THREE.TextureLoader().load(file, (loaded) => {
+      if (disposed) {
+        loaded.dispose();
+        return;
+      }
+      loaded.colorSpace = THREE.SRGBColorSpace;
+      material.map = loaded;
+      material.needsUpdate = true;
+    });
+  };
   image.position.set(x, y + 2.07, z + 0.28);
   image.name = "portal-painting";
   group.add(image);

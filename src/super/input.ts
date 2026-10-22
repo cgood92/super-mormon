@@ -11,6 +11,7 @@ export type InputState = {
   jumpHeld: boolean;
   crouch: boolean;
   interact: boolean;
+  interactHeld: boolean;
   cameraX: number;
   cameraY: number;
   cameraZoom: number;
@@ -361,6 +362,10 @@ export class Input {
         this.touchButtons.has("crouch") ||
         buttons.crouch,
       interact: this.edges.has("interact"),
+      interactHeld:
+        this.keys.has("KeyE") ||
+        this.touchButtons.has("interact") ||
+        buttons.interact,
       cameraX:
         this.lookX +
         ((bindings ? 0 : stick(gamepad?.axes[2] ?? 0)) + keyOrbitX) * orbit +

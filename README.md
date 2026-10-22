@@ -13,15 +13,15 @@ Open http://127.0.0.1:5173/. A 2.6-second splash automatically gives way to the 
 
 ## Controls
 
-| Action         | Keyboard / mouse        | Controller             | Touch           |
-| -------------- | ----------------------- | ---------------------- | --------------- |
-| Move           | WASD or arrows          | Left stick             | Left thumbstick |
-| Jump           | Space (hold for height) | A / bottom face button | A button        |
-| Crouch / crawl | Hold Shift or Z         | Hold LT or X           | Tap Z to toggle |
-| Context action | E                       | B / right face button  | B button        |
-| Camera         | Drag the scene or Q/C   | Right stick            | Drag the scene  |
-| Recenter       | R                       | Left shoulder          | Camera button   |
-| Pause          | Escape / P              | Start                  | Pause button    |
+| Action         | Keyboard / mouse        | Controller             | Touch                   |
+| -------------- | ----------------------- | ---------------------- | ----------------------- |
+| Move           | WASD or arrows          | Left stick             | Left thumbstick         |
+| Jump           | Space (hold for height) | A / bottom face button | A button                |
+| Crouch / crawl | Hold Shift or Z         | Hold LT or X           | Tap Z to toggle         |
+| Context action | E (hold for iron rod)   | B / right face button  | B button (hold for rod) |
+| Camera         | Drag the scene or Q/C   | Right stick            | Drag the scene          |
+| Recenter       | R                       | Left shoulder          | Camera button           |
+| Pause          | Escape / P              | Start                  | Pause button            |
 
 **N64 USB controllers:** the measured `0810:e501` USB profile (10 buttons, 2 axes) works out of the box. For another adapter, choose **Pause → Set up N64 controller**, press and release each requested button, then press A to save. Calibration is stored for that controller in this browser and takes priority over the built-in profile. Unrecognized nonstandard adapters offer setup when gameplay starts; no macOS remapping is required. Menus can be navigated with the joystick and confirmed with A. On-screen hints and button glyphs change with the active keyboard, touch, generic gamepad, or N64 controls.
 
@@ -46,7 +46,7 @@ Walk up to a painting and jump into its canvas to enter. The canvases are physic
 - **The Treasure Offer:** Nephi and his brothers carry gold and silver to Laban. He seizes their treasure; escape his servants through winding Jerusalem streets and gather inside a deep rock cave. Ground routes let the brothers follow around the buildings. Pursuit begins when you move after the refusal or a checkpoint return, giving you time to orient yourself. A brief dialogue bridges to the angel’s encouragement and Nephi’s resolve to return.
 - **Jerusalem by Night:** search the neighborhood’s alleys for Laban. A brief scripture recap describes his death without depicting violence. Laban’s outer garments visibly transfer to Nephi; Laban remains covered in modest linen. Find Zoram, follow him through the palace corridor into the treasury, then carry the brass plates back to the waiting brothers. Guards notice you only at close range, move slowly, and give up quickly; the disguise ends their pursuit.
 
-- **The Tree of Life:** play an interactive adaptation as Lehi. Use E / B beside the iron rod to hold it, walk the winding path through the mists, partake of the white fruit, and invite Sariah, Nephi, and Sam. After the family welcome, stay and explore the garden. Optional reflection spots overlook the spacious building across the gulf, sit beside the clear fountain, and consider the word of God. This scene has no coins, combat, or timer.
+- **The Tree of Life:** play an interactive adaptation as Lehi. Hold E / B / the touch B button beside the iron rod while walking the winding path through the mists; releasing the button detaches. The white fruit interaction is centered beneath the tree, which can also be climbed. Partaking completes the scene directly and welcomes Sariah, Nephi, and Sam without a separate beckoning step. Stay in the garden to talk with the family, watch nearby figures wave, and explore. A bridge and stair route reaches the spacious building’s main floor; its upper storeys are scenic. Instanced crowds populate the vision, and mist thickens away from the path. Optional reflection spots overlook the building and sit beside the clear fountain. This scene has no coins, combat, or timer.
 
 Pause offers restart and return-to-gallery controls. Completed adventures are saved locally under `super-mormon-v1`.
 
@@ -88,7 +88,9 @@ npm run build
 npm run format:check
 ```
 
-Physics tests cover camera-relative movement, collision, jumping, step climbing and ceiling clearance. Camera tests cover wall obstruction and movement/orbit behavior. Browser and route checks are recorded in `docs/prototype-checks.md`.
+Physics tests cover camera-relative movement, collision, jumping, step climbing and ceiling clearance. Camera tests cover wall obstruction and movement/orbit behavior. Browser and route checks are recorded in [prototype checks](docs/prototype-checks.md).
+
+Scene code loads in level chunks as needed; the runtime builds only the active scene. Gallery paintings request their images when first rendered. The six gallery derivatives total 1.28 MB, down from 15.56 MB for the originals (91.7% smaller); the originals are retained. For opt-in development FPS, render workload, and repeated-scene resource checks, see [performance checks](docs/performance-checks.md). These diagnostics do not establish physical phone performance.
 
 ## Deploy on GitHub Pages
 
