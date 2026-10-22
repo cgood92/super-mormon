@@ -48,13 +48,39 @@ test("all three foyer levels enter the bowl and return without jumping", () => {
     assert.ok(Math.abs(p.y - level) < 0.01);
   }
 });
-test("the ground center aisle reaches the pulpit stage and returns", () => {
+function walkAcross(p: PlayerState, x: number, solids: Solid[]) {
+  for (let i = 0; i < 2000 && Math.abs(p.x - x) > 0.1; i++)
+    stepPlayer(
+      p,
+      {
+        x: -Math.sign(x - p.x),
+        y: 0,
+        jump: false,
+        jumpHeld: false,
+        traversal: false,
+      },
+      1 / 60,
+      0,
+      solids,
+    );
+  assert.ok(Math.abs(p.x - x) < 0.15, `Reached ${p.x}, expected ${x}`);
+}
+
+test("the center aisle reaches paired side stairs to the pulpit and returns", () => {
   const { solids } = buildAuditorium(new THREE.Group());
-  const p = createPlayer(0, 0, -0.5);
-  walk(p, -81, solids);
-  assert.ok(Math.abs(p.y - 2.4) < 0.01);
-  walk(p, -0.5, solids);
-  assert.equal(p.y, 0);
+  for (const side of [-25, 25]) {
+    const p = createPlayer(0, 0, -0.5);
+    walk(p, -70, solids);
+    walkAcross(p, side, solids);
+    walk(p, -80.5, solids);
+    walkAcross(p, 0, solids);
+    assert.ok(Math.abs(p.y - 2.4) < 0.01);
+    walkAcross(p, side, solids);
+    walk(p, -70, solids);
+    walkAcross(p, 0, solids);
+    walk(p, -0.5, solids);
+    assert.equal(p.y, 0);
+  }
 });
 test("seating is instanced and landmarks are useful open viewing places", () => {
   const parent = new THREE.Group();
@@ -73,6 +99,40 @@ test("seating is instanced and landmarks are useful open viewing places", () => 
   assert.equal(batches, 3);
   assert.ok(seats > 10000);
   assert.equal(result.landmarks.length, 3);
+});
+
+test("rendered choir backrests face the organ while audience backrests face away", () => {
+  const parent = new THREE.Group();
+  buildAuditorium(parent);
+  const parts: THREE.InstancedMesh[] = [];
+  parent.traverse((object) => {
+    if (
+      object instanceof THREE.InstancedMesh &&
+      object.name === "auditorium seating"
+    )
+      parts.push(object);
+  });
+  const back = new THREE.Matrix4(),
+    cushion = new THREE.Matrix4();
+  let choir = 0,
+    audience = 0;
+  for (let i = 0; i < parts[0].count; i++) {
+    parts[0].getMatrixAt(i, back);
+    parts[1].getMatrixAt(i, cushion);
+    const backZ = back.elements[14],
+      seatZ = cushion.elements[14];
+    if (seatZ < -85) {
+      choir++;
+      assert.ok(
+        backZ < seatZ - 0.2,
+        "choir backrest must be on the organ side",
+      );
+    } else if (seatZ > -60) {
+      audience++;
+      assert.ok(backZ > seatZ, "audience backrest must be away from stage");
+    }
+  }
+  assert.ok(choir > 300 && audience > 1000);
 });
 
 test("rear stair connects the lower seating terraces to the foyer circulation", () => {
@@ -164,7 +224,8 @@ test("lower seating and stage treads have solid infill rather than walk-under ga
         y < s.y + s.h,
     );
   assert.ok(contains(18, 0.1, -20));
-  assert.ok(contains(0, 0.1, -74));
+  assert.ok(contains(25, 0.1, -74));
+  assert.equal(contains(0, 0.1, -74), false, "central staircase is absent");
   assert.ok(contains(0, 0.1, -85));
   const p = createPlayer(0, 0, -0.5);
   walk(p, -20, solids);

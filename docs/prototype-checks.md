@@ -39,7 +39,7 @@ Run `npm test`, `npm run build`, and `npm run format:check` for the current resu
 - Tree of Life spacing and separated waters; held-action rod attachment and release without autonomous movement; bounded correction; checkpoint rescue preserving progression; actual player physics walking the full rod route and the bridge/stair route to the building’s main floor; centered fruit interaction and direct completion; tree climbing; and continued exploration.
 - Lazy scene preparation without changing the active scene, gallery image derivatives, and opt-in performance snapshots including bounded resource trends and unavailable heap reporting.
 
-The automated suite contains 157 tests. Run the commands above to verify the current checkout, including the production build and formatting. Browser viewport checks and developer diagnostics do not establish performance or comfort on a physical phone.
+The automated suite contains 161 tests. Run the commands above to verify the current checkout, including the production build and formatting. Browser viewport checks and developer diagnostics do not establish performance or comfort on a physical phone.
 
 ## Scriptural treatment
 
@@ -63,3 +63,5 @@ The measured N64 adapter is `0810:e501`, with two axes and ten buttons. Its buil
 `tests/super-playthrough.js` supplies legal virtual-controller input and reads a runtime snapshot. Open a preview with `?playtest` and import the driver from the development server. Physical phone and controller playtests remain useful for comfort and game feel.
 
 Earlier browser visits using the previous small gallery kept resource counts stable across gallery → vision → gallery transitions after shadow-target cleanup. Those measurements predate the new Conference Center and do not establish its resource counts or physical-device performance.
+
+The next auditorium refinement follows the supplied front-stage photos: paired side stairs replace the central flight, and choir/presiding chairs face the audience. Browser input traversed both stair routes and checked the balcony trim from the stage side. A ray-based regression verifies that the cream and wood fascia no longer share coincident visible faces; another test verifies actual rendered chair backrest positions.

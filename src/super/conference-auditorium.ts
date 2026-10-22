@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { Solid } from "./physics";
+import { buildRostrum } from "./conference-rostrum";
 
 /** The bowl is column-free; foyer connections are the three central south doors. */
 export function buildAuditorium(parent: THREE.Group) {
@@ -128,10 +129,46 @@ export function buildAuditorium(parent: THREE.Group) {
         cream,
         true,
       );
-      box(x, base - 6.525, -46.1 + curve, 4.025, 0.65, 0.6, wood);
-      box(x, base - 5.925, -46.1 + curve, 4.025, 1.1, 0.6, cream, true);
-      // The cream fascia seals the entire front of the balcony structure.
-      box(x, underside, -46.1 + curve, 4.025, 1.275, 0.6, cream, true);
+      // Keep the sealed AABB guards independent of the visible curved skin.
+      solids.push(
+        { x, y: base - 5.925, z: front, w: 4.025, h: 1.1, d: 0.6 },
+        { x, y: underside, z: front, w: 4.025, h: 1.275, d: 0.6 },
+      );
+    }
+    // One continuous footprint removes overlapping segment end faces. Each
+    // material owns a separate height band, so cream cannot fight the wood
+    // for the same depth-buffer pixels along the front and back surfaces.
+    const outline = new THREE.Shape();
+    // Flat runs follow each original deck segment. Short bevels join them
+    // inside the shared 2.5 cm seam rather than overlapping entire box faces.
+    const edge: Array<[number, number]> = [];
+    for (let x = -60; x <= 60; x += 4) {
+      const front = -46.1 - 10 * (x / 62) ** 2;
+      edge.push(
+        [x - (x === -60 ? 2 : 1.9875), front],
+        [x + (x === 60 ? 2 : 1.9875), front],
+      );
+    }
+    edge.forEach(([x, front], i) => {
+      if (i === 0) outline.moveTo(x, front - 0.3);
+      else outline.lineTo(x, front - 0.3);
+    });
+    for (const [x, front] of [...edge].reverse())
+      outline.lineTo(x, front + 0.3);
+    outline.closePath();
+    for (const [bottom, height, mat] of [
+      [underside, 0.675, cream],
+      [base - 6.525, 0.6, wood],
+      [base - 5.925, 1.1, cream],
+    ] as const) {
+      const geometry = new THREE.ExtrudeGeometry(outline, {
+        depth: height,
+        bevelEnabled: false,
+        steps: 1,
+      });
+      geometry.rotateX(Math.PI / 2);
+      geometry.translate(0, bottom + height, 0);
+      group.add(new THREE.Mesh(geometry, mat));
     }
     for (let row = 0; row < 20; row++) {
       const centerZ = -7 - row * 2;
@@ -148,21 +185,9 @@ export function buildAuditorium(parent: THREE.Group) {
 
   balcony(12);
   balcony(24);
-  // The stage is reachable from the center aisle via 30 cm treads.
-  for (let i = 0; i < 8; i++)
-    box(0, -0.4, -71.3 - i * 1.0, 8, i * 0.3 + 0.7, 1.025, carpet, true);
-  box(0, -0.4, -87.6, 92, 2.8, 17.2, wood, true);
-  box(0, 2.4, -84, 8, 1.15, 2.8, wood);
-  box(0, 3.55, -83.5, 3.8, 0.18, 1.25, wood);
-  box(0, 2.4, -81.6, 1.5, 1.3, 1.1, wood);
-  box(0, 3.7, -81.6, 2, 0.16, 1.35, wood);
-  // Choir terraces and chairs beneath the characteristic gold pipe facade.
-  for (let row = 0; row < 7; row++) {
-    const y = 2.4 + row * 0.3,
-      z = -84 - row * 1.5;
-    box(0, y - 0.3, z, 73, 0.3, 1.5, wood, true);
-    for (let x = -35; x <= 35; x += 1.1) seats.push({ x, y, z, angle: 0 });
-  }
+  const rostrum = buildRostrum(group);
+  solids.push(...rostrum.solids);
+  seats.push(...rostrum.seats);
   for (const side of [-1, 1]) {
     box(side * 47, 15, -97.1, 18, 11, 0.8, cream);
     box(side * 47, 15.6, -96.6, 16, 9.8, 0.1, material(0xeeeade));
@@ -200,7 +225,11 @@ export function buildAuditorium(parent: THREE.Group) {
     const batch = new THREE.InstancedMesh(boxGeometry, part.mat, seats.length);
     batch.name = "auditorium seating";
     seats.forEach((seat, i) => {
-      transforms.position.set(seat.x, seat.y + part.dy, seat.z + part.dz);
+      transforms.position.set(
+        seat.x + Math.sin(seat.angle) * part.dz,
+        seat.y + part.dy,
+        seat.z + Math.cos(seat.angle) * part.dz,
+      );
       transforms.rotation.set(0, seat.angle, 0);
       transforms.scale.set(part.w, part.h, part.d);
       transforms.updateMatrix();
