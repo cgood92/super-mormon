@@ -38,6 +38,7 @@ Earlier browser testing used a virtual raw controller with deliberately scramble
 
 ## Latest feedback and new missions
 
+- Mobile startup: after the splash, a two-button dialog offers Enter Full Screen (recommended) or Continue. Browser checks at 667×375 and 390×844 show no page overflow; a real button click enters native fullscreen and requests landscape, while Continue resumes play. Desktop 1728×997 enters the gallery directly.
 - Automatic splash enters the gallery without a start button. Chapter heading fades after ten seconds, and the objective moves upward and grows. Stories, Treasures and Tokens have text labels.
 - A virtual raw pad matching the measured adapter, with no saved calibration, selects N64 glyphs and jumps using button 5. Keyboard glyphs disappear on connection and return on disconnect. Blue A, green B and yellow C shapes are rendered; joystick down selects Moves & practice and A opens it.
 - The left studio is reachable through its open doorway. Nearby lessons explain the actual buttons for crawl, ledge, pole, jump chains, wall kicks, carrying, long jump, backflip and side somersault. Mobile 667×375 gameplay, lesson and Pause layouts fit without page scrolling.

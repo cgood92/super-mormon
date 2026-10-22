@@ -1273,7 +1273,25 @@ function startGame() {
   started = true;
   el("title-screen").hidden = true;
   input.reset();
-  if (document.fullscreenElement || navigator.userActivation?.isActive)
+  const mobileScreen = matchMedia(
+    "(max-width: 800px), (pointer: coarse) and (max-height: 600px)",
+  ).matches;
+  if (mobileScreen)
+    modal(
+      "READY TO EXPLORE",
+      "A bigger adventure.",
+      "Play full screen and sideways for the best view.",
+      [
+        {
+          label: "Enter Full Screen (recommended)",
+          run: () => {
+            void requestFullScreen();
+          },
+        },
+        { label: "Continue", run: () => {}, secondary: true },
+      ],
+    );
+  else if (document.fullscreenElement || navigator.userActivation?.isActive)
     void requestFullScreen();
   message(
     "Run toward a painting, then press {jump}. {pause} → Moves for practice.",

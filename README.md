@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-Open http://127.0.0.1:5173/. A 2.6-second splash automatically gives way to the gallery; jump or use the action button to skip it. The game requests full screen and landscape orientation where the browser supports them. Unsupported phone browsers retain their own chrome and orientation controls. All gameplay fits the viewport.
+Open http://127.0.0.1:5173/. A 2.6-second splash automatically gives way to the gallery; jump or use the action button to skip it. On mobile, the splash is followed by **Enter Full Screen (recommended)** and **Continue**. The first option requests full screen and landscape orientation where the browser supports them; either option starts play. Unsupported phone browsers retain their own chrome and orientation controls. All gameplay fits the viewport.
 
 ## Controls
 
