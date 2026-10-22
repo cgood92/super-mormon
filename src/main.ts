@@ -1,0 +1,1113 @@
+import * as T from "three";
+import "./style.css";
+import { Input } from "./super/input";
+import { createControllerSetup } from "./super/controller-setup";
+import { readProfile } from "./super/gamepad";
+import { hasLineOfSight } from "./super/interactions";
+import {
+  createCarryObject,
+  nearestCarryObject,
+  pickUp,
+  throwObject,
+  dropObject,
+  resetCarryObject,
+  stepCarryObjects,
+  objectInTarget,
+  type CarryObject,
+} from "./super/objects";
+import {
+  createPlayer,
+  stepPlayer,
+  type PlayerState,
+  type Solid,
+} from "./super/physics";
+import { createCharacter } from "./super/character";
+import { FollowCamera } from "./super/camera";
+import { buildWorld, type WorldData, type WorldId } from "./super/worlds";
+import { label } from "./super/art";
+import {
+  canEnter,
+  isStoryId,
+  nextStory,
+  prerequisite,
+  readCompleted,
+  STORY_TITLES,
+  type StoryId,
+} from "./super/progression";
+
+const app = document.querySelector<HTMLDivElement>("#app")!;
+app.innerHTML = `<div id="viewport" data-look></div><div class="vignette"></div>
+<header class="hud"><button class="wordmark" id="home" aria-label="Return to the gallery">SUPER<span>MORMON</span><small>A BOOK OF MORMON ADVENTURE</small></button><div class="world-title"><span id="chapter-label">THE CONFERENCE CENTER</span><h1 id="world-name">The Gallery</h1></div><div class="hud-actions"><span id="seal-count" title="Adventures completed">◈ 0 / 3</span><button id="pause" aria-label="Pause game">Ⅱ</button></div></header>
+<div class="objective"><span class="objective-dot"></span><span id="objective">Find a painting. Take a running jump.</span></div>
+<div id="collect-count" class="collect-count" hidden></div><div id="prompt" class="prompt" aria-live="polite"></div><div id="toast" class="toast" role="status"></div>
+<div class="touch-controls"><div class="stick" data-stick aria-label="Movement thumbstick"><i></i><span>MOVE</span></div><div class="touch-actions"><button class="crouch" data-crouch aria-pressed="false" aria-label="Toggle crouch or crawl">Z<small>CROUCH</small></button><button class="action" data-action aria-label="Talk, search, pick up or throw">B<small>ACTION</small></button><button class="jump" data-jump aria-label="Jump">A<small>JUMP</small></button></div><button class="camera-button" data-recenter aria-label="Center camera">↻</button></div>
+<div class="desktop-controls"><span>WASD / arrows <b>MOVE</b></span><span>Space <b>JUMP</b></span><span>Shift / Z <b>CROUCH</b></span><span>Drag / Q–C <b>CAMERA</b></span><span>E <b>ACTION</b></span><span>R <b>RECENTER</b></span></div>
+<div class="orientation-hint">↻ Best played with your phone sideways</div><div id="curtain"></div>
+<div id="caught-overlay" class="caught-overlay" aria-live="assertive" aria-atomic="true" hidden><div class="caught-wipe"></div><div class="caught-card"><span class="caught-symbol" aria-hidden="true">↺</span><strong id="caught-heading">Caught!</strong><span id="caught-detail">Let’s try again.</span></div></div>
+<section id="title-screen" class="screen title-screen"><button class="controller-setup-link" id="setup-controller-title">Set up N64 controller</button><div class="title-card"><span class="eyebrow">A NEW ADVENTURE · A PLAYABLE PROTOTYPE</span><h2>SUPER<br><em>MORMON</em></h2><p>Step into the story.</p><button class="primary" id="start">Enter the gallery <span>→</span></button><div class="title-controls">RUN · JUMP · EXPLORE</div><small>Original art and worlds. Inspired by the joy of 3D platform adventures.</small></div><span class="title-location">SALT LAKE CITY · AN IMAGINED CONFERENCE CENTER GALLERY</span></section>
+<section id="modal" class="screen modal-screen" hidden><div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title"><span class="eyebrow" id="modal-kicker"></span><h2 id="modal-title"></h2><p id="modal-body"></p><div id="modal-buttons"></div></div></section>`;
+const el = <E extends HTMLElement>(id: string) =>
+  document.getElementById(id) as E;
+const renderer = new T.WebGLRenderer({
+  antialias: true,
+  powerPreference: "high-performance",
+});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = T.PCFSoftShadowMap;
+renderer.toneMapping = T.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.outputColorSpace = T.SRGBColorSpace;
+el("viewport").append(renderer.domElement);
+const camera = new T.PerspectiveCamera(58, 1, 0.08, 150),
+  follow = new FollowCamera(camera),
+  input = new Input(document);
+let scene = new T.Scene(),
+  world: WorldData,
+  worldId: WorldId = "hub",
+  player = createPlayer(),
+  avatar: ReturnType<typeof createCharacter>;
+let started = false,
+  paused = false,
+  transition = false,
+  caughtTransition = 0,
+  caughtPhase: "none" | "caught" | "wipe" | "safe" = "none",
+  time = 0,
+  levelTime = 0,
+  guardsActive = false,
+  caughtGrace = 0,
+  modalAction: (() => void) | null = null;
+let modalSince = 0;
+let audio: AudioContext | undefined,
+  soundOn = true,
+  previous = performance.now(),
+  toastUntil = 0;
+const completed = readProgress();
+let controllerSetup: ReturnType<typeof createControllerSetup> | null = null;
+let waitForControllerRelease = false;
+const offeredControllers = new Set<string>();
+type Guard = {
+  state: PlayerState;
+  actor: ReturnType<typeof createCharacter>;
+  path: { x: number; z: number }[];
+  timer: number;
+};
+let guards: Guard[] = [],
+  extras: ReturnType<typeof createCharacter>[] = [],
+  treasureMeshes = new Map<string, T.Group>(),
+  collected = new Set<string>();
+let goalMarker: T.Group | null = null;
+let carryObjects: CarryObject[] = [],
+  carryMeshes = new Map<string, T.Group>(),
+  tokenMeshes = new Map<string, T.Mesh>(),
+  bonusCollected = new Set<string>(),
+  deliveryDone = false;
+function readProgress(): Set<StoryId> {
+  try {
+    return readCompleted(
+      JSON.parse(localStorage.getItem("super-mormon-v1") || "[]"),
+    );
+  } catch {
+    return new Set();
+  }
+}
+function saveProgress() {
+  try {
+    localStorage.setItem("super-mormon-v1", JSON.stringify([...completed]));
+  } catch {
+    /* optional */
+  }
+}
+function sound(kind: "jump" | "collect" | "caught" | "portal" | "win") {
+  if (!soundOn) return;
+  try {
+    audio ??= new AudioContext();
+    void audio.resume();
+    const o = audio.createOscillator(),
+      g = audio.createGain(),
+      t = audio.currentTime;
+    o.connect(g);
+    g.connect(audio.destination);
+    o.type = kind === "collect" ? "sine" : "triangle";
+    o.frequency.setValueAtTime(
+      { jump: 250, collect: 740, caught: 190, portal: 220, win: 520 }[kind],
+      t,
+    );
+    o.frequency.exponentialRampToValueAtTime(
+      kind === "caught" ? 90 : kind === "jump" ? 430 : 1100,
+      t + 0.18,
+    );
+    g.gain.setValueAtTime(0.045, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
+    o.start(t);
+    o.stop(t + 0.33);
+  } catch {
+    /* sound optional */
+  }
+}
+function message(text: string, duration = 3) {
+  el("toast").textContent = text;
+  toastUntil = time + duration;
+  el("toast").classList.add("visible");
+}
+function modal(
+  kicker: string,
+  title: string,
+  body: string,
+  buttons: { label: string; run: () => void; secondary?: boolean }[],
+) {
+  paused = true;
+  modalSince = performance.now();
+  input.reset();
+  el("modal-kicker").textContent = kicker;
+  el("modal-title").textContent = title;
+  el("modal-body").textContent = body;
+  const box = el("modal-buttons");
+  box.replaceChildren();
+  for (const data of buttons) {
+    const b = document.createElement("button");
+    b.className = data.secondary ? "secondary" : "primary";
+    b.textContent = data.label;
+    b.onclick = () => {
+      el("modal").hidden = true;
+      paused = false;
+      input.reset();
+      data.run();
+    };
+    box.append(b);
+  }
+  el("modal").hidden = false;
+  modalAction = buttons[0]?.run ?? null;
+  setTimeout(() => box.querySelector("button")?.focus(), 20);
+}
+function closeModalFirst() {
+  const b = el("modal-buttons").querySelector<HTMLButtonElement>("button");
+  b?.click();
+}
+function pause() {
+  if (!started || transition) return;
+  if (!el("modal").hidden) {
+    closeModalFirst();
+    return;
+  }
+  modal(
+    "TAKE YOUR TIME",
+    "A little pause.",
+    "Explore with the left stick. Drag to look around. Hold jump to leap higher.",
+    [
+      { label: "Keep exploring", run: () => {} },
+      {
+        label: "Moves & practice",
+        run: () => showMoves(),
+        secondary: true,
+      },
+      {
+        label: "Set up N64 controller",
+        run: () => openControllerSetup(),
+        secondary: true,
+      },
+      {
+        label: "Restart this scene",
+        run: () => load(worldId),
+        secondary: true,
+      },
+      {
+        label: "Return to the gallery",
+        run: () => load("hub"),
+        secondary: true,
+      },
+      {
+        label: soundOn ? "Turn sound off" : "Turn sound on",
+        run: () => {
+          soundOn = !soundOn;
+        },
+        secondary: true,
+      },
+      {
+        label: document.fullscreenElement ? "Leave full screen" : "Full screen",
+        run: () => {
+          if (document.fullscreenElement) void document.exitFullscreen();
+          else void requestFullScreen();
+        },
+        secondary: true,
+      },
+    ],
+  );
+}
+function openControllerSetup() {
+  if (transition || controllerSetup) return;
+  paused = true;
+  el("modal").hidden = true;
+  input.reset();
+  controllerSetup = createControllerSetup(app, (profile) => {
+    controllerSetup?.dispose();
+    controllerSetup = null;
+    if (profile) {
+      input.setControllerProfile(profile);
+      offeredControllers.add(profile.id);
+      message("N64 controls saved. A jumps · B acts · Z crouches.", 5);
+    }
+    paused = false;
+    waitForControllerRelease = true;
+    input.reset();
+  });
+}
+function connectedController() {
+  return Array.from(navigator.getGamepads?.() ?? []).find(
+    (pad) => pad?.connected,
+  );
+}
+function showMoves(page = 0) {
+  const pages = [
+    [
+      "RUN & JUMP",
+      "Try a new move.",
+      "Crouch: hold Z on N64, Shift / Z on keyboard, or LT / X on a modern pad. Tap Z on screen to toggle. Move to crawl. Run + crouch + jump for a long jump. Stand still + crouch + jump for a backflip.",
+    ],
+    [
+      "JUMP COMBINATIONS",
+      "Keep the rhythm.",
+      "Jump again just as you land for a double jump. Keep running and jump once more for a triple jump. Reverse direction + jump for a side somersault. Jump against a wall, then press jump again to kick away.",
+    ],
+    [
+      "CLIMB & EXPLORE",
+      "Find another route.",
+      "Jump toward a ledge to catch it. Move toward it or jump to pull up; crouch to drop. Jump into a tree or pole while moving toward it, then move up/down to climb. Jump away or crouch to let go.",
+    ],
+    [
+      "CARRY & DISCOVER",
+      "Give it a try.",
+      "E / B picks up a nearby bundle. Press again to throw; crouch + E / B sets it down. Explore the gallery garden for six gold tokens. Deliver the practice bundle to the gold ring. These challenges are optional.",
+    ],
+  ];
+  const [kicker, title, body] = pages[page];
+  // modal() normally resumes before invoking its action; this new modal pauses again.
+  modal(kicker, title, body, [
+    ...(page < pages.length - 1
+      ? [{ label: "Next moves", run: () => showMoves(page + 1) }]
+      : []),
+    { label: "Try it", run: () => {}, secondary: page < pages.length - 1 },
+  ]);
+}
+async function requestFullScreen() {
+  try {
+    if (!document.fullscreenElement) await app.requestFullscreen();
+    await (
+      window.screen.orientation as ScreenOrientation & {
+        lock?: (s: string) => Promise<void>;
+      }
+    ).lock?.("landscape");
+  } catch {
+    /* Browser chrome/orientation remains under device control. */
+  }
+}
+function marker(x: number, y: number, z: number): T.Group {
+  const g = new T.Group();
+  g.position.set(x, y + 0.04, z);
+  const ring = new T.Mesh(
+    new T.TorusGeometry(0.85, 0.055, 8, 48),
+    new T.MeshBasicMaterial({
+      color: "#ead494",
+      transparent: true,
+      opacity: 0.7,
+    }),
+  );
+  ring.rotation.x = -Math.PI / 2;
+  g.add(ring);
+  const beam = new T.Mesh(
+    new T.ConeGeometry(0.22, 0.4, 5),
+    new T.MeshStandardMaterial({
+      color: "#e4c47b",
+      emissive: "#72571b",
+      emissiveIntensity: 0.25,
+    }),
+  );
+  beam.position.y = 2.6;
+  beam.rotation.z = Math.PI;
+  g.add(beam);
+  scene.add(g);
+  return g;
+}
+function decorateGalleryProgress() {
+  for (const portal of world.portals ?? []) {
+    if (!isStoryId(portal.id)) continue;
+    const prior = prerequisite(portal.id, completed);
+    if (!prior) continue;
+    const badge = new T.Group();
+    const plaque = label(
+      badge,
+      "LOCKED",
+      portal.x + 0.75,
+      4.55,
+      -20.63,
+      1.55,
+      0.5,
+    );
+    plaque.renderOrder = 2;
+    scene.add(badge);
+  }
+}
+function setupDiscoveries() {
+  bonusCollected = new Set();
+  deliveryDone = false;
+  tokenMeshes.clear();
+  carryMeshes.clear();
+  carryObjects = (world.carryables ?? []).map((p) =>
+    createCarryObject(p.id, p.x, p.y, p.z),
+  );
+  for (const token of world.tokens ?? []) {
+    const mesh = new T.Mesh(
+      new T.TorusGeometry(0.22, 0.065, 8, 16),
+      new T.MeshStandardMaterial({
+        color: 0xf4cf70,
+        emissive: 0xc28728,
+        emissiveIntensity: 0.4,
+        metalness: 0.45,
+        roughness: 0.35,
+      }),
+    );
+    mesh.position.set(token.x, token.y, token.z);
+    scene.add(mesh);
+    tokenMeshes.set(token.id, mesh);
+  }
+  for (const object of carryObjects) {
+    const group = new T.Group();
+    const bundle = new T.Mesh(
+      new T.BoxGeometry(0.5, 0.4, 0.46),
+      new T.MeshStandardMaterial({
+        color: 0x88734e,
+        roughness: 1,
+        flatShading: true,
+      }),
+    );
+    const strap = new T.Mesh(
+      new T.BoxGeometry(0.09, 0.43, 0.49),
+      new T.MeshStandardMaterial({ color: 0xc3ae79, roughness: 1 }),
+    );
+    group.add(bundle, strap);
+    group.position.set(object.x, object.y, object.z);
+    scene.add(group);
+    carryMeshes.set(object.id, group);
+  }
+}
+function updateCollectionHud() {
+  const parts: string[] = [];
+  if (worldId === "house") parts.push(`✦ ${collected.size} / 5`);
+  if (world.tokens?.length)
+    parts.push(`✧ ${bonusCollected.size} / ${world.tokens.length}`);
+  if (world.delivery) parts.push(deliveryDone ? "Bundle ✓" : "Bundle ○");
+  el("collect-count").hidden = parts.length === 0;
+  el("collect-count").textContent = parts.join(" · ");
+}
+function disposeScene() {
+  avatar?.dispose();
+  for (const e of extras) e.dispose();
+  for (const g of guards) g.actor.dispose();
+  extras = [];
+  guards = [];
+  scene.traverse((o) => {
+    if (o instanceof T.Mesh) {
+      o.geometry.dispose();
+      for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+        for (const v of Object.values(m))
+          if (v instanceof T.Texture) v.dispose();
+        m.dispose();
+      }
+    }
+  });
+  scene.clear();
+}
+function load(id: WorldId) {
+  if (isStoryId(id) && !canEnter(id, completed)) {
+    id = "hub";
+  }
+  clearCaughtTransition();
+  paused = false;
+  el("modal").hidden = true;
+  if (world) disposeScene();
+  worldId = id;
+  scene = new T.Scene();
+  world = buildWorld(id, scene);
+  if (id === "hub") decorateGalleryProgress();
+  player = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
+  player.yaw = world.spawn.yaw ?? Math.PI;
+  avatar = createCharacter(
+    id === "streets" ? "lehi" : id === "palace" ? "laman" : "nephi",
+  );
+  scene.add(avatar.group);
+  avatar.update(0, player);
+  follow.reset(player, player.yaw, id);
+  levelTime = 0;
+  guardsActive = id === "streets";
+  caughtGrace = 3;
+  collected = new Set();
+  treasureMeshes.clear();
+  setupDiscoveries();
+  goalMarker = null;
+  input.reset();
+  for (const t of world.treasures ?? []) {
+    const g = new T.Group();
+    g.position.set(t.x, t.y + 0.25, t.z);
+    const material = new T.MeshStandardMaterial({
+      color: t.id === "silver" ? "#d9e2e1" : "#e1bc64",
+      metalness: 0.6,
+      roughness: 0.3,
+      emissive: "#c79236",
+      emissiveIntensity: 0.22,
+    });
+    const mesh = new T.Mesh(
+      t.id.includes("cup")
+        ? new T.CylinderGeometry(0.19, 0.13, 0.3, 12)
+        : new T.TorusGeometry(0.18, 0.055, 8, 16),
+      material,
+    );
+    g.add(mesh);
+    const halo = new T.Mesh(
+      new T.TorusGeometry(0.36, 0.022, 8, 24),
+      new T.MeshBasicMaterial({
+        color: "#ffeab1",
+        transparent: true,
+        opacity: 0.65,
+      }),
+    );
+    halo.rotation.x = Math.PI / 2;
+    halo.position.y = -0.15;
+    g.add(halo);
+    scene.add(g);
+    treasureMeshes.set(t.id, g);
+  }
+  if (id !== "hub")
+    goalMarker = marker(world.goal.x, world.goal.y, world.goal.z);
+  const spawnGuards =
+    world.pursuers ??
+    (id === "streets"
+      ? [
+          { x: -4, y: 0, z: 15 },
+          { x: 4, y: 0, z: 3 },
+        ]
+      : []);
+  for (const p of spawnGuards) {
+    const state = createPlayer(p.x, p.y, p.z),
+      actor = createCharacter("guard");
+    scene.add(actor.group);
+    actor.update(0, state);
+    guards.push({ state, actor, path: [], timer: 0 });
+    actor.group.visible = id !== "palace";
+  }
+  if (id === "palace") {
+    const laban = createCharacter("guard");
+    laban.group.position.set(0, 0.8, -21.1);
+    laban.group.scale.setScalar(1);
+    scene.add(laban.group);
+    extras.push(laban);
+    const end = world.escapeGoal ?? world.goal;
+    for (let i = 0; i < 3; i++) {
+      const brother = createCharacter(i === 0 ? "nephi" : "laman");
+      brother.group.position.set(end.x - 2 + i * 2, end.y, end.z + 1.2);
+      brother.group.rotation.y = Math.PI;
+      scene.add(brother.group);
+      extras.push(brother);
+    }
+  }
+  el("world-name").textContent = world.name;
+  el("chapter-label").textContent =
+    id === "hub"
+      ? "SALT LAKE CITY · THE CONFERENCE CENTER"
+      : id === "streets"
+        ? "1 NEPHI 1–2 · ABOUT 600 BC"
+        : "1 NEPHI 3 · ABOUT 600 BC";
+  el("seal-count").textContent = `◈ ${completed.size} / 3`;
+  updateCollectionHud();
+  updateObjective();
+  if (started)
+    message(
+      id === "hub"
+        ? nextStory(completed)
+          ? `Next story: ${STORY_TITLES[nextStory(completed)!]}. Jump into its painting.`
+          : "All stories complete. Jump into any painting to replay."
+        : id === "house"
+          ? "Five treasures. Every room has a story."
+          : id === "palace"
+            ? "Find Laban at the far end of the courtyard."
+            : "Find the blue door. Watch the streets.",
+      4,
+    );
+}
+function updateObjective() {
+  el("objective").textContent =
+    worldId === "hub"
+      ? nextStory(completed)
+        ? `Next: ${STORY_TITLES[nextStory(completed)!]} · Jump into the painting.`
+        : "All stories complete · Replay any painting."
+      : worldId === "streets"
+        ? "Help Lehi reach his home safely."
+        : worldId === "house"
+          ? collected.size === 5
+            ? "Return to the courtyard entrance."
+            : `Find the family’s treasures · ${collected.size} of 5`
+          : guardsActive
+            ? "Run through the gate. Your brothers are outside."
+            : "Find Laban and ask for the brass plates.";
+}
+function near(
+  p: { x: number; y: number; z: number },
+  radius = 1.6,
+  vertical = 1.8,
+) {
+  return (
+    Math.hypot(player.x - p.x, player.z - p.z) < radius &&
+    Math.abs(player.y - p.y) < vertical
+  );
+}
+function complete() {
+  if (paused || transition || !isStoryId(worldId)) return;
+  completed.add(worldId);
+  saveProgress();
+  el("seal-count").textContent = `◈ ${completed.size} / 3`;
+  sound("win");
+  const name = worldId;
+  const next = nextStory(completed);
+  modal(
+    "A MEMORY FOR THE JOURNEY",
+    name === "house"
+      ? "The family’s treasures."
+      : name === "streets"
+        ? "Home, safely."
+        : "Together again.",
+    name === "house"
+      ? "Nephi and his brothers gathered gold, silver, and precious things. They hoped to exchange them for the brass plates."
+      : name === "streets"
+        ? `Lehi’s family would soon leave Jerusalem. Their story was only beginning.${next ? ` Next: ${STORY_TITLES[next]}.` : ""}`
+        : `Laban refused the plates, and Laman fled. Nephi encouraged his brothers to keep trying.${next ? ` Next: ${STORY_TITLES[next]}.` : ""}`,
+    [
+      { label: "Back to the paintings", run: () => warp("hub") },
+      {
+        label: "Explore this scene again",
+        run: () => load(name),
+        secondary: true,
+      },
+    ],
+  );
+}
+function warp(id: WorldId) {
+  if (transition) return;
+  transition = true;
+  input.reset();
+  sound("portal");
+  el("curtain").classList.add("closed");
+  setTimeout(() => {
+    load(id);
+    el("curtain").classList.remove("closed");
+    transition = false;
+  }, 330);
+}
+function clearCaughtTransition() {
+  caughtTransition = 0;
+  caughtPhase = "none";
+  const overlay = el("caught-overlay");
+  overlay.hidden = true;
+  overlay.removeAttribute("data-phase");
+}
+function setCaughtPhase(phase: "caught" | "wipe" | "safe") {
+  caughtPhase = phase;
+  const overlay = el("caught-overlay");
+  overlay.dataset.phase = phase;
+  if (phase === "safe") {
+    el("caught-heading").textContent = "Back at a safe spot";
+    el("caught-detail").textContent = "Keep going!";
+    el("prompt").textContent = "";
+    el("prompt").classList.remove("visible");
+  }
+}
+function beginCaughtTransition() {
+  transition = true;
+  caughtTransition = 0;
+  input.reset();
+  sound("caught");
+  el("toast").classList.remove("visible");
+  el("prompt").classList.remove("visible");
+  el("caught-heading").textContent = "Caught!";
+  el("caught-detail").textContent = "Let’s try again.";
+  el("caught-overlay").hidden = false;
+  setCaughtPhase("caught");
+}
+function resetCaughtCheckpoint() {
+  player = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
+  player.yaw = world.spawn.yaw ?? Math.PI;
+  if (worldId === "palace") {
+    player.x = 0;
+    player.z = -14;
+    player.yaw = 0;
+  }
+  for (let i = 0; i < guards.length; i++) {
+    const p = world.pursuers?.[i] ?? { x: i ? -4 : 4, y: 0, z: 12 };
+    guards[i].state = createPlayer(p.x, p.y, p.z);
+    guards[i].path = [];
+    guards[i].timer = 0;
+    guards[i].actor.update(0, guards[i].state);
+  }
+  avatar.update(0, player);
+  follow.reset(player, player.yaw, worldId);
+  for (const object of carryObjects) if (object.held) resetCarryObject(object);
+  caughtGrace = 3.4;
+}
+function advanceCaughtTransition(dt: number) {
+  caughtTransition += dt;
+  if (caughtPhase === "caught" && caughtTransition >= 0.5)
+    setCaughtPhase("wipe");
+  if (caughtPhase === "wipe" && caughtTransition >= 0.76) {
+    resetCaughtCheckpoint();
+    setCaughtPhase("safe");
+  }
+  if (caughtTransition >= 1.3) {
+    clearCaughtTransition();
+    transition = false;
+    input.reset();
+  }
+}
+function navigate(
+  start: PlayerState,
+  target: PlayerState,
+  solids: Solid[],
+): { x: number; z: number }[] {
+  const size = 1.5,
+    b = world.bounds ?? { minX: -40, maxX: 40, minZ: -40, maxZ: 45 };
+  const key = (x: number, z: number) => `${x},${z}`,
+    sx = Math.round(start.x / size),
+    sz = Math.round(start.z / size),
+    tx = Math.round(target.x / size),
+    tz = Math.round(target.z / size);
+  const queue = [[sx, sz]],
+    parent = new Map<string, string | null>([[key(sx, sz), null]]);
+  let end = "";
+  for (let i = 0; i < queue.length && i < 4000; i++) {
+    const [x, z] = queue[i];
+    if (Math.abs(x - tx) + Math.abs(z - tz) < 2) {
+      end = key(x, z);
+      break;
+    }
+    for (const [dx, dz] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ]) {
+      const nx = x + dx,
+        nz = z + dz,
+        k = key(nx, nz),
+        wx = nx * size,
+        wz = nz * size;
+      if (
+        parent.has(k) ||
+        wx < b.minX ||
+        wx > b.maxX ||
+        wz < b.minZ ||
+        wz > b.maxZ
+      )
+        continue;
+      if (
+        solids.some(
+          (s) =>
+            s.y < 1.65 &&
+            s.y + s.h > 0.44 &&
+            Math.abs(wx - s.x) < s.w / 2 + 0.4 &&
+            Math.abs(wz - s.z) < s.d / 2 + 0.4,
+        )
+      )
+        continue;
+      parent.set(k, key(x, z));
+      queue.push([nx, nz]);
+    }
+  }
+  if (!end) return [{ x: target.x, z: target.z }];
+  const path = [];
+  for (let k: string | null = end; k; k = parent.get(k) ?? null) {
+    const [x, z] = k.split(",").map(Number);
+    path.push({ x: x * size, z: z * size });
+  }
+  return path.reverse().slice(1);
+}
+function update(dt: number) {
+  if (controllerSetup) {
+    controllerSetup.update();
+    return;
+  }
+  if (waitForControllerRelease) {
+    const pad = connectedController();
+    if (pad?.buttons.some((button) => button.pressed)) return;
+    waitForControllerRelease = false;
+    input.reset();
+  }
+  if (started && !paused && !transition) {
+    const pad = connectedController();
+    if (
+      pad &&
+      typeof pad.id === "string" &&
+      pad.id.length > 0 &&
+      pad.mapping !== "standard" &&
+      !readProfile(pad.id) &&
+      !offeredControllers.has(pad.id)
+    ) {
+      offeredControllers.add(pad.id);
+      modal(
+        "CONTROLLER CONNECTED",
+        "Make the buttons feel familiar.",
+        "Set up your N64 controller once: press the buttons shown, and we’ll remember them.",
+        [
+          { label: "Set up N64 controls", run: () => openControllerSetup() },
+          { label: "Keep current controls", run: () => {}, secondary: true },
+        ],
+      );
+      return;
+    }
+  }
+  const state = input.latest(dt);
+  if (!started) {
+    if (state.jump || state.interact) startGame();
+    return;
+  }
+  if (caughtPhase !== "none") {
+    advanceCaughtTransition(dt);
+    return;
+  }
+  if (transition) return;
+  if (state.pause && performance.now() - modalSince > 450) {
+    pause();
+    return;
+  }
+  if (paused) {
+    if (performance.now() - modalSince > 450 && (state.interact || state.jump))
+      closeModalFirst();
+    return;
+  }
+  time += dt;
+  levelTime += dt;
+  caughtGrace = Math.max(0, caughtGrace - dt);
+  const events = stepPlayer(
+    player,
+    state,
+    dt,
+    follow.yaw,
+    world.solids,
+    world.climbables,
+  );
+  if (events.jumped) sound("jump");
+  const b = world.bounds;
+  if (b) {
+    player.x = T.MathUtils.clamp(player.x, b.minX + 0.35, b.maxX - 0.35);
+    player.z = T.MathUtils.clamp(player.z, b.minZ + 0.35, b.maxZ - 0.35);
+  }
+  stepCarryObjects(carryObjects, player, dt, world.solids);
+  const held = carryObjects.find((object) => object.held);
+  if (held && state.interact) {
+    if (state.crouch) dropObject(held, player);
+    else if (!throwObject(held, player, world.solids))
+      message("A little more room to throw.", 1.5);
+    state.interact = false;
+  }
+  avatar.update(dt, {
+    ...player,
+    carrying: carryObjects.some((object) => object.held),
+  });
+  follow.update(
+    dt,
+    player,
+    world.solids,
+    {
+      orbitX: state.cameraX,
+      orbitY: state.cameraY,
+      recenter: state.recenter,
+      zoom: state.cameraZoom,
+    },
+    worldId,
+  );
+  const distCam = camera.position.distanceTo(
+    new T.Vector3(player.x, player.y + 1.05, player.z),
+  );
+  avatar.group.visible = distCam > 0.7;
+  let prompt = "";
+  for (const object of carryObjects) {
+    const mesh = carryMeshes.get(object.id)!;
+    mesh.position.set(object.x, object.y, object.z);
+    mesh.rotation.y = object.held ? player.yaw : object.vx * time * 0.03;
+    const bounds = world.bounds;
+    if (
+      bounds &&
+      (object.x < bounds.minX ||
+        object.x > bounds.maxX ||
+        object.z < bounds.minZ ||
+        object.z > bounds.maxZ)
+    )
+      resetCarryObject(object);
+  }
+  for (const token of world.tokens ?? []) {
+    const mesh = tokenMeshes.get(token.id)!;
+    if (bonusCollected.has(token.id)) continue;
+    mesh.rotation.y += dt * 1.5;
+    mesh.position.y = token.y + Math.sin(time * 2.2) * 0.07;
+    if (
+      Math.hypot(
+        player.x - token.x,
+        player.y + (player.crouching ? 0.5 : 0.8) - token.y,
+        player.z - token.z,
+      ) < 0.85 &&
+      hasLineOfSight(
+        { ...player, y: player.y - (player.crouching ? 0.8 : 0) },
+        token,
+        world.solids,
+      )
+    ) {
+      bonusCollected.add(token.id);
+      mesh.visible = false;
+      sound("collect");
+      updateCollectionHud();
+      message(
+        bonusCollected.size === world.tokens!.length
+          ? "Every discovery token found!"
+          : `Discovery token · ${bonusCollected.size} / ${world.tokens!.length}`,
+        2,
+      );
+    }
+  }
+  if (
+    !deliveryDone &&
+    world.delivery &&
+    carryObjects.some((object) => objectInTarget(object, world.delivery!))
+  ) {
+    deliveryDone = true;
+    updateCollectionHud();
+    sound("win");
+    message("Bundle delivered! Pick it up again to keep practicing.", 3);
+  }
+  if (worldId === "hub") {
+    const p = world.portals?.find((p) => near(p, 2.2, 4));
+    if (p && isStoryId(p.id)) {
+      const prior = prerequisite(p.id, completed);
+      prompt = prior
+        ? `${p.title} locked · Finish ${STORY_TITLES[prior]} first`
+        : completed.has(p.id)
+          ? `${p.title} · Jump in to replay`
+          : `${p.title} · Jump into the painting`;
+      if (
+        (player.y > p.y + 0.45 &&
+          Math.hypot(player.x - p.x, player.z - p.z) < 1.2) ||
+        state.interact
+      ) {
+        if (canEnter(p.id, completed)) warp(p.id);
+        else message(`Finish ${STORY_TITLES[prior!]} to unlock ${p.title}.`, 3);
+        return;
+      }
+    }
+  }
+  if (worldId === "streets" && near(world.goal, world.goal.radius ?? 2)) {
+    complete();
+    return;
+  }
+  if (worldId === "house") {
+    for (const t of world.treasures ?? []) {
+      const mesh = treasureMeshes.get(t.id);
+      if (!mesh || collected.has(t.id)) continue;
+      mesh.rotation.y += dt * 0.7;
+      mesh.position.y = t.y + 0.3 + Math.sin(time * 2.4 + Number(t.x)) * 0.055;
+      if (near(t, 2.05, 1.7) && hasLineOfSight(player, t, world.solids)) {
+        prompt = `${t.name} · E / B to gather`;
+        if (state.interact || near(t, 0.65, 0.65)) {
+          collected.add(t.id);
+          mesh.visible = false;
+          sound("collect");
+          message(`${t.name} · ${collected.size} / 5`, 2);
+          updateCollectionHud();
+          updateObjective();
+          break;
+        }
+      }
+    }
+    if (collected.size === 5 && near(world.goal, 2.1)) {
+      complete();
+      return;
+    }
+  }
+  if (worldId === "palace") {
+    if (!guardsActive && near(world.goal, 3.7, 2)) {
+      prompt = "Laban · E / B to speak";
+      if (state.interact) {
+        modal(
+          "1 NEPHI 3:11–14",
+          "Laman asks for the plates.",
+          "Laman asks for his family’s records. Laban refuses and threatens him. Laman flees.",
+          [
+            {
+              label: "Run to your brothers",
+              run: () => {
+                guardsActive = true;
+                caughtGrace = 3.8;
+                for (const g of guards) {
+                  g.actor.group.visible = true;
+                  g.state.x = player.x + (g === guards[0] ? -3 : 3);
+                  g.state.z = player.z - 7;
+                }
+                if (goalMarker) {
+                  goalMarker.position.set(
+                    world.escapeGoal!.x,
+                    world.escapeGoal!.y + 0.04,
+                    world.escapeGoal!.z,
+                  );
+                }
+                follow.reset(player, 0, "palace");
+                updateObjective();
+                message("Through the gate! Keep running.", 3);
+              },
+            },
+          ],
+        );
+        return;
+      }
+    }
+    if (guardsActive && near(world.escapeGoal ?? world.goal, 3.1)) {
+      complete();
+      return;
+    }
+  }
+  if (guardsActive && levelTime > 1.5) {
+    for (const guard of guards) {
+      guard.timer -= dt;
+      if (guard.timer <= 0) {
+        guard.path = navigate(guard.state, player, world.solids);
+        guard.timer = 0.8;
+      }
+      let target = guard.path[0] ?? player;
+      if (
+        Math.hypot(guard.state.x - target.x, guard.state.z - target.z) < 0.7
+      ) {
+        guard.path.shift();
+        target = guard.path[0] ?? player;
+      }
+      const dx = target.x - guard.state.x,
+        dz = target.z - guard.state.z,
+        d = Math.hypot(dx, dz) || 1;
+      stepPlayer(
+        guard.state,
+        {
+          x: (-dx / d) * 0.58,
+          y: (dz / d) * 0.58,
+          jump: false,
+          jumpHeld: false,
+          traversal: false,
+        },
+        dt,
+        0,
+        world.solids,
+      );
+      guard.actor.update(dt, guard.state);
+      if (
+        caughtGrace === 0 &&
+        Math.hypot(player.x - guard.state.x, player.z - guard.state.z) < 0.73 &&
+        Math.abs(player.y - guard.state.y) < 1.2
+      ) {
+        beginCaughtTransition();
+        return;
+      }
+    }
+  }
+  if (goalMarker) {
+    goalMarker.children[1].position.y = 2.6 + Math.sin(time * 2) * 0.12;
+    goalMarker.children[0].rotation.z += dt * 0.25;
+  }
+  const carrying = carryObjects.find((object) => object.held);
+  const loose = nearestCarryObject(player, carryObjects, world.solids);
+  if (!prompt && carrying) prompt = "E / B throw · Crouch + E / B set down";
+  else if (!prompt && loose) {
+    prompt = "Supply bundle · E / B pick up";
+    if (state.interact && pickUp(loose, player, world.solids))
+      message("E / B throws · Crouch + E / B sets down", 2.5);
+  }
+  if (!prompt && player.move === "ledgeHang")
+    prompt = "Up / Jump to pull up · Crouch to drop";
+  if (!prompt && player.move === "climb")
+    prompt = "Up / Down to climb · Jump away · Crouch to drop";
+  el("prompt").textContent = prompt;
+  el("prompt").classList.toggle("visible", !!prompt);
+  if (time > toastUntil) el("toast").classList.remove("visible");
+}
+function resize() {
+  renderer.setSize(innerWidth, innerHeight);
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener("resize", resize);
+resize();
+load("hub");
+function startGame() {
+  if (started) return;
+  started = true;
+  el("title-screen").hidden = true;
+  input.reset();
+  void requestFullScreen();
+  message(
+    "Jump into a painting, or explore the practice garden. Pause → Moves for help.",
+    6,
+  );
+}
+el("start").onclick = startGame;
+el("setup-controller-title").onclick = openControllerSetup;
+document.addEventListener("keydown", (e) => {
+  if (
+    !started &&
+    !controllerSetup &&
+    (e.code === "Enter" || e.code === "Space")
+  )
+    startGame();
+});
+el("pause").onclick = pause;
+el("home").onclick = () => {
+  if (started && !transition) warp("hub");
+};
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden && started && !paused) pause();
+});
+function frame(now: number) {
+  const dt = Math.min((now - previous) / 1000, 0.04);
+  previous = now;
+  update(dt);
+  if (!started)
+    follow.update(
+      dt,
+      player,
+      world.solids,
+      { orbitX: 0, orbitY: 0, recenter: false },
+      "hub",
+    );
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+if (import.meta.env.DEV || new URLSearchParams(location.search).has("playtest"))
+  Object.assign(window, {
+    superMormon: {
+      snapshot: () => ({
+        world: worldId,
+        player: { ...player },
+        cameraYaw: follow.yaw,
+        cameraPosition: {
+          x: camera.position.x,
+          y: camera.position.y,
+          z: camera.position.z,
+        },
+        paused,
+        transition,
+        collected: [...collected],
+        completed: [...completed],
+        guards: guards.map((g) => ({ ...g.state })),
+        goal: world.goal,
+        escapeGoal: world.escapeGoal,
+        treasures: world.treasures,
+        portals: world.portals,
+        climbables: world.climbables,
+        tokens: world.tokens,
+        bonusCollected: [...bonusCollected],
+        carryObjects: carryObjects.map((object) => ({ ...object })),
+        delivery: world.delivery,
+        deliveryDone,
+      }),
+    },
+  });

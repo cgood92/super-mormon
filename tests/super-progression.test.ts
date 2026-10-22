@@ -1,0 +1,43 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import {
+  canEnter,
+  nextStory,
+  prerequisite,
+  readCompleted,
+} from "../src/super/progression";
+
+test("scenes unlock in story order and completed scenes stay replayable", () => {
+  const completed = readCompleted([]);
+  assert.equal(nextStory(completed), "streets");
+  assert.equal(canEnter("streets", completed), true);
+  assert.equal(canEnter("palace", completed), false);
+  assert.equal(canEnter("house", completed), false);
+  assert.equal(prerequisite("house", completed), "streets");
+
+  completed.add("streets");
+  assert.equal(nextStory(completed), "palace");
+  assert.equal(canEnter("streets", completed), true);
+  assert.equal(canEnter("palace", completed), true);
+  assert.equal(canEnter("house", completed), false);
+  assert.equal(prerequisite("house", completed), "palace");
+
+  completed.add("palace");
+  assert.equal(nextStory(completed), "house");
+  assert.equal(canEnter("house", completed), true);
+  completed.add("house");
+  assert.equal(nextStory(completed), null);
+});
+
+test("older out-of-order saves keep completed replay access without opening gaps", () => {
+  const completed = readCompleted(["house", "unknown", "house"]);
+  assert.deepEqual([...completed], ["house"]);
+  assert.equal(canEnter("house", completed), true);
+  assert.equal(canEnter("palace", completed), false);
+  assert.equal(prerequisite("house", completed), null);
+  assert.equal(nextStory(completed), "streets");
+
+  completed.add("streets");
+  assert.equal(canEnter("palace", completed), true);
+  assert.equal(nextStory(completed), "palace");
+});
