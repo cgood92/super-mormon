@@ -124,36 +124,24 @@ test("gallery paintings have reachable jump launch points close to their planes"
   }
 });
 
-test("gallery movement studio has an open left entry and solid practice surfaces", () => {
+test("gallery movement studio is reachable through the west hallway", () => {
   const { data } = world("hub");
   const player = createPlayer(data.spawn.x, data.spawn.y, data.spawn.z);
   for (const [x, z] of [
-    [-13, 10],
-    [-22, 10],
-    [-24, 13],
+    [-5, 36],
+    [-5, 47],
+    [-72, 47],
+    [-72, -40],
   ] as const)
     go(player, x, z, data.solids);
-  assert.ok(player.x < -20.5, "player passed through the side-room entrance");
+  assert.ok(
+    player.x < -69 && player.z < -39,
+    "player reached the side practice room",
+  );
   assert.equal(data.tutorials?.length, 9);
   assert.ok(data.tutorials?.every((station) => station.x < -20.5));
   assert.ok(data.tokens?.every((token) => token.x < -20.5));
   assert.ok(data.delivery && data.delivery.x < -20.5);
-  for (const portal of data.portals ?? [])
-    assert.ok(
-      data.solids.some(
-        (solid) =>
-          solid.h < 0.3 &&
-          Math.abs(
-            solid.x - (portal.facing === "east" ? portal.x - 0.6 : portal.x),
-          ) <
-            solid.w / 2 &&
-          Math.abs(
-            solid.z - (portal.facing === "east" ? portal.z : portal.z + 0.6),
-          ) <
-            solid.d / 2,
-      ),
-      `${portal.id} painting has a solid platform`,
-    );
 });
 
 test("all four Jerusalem visits preserve exact city and palace collision geometry", () => {

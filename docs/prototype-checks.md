@@ -2,6 +2,10 @@
 
 ## Current implementation
 
+- The Conference Center has three public floors, side halls, an auditorium and roof gardens, all unlocked from the start. The six story paintings form one ground-floor gallery cluster and retain their sequential story locks. The auditorium has no paintings, coins or level objectives.
+- Side-foyer escalators physically connect every floor and the roof. Small treads are walkable in either direction, with gentle upward carry while grounded. Shaft guards meet floor edges, and the roof arrival stays open. Original framed mountain landscapes line the side halls as non-interactive exhibits. Nine optional movement lessons, six practice tokens and carrying/delivery practice occupy the west side hall, away from the auditorium.
+- The foyer’s stone checkerboard, black window mullions, cream columns, wood surrounds and circular fixtures interpret 19 supplied tour screenshots. The [Church architectural account](https://www.churchofjesuschrist.org/study/ensign/2000/10/the-conference-center-this-new-and-wonderful-hall?lang=eng) and [OLIN landscape description](https://theolinstudio.com/projects/lds-conference-center/) informed the building and roof treatment. This is an artistic public-area interpretation, not a measured blueprint.
+
 - Six physical gallery canvases unlock in story order: Jerusalem Streets → Laban’s Palace → Lehi’s House → The Treasure Offer → Jerusalem by Night → The Tree of Life. Each canvas blocks walking; entry requires airborne contact with its front. Locked scenes retain their prompts and remain inaccessible.
 - Streets, Palace, Treasure Offer, and Night use the exact same Jerusalem geometry from `src/super/jerusalem.ts`. All four contain Lehi’s house exterior, the palace audience hall, corridor exits, city gate, and an interior treasury. Lighting, actors, and story objectives vary. The explorable house interior remains a separate scene.
 - In the night story, Nephi receives Laban’s actual outer garments. The visible Laban rig changes to modest linen underclothing as Nephi takes on the matching outfit. His death remains a brief text recap rather than an interactive act.
@@ -9,27 +13,21 @@
 - The Tree of Life is a peaceful interactive adaptation as Lehi. Hold E / B / touch B to hold the rod; releasing detaches. Normal walking supplies forward motion, with bounded lateral assistance. Follow the winding path through localized mist and partake of the white fruit beneath the center of the climbable tree. Partaking directly completes the mission and welcomes Sariah, Nephi, and Sam, leaving the garden open for free exploration without a separate beckoning step. Laman and Lemuel remain apart and do not partake.
 - The tree has spreading branches, luminous foliage, and individual white fruit. The spacious building is elevated across a separated gulf, with a bridge and stair route to its main floor; upper storeys are scenic. Crowds use instanced geometry, named family members offer conversations and nearby figures wave. Mist becomes thicker off the path. A safe overlook and clear living fountain offer optional reflection. There are no coins, combat, or timers in this scene. Entering the gulf gently returns the player to a saved safe point without resetting progress.
 - Level builders load in chunks on demand, with only the active level constructed. Gallery paintings load their images when first rendered. Six gallery derivatives total 1.28 MB versus 15.56 MB for the retained originals, a 91.7% reduction. See [developer performance checks](performance-checks.md) for opt-in FPS, render workload, and scene resource trends.
-- The existing `src/super/camera.ts` is unchanged; Tree of Life selects its existing streets preset. World disposal releases the mist texture, meshes, materials, and lights and restores prior background/fog; runtime disposal removes and releases character rigs.
+- The hub uses a closer camera preset (distance 9.5, elevation 0.22, target height 2) and the camera far clip is 320 units. Story camera behavior is unchanged; Tree of Life selects its existing streets preset. World disposal releases the mist texture, meshes, materials, and lights and restores prior background/fog; runtime disposal removes and releases character rigs.
 
 ## Latest browser verification
 
-The following checks were performed against the revised implementation using normal browser input:
+Using normal virtual-controller input, the new Conference Center was traversed from the opening foyer through the auditorium, the escalators, both balconies and the roof. The rooftop path to a fountain was also walked. All public areas were accessible with the existing five-story test save. A painting entered Jerusalem successfully.
 
-- Stand against a gallery painting: it physically stops movement and does not enter. Jump while touching its front: the unlocked scene opens.
-- Lehi reaches his home through the revised shared city.
-- Laman approaches the palace audience, speaks with Laban, and escapes through the palace/city route.
-- Tree of Life: hold the action button along the full iron-rod route through the mists. The fruit prompt appears beneath the tree center within 4.5 units. Partake, complete the scene, choose to stay in the garden, and open Sariah’s reflection conversation. This run produced no browser console errors. Earlier verification also reached the fountain and opened its reflection dialogue.
+At 667×375 mobile landscape, the full-screen prompt and gameplay fit without page overflow. No console errors or warnings were reported. Repeated hub → Jerusalem → hub visits returned to the same settled renderer counts: 191 geometries and 17 textures at the same spawn view. This is a desktop browser check, not physical phone performance testing.
 
-The bridge/stair route into the spacious building’s main floor and back to the tree was also traversed in the browser. Jumping toward the tree attached to its trunk and climbing reached 10.4 units of height. Upper storeys are scenic.
-
-The revised Treasure Offer completed through the shared palace’s western corridor, city gate and deep cave with all three brothers. A fresh refusal followed by 11 seconds idle left guards at their spawns with pursuit unarmed; moving then began the escape normally. The checkpoint-idle regression also covers the retry case.
-
-The revised nighttime scene completed through normal input: Laban outside the palace, the garment transfer, Zoram in the separate treasury, brass plates, and the return through the same corridors and city gate with Zoram following. These checks used isolated test saves with earlier stories completed; no runtime teleporting was used. The Tree of Life opening was also checked at 667×375 with no page overflow or clipped buttons.
+Earlier normal-input checks covered the shared Jerusalem stories and the expanded Tree of Life rod, fruit, family conversations, building round trip and tree climbing. Those gameplay scenes retain their prior behavior.
 
 ## Automated checks
 
 Run `npm test`, `npm run build`, and `npm run format:check` for the current result. Tests cover:
 
+- Conference Center routes from spawn to all six painting fronts and jump entry, all auditorium floor entrances, and the roof; grounded escalator carry; roof and upper-floor shaft guards; and ground building boundaries.
 - Camera-relative movement, acceleration/stopping, variable jumps, coyote time, buffering, stairs, walls, raised platforms, and ceiling clearance.
 - Long jumps, backflips, side somersaults, jump chains, wall kicks, crouch/crawl clearance, ledge traversal, pole climbing, and carried-object physics.
 - Controller and touch input edges, lost pointer capture, key repeat, modal activation, N64 calibration and glyphs, and menu navigation.
@@ -37,7 +35,7 @@ Run `npm test`, `npm run build`, and `npm run format:check` for the current resu
 - Tree of Life spacing and separated waters; held-action rod attachment and release without autonomous movement; bounded correction; checkpoint rescue preserving progression; actual player physics walking the full rod route and the bridge/stair route to the building’s main floor; centered fruit interaction and direct completion; tree climbing; and continued exploration.
 - Lazy scene preparation without changing the active scene, gallery image derivatives, and opt-in performance snapshots including bounded resource trends and unavailable heap reporting.
 
-All 129 automated tests pass. The production build and formatting checks pass. Browser viewport checks and developer diagnostics do not establish performance or comfort on a physical phone.
+All 148 automated tests, the production build, formatting and whitespace checks pass. Browser viewport checks and developer diagnostics do not establish performance or comfort on a physical phone.
 
 ## Scriptural treatment
 
@@ -60,4 +58,4 @@ The measured N64 adapter is `0810:e501`, with two axes and ten buttons. Its buil
 
 `tests/super-playthrough.js` supplies legal virtual-controller input and reads a runtime snapshot. Open a preview with `?playtest` and import the driver from the development server. Physical phone and controller playtests remain useful for comfort and game feel.
 
-Repeated browser gallery → vision → gallery visits kept the settled gallery at 124 geometries and 10 textures after shadow-target cleanup; repeated vision entry likewise showed no resource-count increase. This verifies these visits, not every possible session or device.
+Earlier browser visits using the previous small gallery kept resource counts stable across gallery → vision → gallery transitions after shadow-target cleanup. Those measurements predate the new Conference Center and do not establish its resource counts or physical-device performance.

@@ -17,13 +17,14 @@ export type CameraOrbit = {
   zoom?: number;
 };
 export type CameraMode =
-  "hub" | "streets" | "house" | "palace" | "trade" | "night";
+  "hub" | "conference" | "streets" | "house" | "palace" | "trade" | "night";
 
 const MODES: Record<
   CameraMode,
   { distance: number; elevation: number; targetHeight: number }
 > = {
   hub: { distance: 7.4, elevation: 0.53, targetHeight: 1.1 },
+  conference: { distance: 9.5, elevation: 0.22, targetHeight: 2 },
   streets: { distance: 7, elevation: 0.53, targetHeight: 1.1 },
   house: { distance: 6.2, elevation: 0.52, targetHeight: 1.1 },
   palace: { distance: 7, elevation: 0.52, targetHeight: 1.1 },

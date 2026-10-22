@@ -1,0 +1,591 @@
+import * as THREE from "three";
+import { label, painting } from "./art";
+import { paintingCollider } from "./gallery-entry";
+import type { WorldData } from "./worlds";
+import {
+  conferenceKit,
+  conferencePalette as C,
+  disposeConference,
+} from "./conference-kit";
+import { buildAuditorium } from "./conference-auditorium";
+import { buildRooftop } from "./conference-rooftop";
+
+export const CONFERENCE_LEVELS = [0, 12, 24] as const;
+export const CONFERENCE_ESCALATORS = [
+  { x: -56, y: 0, startZ: 40, endZ: 0 },
+  { x: 56, y: 12, startZ: 0, endZ: 40 },
+  { x: -56, y: 24, startZ: 40, endZ: 0 },
+] as const;
+const stairHole = (x: number, z: number) =>
+  Math.abs(Math.abs(x) - 56) < 5 && z > 0 && z < 40;
+function tileFloor(group: THREE.Group, y: number, upper: boolean) {
+  const geometry = new THREE.BoxGeometry(2.75, 0.035, 2.75),
+    matrix = new THREE.Matrix4(),
+    rotation = new THREE.Quaternion().setFromAxisAngle(
+      new THREE.Vector3(0, 1, 0),
+      Math.PI / 4,
+    );
+  const points: [number, number, number][] = [];
+  for (let a = -60; a <= 60; a++)
+    for (let b = -60; b <= 60; b++) {
+      const x = ((a - b) * 2.75) / Math.SQRT2,
+        z = ((a + b) * 2.75) / Math.SQRT2;
+      if (
+        Math.abs(x) > 88 ||
+        z < -102 ||
+        z > 53 ||
+        (z < 1 && Math.abs(x) < 67) ||
+        (upper && stairHole(x, z))
+      )
+        continue;
+      points.push([x, z, (a + b) & 1]);
+    }
+  for (let shade = 0; shade < 2; shade++) {
+    const list = points.filter((p) => p[2] === shade),
+      mesh = new THREE.InstancedMesh(
+        geometry,
+        new THREE.MeshStandardMaterial({
+          color: shade ? 0xb5ad9c : 0xe7e1d2,
+          roughness: 0.34,
+          metalness: 0.06,
+        }),
+        list.length,
+      );
+    list.forEach(([x, z], i) => {
+      matrix.compose(
+        new THREE.Vector3(x, y + 0.025, z),
+        rotation,
+        new THREE.Vector3(1, 1, 1),
+      );
+      mesh.setMatrixAt(i, matrix);
+    });
+    mesh.name = "diagonal polished limestone checkerboard";
+    mesh.receiveShadow = true;
+    group.add(mesh);
+  }
+}
+export function gallery(scene: THREE.Scene): WorldData {
+  const group = new THREE.Group();
+  group.name = "Conference Center";
+  scene.add(group);
+  const { add, decor, solids, batch } = conferenceKit(group);
+  const priorBackground = scene.background,
+    priorFog = scene.fog;
+  scene.background = new THREE.Color(0xbacbd1);
+  scene.fog = new THREE.Fog(0xbacbd1, 150, 380);
+  group.add(new THREE.HemisphereLight(0xfff8e5, 0x6c7478, 2.6));
+  const sun = new THREE.DirectionalLight(0xfff3da, 2);
+  sun.position.set(-70, 100, 80);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(1024, 1024);
+  Object.assign(sun.shadow.camera, {
+    left: -120,
+    right: 120,
+    top: 120,
+    bottom: -120,
+    far: 250,
+  });
+  sun.shadow.camera.updateProjectionMatrix();
+  group.add(sun);
+  for (const y of CONFERENCE_LEVELS) {
+    if (y === 0)
+      add(0, -0.55, -25, 180, 0.55, 160, C.stone, "ground foundation");
+    else {
+      // Open wells accommodate actual continuous escalator stair surfaces.
+      add(0, y - 0.5, 47.5, 180, 0.5, 15, C.stone, "south landing");
+      add(0, y - 0.5, 0, 180, 0.5, 2, C.stone, "north landing");
+      add(0, y - 0.5, 20, 100, 0.5, 40, C.stone, "central foyer slab");
+      for (const side of [-1, 1]) {
+        add(
+          side * 76,
+          y - 0.5,
+          -30,
+          28,
+          0.5,
+          140,
+          C.stone,
+          "side gallery slab",
+        );
+        add(
+          side * 65,
+          y - 0.5,
+          20,
+          6,
+          0.5,
+          40,
+          C.stone,
+          "escalator outer landing",
+        );
+      }
+    }
+    tileFloor(group, y, y > 0);
+    // Recessed ceiling panels and glowing circular coffers.
+    decor(0, y + 10.9, 27, 100, 0.45, 55, C.pale, "foyer ceiling");
+    for (const side of [-1, 1])
+      decor(
+        side * 76,
+        y + 10.9,
+        27,
+        27,
+        0.45,
+        55,
+        C.pale,
+        "side foyer ceiling",
+      );
+    decor(0, y + 10.9, 47.5, 178, 0.45, 14, C.pale, "south ceiling");
+    for (const x of [-77, -36, 0, 36, 77])
+      for (const z of [12, 43]) {
+        const ring = new THREE.Mesh(
+          new THREE.CylinderGeometry(2.7, 2.7, 0.23, 32),
+          new THREE.MeshStandardMaterial({ color: C.bronze }),
+        );
+        ring.position.set(x, y + 10.72, z);
+        group.add(ring);
+        const diffuser = new THREE.Mesh(
+          new THREE.CylinderGeometry(2.36, 2.36, 0.25, 32),
+          new THREE.MeshBasicMaterial({ color: 0xfff3c7 }),
+        );
+        diffuser.position.set(x, y + 10.57, z);
+        group.add(diffuser);
+      }
+    for (const x of [-70, -40, 0, 40, 70])
+      for (const z of [8, 43]) {
+        add(x, y, z, 1.5, 10.9, 1.5, C.pale, "cream stone column");
+        decor(x, y, z, 1.9, 0.5, 1.9, C.timber, "wood column foot");
+        decor(x, y + 10.4, z, 2.2, 0.5, 2.2, C.stone, "column capital");
+      }
+    // Window bays span the south facade; fine dark mullions preserve the reference silhouette.
+    for (let x = -81; x < 90; x += 18) {
+      decor(x, y + 1, 54.6, 16, 9, 0.16, 0x9ebbc3, "daylight glazing");
+      for (const dx of [-8, -4, 0, 4, 8])
+        decor(
+          x + dx,
+          y,
+          54.35,
+          0.18,
+          11,
+          0.22,
+          C.mullion,
+          "black window mullion",
+        );
+      for (const h of [1, 5, 10])
+        decor(x, y + h, 54.25, 16, 0.18, 0.25, C.mullion, "window transom");
+      decor(x, y, 54.1, 17, 0.65, 0.6, C.timber, "warm wood window sill");
+    }
+    add(0, y, 55.2, 180, 11, 0.45, C.stone, "facade boundary");
+    for (const side of [-1, 1]) {
+      add(side * 90, y, -25, 0.6, 11, 160, C.stone, "outer side wall");
+      decor(
+        side * 78,
+        y + 10.9,
+        -50,
+        23,
+        0.35,
+        102,
+        C.pale,
+        "side hall ceiling",
+      );
+      for (let z = -90; z < 0; z += 18) {
+        decor(side * 89.6, y + 1, z, 0.2, 8, 14, 0xabc1c5, "side hall window");
+        for (const dz of [-7, 0, 7])
+          decor(
+            side * 89.3,
+            y,
+            z + dz,
+            0.22,
+            10,
+            0.18,
+            C.mullion,
+            "side window mullion",
+          );
+      }
+    }
+    add(0, y, -104.5, 180, 11, 0.6, C.stone, "north building wall");
+    // Open warm wood surrounds lead directly into each auditorium level.
+    for (const x of [-10, 10])
+      decor(x, y, 1, 1.1, 6, 0.7, C.timber, "auditorium door surround");
+    decor(0, y + 6, 1, 21, 0.9, 0.7, C.timber, "auditorium lintel");
+    label(
+      group,
+      y === 0
+        ? "AUDITORIUM · ALL LEVELS OPEN"
+        : `AUDITORIUM · LEVEL ${y / 12 + 1}`,
+      0,
+      y + 7.2,
+      1.5,
+      12,
+      0.85,
+    );
+    label(group, "ROOF GARDENS ↑  ·  ESCALATORS", -53, y + 6.2, 41, 14, 0.8);
+  }
+  // Wide paired escalator belts with small climbable risers and bronze rails.
+  for (const flight of CONFERENCE_ESCALATORS) {
+    const count = 40,
+      run = (flight.endZ - flight.startZ) / count;
+    for (let i = 0; i < count; i++)
+      add(
+        flight.x,
+        flight.y + i * 0.3,
+        flight.startZ + run * (i + 0.5),
+        7,
+        0.3,
+        Math.abs(run) + 0.04,
+        0x777d7b,
+        "escalator tread",
+      );
+    for (const dx of [-3.8, 3.8]) {
+      const rail = new THREE.Mesh(
+        new THREE.BoxGeometry(0.2, 0.18, Math.hypot(40, 12)),
+        new THREE.MeshStandardMaterial({ color: C.bronze }),
+      );
+      rail.position.set(flight.x + dx, flight.y + 7, 20);
+      rail.rotation.x = -Math.atan(12 / (flight.endZ - flight.startZ));
+      group.add(rail);
+    }
+  }
+  // Six story paintings form one clearly legible ground-floor gallery.
+  const stories = [
+    ["streets", "streets.jpg", "JERUSALEM STREETS"],
+    ["palace", "palace.jpg", "LABAN’S PALACE"],
+    ["house", "house.jpg", "LEHI’S HOUSE"],
+    ["trade", "trade.jpg", "THE TREASURE OFFER"],
+    ["night", "night.jpg", "JERUSALEM BY NIGHT"],
+    ["tree", "tree.jpg", "THE TREE OF LIFE"],
+  ] as const;
+  const portals: NonNullable<WorldData["portals"]> = [];
+  add(0, 0, 15, 46, 6, 0.45, C.pale, "story gallery wall");
+  decor(0, 0, 15.3, 46, 0.45, 0.2, C.timber, "gallery wood skirting");
+  stories.forEach(([id, file, title], i) => {
+    const x = -20 + i * 8;
+    painting(
+      group,
+      x,
+      0.7,
+      15.3,
+      `${import.meta.env?.BASE_URL ?? "/"}art/gallery/${file}`,
+      0xffffff,
+    );
+    label(group, title, x, 0.55, 16, 6, 0.52);
+    const portal = {
+      id,
+      x,
+      y: 0.59,
+      z: 15.58,
+      title,
+      facing: "north" as const,
+    };
+    portals.push(portal);
+    solids.push(paintingCollider(portal));
+  });
+  label(group, "THE BOOK OF MORMON · STORY GALLERY", 0, 6.8, 15.65, 25, 1);
+  // Unobtrusive optional movement room in the west side hall.
+  add(-82, 0, -48, 3.2, 2.25, 3.2, 0xa5b6a5, "practice ledge");
+  add(-84, 0, -64, 0.35, 3.6, 0.35, C.timber, "practice pole");
+  add(-75.6, 0, -47, 0.35, 1.4, 3.3, 0x879a91);
+  add(-72.4, 0, -47, 0.35, 1.4, 3.3, 0x879a91);
+  add(-74, 1.02, -47, 3.5, 0.38, 3.3, 0xc2c9be);
+  add(-78, 0, -60, 1.8, 1, 4.5, 0xb4c2b0);
+  add(-86, 0, -68, 0.55, 4.5, 5, 0x9dada6);
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(1.4, 0.06, 8, 48),
+    new THREE.MeshBasicMaterial({ color: 0xd3aa56 }),
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.set(-81, 0.07, -71);
+  group.add(ring);
+  label(group, "OPTIONAL MOVEMENT STUDIO", -78, 4, -40, 15, 0.8);
+  for (const y of [12, 24])
+    for (const x of [-62, -50, 50, 62])
+      add(x, y, 20, 0.18, 1.1, 38, C.bronze, "escalator well balustrade");
+  // The roof opening is wider than the lower wells; guard its exact slab edges.
+  for (const x of [-63, -49])
+    add(x, 36, 20, 0.2, 1.15, 40, C.bronze, "roof escalator shaft rail");
+  add(-56, 36, 40, 14.2, 1.15, 0.2, C.bronze, "roof shaft south rail");
+  // Warm auditorium boundary with three permanently open entries on each level.
+  // Side doors align with the escalator approaches; the foyer at z=0 stays clear.
+  for (const y of CONFERENCE_LEVELS) {
+    for (const [left, right] of [
+      [-66, -60.5],
+      [-51.5, -8],
+      [8, 51.5],
+      [60.5, 66],
+    ]) {
+      const width = right - left,
+        x = (left + right) / 2;
+      add(x, y, -2, width, 9.5, 0.6, C.pale, "auditorium foyer boundary");
+      decor(
+        x,
+        y,
+        -1.65,
+        width,
+        2.2,
+        0.18,
+        C.timber,
+        "auditorium wood wainscot",
+      );
+      decor(
+        x,
+        y + 8.7,
+        -1.62,
+        width,
+        0.8,
+        0.2,
+        C.timber,
+        "auditorium wood cornice",
+      );
+    }
+    for (const [x, width] of [
+      [-56, 9],
+      [0, 16],
+      [56, 9],
+    ]) {
+      for (const side of [-1, 1])
+        decor(
+          x + (side * width) / 2,
+          y,
+          -1.6,
+          0.55,
+          6.5,
+          0.3,
+          C.timber,
+          "open auditorium door jamb",
+        );
+      decor(
+        x,
+        y + 6.2,
+        -1.6,
+        width + 0.55,
+        0.65,
+        0.3,
+        C.timber,
+        "open auditorium door head",
+      );
+      add(
+        x,
+        y + 6.8,
+        -2,
+        width,
+        2.7,
+        0.6,
+        C.pale,
+        "auditorium doorway transom",
+      );
+    }
+  }
+  // Original, non-interactive landscape exhibits keep the side halls art-filled.
+  const exhibitPositions: { side: number; y: number; z: number }[] = [];
+  for (const y of CONFERENCE_LEVELS)
+    for (const side of [-1, 1])
+      for (const z of [-20, -43, -66, -89]) {
+        exhibitPositions.push({ side, y, z });
+        decor(
+          side * 67,
+          y + 2,
+          z,
+          0.4,
+          4.7,
+          9.2,
+          C.timber,
+          "landscape exhibit wood frame",
+        );
+        decor(
+          side * 67.23,
+          y + 2.2,
+          z,
+          0.1,
+          4.3,
+          8.8,
+          C.bronze,
+          "landscape exhibit inner frame",
+        );
+        decor(
+          side * 67.3,
+          y + 2.35,
+          z,
+          0.08,
+          4,
+          8.5,
+          0xbcd2d5,
+          "landscape exhibit sky",
+        );
+      }
+  for (const [layer, color, heights] of [
+    [0, 0x8a9caa, [1.2, 2.3, 1.6, 3.4, 2.2, 2.8, 1.4]],
+    [1, 0x677f7b, [0.8, 1.6, 1.1, 2.2, 1.3, 1.8, 0.8]],
+    [2, 0xb0a071, [0.5, 0.7, 0.4, 0.8, 0.6, 0.9, 0.6]],
+  ] as const) {
+    const shape = new THREE.Shape();
+    shape.moveTo(-4.2, 0);
+    heights.forEach((height, index) =>
+      shape.lineTo(-4.2 + index * 1.4, height),
+    );
+    shape.lineTo(4.2, 0);
+    shape.closePath();
+    const artwork = new THREE.InstancedMesh(
+      new THREE.ShapeGeometry(shape),
+      new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide }),
+      exhibitPositions.length,
+    );
+    const matrix = new THREE.Matrix4(),
+      rotation = new THREE.Quaternion();
+    exhibitPositions.forEach(({ side, y, z }, index) => {
+      rotation.setFromAxisAngle(
+        new THREE.Vector3(0, 1, 0),
+        (side * Math.PI) / 2,
+      );
+      matrix.compose(
+        new THREE.Vector3(side * (67.36 + layer * 0.02), y + 2.35, z),
+        rotation,
+        new THREE.Vector3(1, 1, 1),
+      );
+      artwork.setMatrixAt(index, matrix);
+    });
+    artwork.name = "original mountain landscape hallway exhibits";
+    group.add(artwork);
+  }
+  batch();
+  const auditorium = buildAuditorium(group),
+    roof = buildRooftop(group);
+  solids.push(...auditorium.solids, ...roof.solids);
+  let disposed = false;
+  return {
+    name: "Conference Center",
+    update: (dt, player) => {
+      advanceEscalator(player, dt);
+    },
+    subtitle: "Explore three floors, the auditorium and roof gardens",
+    spawn: { x: 0, y: 0, z: 36, yaw: Math.PI },
+    landmarks: [
+      { name: "Story gallery", x: 0, y: 0, z: 20 },
+      { name: "Auditorium ground entrance", x: 0, y: 0, z: -2 },
+      { name: "Auditorium second floor", x: 0, y: 12, z: -2 },
+      { name: "Auditorium third floor", x: 0, y: 24, z: -2 },
+      ...roof.landmarks,
+    ],
+    solids,
+    portals,
+    climbables: [
+      { id: "gallery-pole", x: -84, z: -64, y: 0, height: 3.6, radius: 0.2 },
+    ],
+    tokens: [
+      { id: "arch", x: -74, y: 0.4, z: -47 },
+      { id: "ledge", x: -82, y: 2.75, z: -48 },
+      { id: "pole", x: -84, y: 4.05, z: -64 },
+      { id: "jump", x: -78, y: 1.5, z: -60 },
+      { id: "wall", x: -84.8, y: 2.7, z: -68 },
+      { id: "explore", x: -73, y: 0.55, z: -67 },
+    ],
+    carryables: [
+      {
+        id: "practice-bundle",
+        name: "Practice bundle",
+        x: -73,
+        y: 0.3,
+        z: -70,
+      },
+    ],
+    delivery: { x: -81, y: 0, z: -71, radius: 1.4 },
+    tutorials: practiceLessons(),
+    practiceBounds: { minX: -87, maxX: -69, minZ: -74, maxZ: -39 },
+    goal: { x: 0, y: 0, z: 17.5, radius: 3 },
+    bounds: { minX: -89, maxX: 89, minZ: -104, maxZ: 54 },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      disposeConference(group);
+      scene.background = priorBackground;
+      scene.fog = priorFog;
+    },
+  };
+}
+
+function practiceLessons(): NonNullable<WorldData["tutorials"]> {
+  return [
+    ["arch", "Crawl", "Use {crouch} and move beneath the low arch.", -74, -44],
+    [
+      "ledge",
+      "Jump and climb",
+      "Jump toward the ledge, then {up} or {jump} to pull up. {crouch} lets go.",
+      -82,
+      -45,
+    ],
+    [
+      "pole",
+      "Climb the pole",
+      "Jump toward the pole. Use {up} / {down}; {jump} springs away.",
+      -83,
+      -62,
+    ],
+    [
+      "jump",
+      "Chain jumps",
+      "Press {jump} again as you LAND for a double jump. Chain a third landing jump.",
+      -78,
+      -57,
+    ],
+    [
+      "wall",
+      "Wall kick",
+      "Jump toward the wall, then press {jump} to kick away.",
+      -84,
+      -67,
+    ],
+    [
+      "explore",
+      "Carry and deliver",
+      "{action} picks up the bundle. {crouch} + {action} sets it in the gold ring.",
+      -73,
+      -70,
+    ],
+    [
+      "long-jump",
+      "Long jump",
+      "Run, use {crouch}, then {jump} to leap forward. Hold {jump}.",
+      -73,
+      -54,
+    ],
+    [
+      "backflip",
+      "Backflip",
+      "Stand still. Use {crouch}, then {jump} to flip backward.",
+      -73,
+      -61,
+    ],
+    [
+      "sideflip",
+      "Side somersault",
+      "Run one way, quickly reverse direction, and press {jump}.",
+      -80,
+      -40,
+    ],
+  ].map(([id, title, instruction, x, z]) => ({
+    id: String(id),
+    title: String(title),
+    instruction: String(instruction),
+    x: Number(x),
+    y: 0,
+    z: Number(z),
+    radius: 3,
+  }));
+}
+
+/** Slow moving treads assist grounded visitors; normal movement can overcome the belt. */
+export function advanceEscalator(
+  player: { x: number; y: number; z: number; grounded: boolean },
+  dt: number,
+): boolean {
+  if (!player.grounded || !Number.isFinite(dt) || dt <= 0) return false;
+  for (const flight of CONFERENCE_ESCALATORS) {
+    if (Math.abs(player.x - flight.x) > 3.1) continue;
+    const direction = Math.sign(flight.endZ - flight.startZ),
+      distance = (player.z - flight.startZ) * direction;
+    if (distance < 0 || distance >= 40) continue;
+    const top = flight.y + 0.3 * Math.min(40, Math.floor(distance) + 1);
+    if (Math.abs(player.y - top) > 0.36) continue;
+    const next = Math.min(40, distance + 0.9 * Math.min(dt, 0.1));
+    player.z = flight.startZ + direction * next;
+    player.y = flight.y + 0.3 * Math.min(40, Math.floor(next) + 1);
+    return true;
+  }
+  return false;
+}

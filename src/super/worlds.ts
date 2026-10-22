@@ -1,8 +1,9 @@
 import * as THREE from "three";
 import { buildJerusalem } from "./jerusalem";
 import { buildTreeOfLife } from "./tree-of-life";
-import { gallery, house } from "./gallery-worlds";
-import type { Climbable } from "./physics";
+import { house } from "./gallery-worlds";
+import { gallery } from "./conference-center";
+import type { Climbable, PlayerState } from "./physics";
 export type WorldId =
   "hub" | "streets" | "house" | "palace" | "trade" | "night" | "tree";
 export type Solid = {
@@ -19,6 +20,7 @@ export type WorldData = {
   subtitle: string;
   spawn: Point;
   solids: Solid[];
+  landmarks?: { name: string; x: number; y: number; z: number }[];
   portals?: {
     id: WorldId;
     x: number;
@@ -55,6 +57,7 @@ export type WorldData = {
   pursuers?: { x: number; y: number; z: number }[];
   bounds?: { minX: number; maxX: number; minZ: number; maxZ: number };
   dispose?: () => void;
+  update?: (dt: number, player: PlayerState) => void;
 };
 
 export function buildWorld(id: WorldId, scene: THREE.Scene): WorldData {

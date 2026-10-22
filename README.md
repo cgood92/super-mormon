@@ -1,6 +1,6 @@
 # Super Mormon
 
-An original third-person 3D adventure prototype. Run, jump, explore, and enter early Book of Mormon scenes through paintings in an imagined Conference Center gallery.
+An original third-person 3D adventure prototype. Run, jump, explore, and enter early Book of Mormon scenes through paintings in an original interpretation of the Conference Center.
 
 ## Play locally
 
@@ -38,7 +38,7 @@ Open http://127.0.0.1:5173/. A 2.6-second splash automatically gives way to the 
 
 This uses the N64 buttons for the corresponding existing game actions. The camera's close/wide views and recenter action are adaptations, not a complete recreation of Mario 64's first-person and camera-mode system. Generic USB adapters can report the same physical buttons under different numbers, so setup learns them rather than guessing from the device name.
 
-Walk up to a painting and jump into its canvas to enter. The canvases are physical surfaces: standing against one does not enter it, and jumping while touching its front does. The six stories unlock in order: **Jerusalem Streets → Laban’s Palace → Lehi’s House → The Treasure Offer → Jerusalem by Night → The Tree of Life**. Completed scenes remain available for replay.
+The Conference Center opens with all three public floors, the auditorium and roof gardens available immediately. The six story paintings are grouped together in one ground-floor gallery directly ahead of the starting point. Walk up to a painting and jump into its canvas to enter. The canvases are physical surfaces: standing against one does not enter it, and jumping while touching its front does. The six stories unlock in order: **Jerusalem Streets → Laban’s Palace → Lehi’s House → The Treasure Offer → Jerusalem by Night → The Tree of Life**. Completed scenes remain available for replay.
 
 - **Jerusalem:** play as Lehi, find his blue door, and avoid pursuers. Explore the same streets, palace, and house exterior that appear on later visits.
 - **Laban’s palace:** play as Laman, enter the audience hall and speak with Laban, then escape through the palace corridor and city gate to the brothers. Guards and escape routes are imagined gameplay.
@@ -52,7 +52,7 @@ Pause offers restart and return-to-gallery controls. Completed adventures are sa
 
 ## Movement and exploration
 
-All moves are available immediately in every story. Choose **Pause → Moves & practice** for a short moves guide. In the gallery, head **left** into the separate **Movement Studio**. Nearby lesson prompts explain each obstacle as you approach it. Find six gold discovery tokens, crawl beneath the arch, grab the ledge, climb the pole, and carry the practice bundle to the gold ring. These are optional practice exhibits, not additional story requirements. Discovery tokens reset when a scene reloads.
+All moves are available immediately in every story. Choose **Pause → Moves & practice** for a short moves guide. In the Conference Center, head **left**, continue around the auditorium into the west side hall, and follow the **Optional Movement Studio** sign. Its nine lessons sit apart from the main foyer. Nearby lesson prompts explain each obstacle as you approach it. Find six gold discovery tokens, crawl beneath the arch, grab the ledge, climb the pole, and carry the practice bundle to the gold ring. These are optional practice exhibits, not additional story requirements. Discovery tokens reset when a scene reloads.
 
 - Run + crouch + jump: long jump. Stationary crouch + jump: backflip.
 - Reverse direction while running + jump: side somersault.
@@ -68,7 +68,9 @@ The Movement Studio contains optional traversal and carrying practice. Lehi’s 
 
 The new code replaces the previous collection of mini-games. It uses original low-poly models, run/jump animation, camera-relative analog movement, variable-height jumps, and a camera that follows from above and avoids walls. It contains no Nintendo characters, models, textures, music, or level layouts.
 
-The hub is an imagined gallery inspired by the Conference Center at Temple Square, not a measured recreation. Its six original illustrative paintings represent the six story scenes. They are illustrations, not archaeological reconstructions.
+The hub interprets the Conference Center at Temple Square through three connected public floors, broad foyers and side halls, a large column-free auditorium with seating and organ pipes, and landscaped roof terraces. Original wood-framed mountain landscapes fill the side halls as non-interactive exhibits. Diagonal stone floors, tall black-mullioned windows, cream columns, warm wood surrounds and circular ceiling fixtures draw on the 19 supplied tour screenshots. The architecture and landscape also reference the [Church’s architectural account](https://www.churchofjesuschrist.org/study/ensign/2000/10/the-conference-center-this-new-and-wonderful-hall?lang=eng) and [OLIN’s landscape design](https://theolinstudio.com/projects/lds-conference-center/). This is an original artistic interpretation with invented proportions and circulation, not an accurate blueprint. Its six original story paintings are illustrations, not archaeological reconstructions.
+
+From the starting foyer, pass around the story-gallery wall to reach the auditorium entrance. Escalators at the sides of the foyer connect the public floors and roof; their treads gently carry grounded visitors upward while ordinary walking remains available in either direction. On the roof, paths lead through meadow planting, trees, terraces and water features. The auditorium is an exploration space without story paintings, coins or level objectives. Building access is independent of the six stories’ sequential unlocks.
 
 Ancient rooms, streets, and furnishings are original low-poly artistic interpretations informed by Iron Age Judah around 600 BC: flat roofs, stone and plaster walls, timber, pottery, courtyard architecture, and open clay lamps. The layouts, exact houses, routes, clothing colors, and palace plans are invented rather than verified reconstructions. Reference: [Harvard Museum, Houses of Ancient Israel](https://hmane.harvard.edu/houses-ancient-israel), [Metropolitan Museum, Iron Age II ceramic lamp](https://www.metmuseum.org/art/collection/search/323172).
 
@@ -78,7 +80,7 @@ The four Jerusalem visits—Streets, Palace, Treasure Offer, and Night—constru
 
 The Tree of Life is an artistic, interactive adaptation rather than a claim that Lehi himself followed the iron rod in the scriptural account. Its rod mechanic lets the player explore the experience of those who held fast. [1 Nephi 8](https://www.churchofjesuschrist.org/study/scriptures/bofm/1-ne/8?lang=eng) describes the white fruit, family invitation, mists, and elevated building; Sariah, Nephi, and Sam partake, while Laman and Lemuel do not. [1 Nephi 11:21–25](https://www.churchofjesuschrist.org/study/scriptures/bofm/1-ne/11?lang=eng) explains the tree and living waters as representations of God’s love. The clear fountain is separate from the dark river and gulf: [1 Nephi 12:18](https://www.churchofjesuschrist.org/study/scriptures/bofm/1-ne/12?lang=eng) describes the separating gulf, and [1 Nephi 15:23–28](https://www.churchofjesuschrist.org/study/scriptures/bofm/1-ne/15?lang=eng) explains the rod as God’s word and the river’s water as filthiness. Falling toward the gulf gently returns the player to firm ground without losing progress.
 
-The existing camera behavior in `src/super/camera.ts` is unchanged; the Tree of Life uses the existing streets camera preset. Scene disposal removes the vision’s mist, meshes, materials, lights, and actors and restores the prior background and fog.
+The Conference Center uses a broader camera preset (distance 9.5, elevation 0.22, target height 2) and a 320-unit far clip for the larger building. Story camera behavior remains unchanged; the Tree of Life uses the existing streets preset. Scene disposal releases owned rendering resources and restores the prior background and fog.
 
 ## Verify
 

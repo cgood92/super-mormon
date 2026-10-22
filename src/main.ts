@@ -35,6 +35,7 @@ import { FollowCamera } from "./super/camera";
 import type { WorldData, WorldId } from "./super/worlds";
 import { prepareWorld } from "./super/world-loading";
 import { createPerformanceDiagnostics } from "./super/performance";
+import { conferenceLocation } from "./super/conference-location";
 import { label } from "./super/art";
 import {
   canEnter,
@@ -73,7 +74,7 @@ renderer.toneMapping = T.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.1;
 renderer.outputColorSpace = T.SRGBColorSpace;
 el("viewport").append(renderer.domElement);
-const camera = new T.PerspectiveCamera(58, 1, 0.08, 150),
+const camera = new T.PerspectiveCamera(58, 1, 0.08, 320),
   follow = new FollowCamera(camera),
   input = new Input(document);
 const diagnostics = createPerformanceDiagnostics(renderer, {
@@ -115,6 +116,7 @@ let storyCheckpoint: { x: number; y: number; z: number; yaw?: number } | null =
 let storyObjective = "";
 let learnedMoves = new Set<string>();
 let practiceVisible = false;
+let hubLocation = "";
 let wavingExtras: {
   actor: ReturnType<typeof createCharacter>;
   state: PlayerState;
@@ -430,9 +432,9 @@ function decorateGalleryProgress() {
     const plaque = label(
       badge,
       "LOCKED",
-      portal.facing === "east" ? 18.05 : portal.x + 0.75,
-      4.55,
-      portal.facing === "east" ? portal.z : -20.63,
+      portal.facing === "east" ? portal.x - 0.17 : portal.x + 0.75,
+      (portal.y ?? 0.59) + 3.96,
+      portal.facing === "east" ? portal.z : portal.z + 0.07,
       1.55,
       0.5,
     );
@@ -498,6 +500,7 @@ function updatePracticeLesson() {
   const b = world.practiceBounds;
   const inside =
     !!b &&
+    player.y < 8 &&
     player.x > b.minX &&
     player.x < b.maxX &&
     player.z > b.minZ &&
@@ -600,6 +603,7 @@ async function load(id: WorldId) {
   storyObjective = "";
   learnedMoves = new Set();
   practiceVisible = false;
+  hubLocation = "";
   el("practice-lesson").hidden = true;
   el("app").classList.remove("chapter-faded");
   scene = new T.Scene();
@@ -616,7 +620,11 @@ async function load(id: WorldId) {
   );
   scene.add(avatar.group);
   avatar.update(0, player);
-  follow.reset(player, player.yaw, id === "tree" ? "streets" : id);
+  follow.reset(
+    player,
+    player.yaw,
+    id === "tree" ? "streets" : id === "hub" ? "conference" : id,
+  );
   levelTime = 0;
   guardsActive = id === "streets";
   caughtGrace = 3;
@@ -780,9 +788,11 @@ function updateObjective() {
     (practiceVisible
       ? "Movement Studio · Learn at your own pace."
       : worldId === "hub"
-        ? nextStory(completed)
-          ? `Next: ${STORY_TITLES[nextStory(completed)!]} · {jump} into the painting.`
-          : "All stories complete · {jump} into any painting to replay."
+        ? conferenceLocation(player).name !== "Story Gallery"
+          ? conferenceLocation(player).hint
+          : nextStory(completed)
+            ? `Next: ${STORY_TITLES[nextStory(completed)!]} · {jump} into the painting.`
+            : "All stories complete · {jump} into any painting to replay."
         : worldId === "streets"
           ? "Help Lehi reach his home safely."
           : worldId === "house"
@@ -919,7 +929,11 @@ function resetCaughtCheckpoint() {
   storyScene?.respawn(player);
   avatar.update(0, player);
   treeScene?.respawn(player);
-  follow.reset(player, player.yaw, worldId === "tree" ? "streets" : worldId);
+  follow.reset(
+    player,
+    player.yaw,
+    worldId === "tree" ? "streets" : worldId === "hub" ? "conference" : worldId,
+  );
   for (const object of carryObjects) if (object.held) resetCarryObject(object);
   caughtGrace = 3.4;
 }
@@ -1075,6 +1089,7 @@ function update(dt: number) {
     world.solids,
     world.climbables,
   );
+  world.update?.(dt, player);
   if (events.jumped) sound("jump");
   const b = world.bounds;
   if (b) {
@@ -1122,7 +1137,7 @@ function update(dt: number) {
       recenter: state.recenter,
       zoom: state.cameraZoom,
     },
-    worldId === "tree" ? "streets" : worldId,
+    worldId === "tree" ? "streets" : worldId === "hub" ? "conference" : worldId,
   );
   app.classList.toggle("camera-obstructed", follow.obstructed);
   for (const entry of wavingExtras)
@@ -1189,6 +1204,12 @@ function update(dt: number) {
     message("Bundle delivered! Pick it up again to keep practicing.", 3);
   }
   if (worldId === "hub") {
+    const location = conferenceLocation(player);
+    if (location.name !== hubLocation) {
+      hubLocation = location.name;
+      el("world-name").textContent = location.name;
+      updateObjective();
+    }
     const p = world.portals?.find((p) => near(p, 2.2, 4));
     if (p && isStoryId(p.id)) {
       const prior = prerequisite(p.id, completed);
@@ -1423,7 +1444,7 @@ function frame(now: number) {
       player,
       world.solids,
       { orbitX: 0, orbitY: 0, recenter: false },
-      "hub",
+      "conference",
     );
   renderer.render(scene, camera);
   diagnostics.sampleFrame(now);
@@ -1459,6 +1480,7 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has("playtest"))
         escapeGoal: world.escapeGoal,
         treasures: world.treasures,
         portals: world.portals,
+        landmarks: world.landmarks,
         climbables: world.climbables,
         tokens: world.tokens,
         bonusCollected: [...bonusCollected],

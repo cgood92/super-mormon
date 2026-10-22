@@ -8,7 +8,7 @@ test("runtime starts without eagerly importing story or world builders", () => {
   assert.doesNotMatch(main, /^import \{ buildWorld/m);
 });
 test("gallery uses small painting derivatives", () => {
-  const source = readFileSync("src/super/gallery-worlds.ts", "utf8");
+  const source = readFileSync("src/super/conference-center.ts", "utf8");
   assert.doesNotMatch(source, /art\/.*\.png/);
 });
 

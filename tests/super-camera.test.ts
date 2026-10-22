@@ -5,6 +5,17 @@ import { FollowCamera, resolveCameraPosition } from "../src/super/camera.ts";
 import { createCharacter } from "../src/super/character.ts";
 import { createPlayer, stepPlayer } from "../src/super/physics.ts";
 
+test("conference view shows more of large rooms without changing story presets", () => {
+  const camera = new T.PerspectiveCamera(58, 1, 0.08, 320);
+  const follow = new FollowCamera(camera);
+  const player = { x: 0, y: 0, z: 0, yaw: Math.PI, grounded: true };
+  follow.reset(player, player.yaw, "conference");
+  assert.ok(follow.pitch < 0.3);
+  assert.ok(camera.position.distanceTo(new T.Vector3(0, 2, 0)) > 9);
+  follow.reset(player, player.yaw, "streets");
+  assert.equal(follow.pitch, 0.53);
+});
+
 test("camera ray stops in front of solid walls without clipping through them", () => {
   const target = new T.Vector3(0, 1.2, 0);
   const desired = new T.Vector3(0, 3.5, -5.5);
