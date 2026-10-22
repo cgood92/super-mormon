@@ -11,9 +11,9 @@ export function buildAuditorium(parent: THREE.Group) {
     new THREE.MeshStandardMaterial({ color, roughness });
   const cream = material(0xe6dcc9),
     carpet = material(0x7b3436),
-    wood = material(0x6d3924),
+    wood = material(0x97552e),
     gold = material(0xc5a24f, 0.35),
-    burgundy = material(0x783039),
+    burgundy = material(0x63382f),
     dark = material(0x312522);
   const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
   function box(
@@ -64,24 +64,32 @@ export function buildAuditorium(parent: THREE.Group) {
       const z = start - row * spacing,
         y = base + row * rise,
         half = width - row * taper;
-      for (const side of [-1, 1])
-        box(
-          (side * (half + 4)) / 2,
-          y - 0.42,
-          z,
-          half - 4,
-          0.42,
-          spacing + 0.015,
-          carpet,
-          true,
-        );
+      // The seating banks are filled to the foundation, never floating treads.
+      for (const side of [-1, 1]) {
+        // Exact symmetric 8 m aisle boundary; no segment can protrude into it.
+        for (let edge = 4; edge < half; edge += 4) {
+          const width = Math.min(4, half - edge);
+          const x = side * (edge + width / 2);
+          const curve = (-9 * (x / 60) ** 2 * row) / (rows - 1);
+          box(
+            x,
+            -0.4,
+            z + curve,
+            width + 0.015,
+            y + 0.4,
+            spacing + 0.025,
+            carpet,
+            true,
+          );
+        }
+      }
+      box(0, -0.4, z, 8, y + 0.4, spacing + 0.025, carpet, true);
       // A broad central processional aisle and two radial side aisles stay clear.
       for (let x = -half + 1; x < half - 1; x += 0.68) {
         if (Math.abs(x) < 4.3 || Math.abs(Math.abs(x) - half * 0.66) < 1.15)
           continue;
-        const curve = (2.5 * (x * x)) / (half * half);
-        const angle = Math.atan2(x, 100 + z);
-        seats.push({ x, y, z: z + curve * 0.13, angle: angle * 0.3 });
+        const curve = (-9 * (x / 60) ** 2 * row) / (rows - 1);
+        seats.push({ x, y, z: z + curve, angle: Math.atan2(x, 90 + z) });
       }
       // Row ends receive small warm wood fascia. Seats themselves remain
       // passable so every place can be explored without tens of thousands of colliders.
@@ -90,66 +98,97 @@ export function buildAuditorium(parent: THREE.Group) {
           box(side * (half - 0.2), y, z, 0.25, 0.7, spacing, wood);
     }
   }
-  tier(4.5, 61, -6.55, 1.1, -0.075, 60, 0.35);
-  box(0, -0.4, -37, 8, 0.4, 74, carpet, true);
-  // Rear lateral stairways join the descending seat terraces to the foyer.
-  for (const side of [-1, 1])
-    for (let i = 0; i < 15; i++)
-      box(side * (4.4 + i * 0.8), i * 0.3, -4.8, 0.81, 0.3, 2.4, carpet, true);
-  for (const side of [-1, 1])
-    box(side * 18, 4.08, -4.8, 4, 0.42, 2.4, carpet, true);
+  tier(2.4, 61, -13.55, 0.95, -0.04, 60, 0.35);
+  // The full rear cross aisle rises gently into the bowl; the processional aisle
+  // follows exactly the same rake as adjacent seats rather than forming a trench.
+  for (let i = 0; i < 8; i++)
+    box(0, -0.4, -6.4 - i * 0.9, 124, (i + 1) * 0.3 + 0.4, 0.925, carpet, true);
   // Four fine steps between balcony rows preserve 0.30 m maximum changes.
   function balcony(base: number) {
-    for (let i = 0; i < 80; i++) {
-      const z = -6.25 - i * 0.5,
-        y = base - i * 0.075;
-      box(0, y - 0.6, z, 124, 0.6, 0.505, carpet, true);
+    const underside = base - 7.2;
+    // A continuous structural underside carries the raked deck. Short AABB
+    // segments follow the fan while keeping all collision faces sealed.
+    for (let x = -60; x <= 60; x += 4) {
+      for (let i = 0; i < 80; i++) {
+        const curve = (-10 * (x / 62) ** 2 * i) / 79;
+        const z = -6.25 - i * 0.5 + curve;
+        const y = base - i * 0.075;
+        const depth = 0.5 + (10 * (x / 62) ** 2) / 79 + 0.025;
+        box(x, underside, z, 4.025, y - underside, depth, carpet, true);
+      }
+      const curve = -10 * (x / 62) ** 2;
+      const front = -46.1 + curve;
+      box(
+        x,
+        underside - 0.12,
+        (-6 + front) / 2,
+        4.025,
+        0.12,
+        -6 - front,
+        cream,
+        true,
+      );
+      box(x, base - 6.525, -46.1 + curve, 4.025, 0.65, 0.6, wood);
+      box(x, base - 5.925, -46.1 + curve, 4.025, 1.1, 0.6, cream, true);
+      // The cream fascia seals the entire front of the balcony structure.
+      box(x, underside, -46.1 + curve, 4.025, 1.275, 0.6, cream, true);
     }
-    // Seating follows the stepped bowl, with a sweeping open front rim.
     for (let row = 0; row < 20; row++) {
-      const z = -7 - row * 2,
-        y = base - (row * 4 + 2) * 0.075,
-        half = 60 - row * 0.36;
-      for (let x = -half; x < half; x += 0.68) {
+      const centerZ = -7 - row * 2;
+      const y = base - (row * 4 + 2) * 0.075;
+      const half = 60 - row * 0.36;
+      for (let x = -half; x < half; x += 0.8) {
         if (Math.abs(x) < 4.3 || Math.abs(Math.abs(x) - half * 0.66) < 1.15)
           continue;
-        seats.push({ x, y, z, angle: Math.atan2(x, 110 + z) * 0.3 });
+        const z = centerZ - (10 * (x / 62) ** 2 * (row * 4 + 2)) / 79;
+        seats.push({ x, y, z, angle: Math.atan2(x, 90 + z) });
       }
     }
-    box(0, base - 6.525, -46.1, 124, 0.65, 0.5, wood);
-    // The cross aisle stays behind a continuous guard at the balcony drop.
-    box(0, base - 5.925, -46.1, 124, 1.1, 0.2, cream, true);
   }
+
   balcony(12);
   balcony(24);
   // The stage is reachable from the center aisle via 30 cm treads.
-  for (let i = 0; i < 18; i++)
-    box(0, i * 0.3, -60.1 - i * 0.9, 8, 0.3, 0.91, carpet, true);
-  box(0, 5.4 - 0.6, -85.9, 92, 0.6, 21, wood, true);
-  box(0, 5.4, -80, 8, 1.15, 2.8, wood);
-  box(0, 6.55, -79.5, 3.8, 0.18, 1.25, wood);
-  box(0, 5.4, -77.6, 1.5, 1.3, 1.1, wood);
-  box(0, 6.7, -77.6, 2, 0.16, 1.35, wood);
+  for (let i = 0; i < 8; i++)
+    box(0, -0.4, -71.3 - i * 1.0, 8, i * 0.3 + 0.7, 1.025, carpet, true);
+  box(0, -0.4, -87.6, 92, 2.8, 17.2, wood, true);
+  box(0, 2.4, -84, 8, 1.15, 2.8, wood);
+  box(0, 3.55, -83.5, 3.8, 0.18, 1.25, wood);
+  box(0, 2.4, -81.6, 1.5, 1.3, 1.1, wood);
+  box(0, 3.7, -81.6, 2, 0.16, 1.35, wood);
   // Choir terraces and chairs beneath the characteristic gold pipe facade.
   for (let row = 0; row < 7; row++) {
-    const y = 5.4 + row * 0.3,
+    const y = 2.4 + row * 0.3,
       z = -84 - row * 1.5;
     box(0, y - 0.3, z, 73, 0.3, 1.5, wood, true);
     for (let x = -35; x <= 35; x += 1.1) seats.push({ x, y, z, angle: 0 });
   }
-  box(0, 6, -97.5, 82, 27, 1.1, wood);
-  const pipeGeometry = new THREE.CylinderGeometry(0.38, 0.38, 1, 10);
-  for (let i = -29; i <= 29; i++) {
-    const x = i * 1.12,
-      h =
-        10 +
-        6 * Math.exp(-Math.pow(i / 9, 2)) +
-        3 * Math.pow(Math.cos(i * 0.23), 2);
-    const pipe = new THREE.Mesh(pipeGeometry, gold);
-    pipe.scale.y = h;
-    pipe.position.set(x, 14 + h / 2, -96.55);
-    group.add(pipe);
-    box(x, 13.2, -96.05, 0.5, 0.8, 0.4, gold);
+  for (const side of [-1, 1]) {
+    box(side * 47, 15, -97.1, 18, 11, 0.8, cream);
+    box(side * 47, 15.6, -96.6, 16, 9.8, 0.1, material(0xeeeade));
+  }
+  const blue = material(0x566c91);
+  box(0, 10, -97.7, 100, 23, 0.7, blue);
+  const pipeGeometry = new THREE.CylinderGeometry(0.24, 0.24, 1, 8);
+  // Three tall pipe towers in a stepped walnut case, with lower side wings.
+  for (const [cx, width, top] of [
+    [-28, 13, 25],
+    [-15, 12, 29],
+    [0, 16, 33],
+    [15, 12, 29],
+    [28, 13, 25],
+  ]) {
+    box(cx, 12, -96.6, width, top - 12, 1.8, wood);
+    box(cx, top - 0.5, -95.9, width + 0.7, 0.65, 2.4, wood);
+    for (const side of [-1, 1])
+      box(cx + (side * width) / 2, 12, -95.4, 0.65, top - 12, 1.1, wood);
+    for (let j = -5; j <= 5; j++) {
+      const h = top - 14 - Math.abs(j) * 0.7;
+      const pipe = new THREE.Mesh(pipeGeometry, gold);
+      pipe.scale.y = h;
+      pipe.position.set(cx + (j * width) / 13, 13 + h / 2, -95.3);
+      group.add(pipe);
+    }
   }
   // Upholstered seats are only three instanced draws, regardless of capacity.
   const transforms = new THREE.Object3D();
@@ -177,11 +216,15 @@ export function buildAuditorium(parent: THREE.Group) {
     emissive: 0xffe2a1,
     emissiveIntensity: 0.65,
   });
-  for (let z = -12; z > -95; z -= 12)
-    for (let x = -48; x <= 48; x += 16) {
-      box(x, 33.5, z, 12, 0.15, 7, wood);
-      box(x, 33.35, z, 10, 0.15, 5, luminous);
+  // Broad concentric wood ribs sweep across the ceiling above the fan.
+  for (let row = 0; row < 8; row++) {
+    for (let x = -60; x <= 60; x += 4) {
+      const z = -9 - row * 10 - 12 * (x / 62) ** 2;
+      if (z < -97) continue;
+      box(x, 32.6, z, 4.15, 0.95, 1.3, cream);
+      box(x, 32.55, z + 0.9, 3.2, 0.12, 0.35, luminous);
     }
+  }
   for (const z of [-20, -55, -86]) {
     const light = new THREE.PointLight(0xffe7c5, 120, 100, 1.2);
     light.position.set(0, 31, z);
@@ -215,11 +258,13 @@ export function buildAuditorium(parent: THREE.Group) {
     batch.instanceMatrix.needsUpdate = true;
     group.add(batch);
   }
+  group.userData.reference =
+    "https://newsroom.churchofjesuschrist.org/media/orig/orig_auditorium_right_hr.jpg";
   group.userData.seatCount = seats.length;
   return {
     solids,
     landmarks: [
-      { name: "Conference Center pulpit", x: 0, y: 5.4, z: -76 },
+      { name: "Conference Center pulpit", x: 0, y: 2.4, z: -81 },
       { name: "Balcony", x: 0, y: 6.075, z: -45 },
       { name: "Upper balcony", x: 0, y: 18.075, z: -45 },
     ],

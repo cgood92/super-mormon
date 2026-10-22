@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { layoutSign } from "./sign-layout";
 
 export const palette = {
   limestone: 0xd7c6a2,
@@ -185,19 +186,36 @@ export function label(
     return plaque;
   }
   const canvas = document.createElement("canvas");
-  canvas.width = 768;
-  canvas.height = 144;
   const ctx = canvas.getContext("2d")!;
+  const layout = layoutSign(
+    words,
+    width,
+    height,
+    (text, size) => {
+      ctx.font = `600 ${size}px Georgia, serif`;
+      return ctx.measureText(text).width;
+    },
+    typeof window === "undefined" ? 1 : window.devicePixelRatio,
+  );
+  canvas.width = layout.canvasWidth;
+  canvas.height = layout.canvasHeight;
   ctx.fillStyle = "#243a4a";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.strokeStyle = "#c7a66a";
-  ctx.lineWidth = 8;
-  ctx.strokeRect(8, 8, 752, 128);
+  ctx.lineWidth = Math.max(1, Math.min(canvas.width, canvas.height) * 0.025);
+  const inset = ctx.lineWidth * 1.5;
+  ctx.strokeRect(
+    inset,
+    inset,
+    canvas.width - 2 * inset,
+    canvas.height - 2 * inset,
+  );
   ctx.fillStyle = "#fff5df";
-  ctx.font = "600 48px Georgia, serif";
+  ctx.font = `600 ${layout.fontSize}px Georgia, serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(words, 384, 72);
+  for (const line of layout.lines)
+    ctx.fillText(line.text, canvas.width / 2, line.y);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   const mesh = new THREE.Mesh(

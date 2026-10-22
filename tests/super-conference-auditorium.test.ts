@@ -51,8 +51,8 @@ test("all three foyer levels enter the bowl and return without jumping", () => {
 test("the ground center aisle reaches the pulpit stage and returns", () => {
   const { solids } = buildAuditorium(new THREE.Group());
   const p = createPlayer(0, 0, -0.5);
-  walk(p, -76, solids);
-  assert.ok(Math.abs(p.y - 5.4) < 0.01);
+  walk(p, -81, solids);
+  assert.ok(Math.abs(p.y - 2.4) < 0.01);
   walk(p, -0.5, solids);
   assert.equal(p.y, 0);
 });
@@ -77,17 +77,9 @@ test("seating is instanced and landmarks are useful open viewing places", () => 
 
 test("rear stair connects the lower seating terraces to the foyer circulation", () => {
   const { solids } = buildAuditorium(new THREE.Group());
-  const p = createPlayer(0, 0, -4.8);
-  for (let i = 0; i < 180; i++)
-    stepPlayer(
-      p,
-      { x: -1, y: 0, jump: false, jumpHeld: false, traversal: false },
-      1 / 60,
-      0,
-      solids,
-    );
-  assert.ok(p.x > 16, `Rear stair stopped at ${p.x}, height ${p.y}`);
-  assert.ok(Math.abs(p.y - 4.5) < 0.01);
+  const p = createPlayer(18, 0, -0.5);
+  walk(p, -14, solids);
+  assert.ok(Math.abs(p.y - 2.4) < 0.1);
   walk(p, -55, solids);
   assert.ok(p.y < 1.5);
 });
@@ -133,12 +125,82 @@ test("carpet visually clears the shared structural foundation", () => {
         new THREE.Vector3(-0.5, -0.5, -0.5),
         new THREE.Vector3(0.5, 0.5, 0.5),
       ).applyMatrix4(matrix);
-      if (bounds.containsPoint(new THREE.Vector3(0, -0.1, -30)))
+      if (bounds.containsPoint(new THREE.Vector3(0, -0.1, -70.55)))
         groundCarpetTop = bounds.max.y;
     }
   });
   assert.ok(groundCarpetTop !== undefined && groundCarpetTop > 0.015);
   assert.ok(
-    solids.some((s) => s.x === 0 && s.z === -37 && Math.abs(s.y + s.h) < 0.001),
+    solids.some(
+      (s) => s.x === 0 && s.z < -69 && s.z > -71 && Math.abs(s.y + s.h) < 0.001,
+    ),
   );
+});
+
+test("all side foyer entrances retain walkable balcony routes", () => {
+  const { solids } = buildAuditorium(new THREE.Group());
+  for (const x of [-56, 56]) {
+    for (const level of [0, 12, 24]) {
+      const p = createPlayer(x, level, -0.5);
+      p.grounded = true;
+      // Ground entries climb from the rear cross aisle; balconies continue
+      // down their side aisles, whose curved fronts reach farther toward stage.
+      walk(p, level ? -44 : -20, solids);
+      walk(p, -0.5, solids);
+      assert.ok(Math.abs(p.y - level) < 0.01);
+      assert.equal(p.crouching, false);
+    }
+  }
+});
+
+test("lower seating and stage treads have solid infill rather than walk-under gaps", () => {
+  const { solids } = buildAuditorium(new THREE.Group());
+  const contains = (x: number, y: number, z: number) =>
+    solids.some(
+      (s) =>
+        Math.abs(x - s.x) < s.w / 2 &&
+        Math.abs(z - s.z) < s.d / 2 &&
+        y >= s.y &&
+        y < s.y + s.h,
+    );
+  assert.ok(contains(18, 0.1, -20));
+  assert.ok(contains(0, 0.1, -74));
+  assert.ok(contains(0, 0.1, -85));
+  const p = createPlayer(0, 0, -0.5);
+  walk(p, -20, solids);
+  const centerHeight = p.y;
+  for (let i = 0; i < 120; i++)
+    stepPlayer(
+      p,
+      { x: -1, y: 0, jump: false, jumpHeld: false, traversal: false },
+      1 / 60,
+      0,
+      solids,
+    );
+  assert.ok(p.x > 10, `raked aisle cannot reach adjoining seats at ${p.x}`);
+  assert.ok(
+    Math.abs(p.y - centerHeight) < 0.2,
+    "aisle must match seat bank height",
+  );
+  assert.equal(p.crouching, false);
+});
+
+test("balcony decks are deep continuous structures with visibly curved front guards", () => {
+  const { solids } = buildAuditorium(new THREE.Group());
+  for (const base of [12, 24]) {
+    const decks = solids.filter(
+      (s) => s.h > 1.2 && Math.abs(s.y - (base - 7.2)) < 0.001,
+    );
+    assert.ok(decks.length >= 2400);
+    const guards = solids.filter(
+      (s) => s.h === 1.1 && Math.abs(s.y - (base - 5.925)) < 0.001,
+    );
+    const center = guards.find((s) => s.x === 0)!;
+    const edge = guards.find((s) => s.x === 60)!;
+    assert.ok(
+      center.z - edge.z > 9,
+      "balcony should sweep almost ten metres at its wings",
+    );
+    assert.ok(decks.every((s) => s.h > 1.2));
+  }
 });

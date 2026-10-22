@@ -2,7 +2,8 @@
 
 ## Current implementation
 
-- The Conference Center has three public floors, side halls, an auditorium and roof gardens, all unlocked from the start. The six story paintings form one ground-floor gallery cluster and retain their sequential story locks. The auditorium has no paintings, coins or level objectives.
+- The Conference Center has three public floors, side halls, an auditorium and roof gardens, all unlocked from the start. The auditorium uses curved seating and balcony fronts, continuous cream balcony soffits, concentric ceiling bands, and wood-cased organ towers. Its ground center aisle follows the seating rake, with filled stair structures connecting the foyer and stage. The six story paintings form one ground-floor gallery cluster and retain their sequential story locks. The auditorium has no paintings, coins or level objectives.
+- Sign canvases match each plaque’s physical aspect ratio. Measured lettering wraps and fits inside the border, preserving the full text and natural letter proportions.
 - Side-foyer escalators physically connect every floor and the roof. Small treads are walkable in either direction, with gentle upward carry while grounded. Shaft guards meet floor edges, and the roof arrival stays open. Original framed mountain landscapes line the side halls as non-interactive exhibits. Nine optional movement lessons, six practice tokens and carrying/delivery practice occupy the west side hall, away from the auditorium.
 - The foyer’s stone checkerboard, black window mullions, cream columns, wood surrounds and circular fixtures interpret 19 supplied tour screenshots. The [Church architectural account](https://www.churchofjesuschrist.org/study/ensign/2000/10/the-conference-center-this-new-and-wonderful-hall?lang=eng) and [OLIN landscape description](https://theolinstudio.com/projects/lds-conference-center/) informed the building and roof treatment. This is an artistic public-area interpretation, not a measured blueprint.
 
@@ -17,6 +18,8 @@
 
 ## Latest browser verification
 
+The revised auditorium was walked from the ground foyer along its raked center aisle to the stage. The center aisle no longer forms a trench, and the balcony undersides present continuous cream soffits.
+
 Using normal virtual-controller input, the new Conference Center was traversed from the opening foyer through the auditorium, the escalators, both balconies and the roof. The rooftop path to a fountain was also walked. All public areas were accessible with the existing five-story test save. A painting entered Jerusalem successfully.
 
 At 667×375 mobile landscape, the full-screen prompt and gameplay fit without page overflow. No console errors or warnings were reported. Repeated hub → Jerusalem → hub visits returned to the same settled renderer counts: 191 geometries and 17 textures at the same spawn view. This is a desktop browser check, not physical phone performance testing.
@@ -28,6 +31,7 @@ Earlier normal-input checks covered the shared Jerusalem stories and the expande
 Run `npm test`, `npm run build`, and `npm run format:check` for the current result. Tests cover:
 
 - Conference Center routes from spawn to all six painting fronts and jump entry, all auditorium floor entrances, and the roof; grounded escalator carry; roof and upper-floor shaft guards; and ground building boundaries.
+- Auditorium center and side entrances on all three floors, the stage route, filled seating and stair structures, continuous balcony guards and soffits, and roof clearance. Sign layout checks cover wide banners, long captions, wrapping, Unicode, texture limits, and text bounds.
 - Camera-relative movement, acceleration/stopping, variable jumps, coyote time, buffering, stairs, walls, raised platforms, and ceiling clearance.
 - Long jumps, backflips, side somersaults, jump chains, wall kicks, crouch/crawl clearance, ledge traversal, pole climbing, and carried-object physics.
 - Controller and touch input edges, lost pointer capture, key repeat, modal activation, N64 calibration and glyphs, and menu navigation.
@@ -35,7 +39,7 @@ Run `npm test`, `npm run build`, and `npm run format:check` for the current resu
 - Tree of Life spacing and separated waters; held-action rod attachment and release without autonomous movement; bounded correction; checkpoint rescue preserving progression; actual player physics walking the full rod route and the bridge/stair route to the building’s main floor; centered fruit interaction and direct completion; tree climbing; and continued exploration.
 - Lazy scene preparation without changing the active scene, gallery image derivatives, and opt-in performance snapshots including bounded resource trends and unavailable heap reporting.
 
-All 148 automated tests, the production build, formatting and whitespace checks pass. Browser viewport checks and developer diagnostics do not establish performance or comfort on a physical phone.
+The automated suite contains 157 tests. Run the commands above to verify the current checkout, including the production build and formatting. Browser viewport checks and developer diagnostics do not establish performance or comfort on a physical phone.
 
 ## Scriptural treatment
 
