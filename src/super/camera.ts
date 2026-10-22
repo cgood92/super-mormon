@@ -16,7 +16,8 @@ export type CameraOrbit = {
   recenter: boolean;
   zoom?: number;
 };
-export type CameraMode = "hub" | "streets" | "house" | "palace";
+export type CameraMode =
+  "hub" | "streets" | "house" | "palace" | "trade" | "night";
 
 const MODES: Record<
   CameraMode,
@@ -26,6 +27,8 @@ const MODES: Record<
   streets: { distance: 7, elevation: 0.53, targetHeight: 1.1 },
   house: { distance: 6.2, elevation: 0.52, targetHeight: 1.1 },
   palace: { distance: 7, elevation: 0.52, targetHeight: 1.1 },
+  trade: { distance: 7, elevation: 0.53, targetHeight: 1.1 },
+  night: { distance: 7, elevation: 0.52, targetHeight: 1.1 },
 };
 
 const ZOOM_DISTANCES = [0.6, 1, 1.4] as const;
@@ -95,6 +98,12 @@ export class FollowCamera {
   private stableHeadingTime = 0;
   private previousHeading = 0;
   private smoothDistance = MODES.hub.distance;
+  private orbitTarget: number | null = null;
+  /** Fraction of the requested camera distance blocked by nearby geometry. */
+  obstructionAmount = 0;
+  get obstructed(): boolean {
+    return this.obstructionAmount > 0.001;
+  }
   private zoomLevel = 1;
   private initialized = false;
   private recentering = false;
@@ -113,6 +122,8 @@ export class FollowCamera {
     this.stableHeadingTime = 0;
     this.previousHeading = player.yaw;
     this.recentering = false;
+    this.orbitTarget = null;
+    this.obstructionAmount = 0;
     this.zoomLevel = 1;
     this.smoothDistance = preset.distance;
     this.target.set(
@@ -138,13 +149,25 @@ export class FollowCamera {
     if (orbit.zoom)
       this.zoomLevel = clamp(this.zoomLevel + Math.sign(orbit.zoom), 0, 2);
     if (Math.abs(orbit.orbitX) + Math.abs(orbit.orbitY) > 0.0001) {
-      this.yaw += orbit.orbitX;
+      if (Math.abs(orbit.orbitX) > 0.45)
+        this.orbitTarget = (this.orbitTarget ?? this.yaw) + orbit.orbitX;
+      else {
+        this.orbitTarget = null;
+        this.yaw += orbit.orbitX;
+      }
       this.pitch = clamp(this.pitch + orbit.orbitY, 0.13, 1.12);
       this.manualCooldown = 2.5;
       this.stableHeadingTime = 0;
       this.recentering = false;
     } else {
       this.manualCooldown = Math.max(0, this.manualCooldown - dt);
+    }
+    if (this.orbitTarget !== null) {
+      this.yaw += angleDiff(this.orbitTarget, this.yaw) * ease(16, dt);
+      if (Math.abs(angleDiff(this.orbitTarget, this.yaw)) < 0.002) {
+        this.yaw = this.orbitTarget;
+        this.orbitTarget = null;
+      }
     }
     const headingChange = Math.abs(angleDiff(player.yaw, this.previousHeading));
     this.previousHeading = player.yaw;
@@ -153,6 +176,7 @@ export class FollowCamera {
         ? Math.min(2, this.stableHeadingTime + dt)
         : 0;
     if (orbit.recenter) {
+      this.orbitTarget = null;
       this.manualCooldown = 0;
       this.stableHeadingTime = 2;
       this.recentering = true;
@@ -185,15 +209,31 @@ export class FollowCamera {
     );
     const safe = resolveCameraPosition(this.target, desired, solids);
     const safeDistance = safe.distanceTo(this.target);
-    // Move inward immediately at walls; zoom back out smoothly once there is space.
+    const requestedDistance = preset.distance * ZOOM_DISTANCES[this.zoomLevel];
+    const blockedDistance = requestedDistance - safeDistance;
+    this.obstructionAmount =
+      blockedDistance > 0.001
+        ? clamp(blockedDistance / requestedDistance, 0, 1)
+        : 0;
+    // Wall avoidance must clamp immediately; user zoom eases in either direction.
     this.smoothDistance =
-      safeDistance < this.smoothDistance
+      this.obstructed && safeDistance < this.smoothDistance
         ? safeDistance
         : this.smoothDistance +
-          (safeDistance - this.smoothDistance) * ease(3, dt);
-    this.camera.position
-      .copy(this.target)
-      .addScaledVector(safe.sub(this.target).normalize(), this.smoothDistance);
+          (safeDistance - this.smoothDistance) * ease(11, dt);
+    // The eased distance can still extend beyond a nearby wall when zooming in
+    // while orbiting. Cast the actual final position before placing the camera.
+    const easedPosition = this.desired(this.target, this.smoothDistance);
+    const finalSafe = resolveCameraPosition(this.target, easedPosition, solids);
+    const finalDistance = finalSafe.distanceTo(this.target);
+    if (this.smoothDistance - finalDistance > 0.001) {
+      this.obstructionAmount = Math.max(
+        this.obstructionAmount,
+        (this.smoothDistance - finalDistance) / this.smoothDistance,
+      );
+      this.smoothDistance = finalDistance;
+    }
+    this.camera.position.copy(finalSafe);
     this.camera.lookAt(this.target);
   }
 

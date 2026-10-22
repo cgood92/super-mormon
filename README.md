@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-Open http://127.0.0.1:5173/ and choose **Enter the gallery**. Starting requests full screen and landscape orientation where the browser supports them. Unsupported phone browsers retain their own chrome and orientation controls. All gameplay fits the viewport.
+Open http://127.0.0.1:5173/. A 2.6-second splash automatically gives way to the gallery; jump or use the action button to skip it. The game requests full screen and landscape orientation where the browser supports them. Unsupported phone browsers retain their own chrome and orientation controls. All gameplay fits the viewport.
 
 ## Controls
 
@@ -23,7 +23,7 @@ Open http://127.0.0.1:5173/ and choose **Enter the gallery**. Starting requests 
 | Recenter       | R                       | Left shoulder          | Camera button   |
 | Pause          | Escape / P              | Start                  | Pause button    |
 
-**N64 USB controllers:** choose **Set up N64 controller** on the title screen or in Pause. Press and release each requested button, then press A to save. The mapping is saved for that controller in this browser. Unmapped controllers offer setup when gameplay starts; no macOS remapping is required.
+**N64 USB controllers:** the measured `0810:e501` USB profile (10 buttons, 2 axes) works out of the box. For another adapter, choose **Pause → Set up N64 controller**, press and release each requested button, then press A to save. Calibration is stored for that controller in this browser and takes priority over the built-in profile. Unrecognized nonstandard adapters offer setup when gameplay starts; no macOS remapping is required. Menus can be navigated with the joystick and confirmed with A. On-screen hints and button glyphs change with the active keyboard, touch, generic gamepad, or N64 controls.
 
 | N64 control      | Game action                                                 |
 | ---------------- | ----------------------------------------------------------- |
@@ -38,17 +38,19 @@ Open http://127.0.0.1:5173/ and choose **Enter the gallery**. Starting requests 
 
 This uses the N64 buttons for the corresponding existing game actions. The camera's close/wide views and recenter action are adaptations, not a complete recreation of Mario 64's first-person and camera-mode system. Generic USB adapters can report the same physical buttons under different numbers, so setup learns them rather than guessing from the device name.
 
-Jump toward a painting to enter its scene. The stories unlock in order: Jerusalem Streets, Laban’s Palace, then Lehi’s House. Completed scenes remain available for replay.
+Jump toward a painting to enter its scene. The five stories unlock in order: **Jerusalem Streets → Laban’s Palace → Lehi’s House → The Treasure Offer → Jerusalem by Night**. Completed scenes remain available for replay.
 
 - **Jerusalem:** play as Lehi, find his blue door, and avoid pursuers. Optional stairs and ledges offer higher routes.
 - **Laban’s palace:** play as Laman, approach Laban and talk, then flee through the gate to the brothers outside the city. Guards and the obstacle route are imagined gameplay.
 - **Lehi’s house:** play as Nephi, explore the rooms and upper gallery, gather five treasures, and return to the entrance. Furniture blocks movement and can also be jumped onto.
+- **The Treasure Offer:** bring the family’s treasures to Laban. When he seizes them and sends his servants after the brothers, escape through the gate together and lead all three brothers to the cave. A brief dialogue bridges to the angel’s encouragement and Nephi’s resolve to return.
+- **Jerusalem by Night:** return as Nephi and find Laban. A brief scripture recap describes his death without depicting violence. Wear Laban’s garments, speak with Zoram at the treasury, take the brass plates, and escort Zoram through the gate to the waiting brothers.
 
 Pause offers restart and return-to-gallery controls. Completed adventures are saved locally under `super-mormon-v1`.
 
 ## Movement and exploration
 
-All moves are available immediately in every story. Choose **Pause → Moves & practice** for a short moves guide. In the gallery's optional movement garden, find six gold discovery tokens, crawl beneath the arch, grab the ledge, climb the pole, and carry the practice bundle to the gold ring. These are practice exhibits, not additional story requirements. Discovery tokens reset when a scene reloads.
+All moves are available immediately in every story. Choose **Pause → Moves & practice** for a short moves guide. In the gallery, head **left** into the separate **Movement Studio**. Nearby lesson prompts explain each obstacle as you approach it. Find six gold discovery tokens, crawl beneath the arch, grab the ledge, climb the pole, and carry the practice bundle to the gold ring. These are optional practice exhibits, not additional story requirements. Discovery tokens reset when a scene reloads.
 
 - Run + crouch + jump: long jump. Stationary crouch + jump: backflip.
 - Reverse direction while running + jump: side somersault.
@@ -64,11 +66,11 @@ The streets have optional rooftop/palm discoveries, the palace has climbable cou
 
 The new code replaces the previous collection of mini-games. It uses original low-poly models, run/jump animation, camera-relative analog movement, variable-height jumps, and a camera that follows from above and avoids walls. It contains no Nintendo characters, models, textures, music, or level layouts.
 
-The hub is an imagined gallery inspired by the Conference Center at Temple Square, not a measured recreation. Its three original generated paintings depict the corresponding gameplay scenes: Lehi reaching home, Laman escaping the palace, and Nephi finding family treasures. They are illustrations, not archaeological reconstructions.
+The hub is an imagined gallery inspired by the Conference Center at Temple Square, not a measured recreation. Its five original illustrative paintings represent the five story scenes. They are illustrations, not archaeological reconstructions.
 
-Ancient rooms, streets, and furnishings are artistic interpretations informed by Iron Age Judah around 600 BC: flat roofs, stone and plaster walls, timber, pottery, courtyard architecture, and open clay lamps. Exact houses, routes, clothing colors, and palace plans are not verified reconstructions. Reference: [Harvard Museum, Houses of Ancient Israel](https://hmane.harvard.edu/houses-ancient-israel), [Metropolitan Museum, Iron Age II ceramic lamp](https://www.metmuseum.org/art/collection/search/323172).
+Ancient rooms, streets, and furnishings are original low-poly artistic interpretations informed by Iron Age Judah around 600 BC: flat roofs, stone and plaster walls, timber, pottery, courtyard architecture, and open clay lamps. The layouts, exact houses, routes, clothing colors, and palace plans are invented rather than verified reconstructions. Reference: [Harvard Museum, Houses of Ancient Israel](https://hmane.harvard.edu/houses-ancient-israel), [Metropolitan Museum, Iron Age II ceramic lamp](https://www.metmuseum.org/art/collection/search/323172).
 
-The scripture distinguishes Laman fleeing Laban’s threat in **1 Nephi 3:11–14** from the later servants’ pursuit after the treasures are offered in **3:22–27**. This prototype depicts the first encounter with invented guards for play. The treasure gathering is inspired by the family’s gold, silver, and precious things; specific objects and hiding places are invented. The Lehi homeward chase is also an imagined activity. [Read 1 Nephi 3](https://www.churchofjesuschrist.org/study/scriptures/bofm/1-ne/3?lang=eng).
+The scripture distinguishes Laman fleeing Laban’s threat in **1 Nephi 3:11–14** from the later servants’ pursuit after the treasures are offered in **3:22–27**. The prototype depicts the first encounter with invented guards for play and gives the later treasure offer its own chase. The treasure gathering is inspired by the family’s gold, silver, and precious things; specific objects and hiding places are invented. The Lehi homeward chase is also an imagined activity. The night scene follows **1 Nephi 4** in its essential sequence: Laban dies before Nephi wears his garments, Nephi obtains the records with Zoram, and Zoram joins the family. It presents the death in a short text recap rather than an interactive act. [Read 1 Nephi 3](https://www.churchofjesuschrist.org/study/scriptures/bofm/1-ne/3?lang=eng) and [1 Nephi 4](https://www.churchofjesuschrist.org/study/scriptures/bofm/1-ne/4?lang=eng).
 
 ## Verify
 

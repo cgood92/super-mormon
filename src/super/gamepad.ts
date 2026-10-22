@@ -107,6 +107,33 @@ export function readProfile(
   }
 }
 
+const DEFAULT_N64_ID = "usb gamepad (vendor: 0810 product: e501)";
+const DEFAULT_N64_BINDINGS: N64Profile["bindings"] = {
+  a: { type: "button", index: 5 },
+  b: { type: "button", index: 4 },
+  z: { type: "button", index: 8 },
+  start: { type: "button", index: 9 },
+  r: { type: "button", index: 7 },
+  cLeft: { type: "button", index: 3 },
+  cRight: { type: "button", index: 1 },
+  cUp: { type: "button", index: 0 },
+  cDown: { type: "button", index: 2 },
+};
+
+/** Prefer a saved calibration, then recognize the measured USB N64 adapter. */
+export function resolveControllerProfile(pad: Gamepad): N64Profile | null {
+  const id = pad.id ?? "";
+  const saved = readProfile(id);
+  if (saved) return saved;
+  if (
+    id.trim().replace(/\s+/g, " ").toLowerCase() !== DEFAULT_N64_ID ||
+    pad.buttons?.length !== 10 ||
+    pad.axes?.length !== 2
+  )
+    return null;
+  return { version: 1, id, bindings: DEFAULT_N64_BINDINGS };
+}
+
 export function saveProfile(
   profile: N64Profile,
   storage?: ProfileStorage,

@@ -1,6 +1,7 @@
 import * as T from "three";
 
-export type CharacterRole = "nephi" | "lehi" | "laman" | "guard";
+export type CharacterRole =
+  "nephi" | "nephi-disguised" | "sam" | "lehi" | "laman" | "guard";
 export type CharacterMove =
   | "idle"
   | "run"
@@ -30,6 +31,7 @@ export type CharacterState = {
   moveTime?: number;
   jumpStage?: number;
   carrying?: boolean;
+  wave?: boolean;
 };
 
 const PALETTE: Record<
@@ -49,7 +51,23 @@ const PALETTE: Record<
     trim: 0x7b5638,
     hair: 0x38281f,
     skin: 0xb98560,
-    beard: true,
+    beard: false,
+  },
+  "nephi-disguised": {
+    tunic: 0x373039,
+    mantle: 0x514038,
+    trim: 0x392b25,
+    hair: 0x38281f,
+    skin: 0xb98560,
+    beard: false,
+  },
+  sam: {
+    tunic: 0xbba87f,
+    mantle: 0x6e7964,
+    trim: 0x795d40,
+    hair: 0x4b3327,
+    skin: 0xbc8861,
+    beard: false,
   },
   lehi: {
     tunic: 0xd1b58e,
@@ -88,6 +106,9 @@ export function createCharacter(role: CharacterRole): {
   dispose(): void;
 } {
   const colors = PALETTE[role];
+  const armored = role === "guard" || role === "nephi-disguised";
+  const youngFace =
+    role === "nephi" || role === "nephi-disguised" || role === "sam";
   const group = new T.Group();
   group.name = `${role}-character`;
   const body = new T.Group();
@@ -113,9 +134,9 @@ export function createCharacter(role: CharacterRole): {
   const white = mat(0xf6e8cc);
   const iris = mat(0x251c19);
   const lip = mat(0x71473b);
-  const guardLeather = role === "guard" ? mat(0x684633) : null;
-  const guardBronze = role === "guard" ? mat(0x9b7850, 0.7) : null;
-  const guardRed = role === "guard" ? mat(0x9b3e35) : null;
+  const guardLeather = armored ? mat(0x684633) : null;
+  const guardBronze = armored ? mat(0x9b7850, 0.7) : null;
+  const guardRed = armored ? mat(0x9b3e35) : null;
   const mesh = (
     parent: T.Object3D,
     geometry: T.BufferGeometry,
@@ -205,9 +226,10 @@ export function createCharacter(role: CharacterRole): {
     0.31,
   );
   frontSash.rotation.z = -0.11;
-  if (role === "guard") {
+  if (armored) {
     // A broad leather cuirass and diagonal red sash read clearly at game scale.
     const chest = box(body, 0.67, 0.43, 0.12, guardLeather!, 0, 1.23, 0.295);
+    chest.name = "guard-cuirass";
     chest.rotation.x = -0.07;
     const sash = box(body, 0.13, 0.55, 0.055, guardRed!, -0.015, 1.23, 0.37);
     sash.rotation.z = 0.48;
@@ -228,6 +250,7 @@ export function createCharacter(role: CharacterRole): {
     }
   }
   const cloak = new T.Group();
+  cloak.name = "cloak";
   cloak.position.set(0, 1.37, -0.11);
   body.add(cloak);
   const back = box(cloak, 0.82, 1.01, 0.105, mantle, 0, -0.43, -0.35);
@@ -265,7 +288,7 @@ export function createCharacter(role: CharacterRole): {
     const arm = new T.Group();
     arm.name = side < 0 ? "left-arm" : "right-arm";
     arm.position.set(side * 0.39, 1.32, 0);
-    arm.rotation.z = side * (role === "guard" ? 0.2 : -0.12);
+    arm.rotation.z = side * (armored ? 0.2 : -0.12);
     body.add(arm);
     arms.push(arm);
     cylinder(arm, 0.155, 0.12, 0.37, 7, tunic, side * 0.025, -0.17, 0);
@@ -305,7 +328,7 @@ export function createCharacter(role: CharacterRole): {
   }
   mesh(
     head,
-    new T.ConeGeometry(0.067, 0.14, 5),
+    new T.ConeGeometry(youngFace ? 0.052 : 0.067, 0.14, 5),
     skin,
     0,
     -0.055,
@@ -315,6 +338,10 @@ export function createCharacter(role: CharacterRole): {
   sphere(head, 0.225, hair, 0, 0.19, -0.025, 0.98, 0.48, 0.98);
   for (const side of [-1, 1])
     box(head, 0.076, 0.16, 0.12, hair, side * 0.183, 0.09, -0.055);
+  if (youngFace) {
+    const fringe = box(head, 0.21, 0.065, 0.085, hair, -0.07, 0.205, 0.165);
+    fringe.rotation.z = -0.13;
+  }
   if (colors.beard) {
     const beard = sphere(
       head,
@@ -327,11 +354,12 @@ export function createCharacter(role: CharacterRole): {
       role === "lehi" ? 1.42 : 0.82,
       0.72,
     );
+    beard.name = "beard";
     beard.rotation.x = -0.13;
     for (const side of [-1, 1])
       sphere(head, 0.075, hair, side * 0.125, -0.125, 0.16, 0.7, 1, 0.65);
   }
-  if (role === "guard") {
+  if (armored) {
     // Faceted bronze helmet with cheek guards, without a modern visor or gear.
     cylinder(head, 0.12, 0.26, 0.18, 8, guardBronze!, 0, 0.2, -0.015);
     cylinder(head, 0.255, 0.255, 0.045, 8, guardLeather!, 0, 0.105, 0);
@@ -390,8 +418,8 @@ export function createCharacter(role: CharacterRole): {
       arms[1].rotation.x = state.grounded ? stride * 0.78 - 0.08 : -0.26;
       legs[0].rotation.z = 0;
       legs[1].rotation.z = 0;
-      arms[0].rotation.z = role === "guard" ? -0.2 : 0.12;
-      arms[1].rotation.z = role === "guard" ? 0.2 : -0.12;
+      arms[0].rotation.z = armored ? -0.2 : 0.12;
+      arms[1].rotation.z = armored ? 0.2 : -0.12;
       body.position.y =
         Math.sin(phase * 2) * 0.035 * speed +
         Math.sin(phase * 0.35) * 0.009 -
@@ -401,12 +429,12 @@ export function createCharacter(role: CharacterRole): {
       body.scale.x = 1 + landing * 0.045;
       body.scale.z = 1 + landing * 0.045;
       body.rotation.z = Math.max(-0.1, Math.min(0.1, -state.vx * 0.012));
-      body.rotation.x = role === "guard" ? 0.055 : 0;
+      body.rotation.x = armored ? 0.055 : 0;
       cloak.rotation.x =
         -0.08 - speed * 0.18 + Math.sin(phase * 1.3) * speed * 0.035;
       head.rotation.y = Math.sin(phase * 0.27) * 0.055;
       head.rotation.x = state.grounded
-        ? role === "guard"
+        ? armored
           ? 0.07
           : 0
         : Math.max(-0.12, Math.min(0.15, -state.vy * 0.018));
@@ -495,6 +523,10 @@ export function createCharacter(role: CharacterRole): {
         arms[1].rotation.x = -1.1;
         arms[0].rotation.z = -0.28;
         arms[1].rotation.z = 0.28;
+      }
+      if (state.wave && move === "idle" && !state.carrying) {
+        arms[1].rotation.z = 2.55 + Math.sin(phase * 3.1) * 0.13;
+        arms[1].rotation.x = -0.25 + Math.sin(phase * 5.4) * 0.15;
       }
     },
     dispose() {

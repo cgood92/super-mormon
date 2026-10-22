@@ -1,4 +1,8 @@
-import { isBindingPressed, readProfile, type N64Profile } from "./gamepad";
+import {
+  isBindingPressed,
+  resolveControllerProfile,
+  type N64Profile,
+} from "./gamepad";
 
 export type InputState = {
   x: number;
@@ -30,6 +34,24 @@ function stick(value: number): number {
   return (Math.sign(value) * (Math.abs(value) - DEADZONE)) / (1 - DEADZONE);
 }
 
+function activeGamepad(profile?: N64Profile | null): Gamepad | undefined {
+  if (
+    typeof navigator === "undefined" ||
+    typeof navigator.getGamepads !== "function"
+  )
+    return undefined;
+  const pads = Array.from(navigator.getGamepads()).filter(
+    (pad): pad is Gamepad => !!pad && pad.connected !== false,
+  );
+  return (
+    pads.find(
+      (pad) =>
+        (!!profile && profile.id === pad.id) ||
+        resolveControllerProfile(pad) !== null,
+    ) ?? pads[0]
+  );
+}
+
 export class Input {
   private keys = new Set<string>();
   private edges = new Set<Action>();
@@ -37,6 +59,7 @@ export class Input {
   private controllerProfile: N64Profile | null = null;
   private controllerProfileOverride = false;
   private lastGamepadId: string | null = null;
+  private lastTouch = false;
   private suppressGamepadEdges = false;
   private touchButtons = new Set<Action>();
   private buttonPointers = new Map<number, Action>();
@@ -68,6 +91,7 @@ export class Input {
 
   private onKeyDown = (event: Event) => {
     const key = event as KeyboardEvent;
+    this.lastTouch = false;
     if (
       (key.code === "Space" || key.code === "Enter") &&
       typeof Element !== "undefined" &&
@@ -102,7 +126,12 @@ export class Input {
 
   private onPointerDown = (event: Event) => {
     const pointer = event as PointerEvent;
-    const element = pointer.target instanceof Element ? pointer.target : null;
+    if (pointer.pointerType === "touch") this.lastTouch = true;
+    else if (pointer.pointerType) this.lastTouch = false;
+    const element =
+      typeof Element !== "undefined" && pointer.target instanceof Element
+        ? pointer.target
+        : null;
     const actionButton = element?.closest(
       "[data-jump], [data-crouch], [data-action], [data-recenter], [data-pause]",
     );
@@ -216,14 +245,29 @@ export class Input {
     this.suppressGamepadEdges = true;
   }
 
+  get device(): "keyboard" | "n64" | "gamepad" | "touch" {
+    const gamepad = activeGamepad(
+      this.controllerProfileOverride ? this.controllerProfile : null,
+    );
+    if (gamepad)
+      return (this.controllerProfileOverride &&
+        this.controllerProfile?.id === gamepad.id) ||
+        resolveControllerProfile(gamepad)
+        ? "n64"
+        : "gamepad";
+    if (
+      this.lastTouch ||
+      (typeof matchMedia === "function" &&
+        matchMedia("(pointer: coarse)").matches)
+    )
+      return "touch";
+    return "keyboard";
+  }
+
   latest(dt = 1 / 60): InputState {
-    const gamepad =
-      typeof navigator !== "undefined" &&
-      typeof navigator.getGamepads === "function"
-        ? Array.from(navigator.getGamepads()).find(
-            (pad): pad is Gamepad => !!pad,
-          )
-        : undefined;
+    const gamepad = activeGamepad(
+      this.controllerProfileOverride ? this.controllerProfile : null,
+    );
     const gamepadId = gamepad?.id ?? null;
     if (gamepadId !== this.lastGamepadId) {
       this.previousButtons.clear();
@@ -232,8 +276,10 @@ export class Input {
     const profile =
       gamepad &&
       (this.controllerProfileOverride
-        ? this.controllerProfile
-        : readProfile(gamepad.id ?? ""));
+        ? this.controllerProfile?.id === gamepad.id
+          ? this.controllerProfile
+          : resolveControllerProfile(gamepad)
+        : resolveControllerProfile(gamepad));
     const bindings = profile?.id === gamepadId ? profile.bindings : null;
     const buttons: Record<Action, boolean> = {
       jump:

@@ -27,7 +27,10 @@ test("follow camera responds to manual orbit and recenters behind player", () =>
     { orbitX: Math.PI / 2, orbitY: 0, recenter: false },
     "hub",
   );
-  assert.ok(Math.abs(follow.yaw - Math.PI / 2) < 0.01);
+  assert.ok(follow.yaw > 0 && follow.yaw < Math.PI / 2);
+  for (let i = 0; i < 20; i++)
+    follow.update(1 / 60, p, [], { orbitX: 0, orbitY: 0, recenter: false });
+  assert.ok(Math.abs(follow.yaw - Math.PI / 2) < 0.02);
   follow.update(1 / 60, p, [], { orbitX: 0, orbitY: 0, recenter: true }, "hub");
   for (let i = 0; i < 180; i++)
     follow.update(
@@ -79,6 +82,7 @@ test("camera zoom steps closer and farther without changing its aim", () => {
     nearDistance < originalDistance,
     "C-Up should move the camera closer",
   );
+  assert.ok(nearDistance > 7.4 * 0.6 + 0.5, "zoom should ease inward");
   assert.equal(follow.pitch, originalPitch);
   assert.equal(follow.yaw, 0);
   follow.update(1 / 60, p, [], orbit(1));
@@ -104,6 +108,7 @@ test("camera zoom clamps at its closest and farthest preset and resets to defaul
   });
   follow.reset(p);
   for (let i = 0; i < 10; i++) follow.update(1 / 60, p, [], orbit(-1));
+  for (let i = 0; i < 60; i++) follow.update(1 / 60, p, [], orbit(0));
   assert.ok(Math.abs(camera.position.distanceTo(target) - 7.4 * 0.6) < 0.05);
   for (let i = 0; i < 10; i++) follow.update(1 / 60, p, [], orbit(1));
   for (let i = 0; i < 180; i++) follow.update(1 / 60, p, [], orbit(0));
@@ -134,6 +139,61 @@ test("far zoom still stops in front of a wall", () => {
     camera.position.z > -8.15,
     `camera z ${camera.position.z} crossed wall`,
   );
+});
+
+test("wall obstruction clamps immediately and clears as space opens", () => {
+  const camera = new T.PerspectiveCamera(65, 1, 0.08, 100);
+  const follow = new FollowCamera(camera);
+  const p = { x: 0, y: 0, z: 0, yaw: 0, runSpeed: 0 };
+  const wall = { x: 0, y: 0, z: -2.4, w: 3, h: 6, d: 0.5 };
+  follow.reset(p);
+  follow.update(1 / 60, p, [wall]);
+  assert.ok(follow.obstructed);
+  assert.ok(follow.obstructionAmount > 0);
+  assert.ok(camera.position.z > -2, "camera crossed wall while easing");
+  follow.update(1 / 60, p, []);
+  assert.equal(follow.obstructed, false);
+  assert.equal(follow.obstructionAmount, 0);
+  assert.ok(camera.position.z > -7, "camera should ease back outward");
+});
+
+test("eased zoom stays outside walls while the camera orbits", () => {
+  const camera = new T.PerspectiveCamera(65, 1, 0.08, 100);
+  const follow = new FollowCamera(camera);
+  const p = { x: 0, y: 0, z: 0, yaw: 0, runSpeed: 0 };
+  const wall = { x: -2, y: 0, z: -5.5, w: 2, h: 8, d: 0.8 };
+  const target = new T.Vector3(0, 1.1, 0);
+  follow.reset(p);
+  for (let frame = 0; frame < 30; frame++) {
+    follow.update(1 / 60, p, [wall], {
+      orbitX: frame === 0 ? Math.PI / 2 : 0,
+      orbitY: 0,
+      recenter: false,
+      zoom: frame === 0 ? -1 : 0,
+    });
+    const safe = resolveCameraPosition(target, camera.position, [wall]);
+    assert.ok(
+      safe.distanceTo(camera.position) < 0.001,
+      `camera crossed wall on orbit frame ${frame}`,
+    );
+  }
+});
+
+test("manual orbit drag interrupts an easing C-button step", () => {
+  const camera = new T.PerspectiveCamera(65, 1, 0.08, 100);
+  const follow = new FollowCamera(camera);
+  const p = { x: 0, y: 0, z: 0, yaw: 0, runSpeed: 0 };
+  follow.reset(p);
+  follow.update(1 / 60, p, [], {
+    orbitX: Math.PI / 4,
+    orbitY: 0,
+    recenter: false,
+  });
+  const afterStep = follow.yaw;
+  follow.update(1 / 60, p, [], { orbitX: -0.05, orbitY: 0, recenter: false });
+  assert.ok(follow.yaw < afterStep);
+  for (let i = 0; i < 30; i++) follow.update(1 / 60, p, []);
+  assert.ok(follow.yaw < afterStep);
 });
 
 test("character feet stay at player height and motion animates limbs", () => {

@@ -154,13 +154,29 @@ test("palace cedar bench can be jumped during escape", () => {
 test("gallery paintings have reachable jump launch points close to their planes", () => {
   const { data } = world("hub");
   for (const portal of data.portals ?? []) {
-    assert.ok(Math.abs(portal.z + 20.7) < 0.6);
-    assert.ok(standingClear(portal.x, 0, portal.z + 0.6, data.solids));
-    const player = createPlayer(portal.x, 0, portal.z + 1.3);
+    const side = portal.id === "trade" || portal.id === "night";
+    assert.ok(
+      standingClear(
+        side ? portal.x - 0.7 : portal.x,
+        0.18,
+        side ? portal.z : portal.z + 0.6,
+        data.solids,
+      ),
+    );
+    const player = createPlayer(
+      side ? portal.x - 1.3 : portal.x,
+      0.18,
+      side ? portal.z : portal.z + 1.3,
+    );
     for (let frame = 0; frame < 20; frame++)
       stepPlayer(
         player,
-        { x: 0, y: -1, jump: frame === 0, jumpHeld: true },
+        {
+          x: side ? -1 : 0,
+          y: side ? 0 : -1,
+          jump: frame === 0,
+          jumpHeld: true,
+        },
         1 / 60,
         0,
         data.solids,
@@ -168,4 +184,65 @@ test("gallery paintings have reachable jump launch points close to their planes"
     assert.ok(Math.hypot(player.x - portal.x, player.z - portal.z) < 1.2);
     assert.ok(player.y > 0.45, "jump should enter the painting trigger");
   }
+});
+
+test("gallery movement studio has an open left entry and solid practice surfaces", () => {
+  const { data } = world("hub");
+  const player = createPlayer(data.spawn.x, data.spawn.y, data.spawn.z);
+  for (const [x, z] of [
+    [-13, 10],
+    [-22, 10],
+    [-24, 13],
+  ] as const)
+    go(player, x, z, data.solids);
+  assert.ok(player.x < -20.5, "player passed through the side-room entrance");
+  assert.equal(data.tutorials?.length, 9);
+  assert.ok(data.tutorials?.every((station) => station.x < -20.5));
+  assert.ok(data.tokens?.every((token) => token.x < -20.5));
+  assert.ok(data.delivery && data.delivery.x < -20.5);
+  for (const portal of data.portals ?? [])
+    assert.ok(
+      data.solids.some(
+        (solid) =>
+          solid.h < 0.3 &&
+          Math.abs(solid.x - portal.x) < (portal.x > 15 ? 1 : 0.1) &&
+          Math.abs(solid.z - portal.z) < 2.5,
+      ),
+      `${portal.id} painting has a solid platform`,
+    );
+});
+
+test("the treasure offer has an open route from Laban through the gate to the cave", () => {
+  const { data } = world("trade");
+  assert.ok(data.story?.cave);
+  const player = createPlayer(data.spawn.x, 0, data.spawn.z);
+  for (const [x, z] of [
+    [0, 0],
+    [0, -20],
+    [0, 5],
+    [0, 40],
+    [-8, 50],
+    [-8, 64],
+  ] as const)
+    go(player, x, z, data.solids, 1.3);
+  assert.ok(Math.hypot(player.x + 8, player.z - 64) < 1.3);
+});
+
+test("night route reaches Laban, the treasury, plates and brothers", () => {
+  const { data } = world("night");
+  assert.ok(data.story?.treasury && data.story.plates);
+  const player = createPlayer(data.spawn.x, 0, data.spawn.z);
+  for (const [x, z] of [
+    [0, 28],
+    [0, 0],
+    [-18, -12],
+    [0, -12],
+    [14, -17],
+    [14, -22],
+    [0, -12],
+    [0, 28],
+    [0, 43],
+  ] as const)
+    go(player, x, z, data.solids, 1.4);
+  assert.ok(Math.hypot(player.x, player.z - 43) < 1.4);
 });

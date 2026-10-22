@@ -13,6 +13,8 @@ test("scenes unlock in story order and completed scenes stay replayable", () => 
   assert.equal(canEnter("streets", completed), true);
   assert.equal(canEnter("palace", completed), false);
   assert.equal(canEnter("house", completed), false);
+  assert.equal(canEnter("trade", completed), false);
+  assert.equal(canEnter("night", completed), false);
   assert.equal(prerequisite("house", completed), "streets");
 
   completed.add("streets");
@@ -26,6 +28,13 @@ test("scenes unlock in story order and completed scenes stay replayable", () => 
   assert.equal(nextStory(completed), "house");
   assert.equal(canEnter("house", completed), true);
   completed.add("house");
+  assert.equal(nextStory(completed), "trade");
+  assert.equal(canEnter("trade", completed), true);
+  assert.equal(canEnter("night", completed), false);
+  completed.add("trade");
+  assert.equal(nextStory(completed), "night");
+  assert.equal(prerequisite("night", completed), null);
+  completed.add("night");
   assert.equal(nextStory(completed), null);
 });
 

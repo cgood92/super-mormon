@@ -33,9 +33,9 @@ export function snapshot() {
 }
 export async function press(index = 1) {
   pad.buttons[index].pressed = true;
-  await tick();
+  await new Promise((r) => setTimeout(r, 120));
   pad.buttons[index].pressed = false;
-  await tick();
+  await new Promise((r) => setTimeout(r, 120));
 }
 export async function go(x, z, tolerance = 0.4, timeout = 12000) {
   const start = performance.now();
@@ -80,8 +80,16 @@ export async function enter(id) {
   document.querySelector("#home").click();
   await new Promise((r) => setTimeout(r, 750));
   const p = snapshot().portals.find((p) => p.id === id);
-  await go(p.x, p.z + 1.8, 0.25);
-  pad.axes[1] = -1;
+  const side = id === "trade" || id === "night";
+  if (side) {
+    await go(14, 17, 0.3);
+    await go(p.x - 1.8, p.z, 0.25);
+  } else await go(p.x, p.z + 1.8, 0.25);
+  const yaw = snapshot().cameraYaw;
+  const dx = side ? 1 : 0,
+    dz = side ? 0 : -1;
+  pad.axes[0] = -Math.cos(yaw) * dx + Math.sin(yaw) * dz;
+  pad.axes[1] = -(Math.sin(yaw) * dx + Math.cos(yaw) * dz);
   pad.buttons[0].pressed = true;
   await new Promise((r) => setTimeout(r, 650));
   stop();

@@ -14,7 +14,8 @@ import {
   vessel,
 } from "./art";
 
-export type WorldId = "hub" | "streets" | "house" | "palace";
+export type WorldId =
+  "hub" | "streets" | "house" | "palace" | "trade" | "night";
 export type Solid = {
   x: number;
   y: number;
@@ -35,6 +36,24 @@ export type WorldData = {
   tokens?: { id: string; x: number; y: number; z: number }[];
   carryables?: { id: string; name: string; x: number; y: number; z: number }[];
   delivery?: { x: number; y: number; z: number; radius: number };
+  tutorials?: {
+    id: string;
+    title: string;
+    instruction: string;
+    x: number;
+    y: number;
+    z: number;
+    radius: number;
+  }[];
+  practiceBounds?: { minX: number; maxX: number; minZ: number; maxZ: number };
+  story?: {
+    laban: Point;
+    treasury?: Point;
+    plates?: Point;
+    gate: Point;
+    cave?: Point;
+    brothers: Point;
+  };
   goal: { x: number; y: number; z: number; radius?: number };
   escapeGoal?: { x: number; y: number; z: number; radius?: number };
   pursuers?: { x: number; y: number; z: number }[];
@@ -110,10 +129,16 @@ function gallery(scene: THREE.Scene): WorldData {
   const { group, add, decor, finish } = makeWorld(scene, "gallery");
   decor(0, -0.55, 0, 40, 0.55, 48, 0xd5d2c8, "gallery floor");
   // A broad, contemporary hall inspired by the Conference Center, with daylight above.
-  add(-20, 0, 0, 0.9, 10, 48, 0xc7c5bc);
+  // The west wall opens into the optional movement studio at z=6..13.
+  add(-20, 0, -9, 0.9, 10, 30, 0xc7c5bc);
+  add(-20, 0, 18.5, 0.9, 10, 11, 0xc7c5bc);
   add(20, 0, 0, 0.9, 10, 48, 0xc7c5bc);
   add(0, 0, 24, 40, 10, 0.9, 0xbfc4c1);
   add(0, 0, -24, 40, 10, 0.9, 0xbfc4c1);
+  decor(-32.5, -0.55, 3.5, 25, 0.55, 35, 0xd5d2c8, "movement studio floor");
+  add(-45, 0, 3.5, 0.9, 8, 35, 0xc7c5bc, "studio west wall");
+  add(-32.5, 0, -14, 25, 8, 0.9, 0xc7c5bc, "studio back wall");
+  add(-32.5, 0, 21, 25, 8, 0.9, 0xc7c5bc, "studio front wall");
   for (const x of [-16, 16]) {
     for (const z of [-11, 9]) {
       column(group, x, z, 8.2, 0.48, 0xe4e1d6);
@@ -121,7 +146,7 @@ function gallery(scene: THREE.Scene): WorldData {
     }
   }
   for (const x of [-11, 0, 11]) {
-    decor(x, 0, -18, 6.8, 0.18, 5.6, 0xb8c3c7);
+    add(x, 0, -18, 6.8, 0.18, 5.6, 0xb8c3c7, "painting platform");
     decor(x, 0, -21.4, 6.5, 7.2, 0.2, 0xf2eee4);
     painting(
       group,
@@ -139,6 +164,25 @@ function gallery(scene: THREE.Scene): WorldData {
   label(group, "JERUSALEM STREETS", -11, 0.61, -17.65, 4.2);
   label(group, "LABAN’S PALACE", 0, 0.61, -17.65, 4.0);
   label(group, "LEHI’S HOUSE", 11, 0.61, -17.65, 3.6);
+  for (const [z, file, title] of [
+    [-5, "trade.png", "THE TREASURE OFFER"],
+    [5, "night.png", "JERUSALEM BY NIGHT"],
+  ] as const) {
+    const alcove = new THREE.Group();
+    alcove.position.set(18.5, 0, z);
+    alcove.rotation.y = -Math.PI / 2;
+    group.add(alcove);
+    painting(
+      alcove,
+      0,
+      0.7,
+      0,
+      `${import.meta.env?.BASE_URL ?? "/"}art/${file}`,
+      0xffffff,
+    );
+    label(alcove, title, 0, 0.61, 3.33, 4.5, 0.5);
+    add(17.5, 0, z, 5.6, 0.18, 6.8, 0xb8c3c7, "painting platform");
+  }
   // Long, dark acoustic panels and linear skylights give the hall a modern scale.
   for (const x of [-13.5, -8, -2.5, 3, 8.5, 14])
     decor(x, 9.2, 0, 0.2, 0.13, 44, 0x657b83, "skylight mullion");
@@ -148,22 +192,21 @@ function gallery(scene: THREE.Scene): WorldData {
   for (const x of [-18.2, 18.2])
     for (const z of [-16, -6, 4, 14])
       decor(x, 0.01, z, 0.75, 0.05, 3.7, 0xa0b0b2);
-  // Optional interactive exhibits keep the new moves away from the story route.
-  label(group, "MOVEMENT GARDEN", -10, 0.45, 13, 5.1);
-  label(group, "CRAWL", -11, 1.45, 6.5, 2.2, 0.45);
-  add(-12.55, 0, 6, 0.35, 1.4, 3.3, 0x879a91, "crawl arch support");
-  add(-9.45, 0, 6, 0.35, 1.4, 3.3, 0x879a91, "crawl arch support");
-  add(-11, 1.02, 6, 3.5, 0.38, 3.3, 0xc2c9be, "crawl arch");
-  add(-12, 0, -1, 3.2, 2.25, 3.2, 0xa5b6a5, "ledge practice block");
-  label(group, "JUMP + CLIMB", -12, 2.3, -1, 2.9, 0.42);
-  add(-6, 0, 4, 0.32, 3.6, 0.32, 0x7c6850, "climbing pole");
-  decor(-6, 3.6, 4, 0.6, 0.12, 0.6, 0xc2a66d);
-  label(group, "CLIMB", -6, 0.45, 6, 2, 0.4);
-  add(9, 0, 3, 1.8, 1, 4.5, 0xb4c2b0, "jump practice wall");
-  add(13, 0, -2, 0.55, 4.5, 5, 0x9dada6, "wall kick practice wall");
-  label(group, "JUMP GARDEN", 11, 0.45, 9, 4.2);
-  label(group, "CARRY TO THE RING", 9, 0.45, 17, 4.5, 0.55);
-  const delivery = { x: 13, y: 0, z: 12, radius: 1.4 };
+  label(group, "MOVEMENT STUDIO", -23.5, 2.6, 10, 5.1);
+  label(group, "CRAWL", -27, 1.45, 13, 2.2, 0.45);
+  add(-28.6, 0, 11, 0.35, 1.4, 3.3, 0x879a91, "crawl arch support");
+  add(-25.4, 0, 11, 0.35, 1.4, 3.3, 0x879a91, "crawl arch support");
+  add(-27, 1.02, 11, 3.5, 0.38, 3.3, 0xc2c9be, "crawl arch");
+  add(-34, 0, 8, 3.2, 2.25, 3.2, 0xa5b6a5, "ledge practice block");
+  label(group, "JUMP + CLIMB", -34, 2.3, 8, 2.9, 0.42);
+  add(-40, 0, 3, 0.32, 3.6, 0.32, 0x7c6850, "climbing pole");
+  decor(-40, 3.6, 3, 0.6, 0.12, 0.6, 0xc2a66d);
+  label(group, "CLIMB", -40, 0.45, 5, 2, 0.4);
+  add(-34, 0, -4, 1.8, 1, 4.5, 0xb4c2b0, "jump practice wall");
+  add(-41, 0, -6, 0.55, 4.5, 5, 0x9dada6, "wall kick practice wall");
+  label(group, "JUMP GARDEN", -34, 0.45, -1, 4.2);
+  label(group, "CARRY TO THE RING", -28, 0.45, -11, 4.5, 0.55);
+  const delivery = { x: -37, y: 0, z: -9, radius: 1.4 };
   const ring = new THREE.Mesh(
     new THREE.TorusGeometry(1.4, 0.06, 8, 48),
     new THREE.MeshBasicMaterial({ color: 0xd3aa56 }),
@@ -176,27 +219,121 @@ function gallery(scene: THREE.Scene): WorldData {
     subtitle: "A place of reflection before the journey",
     spawn: { x: 0, y: 0, z: 17, yaw: Math.PI },
     climbables: [
-      { id: "gallery-pole", x: -6, z: 4, y: 0, height: 3.6, radius: 0.2 },
+      { id: "gallery-pole", x: -40, z: 3, y: 0, height: 3.6, radius: 0.2 },
     ],
     tokens: [
-      { id: "arch", x: -11, y: 0.4, z: 6 },
-      { id: "ledge", x: -12, y: 2.75, z: -1 },
-      { id: "pole", x: -6, y: 4.05, z: 4 },
-      { id: "jump", x: 9, y: 1.5, z: 3 },
-      { id: "wall", x: 11.8, y: 2.7, z: -2 },
-      { id: "explore", x: 6, y: 0.55, z: 9 },
+      { id: "arch", x: -27, y: 0.4, z: 11 },
+      { id: "ledge", x: -34, y: 2.75, z: 8 },
+      { id: "pole", x: -40, y: 4.05, z: 3 },
+      { id: "jump", x: -34, y: 1.5, z: -4 },
+      { id: "wall", x: -39.8, y: 2.7, z: -6 },
+      { id: "explore", x: -28, y: 0.55, z: -4 },
     ],
     carryables: [
-      { id: "practice-bundle", name: "Practice bundle", x: 7, y: 0.3, z: 13 },
+      { id: "practice-bundle", name: "Practice bundle", x: -26, y: 0.3, z: -9 },
     ],
     delivery,
     portals: [
       { id: "streets", x: -11, y: 0, z: -20.4, title: "Jerusalem Streets" },
       { id: "palace", x: 0, y: 0, z: -20.4, title: "Laban’s Palace" },
       { id: "house", x: 11, y: 0, z: -20.4, title: "Lehi’s House" },
+      { id: "trade", x: 17.8, y: 0, z: -5, title: "The Treasure Offer" },
+      { id: "night", x: 17.8, y: 0, z: 5, title: "Jerusalem by Night" },
     ],
     goal: { x: 0, y: 0, z: -20.4, radius: 2.2 },
-    bounds: { minX: -19.3, maxX: 19.3, minZ: -23.3, maxZ: 23.3 },
+    tutorials: [
+      {
+        id: "arch",
+        title: "Crawl",
+        instruction:
+          "Use {crouch} and move beneath the low arch. Find the token underneath.",
+        x: -24,
+        y: 0,
+        z: 11,
+        radius: 3.5,
+      },
+      {
+        id: "ledge",
+        title: "Jump and climb",
+        instruction:
+          "Jump toward the ledge, then {up} or {jump} to pull up. {crouch} lets go.",
+        x: -32,
+        y: 0,
+        z: 8,
+        radius: 4,
+      },
+      {
+        id: "pole",
+        title: "Climb the pole",
+        instruction:
+          "Jump toward the pole, then use {up} / {down} to climb. {jump} springs away.",
+        x: -39,
+        y: 0,
+        z: 4,
+        radius: 3.5,
+      },
+      {
+        id: "jump",
+        title: "Chain jumps",
+        instruction:
+          "Press {jump} again as you LAND for a double jump. Keep running and chain a third landing jump.",
+        x: -33,
+        y: 0,
+        z: -2,
+        radius: 4,
+      },
+      {
+        id: "wall",
+        title: "Wall kick",
+        instruction: "Jump toward the wall, then press {jump} to kick away.",
+        x: -39,
+        y: 0,
+        z: -5,
+        radius: 3.5,
+      },
+      {
+        id: "explore",
+        title: "Carry and deliver",
+        instruction:
+          "{action} picks up the bundle. {crouch} + {action} sets it in the gold ring. {action} alone throws.",
+        x: -27,
+        y: 0,
+        z: -8,
+        radius: 4,
+      },
+      {
+        id: "long-jump",
+        title: "Long jump",
+        instruction:
+          "Run, use {crouch}, then {jump} to leap forward. Hold {jump} through the leap.",
+        x: -27,
+        y: 0,
+        z: 4,
+        radius: 3,
+      },
+      {
+        id: "backflip",
+        title: "Backflip",
+        instruction:
+          "Stand still. Use {crouch}, then {jump} to flip backward. Try it on this clear floor.",
+        x: -25,
+        y: 0,
+        z: -1,
+        radius: 3,
+      },
+      {
+        id: "sideflip",
+        title: "Side somersault",
+        instruction:
+          "Run one way, quickly reverse direction, and press {jump}. Keep trying until you flip!",
+        x: -37,
+        y: 0,
+        z: 15,
+        radius: 3,
+      },
+    ],
+    practiceBounds: { minX: -44.3, maxX: -20.5, minZ: -13.3, maxZ: 20.3 },
+    bounds: { minX: -44.3, maxX: 19.3, minZ: -23.3, maxZ: 23.3 },
     ...finish(),
   };
 }
@@ -292,8 +429,10 @@ function streets(scene: THREE.Scene): WorldData {
     [-3, 11],
     [4, -10],
     [-24, -19],
-  ] as const)
+  ] as const) {
     datePalm(group, x, z, 4.8);
+    add(x, 0, z, 0.32, 4.8, 0.32, palette.timber, "palm trunk");
+  }
   for (const [x, z] of [
     [-5.3, -6],
     [4.8, 7],
@@ -311,8 +450,17 @@ function streets(scene: THREE.Scene): WorldData {
     subtitle: "Find the house beyond the city streets",
     spawn: { x: 0, y: 0, z: 21, yaw: Math.PI },
     climbables: [
-      { id: "street-palm", x: -3, z: 11, y: 0, height: 4.8, radius: 0.23 },
-    ],
+      [-3, 11],
+      [4, -10],
+      [-24, -19],
+    ].map(([x, z]) => ({
+      id: `street-palm-${x}-${z}`,
+      x,
+      z,
+      y: 0,
+      height: 4.8,
+      radius: 0.23,
+    })),
     tokens: [
       { id: "roof-route", x: 8, y: 5, z: 9 },
       { id: "palm-view", x: -3, y: 4.9, z: 11 },
@@ -484,9 +632,15 @@ function palace(scene: THREE.Scene): WorldData {
         "folded travel cloth",
       );
   }
-  for (const x of [-9, 9]) datePalm(group, x, 15, 5.4);
-  for (const x of [-18, -13, 14, 19])
-    datePalm(group, x, 37 + Math.abs(x % 3), 4.6);
+  for (const x of [-11, 11]) {
+    datePalm(group, x, 15, 5.4);
+    add(x, 0, 15, 0.32, 5.4, 0.32, palette.timber, "palm trunk");
+  }
+  for (const x of [-18, -13, 14, 19]) {
+    const z = 37 + Math.abs(x % 3);
+    datePalm(group, x, z, 4.6);
+    add(x, 0, z, 0.32, 4.6, 0.32, palette.timber, "palm trunk");
+  }
   for (const [x, z, w] of [
     [-11, 39, 2.2],
     [12, 34, 2.5],
@@ -505,14 +659,24 @@ function palace(scene: THREE.Scene): WorldData {
     name: "Laban’s Palace",
     subtitle: "Ask for the brass plates, then escape to your brothers",
     spawn: { x: 0, y: 0, z: 22, yaw: Math.PI },
-    climbables: [-9, 9].map((x) => ({
-      id: `palace-palm-${x}`,
-      x,
-      z: 15,
-      y: 0,
-      height: 5.4,
-      radius: 0.23,
-    })),
+    climbables: [
+      ...[-11, 11].map((x) => ({
+        id: `palace-palm-${x}-15`,
+        x,
+        z: 15,
+        y: 0,
+        height: 5.4,
+        radius: 0.23,
+      })),
+      ...[-18, -13, 14, 19].map((x) => ({
+        id: `palace-palm-${x}-road`,
+        x,
+        z: 37 + Math.abs(x % 3),
+        y: 0,
+        height: 4.6,
+        radius: 0.23,
+      })),
+    ],
     carryables: [
       { id: "courtyard-bundle", name: "Supply bundle", x: -5, y: 0.3, z: 20 },
     ],
@@ -527,6 +691,137 @@ function palace(scene: THREE.Scene): WorldData {
   };
 }
 
+function trade(scene: THREE.Scene): WorldData {
+  const { group, add, decor, finish } = makeWorld(scene, "jerusalem");
+  decor(0, -0.5, 20, 50, 0.5, 100, 0xc4a780, "stone road and desert");
+  add(-24, 0, 6, 0.9, 7, 68, 0xa98b69, "western city wall");
+  add(24, 0, 6, 0.9, 7, 68, 0xa98b69, "eastern city wall");
+  add(0, 0, -28, 49, 7, 0.9, 0xa98b69, "northern city wall");
+  add(-14, 0, 40, 20, 7, 0.9, 0xa98b69, "southern gate wall");
+  add(14, 0, 40, 20, 7, 0.9, 0xa98b69, "southern gate wall");
+  add(0, 5.6, 40, 8, 1.4, 0.9, 0xa98b69, "gate lintel");
+  for (const [x, z, w, d, h] of [
+    [-17, 12, 9, 13, 5],
+    [17, 10, 9, 14, 5.6],
+    [-17, 29, 9, 9, 5.2],
+    [17, 28, 9, 10, 4.6],
+  ] as const)
+    cityBlock(add, decor, group, x, z, w, d, h, 0xc6a17b);
+  // Laban stands in an open audience court. Tables suggest the family's offer.
+  for (const x of [-8, 8]) {
+    column(group, x, -20, 5.4, 0.48, palette.paleStone);
+    add(x, 0, -20, 0.8, 5.4, 0.8, palette.paleStone, "audience pillar");
+  }
+  add(0, 0, -25, 8, 0.4, 3.5, 0xd7bd95, "audience step");
+  for (const x of [-5.8, 5.8]) {
+    add(x, 0, -14, 2.7, 0.8, 1.5, palette.timber, "offering table");
+    vessel(group, x, 0.8, -14, 1, palette.brass);
+  }
+  label(group, "THE TREASURE OFFER", 0, 5.8, -27.3, 5.4);
+  label(group, "SOUTH GATE", 0, 6.7, 39.4, 3.5);
+  // Beyond the gate a winding road reaches a broad cave mouth.
+  for (const [x, z, w] of [
+    [-19, 54, 4],
+    [13, 58, 4],
+    [11, 67, 5],
+  ] as const)
+    decor(x, 0, z, w, 1.1, 2.8, 0x977f66, "desert boulder");
+  add(-13.7, 0, 66, 2.3, 4.3, 5.5, 0x806d5b, "cave west rock");
+  add(-2.3, 0, 66, 2.3, 4.3, 5.5, 0x806d5b, "cave east rock");
+  decor(-8, 4, 66, 14, 1.2, 5.5, 0x806d5b, "cave roof");
+  decor(-8, 0, 68.5, 8.7, 4, 0.2, 0x493d35, "cave shadow");
+  return {
+    name: "The Treasure Offer",
+    subtitle:
+      "Offer the family's treasures to Laban, then escape through the south gate",
+    spawn: { x: 0, y: 0, z: 12, yaw: Math.PI },
+    story: {
+      laban: { x: 0, y: 0, z: -20 },
+      gate: { x: 0, y: 0, z: 40 },
+      cave: { x: -8, y: 0, z: 64 },
+      brothers: { x: 0, y: 0, z: 43 },
+    },
+    goal: { x: 0, y: 0, z: -20, radius: 3 },
+    escapeGoal: { x: -8, y: 0, z: 64, radius: 3 },
+    pursuers: [
+      { x: -7, y: 0, z: -24 },
+      { x: 7, y: 0, z: -24 },
+    ],
+    bounds: { minX: -23.2, maxX: 23.2, minZ: -27.2, maxZ: 70 },
+    ...finish(),
+  };
+}
+
+function night(scene: THREE.Scene): WorldData {
+  const { group, add, decor, finish } = makeWorld(scene, "jerusalem");
+  scene.background = new THREE.Color(0x263c5a);
+  scene.fog = new THREE.Fog(0x263c5a, 55, 128);
+  for (const light of scene.children) {
+    if (light instanceof THREE.HemisphereLight) {
+      light.color.setHex(0xa9c4e9);
+      light.groundColor.setHex(0x556079);
+      light.intensity = 2.3;
+    } else if (light instanceof THREE.DirectionalLight) {
+      light.color.setHex(0xbfd7fb);
+      light.intensity = 2.1;
+      light.position.set(-24, 33, -20);
+    }
+  }
+  decor(0, -0.5, 9, 76, 0.5, 79, 0x777d83, "moonlit street");
+  add(-36, 0, 0, 0.9, 8, 60, 0x74767d, "west city wall");
+  add(36, 0, 0, 0.9, 8, 60, 0x74767d, "east city wall");
+  add(0, 0, -30, 73, 8, 0.9, 0x74767d, "north city wall");
+  add(-21, 0, 28, 30, 8, 0.9, 0x74767d, "gate wall");
+  add(21, 0, 28, 30, 8, 0.9, 0x74767d, "gate wall");
+  add(0, 6.6, 28, 12, 1.4, 0.9, 0x74767d, "gate lintel");
+  for (const [x, z, w, d, h] of [
+    [-29, 9, 10, 12, 5.2],
+    [29, 10, 10, 13, 5.6],
+    [-29, -13, 10, 13, 6],
+    [29, -12, 10, 13, 5],
+  ] as const)
+    cityBlock(add, decor, group, x, z, w, d, h, 0x85858a);
+  // Open crossings connect the gate, Laban's position, and the treasury.
+  for (const [x, z] of [
+    [-10, 14],
+    [11, 5],
+    [-8, -18],
+    [9, -7],
+  ] as const) {
+    oilLamp(group, x, 1.2, z);
+    const glow = new THREE.PointLight(0xffcb80, 13, 11);
+    glow.position.set(x, 3.1, z);
+    group.add(glow);
+  }
+  add(14, 0, -26.5, 12, 5.7, 0.8, 0x978f8b, "treasury facade");
+  decor(14, 0.03, -26.02, 5.2, 3.7, 0.15, 0x403c45, "treasury door");
+  label(group, "THE TREASURY", 14, 4.4, -25.9, 3.8);
+  label(group, "SOUTH GATE", 0, 7.7, 27.4, 3.8);
+  const moon = new THREE.Mesh(
+    new THREE.SphereGeometry(4, 20, 16),
+    new THREE.MeshBasicMaterial({ color: 0xe4edff }),
+  );
+  moon.position.set(-30, 39, -48);
+  group.add(moon);
+  return {
+    name: "Jerusalem by Night",
+    subtitle:
+      "Find the plates in the sleeping city and return to your brothers",
+    spawn: { x: 0, y: 0, z: 42, yaw: Math.PI },
+    story: {
+      laban: { x: -18, y: 0, z: -12 },
+      treasury: { x: 14, y: 0, z: -17 },
+      plates: { x: 14, y: 0, z: -22 },
+      gate: { x: 0, y: 0, z: 28 },
+      brothers: { x: 0, y: 0, z: 43 },
+    },
+    goal: { x: -18, y: 0, z: -12, radius: 3 },
+    escapeGoal: { x: 0, y: 0, z: 43, radius: 3 },
+    bounds: { minX: -35.2, maxX: 35.2, minZ: -29.2, maxZ: 48 },
+    ...finish(),
+  };
+}
+
 export function buildWorld(id: WorldId, scene: THREE.Scene): WorldData {
   switch (id) {
     case "hub":
@@ -537,5 +832,9 @@ export function buildWorld(id: WorldId, scene: THREE.Scene): WorldData {
       return house(scene);
     case "palace":
       return palace(scene);
+    case "trade":
+      return trade(scene);
+    case "night":
+      return night(scene);
   }
 }

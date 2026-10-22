@@ -1,10 +1,18 @@
-export const STORY_ORDER = ["streets", "palace", "house"] as const;
+export const STORY_ORDER = [
+  "streets",
+  "palace",
+  "house",
+  "trade",
+  "night",
+] as const;
 export type StoryId = (typeof STORY_ORDER)[number];
 
 export const STORY_TITLES: Record<StoryId, string> = {
   streets: "Jerusalem Streets",
   palace: "Laban’s Palace",
   house: "Lehi’s House",
+  trade: "The Treasure Offer",
+  night: "Jerusalem by Night",
 };
 
 export function isStoryId(value: unknown): value is StoryId {

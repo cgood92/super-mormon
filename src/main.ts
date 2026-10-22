@@ -2,7 +2,14 @@ import * as T from "three";
 import "./style.css";
 import { Input } from "./super/input";
 import { createControllerSetup } from "./super/controller-setup";
-import { readProfile } from "./super/gamepad";
+import { resolveControllerProfile } from "./super/gamepad";
+import { MenuNavigation } from "./super/menu";
+import { createStoryScene } from "./super/story-scenes";
+import {
+  renderControlText,
+  renderControlLegend,
+  type ControlDevice,
+} from "./super/controls";
 import { hasLineOfSight } from "./super/interactions";
 import {
   createCarryObject,
@@ -32,20 +39,22 @@ import {
   prerequisite,
   readCompleted,
   STORY_TITLES,
+  STORY_ORDER,
   type StoryId,
 } from "./super/progression";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `<div id="viewport" data-look></div><div class="vignette"></div>
-<header class="hud"><button class="wordmark" id="home" aria-label="Return to the gallery">SUPER<span>MORMON</span><small>A BOOK OF MORMON ADVENTURE</small></button><div class="world-title"><span id="chapter-label">THE CONFERENCE CENTER</span><h1 id="world-name">The Gallery</h1></div><div class="hud-actions"><span id="seal-count" title="Adventures completed">◈ 0 / 3</span><button id="pause" aria-label="Pause game">Ⅱ</button></div></header>
+<header class="hud"><button class="gallery-home" id="home" aria-label="Return to the gallery" title="Return to gallery">⌂</button><div class="world-title"><span id="chapter-label">THE CONFERENCE CENTER</span><h1 id="world-name">The Gallery</h1></div><div class="hud-actions"><span id="seal-count" title="Stories completed">Stories 0 / 5</span><button id="pause" aria-label="Pause game">Ⅱ</button></div></header>
 <div class="objective"><span class="objective-dot"></span><span id="objective">Find a painting. Take a running jump.</span></div>
 <div id="collect-count" class="collect-count" hidden></div><div id="prompt" class="prompt" aria-live="polite"></div><div id="toast" class="toast" role="status"></div>
 <div class="touch-controls"><div class="stick" data-stick aria-label="Movement thumbstick"><i></i><span>MOVE</span></div><div class="touch-actions"><button class="crouch" data-crouch aria-pressed="false" aria-label="Toggle crouch or crawl">Z<small>CROUCH</small></button><button class="action" data-action aria-label="Talk, search, pick up or throw">B<small>ACTION</small></button><button class="jump" data-jump aria-label="Jump">A<small>JUMP</small></button></div><button class="camera-button" data-recenter aria-label="Center camera">↻</button></div>
-<div class="desktop-controls"><span>WASD / arrows <b>MOVE</b></span><span>Space <b>JUMP</b></span><span>Shift / Z <b>CROUCH</b></span><span>Drag / Q–C <b>CAMERA</b></span><span>E <b>ACTION</b></span><span>R <b>RECENTER</b></span></div>
+<div class="desktop-controls" aria-label="Controls"></div>
+<aside id="practice-lesson" class="practice-lesson" hidden><span class="eyebrow">MOVEMENT STUDIO</span><h3 id="lesson-title"></h3><p id="lesson-body"></p><small id="lesson-progress"></small></aside>
 <div class="orientation-hint">↻ Best played with your phone sideways</div><div id="curtain"></div>
 <div id="caught-overlay" class="caught-overlay" aria-live="assertive" aria-atomic="true" hidden><div class="caught-wipe"></div><div class="caught-card"><span class="caught-symbol" aria-hidden="true">↺</span><strong id="caught-heading">Caught!</strong><span id="caught-detail">Let’s try again.</span></div></div>
-<section id="title-screen" class="screen title-screen"><button class="controller-setup-link" id="setup-controller-title">Set up N64 controller</button><div class="title-card"><span class="eyebrow">A NEW ADVENTURE · A PLAYABLE PROTOTYPE</span><h2>SUPER<br><em>MORMON</em></h2><p>Step into the story.</p><button class="primary" id="start">Enter the gallery <span>→</span></button><div class="title-controls">RUN · JUMP · EXPLORE</div><small>Original art and worlds. Inspired by the joy of 3D platform adventures.</small></div><span class="title-location">SALT LAKE CITY · AN IMAGINED CONFERENCE CENTER GALLERY</span></section>
-<section id="modal" class="screen modal-screen" hidden><div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title"><span class="eyebrow" id="modal-kicker"></span><h2 id="modal-title"></h2><p id="modal-body"></p><div id="modal-buttons"></div></div></section>`;
+<section id="title-screen" class="screen splash-screen" aria-label="Super Mormon"><div class="splash-logo">SUPER<br><em>MORMON</em><small>STEP INTO THE STORY</small></div></section>
+<section id="modal" class="screen modal-screen" hidden><div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title"><span class="eyebrow" id="modal-kicker"></span><h2 id="modal-title"></h2><p id="modal-body"></p><div id="modal-hint" class="modal-hint"></div><div id="modal-buttons"></div></div></section>`;
 const el = <E extends HTMLElement>(id: string) =>
   document.getElementById(id) as E;
 const renderer = new T.WebGLRenderer({
@@ -86,6 +95,41 @@ const completed = readProgress();
 let controllerSetup: ReturnType<typeof createControllerSetup> | null = null;
 let waitForControllerRelease = false;
 const offeredControllers = new Set<string>();
+const menuNavigation = new MenuNavigation();
+let pauseMenuOpen = false,
+  splashTime = 0;
+let storyScene: ReturnType<typeof createStoryScene> | null = null;
+let storyCheckpoint: { x: number; y: number; z: number; yaw?: number } | null =
+  null;
+let storyObjective = "";
+let learnedMoves = new Set<string>();
+let practiceVisible = false;
+let wavingExtras: {
+  actor: ReturnType<typeof createCharacter>;
+  state: PlayerState;
+}[] = [];
+let controlsDevice: ControlDevice | null = null;
+let modalText = "",
+  toastText = "",
+  promptText = "",
+  objectiveText = "";
+function refreshControlHints() {
+  const device = input.device;
+  if (device === controlsDevice) return;
+  controlsDevice = device;
+  app.dataset.controls = device;
+  renderControlLegend(
+    document.querySelector<HTMLElement>(".desktop-controls")!,
+    device,
+  );
+  renderControlText(el("modal-body"), modalText, device);
+  renderControlText(el("toast"), toastText, device);
+  renderControlText(el("prompt"), promptText, device);
+  renderControlText(el("objective"), objectiveText, device);
+  renderControlText(el("modal-hint"), "{move} Choose · {jump} Select", device);
+  for (const confirm of document.querySelectorAll<HTMLElement>(".menu-confirm"))
+    renderControlText(confirm, "{jump}", device);
+}
 type Guard = {
   state: PlayerState;
   actor: ReturnType<typeof createCharacter>;
@@ -146,7 +190,8 @@ function sound(kind: "jump" | "collect" | "caught" | "portal" | "win") {
   }
 }
 function message(text: string, duration = 3) {
-  el("toast").textContent = text;
+  toastText = text;
+  renderControlText(el("toast"), text, input.device);
   toastUntil = time + duration;
   el("toast").classList.add("visible");
 }
@@ -157,17 +202,28 @@ function modal(
   buttons: { label: string; run: () => void; secondary?: boolean }[],
 ) {
   paused = true;
+  pauseMenuOpen = false;
   modalSince = performance.now();
   input.reset();
   el("modal-kicker").textContent = kicker;
   el("modal-title").textContent = title;
-  el("modal-body").textContent = body;
+  modalText = body;
+  renderControlText(el("modal-body"), body, input.device);
   const box = el("modal-buttons");
   box.replaceChildren();
-  for (const data of buttons) {
+  for (const [index, data] of buttons.entries()) {
     const b = document.createElement("button");
     b.className = data.secondary ? "secondary" : "primary";
-    b.textContent = data.label;
+    const name = document.createElement("span");
+    name.textContent = data.label;
+    const confirm = document.createElement("span");
+    confirm.className = "menu-confirm";
+    renderControlText(confirm, "{jump}", input.device);
+    b.append(name, confirm);
+    b.addEventListener("focus", () => {
+      menuNavigation.index = index;
+      updateMenuSelection();
+    });
     b.onclick = () => {
       el("modal").hidden = true;
       paused = false;
@@ -176,24 +232,46 @@ function modal(
     };
     box.append(b);
   }
+  menuNavigation.reset(buttons.length);
+  updateMenuSelection();
+  renderControlText(
+    el("modal-hint"),
+    "{move} Choose · {jump} Select",
+    input.device,
+  );
   el("modal").hidden = false;
   modalAction = buttons[0]?.run ?? null;
   setTimeout(() => box.querySelector("button")?.focus(), 20);
 }
 function closeModalFirst() {
-  const b = el("modal-buttons").querySelector<HTMLButtonElement>("button");
+  const b =
+    el("modal-buttons").querySelectorAll<HTMLButtonElement>("button")[
+      menuNavigation.index
+    ];
   b?.click();
+}
+function updateMenuSelection() {
+  el("modal-buttons")
+    .querySelectorAll("button")
+    .forEach((button, index) =>
+      button.classList.toggle("menu-selected", index === menuNavigation.index),
+    );
 }
 function pause() {
   if (!started || transition) return;
   if (!el("modal").hidden) {
-    closeModalFirst();
+    if (pauseMenuOpen) {
+      el("modal").hidden = true;
+      paused = false;
+      pauseMenuOpen = false;
+      input.reset();
+    }
     return;
   }
   modal(
     "TAKE YOUR TIME",
     "A little pause.",
-    "Explore with the left stick. Drag to look around. Hold jump to leap higher.",
+    "Move with {move}. Use {camera} to look around. Hold {jump} to leap higher.",
     [
       { label: "Keep exploring", run: () => {} },
       {
@@ -233,6 +311,7 @@ function pause() {
       },
     ],
   );
+  pauseMenuOpen = true;
 }
 function openControllerSetup() {
   if (transition || controllerSetup) return;
@@ -245,7 +324,10 @@ function openControllerSetup() {
     if (profile) {
       input.setControllerProfile(profile);
       offeredControllers.add(profile.id);
-      message("N64 controls saved. A jumps · B acts · Z crouches.", 5);
+      message(
+        "N64 controls saved. {jump} jumps · {action} acts · {crouch} crouches.",
+        5,
+      );
     }
     paused = false;
     waitForControllerRelease = true;
@@ -262,22 +344,22 @@ function showMoves(page = 0) {
     [
       "RUN & JUMP",
       "Try a new move.",
-      "Crouch: hold Z on N64, Shift / Z on keyboard, or LT / X on a modern pad. Tap Z on screen to toggle. Move to crawl. Run + crouch + jump for a long jump. Stand still + crouch + jump for a backflip.",
+      "Use {crouch} to crouch. Move to crawl. Run + {crouch} + {jump} for a long jump. Stand still + {crouch} + {jump} for a backflip.",
     ],
     [
       "JUMP COMBINATIONS",
       "Keep the rhythm.",
-      "Jump again just as you land for a double jump. Keep running and jump once more for a triple jump. Reverse direction + jump for a side somersault. Jump against a wall, then press jump again to kick away.",
+      "Press {jump} again as you land for a double jump. Keep running and chain another for a triple jump. Reverse direction + {jump} for a side somersault. Jump against a wall, then press {jump} again to kick away.",
     ],
     [
       "CLIMB & EXPLORE",
       "Find another route.",
-      "Jump toward a ledge to catch it. Move toward it or jump to pull up; crouch to drop. Jump into a tree or pole while moving toward it, then move up/down to climb. Jump away or crouch to let go.",
+      "Jump toward a ledge to catch it. Move toward it or press {jump} to pull up; {crouch} drops. Jump toward a tree or pole, then use {up} / {down} to climb. Press {jump} to jump away or {crouch} to let go.",
     ],
     [
       "CARRY & DISCOVER",
       "Give it a try.",
-      "E / B picks up a nearby bundle. Press again to throw; crouch + E / B sets it down. Explore the gallery garden for six gold tokens. Deliver the practice bundle to the gold ring. These challenges are optional.",
+      "{action} picks up a nearby bundle. Press again to throw; {crouch} + {action} sets it down. Find six gold tokens in the gallery garden. Carry the practice bundle to the gold ring. These challenges are optional.",
     ],
   ];
   const [kicker, title, body] = pages[page];
@@ -307,7 +389,7 @@ function marker(x: number, y: number, z: number): T.Group {
   const ring = new T.Mesh(
     new T.TorusGeometry(0.85, 0.055, 8, 48),
     new T.MeshBasicMaterial({
-      color: "#ead494",
+      color: "#9bd5ff",
       transparent: true,
       opacity: 0.7,
     }),
@@ -317,8 +399,8 @@ function marker(x: number, y: number, z: number): T.Group {
   const beam = new T.Mesh(
     new T.ConeGeometry(0.22, 0.4, 5),
     new T.MeshStandardMaterial({
-      color: "#e4c47b",
-      emissive: "#72571b",
+      color: "#62b7ff",
+      emissive: "#245e9d",
       emissiveIntensity: 0.25,
     }),
   );
@@ -337,13 +419,15 @@ function decorateGalleryProgress() {
     const plaque = label(
       badge,
       "LOCKED",
-      portal.x + 0.75,
+      portal.id === "trade" || portal.id === "night" ? 18.05 : portal.x + 0.75,
       4.55,
-      -20.63,
+      portal.id === "trade" || portal.id === "night" ? portal.z : -20.63,
       1.55,
       0.5,
     );
     plaque.renderOrder = 2;
+    if (portal.id === "trade" || portal.id === "night")
+      plaque.rotation.y = -Math.PI / 2;
     scene.add(badge);
   }
 }
@@ -392,14 +476,62 @@ function setupDiscoveries() {
 }
 function updateCollectionHud() {
   const parts: string[] = [];
-  if (worldId === "house") parts.push(`✦ ${collected.size} / 5`);
-  if (world.tokens?.length)
-    parts.push(`✧ ${bonusCollected.size} / ${world.tokens.length}`);
-  if (world.delivery) parts.push(deliveryDone ? "Bundle ✓" : "Bundle ○");
+  if (worldId === "house") parts.push(`Treasures ${collected.size} / 5`);
+  if (world.tokens?.length && (worldId !== "hub" || practiceVisible))
+    parts.push(`Tokens ${bonusCollected.size} / ${world.tokens.length}`);
+  if (world.delivery && practiceVisible)
+    parts.push(deliveryDone ? "Bundle delivered" : "Bundle to deliver");
   el("collect-count").hidden = parts.length === 0;
   el("collect-count").textContent = parts.join(" · ");
 }
+function updatePracticeLesson() {
+  const b = world.practiceBounds;
+  const inside =
+    !!b &&
+    player.x > b.minX &&
+    player.x < b.maxX &&
+    player.z > b.minZ &&
+    player.z < b.maxZ;
+  el("practice-lesson").hidden = !inside;
+  if (practiceVisible !== inside) {
+    practiceVisible = inside;
+    updateCollectionHud();
+    updateObjective();
+  }
+  if (!inside) return;
+  const lessons = world.tutorials ?? [];
+  const lesson = [...lessons].sort(
+    (a, b) =>
+      Math.hypot(player.x - a.x, player.z - a.z) -
+      Math.hypot(player.x - b.x, player.z - b.z),
+  )[0];
+  if (!lesson) return;
+  const moves: Record<string, string> = {
+    crawl: "Crawling",
+    longJump: "Long jump",
+    backflip: "Backflip",
+    sideflip: "Side somersault",
+    doubleJump: "Double jump",
+    tripleJump: "Triple jump",
+    wallKick: "Wall kick",
+    ledgeHang: "Ledge grab",
+    climb: "Climbing",
+  };
+  const held = carryObjects.some((object) => object.held);
+  const move = held ? "carry" : player.move;
+  if ((moves[move] || held) && !learnedMoves.has(move)) {
+    learnedMoves.add(move);
+    message(`${moves[move] ?? "Carrying"} · Nice work!`, 1.5);
+  }
+  el("lesson-title").textContent = lesson.title;
+  renderControlText(el("lesson-body"), lesson.instruction, input.device);
+  el("lesson-progress").textContent =
+    `Tokens ${bonusCollected.size} / ${world.tokens?.length ?? 0} · ${learnedMoves.size} moves tried`;
+}
 function disposeScene() {
+  storyScene?.dispose();
+  storyScene = null;
+  wavingExtras = [];
   avatar?.dispose();
   for (const e of extras) e.dispose();
   for (const g of guards) g.actor.dispose();
@@ -426,6 +558,12 @@ function load(id: WorldId) {
   el("modal").hidden = true;
   if (world) disposeScene();
   worldId = id;
+  storyCheckpoint = null;
+  storyObjective = "";
+  learnedMoves = new Set();
+  practiceVisible = false;
+  el("practice-lesson").hidden = true;
+  el("app").classList.remove("chapter-faded");
   scene = new T.Scene();
   world = buildWorld(id, scene);
   if (id === "hub") decorateGalleryProgress();
@@ -479,13 +617,15 @@ function load(id: WorldId) {
   if (id !== "hub")
     goalMarker = marker(world.goal.x, world.goal.y, world.goal.z);
   const spawnGuards =
-    world.pursuers ??
-    (id === "streets"
-      ? [
-          { x: -4, y: 0, z: 15 },
-          { x: 4, y: 0, z: 3 },
-        ]
-      : []);
+    id === "trade" || id === "night"
+      ? []
+      : (world.pursuers ??
+        (id === "streets"
+          ? [
+              { x: -4, y: 0, z: 15 },
+              { x: 4, y: 0, z: 3 },
+            ]
+          : []));
   for (const p of spawnGuards) {
     const state = createPlayer(p.x, p.y, p.z),
       actor = createCharacter("guard");
@@ -502,9 +642,14 @@ function load(id: WorldId) {
     extras.push(laban);
     const end = world.escapeGoal ?? world.goal;
     for (let i = 0; i < 3; i++) {
-      const brother = createCharacter(i === 0 ? "nephi" : "laman");
+      const brother = createCharacter(
+        i === 0 ? "nephi" : i === 1 ? "laman" : "sam",
+      );
       brother.group.position.set(end.x - 2 + i * 2, end.y, end.z + 1.2);
-      brother.group.rotation.y = Math.PI;
+      const state = createPlayer(end.x - 2 + i * 2, end.y, end.z + 1.2);
+      state.yaw = Math.PI;
+      brother.update(0, state);
+      wavingExtras.push({ actor: brother, state });
       scene.add(brother.group);
       extras.push(brother);
     }
@@ -515,8 +660,37 @@ function load(id: WorldId) {
       ? "SALT LAKE CITY · THE CONFERENCE CENTER"
       : id === "streets"
         ? "1 NEPHI 1–2 · ABOUT 600 BC"
-        : "1 NEPHI 3 · ABOUT 600 BC";
-  el("seal-count").textContent = `◈ ${completed.size} / 3`;
+        : id === "night"
+          ? "1 NEPHI 4 · ABOUT 600 BC"
+          : "1 NEPHI 3 · ABOUT 600 BC";
+  el("seal-count").textContent =
+    `Stories ${completed.size} / ${STORY_ORDER.length}`;
+  if (id === "trade" || id === "night") {
+    storyObjective =
+      id === "trade"
+        ? "Bring the family’s treasures to Laban."
+        : "Search Jerusalem for Laban.";
+    storyScene = createStoryScene(id, scene, world, {
+      dialog: (kicker, title, body, onContinue) =>
+        modal(kicker, title, body, [{ label: "Continue", run: onContinue }]),
+      toast: (text) => message(text, 3),
+      complete,
+      checkpoint: (point) => {
+        storyCheckpoint = { ...point };
+      },
+      setMarker: (point) => {
+        if (goalMarker)
+          goalMarker.position.set(point.x, point.y + 0.04, point.z);
+      },
+      setDisguise: (enabled) => {
+        avatar.dispose();
+        avatar = createCharacter(enabled ? "nephi-disguised" : "nephi");
+        scene.add(avatar.group);
+        avatar.update(0, player);
+      },
+      caught: beginCaughtTransition,
+    });
+  }
   updateCollectionHud();
   updateObjective();
   if (started)
@@ -529,25 +703,33 @@ function load(id: WorldId) {
           ? "Five treasures. Every room has a story."
           : id === "palace"
             ? "Find Laban at the far end of the courtyard."
-            : "Find the blue door. Watch the streets.",
+            : id === "trade"
+              ? "Your brothers will follow. Bring the treasures to Laban."
+              : id === "night"
+                ? "Enter the city and search its moonlit streets."
+                : "Find the blue door. Watch the streets.",
       4,
     );
 }
 function updateObjective() {
-  el("objective").textContent =
-    worldId === "hub"
-      ? nextStory(completed)
-        ? `Next: ${STORY_TITLES[nextStory(completed)!]} · Jump into the painting.`
-        : "All stories complete · Replay any painting."
-      : worldId === "streets"
-        ? "Help Lehi reach his home safely."
-        : worldId === "house"
-          ? collected.size === 5
-            ? "Return to the courtyard entrance."
-            : `Find the family’s treasures · ${collected.size} of 5`
-          : guardsActive
-            ? "Run through the gate. Your brothers are outside."
-            : "Find Laban and ask for the brass plates.";
+  objectiveText =
+    storyObjective ||
+    (practiceVisible
+      ? "Movement Studio · Learn at your own pace."
+      : worldId === "hub"
+        ? nextStory(completed)
+          ? `Next: ${STORY_TITLES[nextStory(completed)!]} · {jump} into the painting.`
+          : "All stories complete · {jump} into any painting to replay."
+        : worldId === "streets"
+          ? "Help Lehi reach his home safely."
+          : worldId === "house"
+            ? collected.size === 5
+              ? "Return to the courtyard entrance."
+              : `Find the family’s treasures · ${collected.size} of 5`
+            : guardsActive
+              ? "Run through the gate. Your brothers are outside."
+              : "Find Laban and ask for the brass plates.");
+  renderControlText(el("objective"), objectiveText, input.device);
 }
 function near(
   p: { x: number; y: number; z: number },
@@ -563,7 +745,8 @@ function complete() {
   if (paused || transition || !isStoryId(worldId)) return;
   completed.add(worldId);
   saveProgress();
-  el("seal-count").textContent = `◈ ${completed.size} / 3`;
+  el("seal-count").textContent =
+    `Stories ${completed.size} / ${STORY_ORDER.length}`;
   sound("win");
   const name = worldId;
   const next = nextStory(completed);
@@ -573,12 +756,20 @@ function complete() {
       ? "The family’s treasures."
       : name === "streets"
         ? "Home, safely."
-        : "Together again.",
+        : name === "trade"
+          ? "Safe in the cave."
+          : name === "night"
+            ? "The records recovered."
+            : "Together again.",
     name === "house"
       ? "Nephi and his brothers gathered gold, silver, and precious things. They hoped to exchange them for the brass plates."
       : name === "streets"
         ? `Lehi’s family would soon leave Jerusalem. Their story was only beginning.${next ? ` Next: ${STORY_TITLES[next]}.` : ""}`
-        : `Laban refused the plates, and Laman fled. Nephi encouraged his brothers to keep trying.${next ? ` Next: ${STORY_TITLES[next]}.` : ""}`,
+        : name === "trade"
+          ? "The brothers escaped Laban’s servants and hid in the rocks. Nephi would return to Jerusalem."
+          : name === "night"
+            ? "The brass plates were safe. Zoram chose to join the family in the wilderness."
+            : `Laban refused the plates, and Laman fled. Nephi encouraged his brothers to keep trying.${next ? ` Next: ${STORY_TITLES[next]}.` : ""}`,
     [
       { label: "Back to the paintings", run: () => warp("hub") },
       {
@@ -615,7 +806,8 @@ function setCaughtPhase(phase: "caught" | "wipe" | "safe") {
   if (phase === "safe") {
     el("caught-heading").textContent = "Back at a safe spot";
     el("caught-detail").textContent = "Keep going!";
-    el("prompt").textContent = "";
+    promptText = "";
+    renderControlText(el("prompt"), "", input.device);
     el("prompt").classList.remove("visible");
   }
 }
@@ -632,8 +824,9 @@ function beginCaughtTransition() {
   setCaughtPhase("caught");
 }
 function resetCaughtCheckpoint() {
-  player = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
-  player.yaw = world.spawn.yaw ?? Math.PI;
+  const checkpoint = storyCheckpoint ?? world.spawn;
+  player = createPlayer(checkpoint.x, checkpoint.y, checkpoint.z);
+  player.yaw = checkpoint.yaw ?? Math.PI;
   if (worldId === "palace") {
     player.x = 0;
     player.z = -14;
@@ -646,6 +839,7 @@ function resetCaughtCheckpoint() {
     guards[i].timer = 0;
     guards[i].actor.update(0, guards[i].state);
   }
+  storyScene?.respawn(player);
   avatar.update(0, player);
   follow.reset(player, player.yaw, worldId);
   for (const object of carryObjects) if (object.held) resetCarryObject(object);
@@ -728,6 +922,7 @@ function navigate(
   return path.reverse().slice(1);
 }
 function update(dt: number) {
+  refreshControlHints();
   if (controllerSetup) {
     controllerSetup.update();
     return;
@@ -745,7 +940,7 @@ function update(dt: number) {
       typeof pad.id === "string" &&
       pad.id.length > 0 &&
       pad.mapping !== "standard" &&
-      !readProfile(pad.id) &&
+      !resolveControllerProfile(pad) &&
       !offeredControllers.has(pad.id)
     ) {
       offeredControllers.add(pad.id);
@@ -763,7 +958,8 @@ function update(dt: number) {
   }
   const state = input.latest(dt);
   if (!started) {
-    if (state.jump || state.interact) startGame();
+    splashTime += dt;
+    if (splashTime >= 2.6 || state.jump || state.interact) startGame();
     return;
   }
   if (caughtPhase !== "none") {
@@ -776,12 +972,22 @@ function update(dt: number) {
     return;
   }
   if (paused) {
+    if (performance.now() - modalSince > 300) {
+      const index = menuNavigation.update(state.y, dt);
+      if (index !== null) {
+        el("modal-buttons")
+          .querySelectorAll<HTMLButtonElement>("button")
+          [index]?.focus();
+        updateMenuSelection();
+      }
+    }
     if (performance.now() - modalSince > 450 && (state.interact || state.jump))
       closeModalFirst();
     return;
   }
   time += dt;
   levelTime += dt;
+  app.classList.toggle("chapter-faded", levelTime >= 10);
   caughtGrace = Math.max(0, caughtGrace - dt);
   const events = stepPlayer(
     player,
@@ -807,7 +1013,10 @@ function update(dt: number) {
   }
   avatar.update(dt, {
     ...player,
-    carrying: carryObjects.some((object) => object.held),
+    carrying:
+      carryObjects.some((object) => object.held) ||
+      (worldId === "night" &&
+        !!(storyScene?.snapshot() as { plates?: boolean } | undefined)?.plates),
   });
   follow.update(
     dt,
@@ -821,6 +1030,12 @@ function update(dt: number) {
     },
     worldId,
   );
+  app.classList.toggle("camera-obstructed", follow.obstructed);
+  for (const entry of wavingExtras)
+    entry.actor.update(dt, {
+      ...entry.state,
+      wave: Math.hypot(player.x - entry.state.x, player.z - entry.state.z) < 23,
+    });
   const distCam = camera.position.distanceTo(
     new T.Vector3(player.x, player.y + 1.05, player.z),
   );
@@ -886,8 +1101,8 @@ function update(dt: number) {
       prompt = prior
         ? `${p.title} locked · Finish ${STORY_TITLES[prior]} first`
         : completed.has(p.id)
-          ? `${p.title} · Jump in to replay`
-          : `${p.title} · Jump into the painting`;
+          ? `${p.title} · {jump} to replay`
+          : `${p.title} · {jump} into the painting`;
       if (
         (player.y > p.y + 0.45 &&
           Math.hypot(player.x - p.x, player.z - p.z) < 1.2) ||
@@ -910,7 +1125,7 @@ function update(dt: number) {
       mesh.rotation.y += dt * 0.7;
       mesh.position.y = t.y + 0.3 + Math.sin(time * 2.4 + Number(t.x)) * 0.055;
       if (near(t, 2.05, 1.7) && hasLineOfSight(player, t, world.solids)) {
-        prompt = `${t.name} · E / B to gather`;
+        prompt = `${t.name} · {action} to gather`;
         if (state.interact || near(t, 0.65, 0.65)) {
           collected.add(t.id);
           mesh.visible = false;
@@ -929,7 +1144,7 @@ function update(dt: number) {
   }
   if (worldId === "palace") {
     if (!guardsActive && near(world.goal, 3.7, 2)) {
-      prompt = "Laban · E / B to speak";
+      prompt = "Laban · {action} to speak";
       if (state.interact) {
         modal(
           "1 NEPHI 3:11–14",
@@ -967,6 +1182,18 @@ function update(dt: number) {
       complete();
       return;
     }
+  }
+  if (storyScene) {
+    const result = storyScene.update(dt, player, { interact: state.interact });
+    if (storyObjective !== result.objective) {
+      storyObjective = result.objective;
+      updateObjective();
+    }
+    if (result.prompt)
+      prompt = result.prompt.startsWith("Wait")
+        ? result.prompt
+        : `{action} · ${result.prompt}`;
+    if (paused || transition) return;
   }
   if (guardsActive && levelTime > 1.5) {
     for (const guard of guards) {
@@ -1015,17 +1242,20 @@ function update(dt: number) {
   }
   const carrying = carryObjects.find((object) => object.held);
   const loose = nearestCarryObject(player, carryObjects, world.solids);
-  if (!prompt && carrying) prompt = "E / B throw · Crouch + E / B set down";
+  if (!prompt && carrying)
+    prompt = "{action} throw · {crouch} + {action} set down";
   else if (!prompt && loose) {
-    prompt = "Supply bundle · E / B pick up";
+    prompt = "Supply bundle · {action} pick up";
     if (state.interact && pickUp(loose, player, world.solids))
-      message("E / B throws · Crouch + E / B sets down", 2.5);
+      message("{action} throws · {crouch} + {action} sets down", 2.5);
   }
   if (!prompt && player.move === "ledgeHang")
-    prompt = "Up / Jump to pull up · Crouch to drop";
+    prompt = "{up} or {jump} to pull up · {crouch} to drop";
   if (!prompt && player.move === "climb")
-    prompt = "Up / Down to climb · Jump away · Crouch to drop";
-  el("prompt").textContent = prompt;
+    prompt = "{up} / {down} to climb · {jump} away · {crouch} to drop";
+  updatePracticeLesson();
+  promptText = prompt;
+  renderControlText(el("prompt"), prompt, input.device);
   el("prompt").classList.toggle("visible", !!prompt);
   if (time > toastUntil) el("toast").classList.remove("visible");
 }
@@ -1036,20 +1266,20 @@ function resize() {
 }
 window.addEventListener("resize", resize);
 resize();
+refreshControlHints();
 load("hub");
 function startGame() {
   if (started) return;
   started = true;
   el("title-screen").hidden = true;
   input.reset();
-  void requestFullScreen();
+  if (document.fullscreenElement || navigator.userActivation?.isActive)
+    void requestFullScreen();
   message(
-    "Jump into a painting, or explore the practice garden. Pause → Moves for help.",
+    "Run toward a painting, then press {jump}. {pause} → Moves for practice.",
     6,
   );
 }
-el("start").onclick = startGame;
-el("setup-controller-title").onclick = openControllerSetup;
 document.addEventListener("keydown", (e) => {
   if (
     !started &&
@@ -1088,6 +1318,11 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has("playtest"))
         world: worldId,
         player: { ...player },
         cameraYaw: follow.yaw,
+        cameraObstructed: follow.obstructed,
+        story: storyScene?.snapshot(),
+        tutorials: world.tutorials,
+        practiceBounds: world.practiceBounds,
+        learnedMoves: [...learnedMoves],
         cameraPosition: {
           x: camera.position.x,
           y: camera.position.y,

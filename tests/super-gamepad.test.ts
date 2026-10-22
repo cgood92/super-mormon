@@ -4,9 +4,69 @@ import { Input } from "../src/super/input.ts";
 import {
   isBindingPressed,
   readProfile,
+  resolveControllerProfile,
   saveProfile,
   type N64Profile,
 } from "../src/super/gamepad.ts";
+
+const measuredId = "usb gamepad            (Vendor: 0810 Product: e501)";
+function measuredPad(id = measuredId, buttons = 10, axes = 2): Gamepad {
+  return {
+    id,
+    buttons: Array.from({ length: buttons }, () => ({ pressed: false })),
+    axes: Array.from({ length: axes }, () => 0),
+  } as unknown as Gamepad;
+}
+
+test("known N64 adapter resolves only for its normalized id and measured shape", () => {
+  const pad = measuredPad();
+  const resolved = resolveControllerProfile(pad);
+  assert.equal(resolved?.id, measuredId);
+  assert.deepEqual(resolved?.bindings, {
+    a: { type: "button", index: 5 },
+    b: { type: "button", index: 4 },
+    z: { type: "button", index: 8 },
+    start: { type: "button", index: 9 },
+    r: { type: "button", index: 7 },
+    cLeft: { type: "button", index: 3 },
+    cRight: { type: "button", index: 1 },
+    cUp: { type: "button", index: 0 },
+    cDown: { type: "button", index: 2 },
+  });
+  assert.ok(
+    resolveControllerProfile(
+      measuredPad("  USB   GAMEPAD (vendor: 0810   product: E501) "),
+    ),
+  );
+  assert.equal(
+    resolveControllerProfile(measuredPad("Other USB Gamepad")),
+    null,
+  );
+  assert.equal(resolveControllerProfile(measuredPad(measuredId, 12)), null);
+  assert.equal(resolveControllerProfile(measuredPad(measuredId, 10, 4)), null);
+});
+
+test("saved calibration overrides the known N64 adapter default", () => {
+  const prior = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+  const values = new Map<string, string>();
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        values.set(key, value);
+      },
+    },
+  });
+  try {
+    const saved: N64Profile = { ...profile, id: measuredId };
+    saveProfile(saved);
+    assert.deepEqual(resolveControllerProfile(measuredPad()), saved);
+  } finally {
+    if (prior) Object.defineProperty(globalThis, "localStorage", prior);
+    else Reflect.deleteProperty(globalThis, "localStorage");
+  }
+});
 
 const profile: N64Profile = {
   version: 1,

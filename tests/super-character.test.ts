@@ -68,8 +68,49 @@ test("carrying keeps both hands raised in front of the body", () => {
   character.dispose();
 });
 
+test("Nephi is clean shaven and can wave while idle", () => {
+  const nephi = createCharacter("nephi");
+  const lehi = createCharacter("lehi");
+  assert.equal(nephi.group.getObjectByName("beard"), undefined);
+  assert.ok(lehi.group.getObjectByName("beard"));
+  nephi.update(1 / 60, { ...standing, wave: true });
+  const wavingArm = nephi.group.getObjectByName("right-arm")!;
+  assert.ok(wavingArm.rotation.z > 2);
+  nephi.update(1 / 60, { ...standing, wave: true, runSpeed: 4 });
+  assert.ok(wavingArm.rotation.z < 1);
+  nephi.dispose();
+  lehi.dispose();
+});
+
+test("Nephi's disguise retains his young face with guard clothes", () => {
+  const disguised = createCharacter("nephi-disguised");
+  assert.equal(disguised.group.getObjectByName("beard"), undefined);
+  assert.ok(disguised.group.getObjectByName("guard-cuirass"));
+  disguised.update(1 / 60, standing);
+  assert.ok(bounds(disguised).max.y <= 1.66);
+  disguised.dispose();
+});
+
+test("Sam looks young and wears a distinct mantle", () => {
+  const sam = createCharacter("sam");
+  const nephi = createCharacter("nephi");
+  assert.equal(sam.group.getObjectByName("beard"), undefined);
+  const samCloak = sam.group.getObjectByName("cloak")!.children[0] as T.Mesh;
+  const nephiCloak = nephi.group.getObjectByName("cloak")!
+    .children[0] as T.Mesh;
+  const samColor = (samCloak.material as T.MeshStandardMaterial).color.getHex();
+  const nephiColor = (
+    nephiCloak.material as T.MeshStandardMaterial
+  ).color.getHex();
+  assert.notEqual(samColor, nephiColor);
+  sam.update(1 / 60, standing);
+  assert.ok(bounds(sam).max.y <= 1.66);
+  sam.dispose();
+  nephi.dispose();
+});
+
 test("all character roles keep crouch and flip poses above the floor", () => {
-  for (const role of ["nephi", "lehi", "laman", "guard"] as const) {
+  for (const role of ["nephi", "sam", "lehi", "laman", "guard"] as const) {
     const character = createCharacter(role);
     for (const move of ["crouch", "crawl"] as const) {
       character.update(1 / 60, {

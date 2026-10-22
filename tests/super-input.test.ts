@@ -1,12 +1,110 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { Input } from "../src/super/input.ts";
+import type { N64Profile } from "../src/super/gamepad.ts";
 
 function key(type: string, code: string) {
   const event = new Event(type);
   Object.defineProperty(event, "code", { value: code });
   return event;
 }
+
+test("device follows connected N64, generic pad, touch, and keyboard presence", () => {
+  const priorNavigator = Object.getOwnPropertyDescriptor(
+    globalThis,
+    "navigator",
+  );
+  const priorMatchMedia = Object.getOwnPropertyDescriptor(
+    globalThis,
+    "matchMedia",
+  );
+  const pads: Array<Record<string, unknown> | null> = [];
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: { getGamepads: () => pads },
+  });
+  Object.defineProperty(globalThis, "matchMedia", {
+    configurable: true,
+    value: () => ({ matches: false }),
+  });
+  try {
+    const target = new EventTarget();
+    const input = new Input(target);
+    assert.equal(input.device, "keyboard");
+    pads.push({ buttons: [], axes: [] });
+    assert.equal(input.device, "gamepad");
+    pads.push({
+      id: "usb gamepad            (Vendor: 0810 Product: e501)",
+      buttons: Array.from({ length: 10 }, () => ({ pressed: false })),
+      axes: [0, 0],
+    });
+    assert.equal(input.device, "n64");
+    target.dispatchEvent(key("keydown", "KeyW"));
+    assert.equal(input.device, "n64");
+    pads[1]!.connected = false;
+    assert.equal(input.device, "gamepad");
+    pads.length = 0;
+    assert.equal(input.device, "keyboard");
+    const touch = new Event("pointerdown");
+    Object.defineProperty(touch, "pointerType", { value: "touch" });
+    target.dispatchEvent(touch);
+    assert.equal(input.device, "touch");
+    target.dispatchEvent(key("keydown", "KeyW"));
+    assert.equal(input.device, "keyboard");
+    input.dispose();
+  } finally {
+    if (priorNavigator)
+      Object.defineProperty(globalThis, "navigator", priorNavigator);
+    else Reflect.deleteProperty(globalThis, "navigator");
+    if (priorMatchMedia)
+      Object.defineProperty(globalThis, "matchMedia", priorMatchMedia);
+    else Reflect.deleteProperty(globalThis, "matchMedia");
+  }
+});
+
+test("known adapter uses N64 button map and a stale override cannot mask it", () => {
+  const prior = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  const buttons = Array.from({ length: 10 }, () => ({ pressed: false }));
+  const pad = {
+    id: "usb gamepad            (Vendor: 0810 Product: e501)",
+    buttons,
+    axes: [0, 0],
+  };
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: { getGamepads: () => [pad] },
+  });
+  try {
+    const input = new Input(new EventTarget());
+    const stale: N64Profile = {
+      version: 1,
+      id: "different controller",
+      bindings: {
+        a: { type: "button", index: 0 },
+        b: { type: "button", index: 1 },
+        z: { type: "button", index: 2 },
+        start: { type: "button", index: 3 },
+        r: { type: "button", index: 4 },
+        cLeft: { type: "button", index: 5 },
+        cRight: { type: "button", index: 6 },
+        cUp: { type: "button", index: 7 },
+        cDown: { type: "button", index: 8 },
+      },
+    };
+    input.setControllerProfile(stale);
+    input.latest();
+    buttons[5].pressed = true;
+    assert.equal(input.latest().jump, true);
+    buttons[5].pressed = false;
+    buttons[0].pressed = true;
+    assert.equal(input.latest().cameraZoom, -1);
+    assert.equal(input.device, "n64");
+    input.dispose();
+  } finally {
+    if (prior) Object.defineProperty(globalThis, "navigator", prior);
+    else Reflect.deleteProperty(globalThis, "navigator");
+  }
+});
 
 test("keyboard movement and one shot actions reset correctly", () => {
   const target = new EventTarget();
