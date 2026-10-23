@@ -257,7 +257,7 @@ export function buildBountiful(scene: T.Scene): WorldData {
     const roof = mesh(cone, 0xc2ac7e, x, 2.6, 22, 4, 2, 4, "Family shelter");
     roof.rotation.y = Math.PI / 4;
   }
-  const people = [createCharacter("laman"), createCharacter("sam")];
+  const people = [createCharacter("laman"), createCharacter("lemuel")];
   people.forEach((actor, i) => {
     actor.group.position.set(brothers.x + i * 2, 0, brothers.z);
     root.add(actor.group);

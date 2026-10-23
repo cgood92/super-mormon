@@ -675,7 +675,10 @@ async function load(id: WorldId) {
       ? "lehi"
       : id === "palace"
         ? "laman"
-        : "nephi",
+        : id === "voyage"
+          ? "child"
+          : "nephi",
+    { quality: "hero" },
   );
   (world.actorParent ?? scene).add(avatar.group);
   avatar.update(0, player);
@@ -748,7 +751,7 @@ async function load(id: WorldId) {
     actor.group.visible = id !== "palace";
   }
   if (id === "palace") {
-    const laban = createCharacter("guard");
+    const laban = createCharacter("laban");
     const audience = world.story!.laban;
     laban.group.position.set(audience.x, audience.y, audience.z);
     laban.group.scale.setScalar(1);
@@ -757,7 +760,7 @@ async function load(id: WorldId) {
     const end = world.escapeGoal ?? world.goal;
     for (let i = 0; i < 3; i++) {
       const brother = createCharacter(
-        i === 0 ? "nephi" : i === 1 ? "laman" : "sam",
+        i === 0 ? "nephi" : i === 1 ? "lemuel" : "sam",
       );
       brother.group.position.set(end.x - 2 + i * 2, end.y, end.z + 1.2);
       const state = createPlayer(end.x - 2 + i * 2, end.y, end.z + 1.2);
@@ -803,7 +806,9 @@ async function load(id: WorldId) {
       },
       setDisguise: (enabled) => {
         avatar.dispose();
-        avatar = createCharacter(enabled ? "nephi-disguised" : "nephi");
+        avatar = createCharacter(enabled ? "nephi-disguised" : "nephi", {
+          quality: "hero",
+        });
         scene.add(avatar.group);
         avatar.update(0, player);
       },
@@ -829,8 +834,7 @@ async function load(id: WorldId) {
       complete,
       setAvatar: (role) => {
         avatar.dispose();
-        avatar = createCharacter("nephi");
-        avatar.group.scale.setScalar(role === "child" ? 0.65 : 1);
+        avatar = createCharacter(role, { quality: "hero" });
         (world.actorParent ?? scene).add(avatar.group);
         avatar.update(0, player);
       },

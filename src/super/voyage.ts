@@ -71,7 +71,7 @@ export function buildVoyage(scene: T.Scene): WorldData {
   const brothers = { x: -1, y: 0, z: 16 };
   const npcs = [
     createCharacter("laman"),
-    createCharacter("sam"),
+    createCharacter("lemuel"),
     createCharacter("nephi"),
   ];
   const positions = [

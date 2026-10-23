@@ -194,3 +194,56 @@ test("runtime disposes crowd GPU instances and removes actor groups exactly once
   for (const part of instances) assert.equal(part.parent, null);
   for (const actor of crowds) assert.equal(actor.parent, null);
 });
+
+test("instanced crowds have colored smooth bodies, paired moving arms and legs within four draw calls", () => {
+  const s = setup();
+  const parts = s.scene.children.filter(
+    (o): o is THREE.InstancedMesh => o instanceof THREE.InstancedMesh,
+  );
+  assert.equal(parts.length, 4);
+  const bodies = parts.find((part) => part.name === "vision crowd bodies")!;
+  const arms = parts.find((part) => part.name === "vision crowd arms")!;
+  const legs = parts.find((part) => part.name === "vision crowd legs")!;
+  assert.ok(bodies, "a shared sculpted body replaces disconnected primitives");
+  assert.ok(arms, "both sleeved arms are instanced");
+  assert.ok(legs, "both sandaled legs are instanced");
+  assert.equal(bodies.count, 108);
+  assert.equal(arms.count, 216);
+  assert.equal(legs.count, 216);
+  for (const part of [bodies, arms, legs]) {
+    assert.ok(part.geometry.getAttribute("color"));
+    assert.ok(part.geometry.getAttribute("normal"));
+    assert.ok(part.geometry.getAttribute("position").count / 3 < 6000);
+  }
+  const triangles = parts.reduce(
+    (sum, part) =>
+      sum +
+      ((part.geometry.index?.count ??
+        part.geometry.getAttribute("position").count) /
+        3) *
+        part.count,
+    0,
+  );
+  assert.ok(triangles < 300_000, `crowd triangle budget: ${triangles}`);
+  bodies.geometry.computeBoundingBox();
+  assert.ok(bodies.geometry.boundingBox!.max.y > 1.6);
+  assert.ok(bodies.geometry.boundingBox!.min.y < 0.45);
+  s.runtime.update(1 / 60, s.player, { interact: false });
+  s.dialogs.shift()!();
+  const before = new THREE.Matrix4();
+  arms.getMatrixAt(72, before);
+  s.runtime.update(0.4, s.player, { interact: false });
+  const after = new THREE.Matrix4();
+  arms.getMatrixAt(72, after);
+  assert.notDeepEqual(
+    after.elements,
+    before.elements,
+    "walking crowd swings its arms",
+  );
+  assert.ok(
+    bodies.instanceColor,
+    "individual clothing varies across the crowd",
+  );
+  s.runtime.dispose();
+  s.world.dispose?.();
+});

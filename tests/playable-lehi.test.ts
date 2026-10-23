@@ -26,9 +26,9 @@ function bounds(group: T.Object3D) {
 function assertBackCovered(group: T.Group, context: string) {
   group.updateMatrixWorld(true);
   const coat = group.getObjectByName("flowing-mantle") as T.Mesh;
-  const layers = ["continuous-robe-and-sleeves", "continuous-folded-robe"].map(
-    (name) => group.getObjectByName(name) as T.Mesh,
-  );
+  const layers = ["continuous-robe-and-sleeves", "continuous-folded-robe"]
+    .map((name) => group.getObjectByName(name) as T.Mesh)
+    .filter(Boolean);
   for (const mesh of layers)
     if (mesh instanceof T.SkinnedMesh) mesh.skeleton.update();
   for (const y of [1.0, 1.1, 1.25, 1.4])
@@ -98,7 +98,12 @@ test("chosen Lehi is a grounded 1.65m avatar with independently deforming sleeve
   let sleeveIndex = -1;
   let chestIndex = -1;
   for (let i = 0; i < position.count; i++) {
-    if (sleeveIndex < 0 && position.getX(i) < -0.54 && position.getY(i) < 1.12)
+    if (
+      sleeveIndex < 0 &&
+      position.getX(i) < -0.54 &&
+      position.getY(i) > 1.08 &&
+      position.getY(i) < 1.2
+    )
       sleeveIndex = i;
     if (
       chestIndex < 0 &&
@@ -175,7 +180,9 @@ test("playable Lehi responds to traversal poses and keeps crouch under a low cei
 test("mantle collar remains fixed while the hem responds softly to movement", () => {
   const actor = createPlayableLehi();
   const mantle = actor.group.getObjectByName("flowing-mantle") as T.Mesh;
-  const robe = actor.group.getObjectByName("continuous-folded-robe") as T.Mesh;
+  const robe = actor.group.getObjectByName(
+    "continuous-robe-and-sleeves",
+  ) as T.Mesh;
   const position = mantle.geometry.getAttribute(
     "position",
   ) as T.BufferAttribute;
@@ -185,15 +192,21 @@ test("mantle collar remains fixed while the hem responds softly to movement", ()
   let top = -1;
   let hem = -1;
   for (let i = 0; i < position.count; i++) {
-    if (top < 0 && position.getY(i) > 1.48) top = i;
-    if (hem < 0 && position.getY(i) < 0.88) hem = i;
+    if (top < 0 && position.getY(i) > 1.58 && Math.abs(position.getX(i)) < 0.12)
+      top = i;
+    if (hem < 0 && position.getY(i) < 0.3) hem = i;
   }
   assert.ok(top >= 0 && hem >= 0);
   let robeTop = -1;
   let robeHem = -1;
   for (let i = 0; i < robePosition.count; i++) {
-    if (robeTop < 0 && robePosition.getY(i) > 1.14) robeTop = i;
-    if (robeHem < 0 && robePosition.getY(i) < 0.54) robeHem = i;
+    if (
+      robeTop < 0 &&
+      robePosition.getY(i) > 1.4 &&
+      Math.abs(robePosition.getX(i)) < 0.12
+    )
+      robeTop = i;
+    if (robeHem < 0 && robePosition.getY(i) < 0.3) robeHem = i;
   }
   assert.ok(robeTop >= 0 && robeHem >= 0);
   const robeTopZ = robePosition.getZ(robeTop);
@@ -215,5 +228,49 @@ test("mantle collar remains fixed while the hem responds softly to movement", ()
     Math.abs(robePosition.getZ(robeHem) - robeHemZ) > 0.005,
     "the tunic hem should respond to the stride",
   );
+  actor.dispose();
+});
+
+test("coat sleeves share the tunic skeleton instead of floating over swinging arms", () => {
+  const actor = createPlayableLehi();
+  const shirt = actor.group.getObjectByName(
+    "continuous-robe-and-sleeves",
+  ) as T.SkinnedMesh;
+  const coat = actor.group.getObjectByName("flowing-mantle") as T.SkinnedMesh;
+  assert.ok(coat.isSkinnedMesh);
+  assert.equal(coat.skeleton, shirt.skeleton);
+  assert.equal(
+    actor.group.getObjectByName("continuous-folded-robe"),
+    undefined,
+    "no intersecting second tunic layer",
+  );
+  actor.update(1 / 60, standing);
+  actor.group.updateMatrixWorld(true);
+  coat.skeleton.update();
+  const positions = coat.geometry.getAttribute("position") as T.BufferAttribute;
+  let sleeve = -1;
+  for (let i = 0; i < positions.count; i++)
+    if (
+      positions.getX(i) < -0.5 &&
+      positions.getY(i) > 1.02 &&
+      positions.getY(i) < 1.15
+    ) {
+      sleeve = i;
+      break;
+    }
+  assert.ok(sleeve >= 0);
+  const before = coat.getVertexPosition(sleeve, new T.Vector3());
+  for (let i = 0; i < 8; i++)
+    actor.update(1 / 60, {
+      ...standing,
+      z: i * 0.065,
+      vz: 4,
+      runSpeed: 4,
+      move: "run",
+    });
+  actor.group.updateMatrixWorld(true);
+  coat.skeleton.update();
+  const after = coat.getVertexPosition(sleeve, new T.Vector3());
+  assert.ok(after.distanceTo(before) > 0.02, "coat sleeve must visibly swing");
   actor.dispose();
 });

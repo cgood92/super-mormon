@@ -330,7 +330,7 @@ test("night Laban transfers his armor only after confirmation and remains covere
     events = hooksForTest();
   const mission = createStoryScene("night", scene, world, events.hooks);
   const before = scene.getObjectByName("laban-character")!;
-  assert.ok(before.getObjectByName("guard-cuirass"));
+  assert.ok(before.getObjectByName("flowing-mantle"));
   let disposed = 0;
   before.traverse((object) => {
     if (object instanceof T.Mesh)
@@ -343,9 +343,15 @@ test("night Laban transfers his armor only after confirmation and remains covere
     rotation = before.rotation.clone();
   events.dialogs.shift()!();
   const after = scene.getObjectByName("laban-undressed-character")!;
-  assert.ok(after.getObjectByName("modesty-linen"));
-  assert.ok(after.getObjectByName("bare-torso"));
-  assert.equal(after.getObjectByName("guard-cuirass"), undefined);
+  const covering = after.getObjectByName(
+    "continuous-robe-and-sleeves",
+  ) as T.Mesh;
+  assert.ok(covering, "Laban retains a continuous modest covering");
+  assert.equal(after.getObjectByName("flowing-mantle"), undefined);
+  // Laban is lying down; measure the covering in garment coordinates.
+  covering.geometry.computeBoundingBox();
+  const coveringBounds = covering.geometry.boundingBox!;
+  assert.ok(coveringBounds.max.y - coveringBounds.min.y > 0.65);
   assert.equal(scene.getObjectByName("laban-character"), undefined);
   assert.ok(disposed > 0);
   assert.deepEqual(after.position, position);

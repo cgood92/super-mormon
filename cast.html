@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Super Mormon · Cast study</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #e7e2d7;
+        color: #29392e;
+        font: 15px system-ui;
+      }
+      header {
+        padding: 24px 32px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      h1 {
+        margin: 0;
+        font: 32px Georgia;
+      }
+      header p {
+        margin: 8px 0;
+      }
+      a {
+        color: inherit;
+      }
+      #grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+        padding: 0 24px 24px;
+      }
+      article {
+        border-radius: 16px;
+        background: #f8f4eb;
+        overflow: hidden;
+      }
+      article h2 {
+        margin: 12px 18px 4px;
+        font: 22px Georgia;
+      }
+      article p {
+        margin: 0 18px 16px;
+        font-size: 12px;
+        min-height: 30px;
+      }
+      .view {
+        height: 270px;
+        touch-action: none;
+        cursor: grab;
+      }
+      canvas {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        width: 100%;
+        height: 100%;
+      }
+      button,
+      select {
+        font: inherit;
+        color: inherit;
+        background: #fff9;
+        border: 1px solid #aab7a6;
+        border-radius: 7px;
+        padding: 8px;
+      }
+      nav {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      @media (max-width: 900px) {
+        #grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        header {
+          display: block;
+        }
+        nav {
+          margin-top: 18px;
+        }
+        .view {
+          height: 230px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>The cast</h1>
+        <p>Drag any character to turn. Same style, distinct people.</p>
+      </div>
+      <nav>
+        <label
+          >Pose
+          <select id="pose">
+            <option value="idle">Standing</option>
+            <option value="run">Walking pose</option>
+            <option value="carry">Carrying</option>
+            <option value="wave">Waving</option>
+            <option value="crouch">Crouching</option>
+          </select></label
+        ><button id="front">Front</button><button id="side">Side</button
+        ><button id="back">Back</button
+        ><a href="./nephi-faces.html">Nephi face options ↗</a
+        ><a href="./">Play the game ↗</a>
+      </nav>
+    </header>
+    <main id="grid"></main>
+    <script type="module" src="/src/cast-lab.ts"></script>
+  </body>
+</html>

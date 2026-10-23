@@ -8,6 +8,10 @@ test("voyage follows fourth-day release, prayer, Liahona and sustained steering"
   const scene = new T.Scene(),
     world = buildVoyage(scene);
   assert.equal(world.initialObjective, "Find Laman and Lemuel below deck");
+  assert.ok(scene.getObjectByName("laman-character"));
+  assert.ok(scene.getObjectByName("lemuel-character"));
+  assert.ok(scene.getObjectByName("nephi-character"));
+  assert.equal(scene.getObjectByName("sam-character"), undefined);
   let avatar = "",
     complete = 0;
   const runtime = world.adventure!({

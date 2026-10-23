@@ -1,0 +1,32 @@
+import type { SculptedFaceProfile } from "./lehi-sculpted-models";
+
+/** Approved face-study option 2, shared by Nephi and his disguise. */
+export const APPROVED_NEPHI_FACE: Readonly<SculptedFaceProfile> = {
+  faceHeight: 0.98,
+  faceDepth: 0.79,
+  jawSquareness: 1.08,
+  jawDrop: 0.47,
+  jawDepth: 0.59,
+  cheekbone: 0.1,
+  noseWidth: 0.037,
+  noseProjection: 0.68,
+  noseBridge: 0.45,
+  eyeHeight: 0.13,
+  eyeWidth: 0.195,
+  browAngle: 0.025,
+  browLift: 0.015,
+  browThickness: 0.019,
+  mouthHeight: 0.34,
+  hairCut: "side-part",
+  hairColor: 0xa18458,
+  hairLength: 0.023,
+  faceWidth: 0.77,
+  jawWidth: 0.5,
+  lowerFaceTaper: 0.68,
+  chinLength: 0.42,
+  softUnderEyes: true,
+  eyeSpacing: 0.34,
+  eyeOpening: 0.145,
+  mouthWidth: 0.195,
+  smile: 0.015,
+};

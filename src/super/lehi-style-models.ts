@@ -1,5 +1,5 @@
 import * as T from "three";
-import { createCharacter } from "./character";
+import { createCharacter } from "./legacy-character";
 
 export type LehiVariant = { group: T.Group; dispose: () => void };
 

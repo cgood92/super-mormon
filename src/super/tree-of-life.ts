@@ -1,10 +1,12 @@
 import * as T from "three";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { box, material, ambient, palette } from "./art";
 import { createCharacter, type CharacterState } from "./character";
 import type { StoryShot } from "./cinematic";
 import { terracedRock, markScenery } from "./scenery";
 import type { PlayerState } from "./physics";
 import type { WorldData, Point } from "./worlds";
+import { capsule, ellipsoid, sculpt, smoothUnion } from "./sculpture";
 
 export type TreeWorldData = WorldData & {
   treeData: {
@@ -742,6 +744,150 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
   };
 }
 
+/** Reduced smooth figures keep the large vision crowd within four draw calls. */
+function createVisionCrowdParts() {
+  const cloth = 0xb7a27e,
+    mantle = 0x737f70,
+    skin = 0xbf906b,
+    hair = 0x49372c,
+    leather = 0x634a34;
+  const surface = () =>
+    new T.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
+  const bodyMaterial = surface(),
+    armMaterial = surface(),
+    legMaterial = surface();
+  const body = sculpt({
+    bounds: [
+      [-0.55, 0.15, -0.42],
+      [0.55, 1.95, 0.42],
+    ],
+    resolution: 18,
+    material: bodyMaterial,
+    field(x, y, z) {
+      const skirtWidth = 0.31 - T.MathUtils.clamp((y - 0.4) / 0.5, 0, 1) * 0.07;
+      const folds = Math.sin(Math.atan2(x, z) * 9 + y * 2) * 0.006;
+      const skirt = Math.max(
+        (Math.hypot(x / skirtWidth, z / 0.21) - 1) * 0.21 + folds,
+        0.39 - y,
+        y - 0.96,
+      );
+      let d = smoothUnion(
+        skirt,
+        ellipsoid(x, y, z, 0, 1.035, 0, 0.27, 0.25, 0.205),
+        0.09,
+      );
+      for (const side of [-1, 1])
+        d = smoothUnion(
+          d,
+          ellipsoid(x, y, z, side * 0.245, 1.155, 0, 0.13, 0.135, 0.14),
+          0.06,
+        );
+      d = smoothUnion(d, capsule(x, y, z, 0, 1.2, 0, 0, 1.38, 0, 0.085), 0.045);
+      d = smoothUnion(
+        d,
+        ellipsoid(x, y, z, 0, 1.46, 0, 0.17, 0.205, 0.153),
+        0.035,
+      );
+      return smoothUnion(
+        d,
+        ellipsoid(x, y, z, 0, 1.445, 0.15, 0.041, 0.059, 0.052),
+        0.025,
+      );
+    },
+    color(x, y, z) {
+      if (y > 1.29) return y > 1.585 || (z < -0.055 && y > 1.36) ? hair : skin;
+      if (y > 0.83 && y < 0.88) return leather;
+      return y > 0.9 && (z < -0.1 || x < -0.12) ? mantle : cloth;
+    },
+  }).geometry;
+  // Eyes share the body's vertex-colored geometry, with no extra meshes per person.
+  const bodyPieces = [body];
+  const addOval = (
+    pieces: T.BufferGeometry[],
+    x: number,
+    y: number,
+    z: number,
+    sx: number,
+    sy: number,
+    sz: number,
+    color: number,
+  ) => {
+    const geometry = new T.SphereGeometry(1, 8, 4).toNonIndexed();
+    geometry.deleteAttribute("uv");
+    geometry.scale(sx, sy, sz).translate(x, y, z);
+    const colors = new Float32Array(
+      geometry.getAttribute("position").count * 3,
+    );
+    const tint = new T.Color(color);
+    for (let i = 0; i < colors.length; i += 3) tint.toArray(colors, i);
+    geometry.setAttribute("color", new T.BufferAttribute(colors, 3));
+    pieces.push(geometry);
+  };
+  for (const side of [-1, 1]) {
+    addOval(
+      bodyPieces,
+      side * 0.064,
+      1.49,
+      0.139,
+      0.034,
+      0.023,
+      0.014,
+      0xe3d6bd,
+    );
+    addOval(bodyPieces, side * 0.064, 1.49, 0.151, 0.013, 0.016, 0.008, hair);
+  }
+  const bodyGeometry = mergeGeometries(bodyPieces)!;
+  for (const geometry of bodyPieces) geometry.dispose();
+  const armGeometry = sculpt({
+    bounds: [
+      [-0.25, -0.8, -0.25],
+      [0.25, 0.3, 0.25],
+    ],
+    resolution: 12,
+    material: armMaterial,
+    field(x, y, z) {
+      let d = capsule(x, y, z, 0, 0, 0, 0, -0.27, 0.01, 0.115);
+      d = smoothUnion(
+        d,
+        capsule(x, y, z, 0, -0.26, 0.01, 0, -0.47, 0.025, 0.068),
+        0.035,
+      );
+      return smoothUnion(
+        d,
+        ellipsoid(x, y, z, 0, -0.52, 0.025, 0.071, 0.093, 0.058),
+        0.035,
+      );
+    },
+    color: (_x, y) => (y > -0.3 ? cloth : skin),
+  }).geometry;
+  const legPieces: T.BufferGeometry[] = [];
+  addOval(legPieces, 0, -0.18, 0, 0.078, 0.215, 0.08, skin);
+  addOval(legPieces, 0, -0.405, 0.065, 0.1, 0.065, 0.175, leather);
+  addOval(legPieces, 0, -0.37, 0.07, 0.075, 0.055, 0.115, skin);
+  const legGeometry = mergeGeometries(legPieces)!;
+  for (const geometry of legPieces) geometry.dispose();
+  const parts = [
+    new T.InstancedMesh(bodyGeometry, bodyMaterial, 108),
+    new T.InstancedMesh(armGeometry, armMaterial, 216),
+    new T.InstancedMesh(legGeometry, legMaterial, 216),
+    new T.InstancedMesh(
+      new T.SphereGeometry(0.105, 6, 4),
+      new T.MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: 0xe7ebbc,
+        emissiveIntensity: 0.5,
+      }),
+      108,
+    ),
+  ];
+  for (let i = 0; i < parts.length; i++) {
+    parts[i].name = `vision crowd ${["bodies", "arms", "legs", "fruit"][i]}`;
+    parts[i].frustumCulled = false;
+    parts[i].instanceMatrix.setUsage(T.DynamicDrawUsage);
+  }
+  return parts;
+}
+
 export function createTreeOfLifeScene(
   scene: T.Scene,
   world: WorldData,
@@ -767,41 +913,15 @@ export function createTreeOfLifeScene(
     home: Point;
     behavior?: "press" | "lost" | "eat";
   }[] = [];
-  // Crowd silhouettes share four draw calls; only named family use detailed rigs.
-  const crowdParts = [
-    new T.InstancedMesh(
-      new T.CylinderGeometry(0.22, 0.34, 1.15, 6),
-      material(0xa49377),
-      108,
-    ),
-    new T.InstancedMesh(
-      new T.IcosahedronGeometry(0.22, 1),
-      material(0xb99978),
-      108,
-    ),
-    new T.InstancedMesh(
-      new T.BoxGeometry(0.14, 0.65, 0.14),
-      material(0xa49377),
-      108,
-    ),
-  ];
-  crowdParts.push(
-    new T.InstancedMesh(
-      new T.IcosahedronGeometry(0.15, 1),
-      new T.MeshStandardMaterial({
-        color: 0xffffff,
-        emissive: 0xe7ebbc,
-        emissiveIntensity: 0.5,
-      }),
-      108,
-    ),
-  );
+  const crowdParts = createVisionCrowdParts();
   for (const part of crowdParts) {
     part.frustumCulled = false;
     scene.add(part);
   }
   let crowdIndex = 0;
   const transform = new T.Object3D();
+  const local = new T.Object3D();
+  const instanceMatrix = new T.Matrix4();
   const makeActor = (
     role: Parameters<typeof createCharacter>[0],
     point: Point,
@@ -810,36 +930,60 @@ export function createTreeOfLifeScene(
   ) => {
     const index = crowdIndex;
     if (mock || crowd) crowdIndex++;
+    if (mock || crowd) {
+      const tint = new T.Color().setHSL(
+        (index % 5) * 0.025 + 0.05,
+        0.12,
+        0.8 + (index % 3) * 0.07,
+      );
+      crowdParts[0].setColorAt(index, tint);
+      for (const part of [crowdParts[1], crowdParts[2]])
+        for (let side = 0; side < 2; side++)
+          part.setColorAt(index * 2 + side, tint);
+    }
     const rig =
       mock || crowd
         ? ({
             group: new T.Group(),
             update(_dt: number, state: CharacterState) {
-              for (let part = 0; part < crowdParts.length; part++) {
-                transform.position.set(
-                  state.x,
-                  state.y + [0.7, 1.5, 1.1, 1.15][part],
-                  state.z,
-                );
-                transform.rotation.set(
+              const walking = Math.min(1, state.runSpeed),
+                stride = Math.sin(time * 4.8 + index * 1.7) * walking,
+                height = 0.92 + (index % 7) * 0.025;
+              transform.position.set(
+                state.x,
+                state.y + Math.abs(stride) * 0.018,
+                state.z,
+              );
+              transform.rotation.set(0, state.yaw, 0);
+              transform.scale.setScalar(height);
+              transform.updateMatrix();
+              crowdParts[0].setMatrixAt(index, transform.matrix);
+              for (let i = 0; i < 2; i++) {
+                const side = i ? 1 : -1;
+                local.position.set(side * 0.29, 1.16, 0);
+                local.rotation.set(
+                  state.carrying && i === 1 ? -1.4 : side * stride * 0.34,
                   0,
-                  state.yaw,
-                  part === 2 ? (state.pointing ? -1.45 : 0.2) : 0,
+                  state.pointing && i === 0
+                    ? -1.42 + Math.sin(time * 2 + index) * 0.08
+                    : side * 0.1,
                 );
-                if (part === 2) {
-                  transform.position.x += state.pointing ? -0.45 : 0.28;
-                }
-                transform.scale.setScalar(
-                  part === 3 && !state.carrying ? 0 : 1,
-                );
-                if (part === 3) {
-                  transform.position.x += 0.3;
-                  transform.position.z += 0.3;
-                }
-                transform.updateMatrix();
-                crowdParts[part].setMatrixAt(index, transform.matrix);
-                crowdParts[part].instanceMatrix.needsUpdate = true;
+                local.scale.setScalar(1);
+                local.updateMatrix();
+                instanceMatrix.multiplyMatrices(transform.matrix, local.matrix);
+                crowdParts[1].setMatrixAt(index * 2 + i, instanceMatrix);
+                local.position.set(side * 0.125, 0.47, 0);
+                local.rotation.set(-side * stride * 0.28, 0, 0);
+                local.updateMatrix();
+                instanceMatrix.multiplyMatrices(transform.matrix, local.matrix);
+                crowdParts[2].setMatrixAt(index * 2 + i, instanceMatrix);
               }
+              local.position.set(0.29, 1.07, 0.56);
+              local.rotation.set(0, 0, 0);
+              local.scale.setScalar(state.carrying ? 1 : 0);
+              local.updateMatrix();
+              instanceMatrix.multiplyMatrices(transform.matrix, local.matrix);
+              crowdParts[3].setMatrixAt(index, instanceMatrix);
             },
             dispose() {},
           } as ReturnType<typeof createCharacter>)
@@ -854,6 +998,7 @@ export function createTreeOfLifeScene(
       grounded: true,
       runSpeed: 0,
     };
+    rig.update(0, state);
     actors.push({ rig, state, mock, home: { ...point } });
     return rig;
   };
@@ -864,7 +1009,7 @@ export function createTreeOfLifeScene(
   makeActor("sam", p(-12, -33)).group.name = "Sam";
   // Laman and Lemuel remain apart; this scene never depicts them taking the fruit.
   makeActor("laman", p(8, 65)).group.name = "Laman";
-  makeActor("laman", p(12, 68)).group.name = "Lemuel";
+  makeActor("lemuel", p(12, 68)).group.name = "Lemuel";
   for (let i = 0; i < 36; i++)
     makeActor(
       i % 2 ? "guard" : "laman",
@@ -1106,6 +1251,7 @@ export function createTreeOfLifeScene(
         a.state.wave = !a.mock && !a.behavior && distance(player, a.state) < 7;
         a.rig.update(dt, a.state);
       }
+      for (const part of crowdParts) part.instanceMatrix.needsUpdate = true;
       // Garden light falls away in every direction, including behind the player.
       const gardenDistance = distance(player, data.tree);
       const strength = T.MathUtils.smoothstep(gardenDistance, 22, 38);

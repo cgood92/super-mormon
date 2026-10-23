@@ -4,7 +4,23 @@ import * as T from "three";
 import {
   createCharacter,
   type CharacterState,
+  type CharacterRole,
 } from "../src/super/character.ts";
+
+const roles: CharacterRole[] = [
+  "nephi",
+  "nephi-disguised",
+  "sam",
+  "lehi",
+  "laman",
+  "lemuel",
+  "guard",
+  "laban",
+  "laban-undressed",
+  "sariah",
+  "zoram",
+  "child",
+];
 
 const standing: CharacterState = {
   x: 0,
@@ -71,8 +87,11 @@ test("carrying keeps both hands raised in front of the body", () => {
 test("Nephi is clean shaven and can wave while idle", () => {
   const nephi = createCharacter("nephi");
   const lehi = createCharacter("lehi");
-  assert.equal(nephi.group.getObjectByName("beard"), undefined);
-  assert.ok(lehi.group.getObjectByName("beard"));
+  assert.equal(
+    nephi.group.getObjectByName("one-piece-sculpted-beard"),
+    undefined,
+  );
+  assert.ok(lehi.group.getObjectByName("one-piece-sculpted-beard"));
   nephi.update(1 / 60, { ...standing, wave: true });
   const wavingArm = nephi.group.getObjectByName("right-arm")!;
   assert.ok(wavingArm.rotation.z > 2);
@@ -82,10 +101,13 @@ test("Nephi is clean shaven and can wave while idle", () => {
   lehi.dispose();
 });
 
-test("Nephi's disguise retains his young face with guard clothes", () => {
+test("Nephi's disguise retains his young face with Laban's garments", () => {
   const disguised = createCharacter("nephi-disguised");
-  assert.equal(disguised.group.getObjectByName("beard"), undefined);
-  assert.ok(disguised.group.getObjectByName("guard-cuirass"));
+  assert.equal(
+    disguised.group.getObjectByName("one-piece-sculpted-beard"),
+    undefined,
+  );
+  assert.ok(disguised.group.getObjectByName("continuous-robe-and-sleeves"));
   disguised.update(1 / 60, standing);
   assert.ok(bounds(disguised).max.y <= 1.66);
   disguised.dispose();
@@ -94,10 +116,12 @@ test("Nephi's disguise retains his young face with guard clothes", () => {
 test("Sam looks young and wears a distinct mantle", () => {
   const sam = createCharacter("sam");
   const nephi = createCharacter("nephi");
-  assert.equal(sam.group.getObjectByName("beard"), undefined);
-  const samCloak = sam.group.getObjectByName("cloak")!.children[0] as T.Mesh;
-  const nephiCloak = nephi.group.getObjectByName("cloak")!
-    .children[0] as T.Mesh;
+  assert.equal(
+    sam.group.getObjectByName("one-piece-sculpted-beard"),
+    undefined,
+  );
+  const samCloak = sam.group.getObjectByName("flowing-mantle") as T.Mesh;
+  const nephiCloak = nephi.group.getObjectByName("flowing-mantle") as T.Mesh;
   const samColor = (samCloak.material as T.MeshStandardMaterial).color.getHex();
   const nephiColor = (
     nephiCloak.material as T.MeshStandardMaterial
@@ -110,7 +134,7 @@ test("Sam looks young and wears a distinct mantle", () => {
 });
 
 test("all character roles keep crouch and flip poses above the floor", () => {
-  for (const role of ["nephi", "sam", "lehi", "laman", "guard"] as const) {
+  for (const role of roles) {
     const character = createCharacter(role);
     for (const move of ["crouch", "crawl"] as const) {
       character.update(1 / 60, {
@@ -161,7 +185,7 @@ test("jump stage selects the airborne pose when move is omitted", () => {
 });
 
 test("forced crouch stays compact during airborne moves under a ceiling", () => {
-  for (const role of ["nephi", "lehi", "laman", "guard"] as const) {
+  for (const role of roles) {
     const character = createCharacter(role);
     for (const move of ["jump", "longJump", "backflip", "sideflip"] as const) {
       character.update(1 / 60, {
@@ -183,37 +207,67 @@ test("Laban's official garments match Nephi's disguise and leave a modest linen 
   const laban = createCharacter("laban"),
     disguise = createCharacter("nephi-disguised"),
     undressed = createCharacter("laban-undressed");
-  for (const name of ["guard-cuirass", "tunic"]) {
+  for (const name of [
+    "continuous-robe-and-sleeves",
+    "flowing-mantle",
+    "character-headwear",
+    "left-regal-embroidery",
+    "right-regal-embroidery",
+  ]) {
     const material = (rig: typeof laban) =>
       (
         (rig.group.getObjectByName(name) as T.Mesh)
           .material as T.MeshStandardMaterial
       ).color.getHex();
-    assert.equal(material(laban), material(disguise));
+    assert.equal(material(laban), material(disguise), name);
   }
-  assert.ok(laban.group.getObjectByName("beard"));
-  assert.equal(undressed.group.getObjectByName("guard-cuirass"), undefined);
-  assert.ok(undressed.group.getObjectByName("bare-torso"));
-  const linen = undressed.group.getObjectByName("modesty-linen") as T.Mesh;
-  assert.ok((linen.geometry as T.CylinderGeometry).parameters.height >= 0.65);
-  assert.equal(undressed.group.getObjectByName("cloak")!.visible, false);
+  assert.ok(laban.group.getObjectByName("one-piece-sculpted-beard"));
+  assert.equal(
+    disguise.group.getObjectByName("one-piece-sculpted-beard"),
+    undefined,
+  );
+  const linen = undressed.group.getObjectByName(
+    "continuous-robe-and-sleeves",
+  ) as T.Mesh;
+  assert.ok(linen, "Laban must retain a continuous linen covering");
+  undressed.update(1 / 60, standing);
+  undressed.group.updateMatrixWorld(true);
+  const linenBounds = new T.Box3().setFromObject(linen);
+  assert.ok(linenBounds.min.y < 0.55, "linen must extend below the thighs");
+  assert.ok(linenBounds.max.y > 1.15, "linen must cover the torso");
+  assert.equal(undressed.group.getObjectByName("flowing-mantle"), undefined);
   laban.dispose();
   disguise.dispose();
   undressed.dispose();
 });
 
-test("Sariah has an adult face, ankle length robe and pale linen head covering", () => {
+test("Sariah has an adult face, ankle length robe and linen head covering", () => {
   const sariah = createCharacter("sariah");
-  assert.equal(sariah.group.getObjectByName("beard"), undefined);
-  const robe = sariah.group.getObjectByName("long-robe") as T.Mesh;
-  assert.ok(robe);
-  assert.ok((robe.geometry as T.CylinderGeometry).parameters.height >= 0.9);
-  const veil = sariah.group.getObjectByName("linen-head-covering")!;
-  assert.ok(veil && veil.children.length >= 4);
-  const material = (veil.children[0] as T.Mesh)
-    .material as T.MeshStandardMaterial;
-  assert.equal(material.color.getHex(), 0xe8dfcb);
+  assert.equal(
+    sariah.group.getObjectByName("one-piece-sculpted-beard"),
+    undefined,
+  );
+  const robe = sariah.group.getObjectByName(
+    "continuous-robe-and-sleeves",
+  ) as T.Mesh;
+  const veil = sariah.group.getObjectByName("character-headwear") as T.Mesh;
+  assert.ok(robe && veil);
   sariah.update(1 / 60, standing);
+  sariah.group.updateMatrixWorld(true);
+  const robeBounds = new T.Box3().setFromObject(robe);
+  const veilBounds = new T.Box3().setFromObject(veil);
+  assert.ok(robeBounds.min.y < 0.2, "robe must reach the ankles");
+  assert.ok(robeBounds.max.y - robeBounds.min.y > 0.9);
+  assert.ok(
+    veilBounds.max.y > 1.5 && veilBounds.min.y < 1.4,
+    "head covering must drape from the crown",
+  );
+  const material = veil.material as T.MeshStandardMaterial;
+  const linenColor = material.color.clone().convertLinearToSRGB();
+  assert.ok(
+    linenColor.r > 0.65 && linenColor.g > 0.6 && linenColor.b > 0.5,
+    "head covering should read as pale linen",
+  );
   assert.ok(bounds(sariah).min.y >= -0.02);
   assert.ok(bounds(sariah).max.y < 1.7);
   sariah.dispose();

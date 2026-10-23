@@ -1,21 +1,28 @@
 import * as T from "three";
-import { createCharacter, type CharacterState } from "./character";
-import { buildSculptedLehi } from "./lehi-sculpted-models";
+import { createClothNormalUpdater } from "./cloth-normals";
+import type { CharacterState, CharacterRole } from "./character-types";
+import { createMotionDriver } from "./character-motion";
+import { acquireCharacterModel } from "./character-model-cache";
 
 const damp = (rate: number, dt: number) =>
   1 - Math.exp(-rate * Math.min(0.1, Math.max(0, dt)));
 const angleDiff = (a: number, b: number) =>
   Math.atan2(Math.sin(a - b), Math.cos(a - b));
 
-export function createPlayableLehi(): {
+export function createSculptedCharacterRig(
+  role: CharacterRole,
+  options: { quality?: "hero" | "npc" | "crowd" } = {},
+): {
   group: T.Group;
   update(dt: number, state: CharacterState): void;
   dispose(): void;
 } {
-  const driver = createCharacter("lehi");
-  const model = buildSculptedLehi(2);
+  const driver = createMotionDriver(role);
+  const model = acquireCharacterModel(role, options.quality ?? "npc");
   const group = new T.Group();
-  group.name = "playable-sculpted-lehi";
+  group.name = `${role}-character`;
+  group.userData = { ...model.group.userData };
+  const actorScale = role === "child" ? 1.15 / 2 : 0.825;
   const body = new T.Group();
   body.name = "body";
   group.add(body);
@@ -45,47 +52,63 @@ export function createPlayableLehi(): {
   const shirt = model.group.getObjectByName(
     "continuous-robe-and-sleeves",
   ) as T.Mesh;
-  const skinGeometry = shirt.geometry;
-  const positions = skinGeometry.getAttribute("position") as T.BufferAttribute;
-  const indices = new Uint16Array(positions.count * 4);
-  const weights = new Float32Array(positions.count * 4);
-  for (let i = 0; i < positions.count; i++) {
-    const x = positions.getX(i);
-    const y = positions.getY(i);
-    const shoulder = T.MathUtils.smoothstep(Math.abs(x), 0.22, 0.58);
-    const sleeve = 1 - T.MathUtils.smoothstep(y, 1.45, 1.61);
-    const armWeight = shoulder * sleeve;
-    indices[i * 4] = 0;
-    weights[i * 4] = 1 - armWeight;
-    indices[i * 4 + 1] = x < 0 ? 1 : 2;
-    weights[i * 4 + 1] = armWeight;
-  }
-  skinGeometry.setAttribute(
-    "skinIndex",
-    new T.Uint16BufferAttribute(indices, 4),
-  );
-  skinGeometry.setAttribute(
-    "skinWeight",
-    new T.Float32BufferAttribute(weights, 4),
-  );
   const rootBone = new T.Bone();
   rootBone.name = "torso-bone";
   const armBones = [-1, 1].map((side) => {
     const bone = new T.Bone();
-    bone.name = side < 0 ? "left-arm-bone" : "right-arm-bone";
+    bone.name = side < 0 ? "left-arm" : "right-arm";
     bone.position.set(side * 0.385, 1.3, 0);
     rootBone.add(bone);
     return bone;
   });
   model.group.add(rootBone);
   const skeleton = new T.Skeleton([rootBone, ...armBones]);
-  const skinnedShirt = new T.SkinnedMesh(skinGeometry, shirt.material);
-  skinnedShirt.name = "continuous-robe-and-sleeves";
-  skinnedShirt.castShadow = skinnedShirt.receiveShadow = true;
-  model.group.remove(shirt);
-  model.group.add(skinnedShirt);
-  model.group.updateMatrixWorld(true);
-  skinnedShirt.bind(skeleton);
+  const skinnedGarments: T.SkinnedMesh[] = [];
+  const bindGarment = (mesh: T.Mesh) => {
+    const positions = mesh.geometry.getAttribute(
+      "position",
+    ) as T.BufferAttribute;
+    const indices = new Uint16Array(positions.count * 4);
+    const weights = new Float32Array(positions.count * 4);
+    for (let i = 0; i < positions.count; i++) {
+      const x = positions.getX(i),
+        y = positions.getY(i);
+      const armWeight =
+        T.MathUtils.smoothstep(Math.abs(x), 0.22, 0.58) *
+        (1 - T.MathUtils.smoothstep(y, 1.45, 1.61)) *
+        T.MathUtils.smoothstep(y, 0.88, 1.12);
+      indices[i * 4] = 0;
+      weights[i * 4] = 1 - armWeight;
+      indices[i * 4 + 1] = x < 0 ? 1 : 2;
+      weights[i * 4 + 1] = armWeight;
+    }
+    mesh.geometry.setAttribute(
+      "skinIndex",
+      new T.Uint16BufferAttribute(indices, 4),
+    );
+    mesh.geometry.setAttribute(
+      "skinWeight",
+      new T.Float32BufferAttribute(weights, 4),
+    );
+    const skinned = new T.SkinnedMesh(mesh.geometry, mesh.material);
+    skinned.name = mesh.name;
+    skinned.castShadow = skinned.receiveShadow = true;
+    model.group.remove(mesh);
+    model.group.add(skinned);
+    model.group.updateMatrixWorld(true);
+    skinned.bind(skeleton);
+    skinned.boundingSphere = new T.Sphere(new T.Vector3(0, 1, 0), 2.3);
+    skinnedGarments.push(skinned);
+    return skinned;
+  };
+  bindGarment(shirt);
+  const mantle = model.group.getObjectByName("flowing-mantle") as
+    T.Mesh | undefined;
+  if (mantle) bindGarment(mantle);
+  for (const name of ["left-regal-embroidery", "right-regal-embroidery"]) {
+    const trim = model.group.getObjectByName(name) as T.Mesh | undefined;
+    if (trim) bindGarment(trim);
+  }
 
   const head = new T.Group();
   head.name = "head";
@@ -129,6 +152,10 @@ export function createPlayableLehi(): {
     "left-brow",
     "right-brow",
     "lehi-headband",
+    "character-headwear",
+    "character-ear-left",
+    "character-ear-right",
+    "character-mouth",
   ])
     attach(name, head);
   attach("left-hand", armPivots[0]);
@@ -138,34 +165,73 @@ export function createPlayableLehi(): {
   attach("left-sandal", footPivots[0]);
   attach("right-sandal", footPivots[1]);
 
-  const cloth = ["flowing-mantle", "mantle-edge"]
+  const cloth = [
+    "flowing-mantle",
+    "mantle-edge",
+    "left-regal-embroidery",
+    "right-regal-embroidery",
+  ]
     .map((name) => model.group.getObjectByName(name) as T.Mesh | undefined)
     .filter((mesh): mesh is T.Mesh => !!mesh)
     .map((mesh) => ({
       mesh,
+      updateNormals: createClothNormalUpdater(mesh.geometry),
       attribute: mesh.geometry.getAttribute("position") as T.BufferAttribute,
       rest: Float32Array.from(
         (mesh.geometry.getAttribute("position") as T.BufferAttribute).array,
       ),
     }));
-  const tunic = ["continuous-folded-robe", "robe-hem-thickness"]
+  const tunic = ["continuous-robe-and-sleeves"]
     .map((name) => model.group.getObjectByName(name) as T.Mesh | undefined)
     .filter((mesh): mesh is T.Mesh => !!mesh)
     .map((mesh) => ({
       geometry: mesh.geometry,
+      updateNormals: createClothNormalUpdater(mesh.geometry),
       attribute: mesh.geometry.getAttribute("position") as T.BufferAttribute,
       rest: Float32Array.from(
         (mesh.geometry.getAttribute("position") as T.BufferAttribute).array,
       ),
     }));
+  const clothPoint = new T.Vector3();
+
+  const footBounds = [new T.Box3(), new T.Box3()];
+  const footMeshes = ["left-sandal", "right-sandal"].map(
+    (name) => model.group.getObjectByName(name) as T.Mesh,
+  );
+  footMeshes.forEach((mesh) => mesh.geometry.computeBoundingBox());
+  const intoModel = new T.Matrix4();
+  const footMatrix = new T.Matrix4();
+  const clearFeet = (x: number, y: number, z: number) => {
+    if (!walkingCloth) return z;
+    for (const box of footBounds) {
+      const centerX = (box.min.x + box.max.x) / 2;
+      const influence =
+        Math.exp(-Math.pow((x - centerX) / 0.29, 2)) *
+        (1 - T.MathUtils.smoothstep(y, box.max.y, box.max.y + 0.22));
+      if (z > 0)
+        z +=
+          Math.max(0, box.max.z + 0.04 - 0.3) *
+          influence *
+          T.MathUtils.smoothstep(z, 0, 0.22);
+      else
+        z -=
+          Math.max(0, -0.3 - box.min.z + 0.04) *
+          influence *
+          T.MathUtils.smoothstep(-z, 0, 0.22);
+    }
+    return z;
+  };
+  let walkingCloth = false;
+  const worldFootBox = new T.Box3();
   let clothX = 0;
   let clothZ = 0;
   let lastYaw = 0;
   let lastX = 0;
   let lastZ = 0;
   let gaitPhase = 0;
-  let time = 0;
+  let clothWasMoving = true;
   let first = true;
+  body.scale.setScalar(actorScale);
   return {
     group,
     update(dt, state) {
@@ -181,9 +247,9 @@ export function createPlayableLehi(): {
           )
         : driverBody.scale.y / 0.84;
       body.scale.set(
-        0.825 * driverBody.scale.x,
-        0.825 * crouchScale,
-        0.825 * driverBody.scale.z,
+        actorScale * driverBody.scale.x,
+        actorScale * crouchScale,
+        actorScale * driverBody.scale.z,
       );
       head.rotation.copy(driverHead.rotation);
       for (let i = 0; i < 2; i++) {
@@ -193,7 +259,38 @@ export function createPlayableLehi(): {
         footPivots[i].rotation.copy(driverFeet[i].rotation);
         footPivots[i].position.y = -0.27 + (driverFeet[i].position.y + 0.28);
       }
-      time += dt;
+      // Plant the actual sculpted sole, rather than assuming the old primitive
+      // sandal's thickness. This preserves the motion driver's horizontal anchor.
+      const groundedWalk =
+        state.grounded &&
+        !state.crouching &&
+        (!state.move || state.move === "run" || state.move === "idle");
+      if (groundedWalk) {
+        model.group.updateWorldMatrix(true, true);
+        for (let i = 0; i < 2; i++)
+          if (driverKnees[i].rotation.x < 0.08) {
+            worldFootBox
+              .copy(footMeshes[i].geometry.boundingBox!)
+              .applyMatrix4(footMeshes[i].matrixWorld);
+            const worldYPerLocalY =
+              footPivots[i].parent!.matrixWorld.elements[5];
+            if (Math.abs(worldYPerLocalY) > 0.1)
+              footPivots[i].position.y +=
+                (state.y - worldFootBox.min.y) / worldYPerLocalY;
+          }
+      }
+      walkingCloth =
+        state.grounded && !state.crouching && state.runSpeed > 0.25;
+      if (walkingCloth) {
+        model.group.updateWorldMatrix(true, true);
+        intoModel.copy(model.group.matrixWorld).invert();
+        footMeshes.forEach((mesh, i) => {
+          footMatrix.multiplyMatrices(intoModel, mesh.matrixWorld);
+          footBounds[i]
+            .copy(mesh.geometry.boundingBox!)
+            .applyMatrix4(footMatrix);
+        });
+      }
       const yaw = driverBody.rotation.y;
       if (first) {
         lastYaw = yaw;
@@ -220,46 +317,63 @@ export function createPlayableLehi(): {
           clothX) *
         damp(5, dt);
       clothZ += (Math.min(0.07, state.runSpeed * 0.009) - clothZ) * damp(4, dt);
-      for (const { attribute, rest } of cloth) {
-        for (let i = 0; i < attribute.count; i++) {
-          const j = i * 3;
-          const w = Math.pow(
-            T.MathUtils.clamp((1.49 - rest[j + 1]) / 0.63, 0, 1),
-            1.5,
-          );
-          attribute.setXYZ(
-            i,
-            rest[j] +
-              clothX * w +
-              Math.sin(time * 3 + rest[j + 1] * 5) * 0.007 * w,
-            rest[j + 1],
-            rest[j + 2] - clothZ * w,
-          );
-        }
-        attribute.needsUpdate = true;
+      const clothMoving =
+        state.runSpeed > 0.05 ||
+        Math.abs(clothX) > 0.0001 ||
+        Math.abs(clothZ) > 0.0001;
+      if (!clothMoving) {
+        clothX = 0;
+        clothZ = 0;
       }
-      const stepWeight = Math.min(1, state.runSpeed / 5);
-      for (const { geometry, attribute, rest } of tunic) {
-        for (let i = 0; i < attribute.count; i++) {
-          const j = i * 3;
-          const w = Math.pow(
-            T.MathUtils.clamp((1.15 - rest[j + 1]) / 0.64, 0, 1),
-            1.4,
-          );
-          attribute.setXYZ(
-            i,
-            rest[j] +
-              w * (Math.sin(gaitPhase) * 0.02 * stepWeight + clothX * 0.25),
-            rest[j + 1],
-            rest[j + 2] +
-              w *
-                (Math.cos(gaitPhase + rest[j] * 3) * 0.024 * stepWeight -
-                  clothZ * 0.2),
-          );
+      if (clothMoving || clothWasMoving) {
+        for (const { attribute, rest, updateNormals } of cloth) {
+          for (let i = 0; i < attribute.count; i++) {
+            const j = i * 3;
+            const w = Math.pow(
+              T.MathUtils.clamp((1.1 - rest[j + 1]) / 0.9, 0, 1),
+              1.5,
+            );
+            clothPoint.set(rest[j], rest[j + 1], rest[j + 2]);
+            const panelSway =
+              Math.sin(gaitPhase - rest[j] * 2) *
+              Math.min(1, state.runSpeed / 5);
+            clothPoint.x += clothX * w + panelSway * 0.025 * w;
+            clothPoint.z -= clothZ * w;
+            attribute.setXYZ(
+              i,
+              clothPoint.x,
+              clothPoint.y,
+              clearFeet(clothPoint.x, clothPoint.y, clothPoint.z),
+            );
+          }
+          attribute.needsUpdate = true;
+          updateNormals();
         }
-        attribute.needsUpdate = true;
-        geometry.computeVertexNormals();
+        const stepWeight = Math.min(1, state.runSpeed / 5);
+        for (const { attribute, rest, updateNormals } of tunic) {
+          for (let i = 0; i < attribute.count; i++) {
+            const j = i * 3;
+            const w = Math.pow(
+              T.MathUtils.clamp((1.1 - rest[j + 1]) / 0.9, 0, 1),
+              1.5,
+            );
+            const panelSway = Math.sin(gaitPhase - rest[j] * 2) * stepWeight;
+            attribute.setXYZ(
+              i,
+              rest[j] + clothX * w + panelSway * 0.025 * w,
+              rest[j + 1],
+              clearFeet(rest[j], rest[j + 1], rest[j + 2] - clothZ * w),
+            );
+          }
+          attribute.needsUpdate = true;
+          updateNormals();
+        }
       }
+      clothWasMoving = clothMoving;
+      // Keep inverse bind transforms in step with actors placed above ground or
+      // translated during play; callers can inspect posed bounds before render.
+      group.updateMatrixWorld(true);
+      skinnedGarments.forEach((mesh) => Reflect.set(mesh, "boundingBox", null));
     },
     dispose() {
       group.parent?.remove(group);
@@ -269,4 +383,9 @@ export function createPlayableLehi(): {
       group.clear();
     },
   };
+}
+
+/** The style playground uses exactly the same Lehi as the full game. */
+export function createPlayableLehi() {
+  return createSculptedCharacterRig("lehi", { quality: "hero" });
 }

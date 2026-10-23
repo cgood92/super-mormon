@@ -8,6 +8,7 @@ import {
 import {
   createCharacter,
   type CharacterState,
+  type CharacterRole,
 } from "../src/super/character.ts";
 import * as T from "three";
 
@@ -53,6 +54,21 @@ test("diagonal braking has the same bounded deceleration as straight braking", (
   assert.ok(brakingRate <= 26.5, `diagonal braking rate was ${brakingRate}`);
   assert.ok(brakingRate > 15);
 });
+
+const castRoles: CharacterRole[] = [
+  "nephi",
+  "nephi-disguised",
+  "sam",
+  "lehi",
+  "laman",
+  "lemuel",
+  "guard",
+  "laban",
+  "laban-undressed",
+  "sariah",
+  "zoram",
+  "child",
+];
 
 const standing: CharacterState = {
   x: 0,
@@ -265,7 +281,7 @@ test("running sandals stay above the ground through a full stride", () => {
       move: "run",
     });
     actor.group.updateMatrixWorld(true);
-    for (const name of ["left-foot", "right-foot"]) {
+    for (const name of ["left-sandal", "right-sandal"]) {
       const foot = actor.group.getObjectByName(name)!;
       lowest = Math.min(lowest, new T.Box3().setFromObject(foot).min.y);
     }
@@ -276,7 +292,7 @@ test("running sandals stay above the ground through a full stride", () => {
 
 test("a slow walk plants each sandal instead of sliding it with the body", () => {
   const actor = createCharacter("nephi");
-  const sole = actor.group.getObjectByName("left-foot")!;
+  const sole = actor.group.getObjectByName("left-sandal")!;
   const knee = actor.group.getObjectByName("left-knee")!;
   let previous: { z: number; planted: boolean } | null = null;
   let contacts = 0;
@@ -291,8 +307,9 @@ test("a slow walk plants each sandal instead of sliding it with the body", () =>
       move: "run",
     });
     actor.group.updateMatrixWorld(true);
-    sole.getWorldPosition(worldPosition);
-    const height = new T.Box3().setFromObject(sole).min.y;
+    const soleBounds = new T.Box3().setFromObject(sole);
+    soleBounds.getCenter(worldPosition);
+    const height = soleBounds.min.y;
     const planted = height < 0.035 && knee.rotation.x < 0.04;
     if (i > 60 && previous?.planted && planted) {
       contacts++;
@@ -311,7 +328,7 @@ test("a slow walk plants each sandal instead of sliding it with the body", () =>
 
 test("braking leaves the final contact foot planted after the body stops", () => {
   const actor = createCharacter("nephi");
-  const sole = actor.group.getObjectByName("left-foot")!;
+  const sole = actor.group.getObjectByName("left-sandal")!;
   const worldPosition = new T.Vector3();
   const contactPositions: number[] = [];
   let z = 0;
@@ -327,9 +344,9 @@ test("braking leaves the final contact foot planted after the body stops", () =>
     });
     if (i < 92) continue;
     actor.group.updateMatrixWorld(true);
-    sole.getWorldPosition(worldPosition);
-    if (new T.Box3().setFromObject(sole).min.y < 0.035)
-      contactPositions.push(worldPosition.z);
+    const soleBounds = new T.Box3().setFromObject(sole);
+    soleBounds.getCenter(worldPosition);
+    if (soleBounds.min.y < 0.035) contactPositions.push(worldPosition.z);
   }
   assert.ok(contactPositions.length > 12, "final foot lost ground contact");
   assert.ok(
@@ -339,9 +356,99 @@ test("braking leaves the final contact foot planted after the body stops", () =>
   actor.dispose();
 });
 
-test("major visible garments and footwear form faceted curves rather than cuboids", () => {
-  for (const role of ["nephi", "guard", "sariah"] as const) {
+test("the whole cast uses continuous smooth garments and sculpted faces", () => {
+  for (const role of castRoles) {
     const actor = createCharacter(role);
+    for (const name of [
+      "continuous-robe-and-sleeves",
+      "sculpted-face-neck-nose",
+    ]) {
+      const mesh = actor.group.getObjectByName(name) as T.Mesh;
+      assert.ok(mesh instanceof T.Mesh, `${role} lacks ${name}`);
+      assert.ok(
+        !(mesh.geometry instanceof T.BoxGeometry),
+        `${role} ${name} is a cuboid`,
+      );
+      assert.ok(
+        mesh.geometry.getAttribute("position").count > 200,
+        `${role} ${name} lacks a sculpted surface`,
+      );
+      assert.ok(
+        mesh.geometry.getAttribute("normal"),
+        `${role} ${name} lacks smooth lighting normals`,
+      );
+      const materials = Array.isArray(mesh.material)
+        ? mesh.material
+        : [mesh.material];
+      assert.ok(
+        materials.every(
+          (material) => !(material as T.MeshStandardMaterial).flatShading,
+        ),
+        `${role} ${name} has flat shading`,
+      );
+    }
+    const shirt = actor.group.getObjectByName(
+      "continuous-robe-and-sleeves",
+    ) as T.SkinnedMesh;
+    assert.ok(shirt.isSkinnedMesh, `${role} needs bending sleeves`);
+    const mantle = actor.group.getObjectByName("flowing-mantle") as
+      T.SkinnedMesh | undefined;
+    if (mantle) {
+      assert.ok(mantle.isSkinnedMesh, `${role} mantle must follow the sleeves`);
+      assert.equal(
+        mantle.skeleton,
+        shirt.skeleton,
+        `${role} garments need one arm skeleton`,
+      );
+    }
+    actor.update(1 / 60, standing);
+    actor.group.updateMatrixWorld(true);
+    const restBounds = new T.Box3().setFromObject(actor.group);
+    assert.ok(Math.abs(restBounds.min.y) < 0.02, `${role} is not grounded`);
+    const expectedHeight = role === "child" ? 1.15 : 1.65;
+    assert.ok(
+      Math.abs(restBounds.max.y - expectedHeight) < 0.015,
+      `${role} reaches ${restBounds.max.y}m rather than ${expectedHeight}m`,
+    );
+
+    // Sample the garment's own skin deformation: moving only an empty arm
+    // joint would satisfy the pose tests without producing a visible gesture.
+    const weights = shirt.geometry.getAttribute("skinWeight");
+    const indices = shirt.geometry.getAttribute("skinIndex");
+    const points = shirt.geometry.getAttribute("position");
+    let sleeve = -1;
+    let chest = -1;
+    for (let i = 0; i < points.count; i++) {
+      if (sleeve < 0 && weights.getY(i) > 0.75 && indices.getY(i) === 1)
+        sleeve = i;
+      if (
+        chest < 0 &&
+        weights.getX(i) > 0.999 &&
+        Math.abs(points.getX(i)) < 0.04 &&
+        points.getY(i) > 1.1
+      )
+        chest = i;
+    }
+    assert.ok(
+      sleeve >= 0 && chest >= 0,
+      `${role} needs separate sleeve and torso influences`,
+    );
+    shirt.skeleton.update();
+    const sleeveRest = shirt.getVertexPosition(sleeve, new T.Vector3());
+    const chestRest = shirt.getVertexPosition(chest, new T.Vector3());
+    actor.update(1 / 60, { ...standing, carrying: true });
+    actor.group.updateMatrixWorld(true);
+    shirt.skeleton.update();
+    assert.ok(
+      shirt.getVertexPosition(sleeve, new T.Vector3()).distanceTo(sleeveRest) >
+        0.08,
+      `${role} carrying does not bend the visible sleeve`,
+    );
+    assert.ok(
+      shirt.getVertexPosition(chest, new T.Vector3()).distanceTo(chestRest) <
+        0.025,
+      `${role} arm gesture drags the central chest`,
+    );
     let broadBlocks = 0;
     actor.group.traverse((object) => {
       if (
@@ -361,55 +468,52 @@ test("major visible garments and footwear form faceted curves rather than cuboid
       )
         broadBlocks++;
     });
-    assert.ok(
-      broadBlocks <= 1,
+    assert.equal(
+      broadBlocks,
+      0,
       `${role} has ${broadBlocks} broad rectangular pieces`,
     );
     actor.dispose();
   }
 });
 
-test("eyes and brows intersect the face surface in profile", () => {
-  for (const role of ["nephi", "guard", "sariah"] as const) {
+test("eyes, irises and brows stay embedded in sculpted facial surfaces", () => {
+  for (const role of castRoles) {
     const actor = createCharacter(role);
+    actor.group.updateMatrixWorld(true);
     const face = actor.group.getObjectByName(
-      "face",
-    ) as T.Mesh<T.SphereGeometry>;
-    const radius = face.geometry.parameters.radius;
-    for (const side of ["left", "right"]) {
-      const eye = actor.group.getObjectByName(
-        `${side}-eye`,
-      ) as T.Mesh<T.SphereGeometry>;
-      const iris = actor.group.getObjectByName(
-        `${side}-iris`,
-      ) as T.Mesh<T.SphereGeometry>;
-      const brow = actor.group.getObjectByName(
-        `${side}-brow`,
-      ) as T.Mesh<T.SphereGeometry>;
-      for (const feature of [eye, brow]) {
-        const x =
-          (feature.position.x - face.position.x) / (radius * face.scale.x);
-        const y =
-          (feature.position.y - face.position.y) / (radius * face.scale.y);
-        const faceSurface =
-          face.position.z +
-          radius * face.scale.z * Math.sqrt(1 - x * x - y * y);
-        const featureBack =
-          feature.position.z -
-          feature.geometry.parameters.radius * feature.scale.z;
-        assert.ok(
-          featureBack <= faceSurface + 0.002,
-          `${role} ${side} feature floats ${featureBack - faceSurface}m off face`,
-        );
-      }
-      const eyeFront =
-        eye.position.z + eye.geometry.parameters.radius * eye.scale.z;
-      const irisBack =
-        iris.position.z - iris.geometry.parameters.radius * iris.scale.z;
+      "sculpted-face-neck-nose",
+    ) as T.Mesh;
+    assert.ok(face, `${role} needs a sculpted face`);
+    const assertAttached = (
+      feature: T.Mesh,
+      surface: T.Mesh,
+      label: string,
+    ) => {
+      const featureBounds = new T.Box3().setFromObject(feature);
+      const center = featureBounds.getCenter(new T.Vector3());
+      const origin = new T.Vector3(center.x, center.y, featureBounds.max.z + 1);
+      const hit = new T.Raycaster(
+        origin,
+        new T.Vector3(0, 0, -1),
+      ).intersectObject(surface, false)[0];
+      assert.ok(hit, `${role} ${label} has no facial surface behind it`);
       assert.ok(
-        irisBack <= eyeFront + 0.002,
-        `${role} ${side} iris floats off eye`,
+        featureBounds.min.z <= hit.point.z + 0.002,
+        `${role} ${label} floats ${featureBounds.min.z - hit.point.z}m off its surface`,
       );
+    };
+    for (const side of ["left", "right"]) {
+      const eye = actor.group.getObjectByName(`${side}-eye`) as T.Mesh;
+      const iris = actor.group.getObjectByName(`${side}-iris`) as T.Mesh;
+      const brow = actor.group.getObjectByName(`${side}-brow`) as T.Mesh;
+      assert.ok(
+        eye && iris && brow,
+        `${role} needs both attached eyes and brows`,
+      );
+      assertAttached(eye, face, `${side} eye`);
+      assertAttached(brow, face, `${side} brow`);
+      assertAttached(iris, eye, `${side} iris`);
     }
     actor.dispose();
   }

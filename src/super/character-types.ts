@@ -1,0 +1,45 @@
+export type CharacterRole =
+  | "nephi"
+  | "nephi-disguised"
+  | "sam"
+  | "lehi"
+  | "laman"
+  | "guard"
+  | "laban"
+  | "laban-undressed"
+  | "sariah"
+  | "lemuel"
+  | "zoram"
+  | "child";
+export type CharacterMove =
+  | "idle"
+  | "run"
+  | "crouch"
+  | "crawl"
+  | "jump"
+  | "doubleJump"
+  | "tripleJump"
+  | "longJump"
+  | "backflip"
+  | "sideflip"
+  | "wallKick"
+  | "ledgeHang"
+  | "climb";
+export type CharacterState = {
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  yaw: number;
+  grounded: boolean;
+  runSpeed: number;
+  crouching?: boolean;
+  move?: CharacterMove;
+  moveTime?: number;
+  jumpStage?: number;
+  carrying?: boolean;
+  wave?: boolean;
+  pointing?: boolean;
+};

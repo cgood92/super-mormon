@@ -335,7 +335,7 @@ export function createStoryScene(
             y: 0,
             z: world.spawn.z + 2.6,
           }),
-          makeActor(scene, "laman", {
+          makeActor(scene, "lemuel", {
             x: world.spawn.x + 2.0,
             y: 0,
             z: world.spawn.z + 2.6,
@@ -352,7 +352,7 @@ export function createStoryScene(
             y: 0,
             z: story.brothers.z,
           }),
-          makeActor(scene, "laman", {
+          makeActor(scene, "lemuel", {
             x: story.brothers.x + 2,
             y: 0,
             z: story.brothers.z,
@@ -366,7 +366,7 @@ export function createStoryScene(
   actors.push(...brothers);
   const zoram =
     id === "night"
-      ? makeActor(scene, "laman", story.treasury ?? story.plates ?? story.laban)
+      ? makeActor(scene, "zoram", story.treasury ?? story.plates ?? story.laban)
       : undefined;
   if (zoram) actors.push(zoram);
   const guardPoints = world.pursuers?.length

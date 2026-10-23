@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Choose Nephi’s face · Super Mormon</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #e9e4da;
+        color: #283c34;
+        font:
+          15px system-ui,
+          sans-serif;
+      }
+      header {
+        padding: 24px 30px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 22px;
+      }
+      h1 {
+        font:
+          34px Georgia,
+          serif;
+        margin: 4px 0 8px;
+      }
+      .eyebrow {
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        font-weight: 700;
+      }
+      header p {
+        margin: 0;
+        color: #5d6d62;
+      }
+      nav {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      button,
+      a {
+        font: inherit;
+        color: inherit;
+      }
+      button {
+        cursor: pointer;
+        background: #fffc;
+        border: 1px solid #b8c3b5;
+        padding: 8px 12px;
+        border-radius: 8px;
+      }
+      button:hover {
+        background: white;
+      }
+      button:focus-visible,
+      a:focus-visible {
+        outline: 3px solid #b27f3e;
+        outline-offset: 3px;
+      }
+      button[aria-pressed="true"] {
+        background: #375c50;
+        color: #fff;
+      }
+      a {
+        margin-left: 6px;
+      }
+      #grid {
+        padding: 0 24px 24px;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+      }
+      article {
+        background: #f9f6ef;
+        border: 2px solid transparent;
+        border-radius: 16px;
+        overflow: hidden;
+      }
+      article.selected {
+        border-color: #517b63;
+      }
+      .view {
+        height: clamp(220px, calc((100dvh - 330px) / 2), 330px);
+        touch-action: none;
+        cursor: grab;
+      }
+      .caption {
+        padding: 0 16px 14px;
+        position: relative;
+        z-index: 2;
+      }
+      h2 {
+        font:
+          21px Georgia,
+          serif;
+        margin: 0 0 6px;
+      }
+      .caption p {
+        font-size: 12px;
+        margin: 0 0 12px;
+        color: #667363;
+        min-height: 30px;
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+      }
+      .actions button {
+        font-size: 12px;
+        padding: 7px 10px;
+      }
+      canvas {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 1;
+      }
+      #selection {
+        font-size: 12px;
+        color: #375c50;
+        min-height: 18px;
+        padding: 0 30px 15px;
+      }
+      dialog {
+        width: min(900px, 94vw);
+        height: min(860px, 94dvh);
+        border: 0;
+        padding: 18px 22px;
+        border-radius: 18px;
+        background: #f3eee4;
+        color: inherit;
+        overflow: hidden;
+      }
+      dialog::backdrop {
+        background: #1c2c28b8;
+      }
+      dialog > div,
+      dialog > h2 {
+        position: relative;
+        z-index: 2;
+      }
+      .inspect-header,
+      .inspect-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .inspect-header h2 {
+        margin: 0;
+        font-size: 25px;
+      }
+      #inspect-view {
+        height: calc(100% - 115px);
+        touch-action: none;
+        cursor: grab;
+      }
+      .inspect-footer {
+        font-size: 12px;
+      }
+      dialog canvas {
+        z-index: 0;
+      }
+      @media (max-width: 950px) {
+        header {
+          display: block;
+          padding: 20px;
+        }
+        nav {
+          margin-top: 16px;
+        }
+        #grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          padding: 0 14px 14px;
+          gap: 12px;
+        }
+        .view {
+          height: 250px;
+        }
+        h1 {
+          font-size: 29px;
+        }
+      }
+      @media (max-width: 430px) {
+        .view {
+          height: 205px;
+        }
+        .caption {
+          padding: 0 10px 12px;
+        }
+        h2 {
+          font-size: 18px;
+        }
+        .caption p {
+          font-size: 11px;
+        }
+        .actions {
+          gap: 5px;
+        }
+        .actions button {
+          padding: 7px;
+          font-size: 11px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <div class="eyebrow">SUPER MORMON · FACE STUDY · NEW SET</div>
+        <h1>Which Nephi feels right?</h1>
+        <p>
+          Lighter hair. Sharper cuts. Leaner faces. Drag to turn; enlarge to
+          inspect.
+        </p>
+      </div>
+      <nav>
+        <button id="rotate" aria-pressed="false">Rotate</button
+        ><button id="front">Front</button
+        ><button id="three-quarter">¾ view</button
+        ><button id="side">Side</button><a href="./">Back to the game ↗</a>
+      </nav>
+    </header>
+    <div id="selection" role="status" aria-live="polite">
+      Your choice here won’t change the game yet.
+    </div>
+    <main id="grid"></main>
+    <dialog id="inspector">
+      <div class="inspect-header">
+        <h2 id="inspect-title"></h2>
+        <button id="close">Close ✕</button>
+      </div>
+      <div id="inspect-view"></div>
+      <div class="inspect-footer">
+        <button id="previous">← Previous</button
+        ><span>Drag to see his profile</span><button id="next">Next →</button>
+      </div>
+    </dialog>
+    <script type="module" src="/src/nephi-faces.ts"></script>
+  </body>
+</html>

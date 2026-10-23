@@ -8,6 +8,9 @@ test("Bountiful requires prayer, tools, reconciliation and six individually alig
   const scene = new T.Scene(),
     world = buildBountiful(scene);
   assert.equal(world.initialObjective, "Climb the mountain trail and pray");
+  assert.ok(scene.getObjectByName("laman-character"));
+  assert.ok(scene.getObjectByName("lemuel-character"));
+  assert.equal(scene.getObjectByName("sam-character"), undefined);
   let completed = 0,
     dialogs = 0;
   let finishDialog: (() => void) | undefined;
