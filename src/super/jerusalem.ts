@@ -1,3 +1,4 @@
+import { markScenery, sceneryBox, terracedRock } from "./scenery";
 import * as THREE from "three";
 import type { WorldData, Solid } from "./worlds";
 import {
@@ -35,8 +36,11 @@ function makeWorld(
     color: number,
     name = "",
   ) => {
-    solids.push({ x, y: ybase, z, w, h, d });
-    return box(group, x, ybase, z, w, h, d, color, name);
+    const shape = { x, y: ybase, z, w, h, d };
+    solids.push(shape);
+    const mesh = box(group, x, ybase, z, w, h, d, color, name);
+    markScenery(mesh, { kind: "solid", solids: [shape] });
+    return mesh;
   };
   const decor = (
     x: number,
@@ -54,6 +58,7 @@ function makeWorld(
       if (disposed) return;
       disposed = true;
       group.traverse((object) => {
+        if (object instanceof THREE.InstancedMesh) object.dispose();
         if (!(object instanceof THREE.Mesh)) return;
         object.geometry.dispose();
         const materials = Array.isArray(object.material)
@@ -80,7 +85,7 @@ function makeWorld(
     };
     return { solids, dispose };
   };
-  return { group, add, decor, finish };
+  return { group, add, decor, finish, solids };
 }
 
 function cityBlock(
@@ -138,65 +143,44 @@ function cityBlock(
 function rockCave(
   add: ReturnType<typeof makeWorld>["add"],
   group: THREE.Group,
+  solids: Solid[],
 ) {
-  const rock = (
-    x: number,
-    y: number,
-    z: number,
-    w: number,
-    h: number,
-    d: number,
-    seed: number,
-  ) => {
-    const geometry = new THREE.IcosahedronGeometry(1, 1);
-    const positions = geometry.attributes.position;
-    for (let i = 0; i < positions.count; i++) {
-      const uneven =
-        1 +
-        0.12 *
-          Math.sin(
-            positions.getX(i) * 17 +
-              positions.getY(i) * 11 +
-              positions.getZ(i) * 7 +
-              seed,
-          );
-      positions.setXYZ(
-        i,
-        positions.getX(i) * uneven,
-        positions.getY(i) * uneven,
-        positions.getZ(i) * uneven,
-      );
-    }
-    geometry.computeVertexNormals();
-    const mesh = new THREE.Mesh(
-      geometry,
-      new THREE.MeshStandardMaterial({
-        color: seed % 2 ? 0x796956 : 0x625748,
-        roughness: 1,
-        flatShading: true,
-      }),
-    );
-    mesh.position.set(x, y, z);
-    mesh.scale.set(w, h, d);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    mesh.name = "weathered cave rock";
-    group.add(mesh);
-  };
-  // A broad mouth opens into a real 18 m chamber. Collision stays behind
-  // the visible rock faces, leaving a clear floor beneath the high ceiling.
+  // The shell uses the same visible dimensions as its physical surfaces.
+  // Keep the broad 13 m mouth and standing clearance beneath the 7 m ceiling.
+  const stone = new THREE.MeshStandardMaterial({
+    color: 0x796956,
+    roughness: 1,
+  });
   for (const [x, z, w, d] of [
     [-16, 67, 3, 18],
     [0, 67, 3, 18],
     [-8, 79, 19, 3],
-  ] as const) {
-    add(x, 0, z, w, 9, d, 0x625748, "cave bedrock").visible = false;
-    rock(x, 3.8, z, w * 0.9, 6, d * 0.75, x + z);
-  }
-  add(-8, 7, 69, 19, 3, 22, 0x625748, "cave ceiling").visible = false;
-  rock(-8, 9.4, 69, 12, 3.6, 13, 3);
-  rock(-17, 2, 58, 4, 4, 5, 4);
-  rock(1, 2, 59, 4, 5, 5, 5);
+  ] as const)
+    sceneryBox(
+      group,
+      solids,
+      stone,
+      { x, y: 0, z, w, h: 9, d },
+      "weathered cave rock wall",
+    );
+  sceneryBox(
+    group,
+    solids,
+    stone,
+    { x: -8, y: 7, z: 69, w: 19, h: 3, d: 22 },
+    "weathered cave rock ceiling",
+  );
+  for (const [x, z, h] of [
+    [-17, 58, 6],
+    [1, 59, 7],
+  ] as const)
+    terracedRock(
+      group,
+      solids,
+      new THREE.MeshStandardMaterial({ color: 0x796956, roughness: 1 }),
+      { x, y: 0, z, w: 8, h, d: 10 },
+      "Cave entrance boulder",
+    );
   const shade = new THREE.Mesh(
     new THREE.PlaneGeometry(14, 18),
     new THREE.MeshStandardMaterial({ color: 0x433b31, roughness: 1 }),
@@ -212,7 +196,7 @@ export function buildJerusalem(
   id: "streets" | "palace" | "trade" | "night",
   scene: THREE.Scene,
 ): WorldData {
-  const { group, add, decor, finish } = makeWorld(scene, "jerusalem");
+  const { group, add, decor, finish, solids } = makeWorld(scene, "jerusalem");
   decor(0, -0.5, 25, 80, 0.5, 120, 0xc4a780, "Jerusalem earth and desert road");
   add(-36, 0, 5.5, 0.9, 8, 69, 0xa98b69, "west city wall");
   add(36, 0, 5.5, 0.9, 8, 69, 0xa98b69, "east city wall");
@@ -337,8 +321,14 @@ export function buildJerusalem(
     [13, 58, 4],
     [12, 69, 5],
   ])
-    decor(x, 0, z, w, 1.2, 3, 0x977f66, "desert boulder");
-  rockCave(add, group);
+    terracedRock(
+      group,
+      solids,
+      new THREE.MeshStandardMaterial({ color: 0x977f66, roughness: 1 }),
+      { x, y: 0, z, w, h: 1.2, d: 3 },
+      "desert boulder",
+    );
+  rockCave(add, group, solids);
   if (id === "night") {
     scene.background = new THREE.Color(0x263c5a);
     scene.fog = new THREE.Fog(0x263c5a, 60, 140);

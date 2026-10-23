@@ -371,6 +371,7 @@ export function createCharacter(role: CharacterRole): {
   }
 
   const head = new T.Group();
+  head.name = "head";
   head.position.set(0, 1.64, 0.025);
   body.add(head);
   sphere(

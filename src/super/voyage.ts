@@ -213,6 +213,7 @@ export function buildVoyage(scene: T.Scene): WorldData {
   };
   const world: WorldData = {
     name: "Across the Great Waters",
+    initialObjective: "Find Laman and Lemuel below deck",
     subtitle: "An imagined child’s visit • 1 Nephi 18",
     spawn: { x: 2, y: 4.2, z: 2 },
     solids: ship.solids,
@@ -243,8 +244,12 @@ export function buildVoyage(scene: T.Scene): WorldData {
       hooks.dialog(
         "An imagined visit",
         "The fourth day",
-        "Imagine being a child aboard. The storm has lasted four days. Find Laman and Lemuel in the common room below deck. The ship and your visit are imagined; the story comes from 1 Nephi 18:13–15.",
+        "An imagined visit: you are a child aboard during the fourth day of the storm. Find Laman and Lemuel below deck.",
         () => {},
+        {
+          actors: [{ group: npcs[2].group, gesture: "bound", speaker: true }],
+          focus: npcs[2].group,
+        },
       );
       return {
         movementLocked: () => phase === "steer",
@@ -280,6 +285,14 @@ export function buildVoyage(scene: T.Scene): WorldData {
                   "The fourth day",
                   "The storm has become terrible. Laman and Lemuel finally release Nephi. Go to him on deck.",
                   () => {},
+                  {
+                    actors: npcs.slice(0, 2).map((npc, i) => ({
+                      group: npc.group,
+                      gesture: "recoil",
+                      speaker: i === 0,
+                    })),
+                    focus: npcs[0].group,
+                  },
                 );
               }
             }
@@ -298,6 +311,11 @@ export function buildVoyage(scene: T.Scene): WorldData {
                   "Turn toward God",
                   "Though his wrists are sore, Nephi praises God. Use {action} to pray.",
                   () => {},
+                  {
+                    actors: [],
+                    playerGesture: "pray",
+                    focus: ship.points.boundNephi,
+                  },
                 );
               }
             }
@@ -311,6 +329,11 @@ export function buildVoyage(scene: T.Scene): WorldData {
                 "Peace on the waters",
                 "Nephi prays. The winds cease and the storm becomes calm. Find the Liahona near the stern.",
                 () => {},
+                {
+                  actors: [],
+                  playerGesture: "pray",
+                  focus: ship.points.boundNephi,
+                },
               );
             }
           } else if (phase === "liahona") {
@@ -362,6 +385,13 @@ export function buildVoyage(scene: T.Scene): WorldData {
                   "A new shore",
                   "After many days, the family reaches the promised land. You helped Nephi guide the ship with patience and care.",
                   () => hooks.complete(),
+                  {
+                    actors: npcs
+                      .slice(0, 2)
+                      .map((npc) => ({ group: npc.group, gesture: "point" })),
+                    focus: ship.points.helm,
+                    wide: 10,
+                  },
                 );
               } else
                 hooks.toast("Passage reached! Follow the next golden opening.");

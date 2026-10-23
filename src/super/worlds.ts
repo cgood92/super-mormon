@@ -29,6 +29,7 @@ export type Point = { x: number; y: number; z: number; yaw?: number };
 export type WorldData = {
   name: string;
   subtitle: string;
+  initialObjective?: string;
   spawn: Point;
   solids: Solid[];
   adventure?: (hooks: AdventureHooks) => AdventureRuntime;

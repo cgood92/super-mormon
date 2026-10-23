@@ -1,6 +1,8 @@
 import * as T from "three";
 import { box, material, ambient, palette } from "./art";
 import { createCharacter, type CharacterState } from "./character";
+import type { StoryShot } from "./cinematic";
+import { terracedRock, markScenery } from "./scenery";
 import type { PlayerState } from "./physics";
 import type { WorldData, Point } from "./worlds";
 
@@ -25,6 +27,7 @@ export type TreeHooks = {
     title: string,
     body: string,
     onContinue: () => void,
+    shot?: StoryShot,
   ): void;
   toast(text: string): void;
   complete(): void;
@@ -96,6 +99,95 @@ function nearestRoute(point: Point, path: Point[]) {
   return best;
 }
 
+/** World-space darkness uses horizontal distance so an orbiting camera never hides
+ * the avatar or the ground immediately beneath it. Materials are patched locally;
+ * restoring their hooks also supports the persistent player rig between worlds. */
+export function createVisionDarkness(scene: T.Scene) {
+  const uniforms = {
+    visionPlayer: { value: new T.Vector3() },
+    visionStrength: { value: 0 },
+    visionRadius: { value: 0.6 },
+  };
+  const patched = new Map<
+    T.Material,
+    {
+      compile: T.Material["onBeforeCompile"];
+      key: T.Material["customProgramCacheKey"];
+    }
+  >();
+  const attach = () =>
+    scene.traverse((object) => {
+      if (!(object instanceof T.Mesh)) return;
+      for (const mat of Array.isArray(object.material)
+        ? object.material
+        : [object.material]) {
+        if (
+          patched.has(mat) ||
+          !(
+            mat instanceof T.MeshStandardMaterial ||
+            mat instanceof T.MeshBasicMaterial
+          )
+        )
+          continue;
+        const compile = mat.onBeforeCompile,
+          key = mat.customProgramCacheKey;
+        patched.set(mat, { compile, key });
+        mat.onBeforeCompile = function (shader, renderer) {
+          compile.call(this, shader, renderer);
+          Object.assign(shader.uniforms, uniforms);
+          shader.vertexShader =
+            "varying vec3 vVisionWorld;\n" +
+            shader.vertexShader.replace(
+              "#include <project_vertex>",
+              `
+          #include <project_vertex>
+          vec4 visionLocal = vec4(transformed, 1.0);
+          #ifdef USE_BATCHING
+            visionLocal = batchingMatrix * visionLocal;
+          #endif
+          #ifdef USE_INSTANCING
+            visionLocal = instanceMatrix * visionLocal;
+          #endif
+          vVisionWorld = (modelMatrix * visionLocal).xyz;
+        `,
+            );
+          shader.fragmentShader =
+            "varying vec3 vVisionWorld; uniform vec3 visionPlayer; uniform float visionStrength; uniform float visionRadius;\n" +
+            shader.fragmentShader.replace(
+              "#include <fog_fragment>",
+              `
+          #include <fog_fragment>
+          float visionDistance = length(vVisionWorld.xz - visionPlayer.xz);
+          float visionFog = smoothstep(visionRadius, visionRadius + 0.65, visionDistance);
+          gl_FragColor.rgb *= 1.0 - visionStrength * visionFog;
+        `,
+            );
+        };
+        mat.customProgramCacheKey = function () {
+          return key.call(this) + ":vision-world-darkness-v1";
+        };
+        mat.needsUpdate = true;
+      }
+    });
+  return {
+    uniforms,
+    update(player: Point, strength: number, radius = 0.6) {
+      uniforms.visionPlayer.value.set(player.x, player.y, player.z);
+      uniforms.visionStrength.value = strength;
+      uniforms.visionRadius.value = radius;
+      attach();
+    },
+    dispose() {
+      for (const [mat, hooks] of patched) {
+        mat.onBeforeCompile = hooks.compile;
+        mat.customProgramCacheKey = hooks.key;
+        mat.needsUpdate = true;
+      }
+      patched.clear();
+    },
+  };
+}
+
 /** An original visual interpretation; symbols and narrative follow 1 Nephi 8, 11, 12 and 15. */
 export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
   const before = new Set(scene.children),
@@ -119,8 +211,11 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
     c: number,
     name: string,
   ) => {
-    solids.push({ x, y, z, w, h, d });
-    return box(group, x, y, z, w, h, d, c, name);
+    const collider = { x, y, z, w, h, d };
+    solids.push(collider);
+    const mesh = box(group, x, y, z, w, h, d, c, name);
+    markScenery(mesh, { kind: "solid", solids: [collider] });
+    return mesh;
   };
   const path = [
     p(-42, 80),
@@ -200,7 +295,8 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
     0.53,
     0xb0a38b,
   );
-  solid(tree.x, 0, tree.z, 1.6, 7, 1.6, 0xb0a38b, "tree trunk").visible = false;
+  solid(tree.x, 0, tree.z, 1.6, 7.7, 1.6, 0xb0a38b, "tree trunk").visible =
+    false;
   for (let i = 0; i < 9; i++) {
     const angle = i * 2.39996,
       r = 4.7 + (i % 3) * 0.8;
@@ -287,7 +383,7 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
   group.add(water);
   for (let i = 0; i < 5; i++) {
     const a = i * 2.4;
-    oval(
+    const stone = oval(
       group,
       fountain.x + Math.sin(a) * 1.2,
       0.6,
@@ -298,6 +394,16 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
       0xcacdb5,
       "fountain stones",
     );
+    const collider = {
+      x: stone.position.x,
+      y: 0,
+      z: stone.position.z,
+      w: 1.4,
+      h: 1.2,
+      d: 1.2,
+    };
+    solids.push(collider);
+    markScenery(stone, { kind: "solid", solids: [collider] });
   }
   const spring = new T.Mesh(
     new T.CylinderGeometry(0.1, 0.24, 1.5, 10),
@@ -361,10 +467,10 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
   }
   // This crossing and stair are exploratory interpretation, not details in the vision.
   solid(
-    37,
+    38.5,
     -0.3,
     5,
-    26,
+    19,
     0.3,
     5,
     0x9c9988,
@@ -382,7 +488,8 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
       "returnable eastern stair",
     );
   }
-  solid(53, 16.1, -13.5, 5, 0.1, 8, 0xb9a49c, "building entry landing");
+  // The landing ends at the slab edge z=-14; overlapping equal-height tops flicker.
+  solid(53, 16.1, -11.5375, 5, 0.1, 4.925, 0xb9a49c, "building entry landing");
   climbables.push({
     id: "living-tree",
     x: tree.x,
@@ -424,7 +531,7 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
       continue;
     if (i % 3 === 0) {
       const h = 3.4 + (i % 5) * 0.65;
-      limb(
+      const trunk = limb(
         group,
         new T.Vector3(x, 0, z),
         new T.Vector3(x + 0.3, h, z),
@@ -432,7 +539,33 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
         0.1,
         0x73684e,
       );
+      const collider = { x: x + 0.15, y: 0, z, w: 0.72, h, d: 0.42 };
+      solids.push(collider);
+      markScenery(trunk, { kind: "solid", solids: [collider] });
+      climbables.push({
+        id: `field-olive-${i}`,
+        x,
+        z,
+        y: 0,
+        height: h,
+        radius: 0.45,
+      });
       oval(group, x, h, z, 2.3, 1.8, 2, 0x647e57, "field olive tree");
+    } else if (i % 2 === 0) {
+      terracedRock(
+        group,
+        solids,
+        material(0x999986),
+        {
+          x,
+          y: 0,
+          z,
+          w: 2 * (0.55 + (i % 3) * 0.24),
+          h: 0.7,
+          d: 1.2,
+        },
+        "meadow stone",
+      );
     } else
       oval(
         group,
@@ -536,23 +669,22 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
     {
       point: fountain,
       title: "The fountain of living water",
-      body: "Nephi saw the fountain of living waters and the tree of life as representations of the love of God. Pause beside the clear water. What helps you recognize that love? — 1 Nephi 11:21–25",
+      body: "The living waters and the tree represent the love of God. Pause beside the fountain. What helps you recognize that love? — 1 Nephi 11:21–25",
     },
     {
       point: overlook,
       title: "Across the gulf",
-      body: "The people in the spacious building pointed and mocked. Some who tasted the fruit became ashamed. The great gulf separated the building from the tree. What helps you remain faithful when others disapprove? — 1 Nephi 8:26–28; 12:18",
+      body: "Across the gulf, people point and mock. Some who tasted the fruit feel ashamed. What helps you remain faithful when others disapprove? — 1 Nephi 8:26–28; 12:18",
     },
     {
       point: p(-42, -78),
       title: "The word of God",
-      body: "Nephi explained that the iron rod represents the word of God. Those who hold fast can find their way through temptation. What does holding fast mean in your life? — 1 Nephi 15:23–24",
+      body: "The iron rod represents the word of God, guiding those who hold fast through temptation. What does holding fast mean to you? — 1 Nephi 15:23–24",
     },
   ];
   for (const spot of reflections) {
     // Small natural stone seating, leaving every reflection point open and accessible.
-    box(
-      group,
+    solid(
       spot.point.x - 2,
       0.02,
       spot.point.z - 1,
@@ -594,6 +726,7 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
         child.traverse((o) => {
           if (o instanceof T.Light) o.dispose();
           if (o instanceof T.Mesh || o instanceof T.Sprite) {
+            if (o instanceof T.InstancedMesh) o.dispose();
             if (o instanceof T.Mesh) o.geometry.dispose();
             for (const m of Array.isArray(o.material)
               ? o.material
@@ -616,6 +749,8 @@ export function createTreeOfLifeScene(
 ) {
   const data = (world as TreeWorldData).treeData;
   if (!data) throw new Error("Tree of Life metadata is required");
+  const darkness = createVisionDarkness(scene);
+  darkness.update(world.spawn, 1);
   let phase: "opening" | "rod" | "journey" | "fruit" | "done" = "opening",
     holdingRod = false,
     dialogOpen = false,
@@ -756,24 +891,35 @@ export function createTreeOfLifeScene(
   }
   const familyWords: Record<string, string> = {
     "Lehi — dreamer and father":
-      "Lehi desired his family to share the joy of the fruit. His concern continued for those who would not come. — 1 Nephi 8:12–18, 35–37",
+      "Lehi longs for his family to share the fruit’s joy. He still loves those who will not come. — 1 Nephi 8:12–18, 35–37",
     Sariah:
-      "Sariah came with Nephi and Sam and partook of the fruit. Imagine the joy of finding loved ones at the tree. — 1 Nephi 8:14–16",
+      "Sariah comes with Nephi and Sam to partake of the fruit. Imagine finding your loved ones at the tree. — 1 Nephi 8:14–16",
     Nephi:
-      "Nephi came and partook. Later he sought to understand the vision and learned of the love of God. — 1 Nephi 8:16; 11:21–23",
+      "Nephi partakes of the fruit. Later, seeking to understand the vision, he learns of the love of God. — 1 Nephi 8:16; 11:21–23",
     Sam: "Sam came with Sariah and Nephi to share the fruit. Quiet faith can lead toward the same joy. — 1 Nephi 8:16",
     Laman:
-      "Lehi saw that Laman would not come to partake. The vision records his choice; this short reflection does not invent his words. — 1 Nephi 8:17–18",
+      "Laman will not come to partake of the fruit. Lehi sees his choice and continues to care for him. — 1 Nephi 8:17–18",
     Lemuel:
-      "Lemuel also would not come. Lehi still cared deeply for his sons and exhorted them with a tender parent's concern. — 1 Nephi 8:18, 35–37",
+      "Lemuel also will not come. Lehi urges his sons toward faith with a tender parent’s concern. — 1 Nephi 8:18, 35–37",
   };
-  const say = (title: string, body: string, next: () => void) => {
+  const say = (
+    title: string,
+    body: string,
+    next: () => void,
+    shot?: StoryShot,
+  ) => {
     dialogOpen = true;
-    hooks.dialog("LEHI’S VISION · 1 NEPHI 8", title, body, () => {
-      if (disposed) return;
-      dialogOpen = false;
-      next();
-    });
+    hooks.dialog(
+      "LEHI’S VISION · 1 NEPHI 8",
+      title,
+      body,
+      () => {
+        if (disposed) return;
+        dialogOpen = false;
+        next();
+      },
+      shot ?? { actors: [], focus: data.tree, wide: 14 },
+    );
   };
   const save = (point: Point) => {
     checkpoint = { ...point };
@@ -807,11 +953,14 @@ export function createTreeOfLifeScene(
       if (phase === "opening" && !dialogOpen)
         say(
           "A vision in the wilderness",
-          "You are Lehi. In a vast field you see a tree whose fruit brings great joy. Find the iron rod beside the narrow path. Walk at your own pace; there is no score or time limit. This is an artistic exploration of Lehi’s vision, with Nephi’s explanations of its symbols.",
+          "You are Lehi. Find the iron rod and follow it toward the tree of life. Walk at your own pace through this artistic interpretation. — 1 Nephi 8",
           () => {
             phase = "rod";
             hooks.setMarker(data.path[0]);
           },
+          // Start on the player’s visible patch; the distant tree is intentionally
+          // obscured from this position, so framing it would produce a black shot.
+          { actors: [], focus: { ...world.spawn, y: 1 }, wide: 4 },
         );
       const route = nearestRoute(player, data.path);
       if (
@@ -886,7 +1035,7 @@ export function createTreeOfLifeScene(
         if (input.interact)
           say(
             "Joy at the tree",
-            "Lehi tasted the fruit and felt a joy he wanted his family to share. Nephi later learned that the tree represents the love of God, revealed through Jesus Christ. — 1 Nephi 8:10–12; 11:21–23",
+            "The fruit fills Lehi with joy he longs to share. The tree represents the love of God, revealed through Jesus Christ. — 1 Nephi 8:10–12; 11:21–23",
             () => {
               phase = "done";
               save(p(data.tree.x, data.tree.z + 3));
@@ -906,6 +1055,11 @@ export function createTreeOfLifeScene(
               person.rig.group.name,
               familyWords[person.rig.group.name],
               () => {},
+              {
+                actors: [
+                  { group: person.rig.group, gesture: "talk", speaker: true },
+                ],
+              },
             );
         }
       }
@@ -952,24 +1106,18 @@ export function createTreeOfLifeScene(
         a.state.wave = !a.mock && !a.behavior && distance(player, a.state) < 7;
         a.rig.update(dt, a.state);
       }
-      const inMist =
-        player.z > -15 &&
-        player.z < 75 &&
-        player.x < data.river.minX &&
-        distance(player, data.tree) > 22;
+      // Garden light falls away in every direction, including behind the player.
+      const gardenDistance = distance(player, data.tree);
+      const strength = T.MathUtils.smoothstep(gardenDistance, 22, 38);
+      darkness.update(player, strength, route.distance > 3 ? 0.6 : 0.85);
+      if (scene.background instanceof T.Color)
+        scene.background.setHex(0xbdcfd5).lerp(new T.Color(0x000000), strength);
+      // Camera-depth fog must not obscure the visibility bubble when orbiting.
       if (scene.fog instanceof T.Fog) {
-        const target = inMist ? (route.distance > 3 ? 11 : 17) : 149;
-        scene.fog.far = T.MathUtils.lerp(
-          scene.fog.far,
-          target,
-          1 - Math.exp(-dt * 2),
-        );
-        scene.fog.near = inMist ? 7 : 82;
-        scene.fog.color.lerp(
-          new T.Color(inMist ? 0x536364 : 0xbdcfd5),
-          1 - Math.exp(-dt * 2),
-        );
+        scene.fog.near = 82;
+        scene.fog.far = 149;
       }
+      data.mist.visible = strength < 0.98;
       return {
         objective:
           phase === "opening"
@@ -999,6 +1147,7 @@ export function createTreeOfLifeScene(
     dispose() {
       if (disposed) return;
       disposed = true;
+      darkness.dispose();
       for (const part of crowdParts) {
         scene.remove(part);
         part.dispose();

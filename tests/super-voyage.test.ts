@@ -7,6 +7,7 @@ import { createPlayer } from "../src/super/physics";
 test("voyage follows fourth-day release, prayer, Liahona and sustained steering", () => {
   const scene = new T.Scene(),
     world = buildVoyage(scene);
+  assert.equal(world.initialObjective, "Find Laman and Lemuel below deck");
   let avatar = "",
     complete = 0;
   const runtime = world.adventure!({

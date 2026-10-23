@@ -1,3 +1,4 @@
+import { StoryCinematic, type StoryShot } from "./super/cinematic";
 import type { AdventureRuntime } from "./super/adventure";
 import * as T from "three";
 import "./style.css";
@@ -99,6 +100,8 @@ let started = false,
   caughtGrace = 0,
   modalAction: (() => void) | null = null;
 let modalSince = 0;
+let cinematic: StoryCinematic | null = null;
+let cinematicContinue: (() => void) | null = null;
 let audio: AudioContext | undefined,
   soundOn = true,
   previous = performance.now(),
@@ -216,6 +219,7 @@ function modal(
   body: string,
   buttons: { label: string; run: () => void; secondary?: boolean }[],
 ) {
+  el("modal").classList.remove("story-subtitles");
   paused = true;
   pauseMenuOpen = false;
   modalSince = performance.now();
@@ -256,7 +260,52 @@ function modal(
   );
   el("modal").hidden = false;
   modalAction = buttons[0]?.run ?? null;
-  setTimeout(() => box.querySelector("button")?.focus(), 20);
+  setTimeout(() => {
+    if (!el("modal").hidden) box.querySelector("button")?.focus();
+  }, 20);
+}
+function storyDialog(
+  kicker: string,
+  title: string,
+  body: string,
+  next: () => void,
+  shot?: StoryShot,
+) {
+  cinematic?.dispose();
+  const actors = shot?.actors?.length
+    ? shot.actors
+    : [{ group: avatar.group, gesture: "talk" as const, speaker: true }];
+  cinematic = new StoryCinematic(
+    camera,
+    {
+      ...shot,
+      actors: [
+        {
+          group: avatar.group,
+          gesture:
+            shot?.playerGesture ??
+            actors.find((a) => a.group === avatar.group)?.gesture ??
+            "talk",
+          speaker:
+            actors.find((a) => a.group === avatar.group)?.speaker ?? false,
+        },
+        ...actors.filter((a) => a.group !== avatar.group),
+      ],
+    },
+    world.solids,
+  );
+  modal(kicker, title, body, [{ label: "Continue", run: () => {} }]);
+  el("modal").classList.add("story-subtitles");
+  const button =
+    el("modal-buttons").querySelector<HTMLButtonElement>("button")!;
+  button.disabled = true;
+  cinematicContinue = next;
+  button.onclick = () => {
+    if (!cinematic?.finish()) return;
+    el("modal").hidden = true;
+    input.reset();
+  };
+  renderControlText(el("modal-hint"), "Watch the scene", input.device);
 }
 function closeModalFirst() {
   const b =
@@ -598,11 +647,15 @@ async function load(id: WorldId) {
   }
   if (generation !== loadGeneration) return;
   const { buildWorld, createStoryScene, createTreeOfLifeScene } = prepared;
+  cinematic?.dispose();
+  cinematic = null;
+  cinematicContinue = null;
   clearCaughtTransition();
   paused = false;
   el("modal").hidden = true;
   if (world) disposeScene();
   worldId = id;
+  completionSceneSeen = false;
   storyCheckpoint = null;
   storyObjective = "";
   learnedMoves = new Set();
@@ -612,6 +665,7 @@ async function load(id: WorldId) {
   el("app").classList.remove("chapter-faded");
   scene = new T.Scene();
   world = buildWorld(id, scene);
+  storyObjective = world.initialObjective ?? "";
   if (id === "hub") decorateGalleryProgress();
   player = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
   player.yaw = world.spawn.yaw ?? Math.PI;
@@ -736,8 +790,7 @@ async function load(id: WorldId) {
         ? "Bring the family’s treasures to Laban."
         : "Search Jerusalem for Laban.";
     storyScene = createStoryScene!(id, scene, world, {
-      dialog: (kicker, title, body, onContinue) =>
-        modal(kicker, title, body, [{ label: "Continue", run: onContinue }]),
+      dialog: storyDialog,
       toast: (text) => message(text, 3),
       complete,
       checkpoint: (point) => {
@@ -759,8 +812,7 @@ async function load(id: WorldId) {
   if (id === "tree") {
     storyObjective = "Find the iron rod beside the narrow path.";
     treeScene = createTreeOfLifeScene!(scene, world, {
-      dialog: (kicker, title, body, onContinue) =>
-        modal(kicker, title, body, [{ label: "Continue", run: onContinue }]),
+      dialog: storyDialog,
       toast: (text) => message(text, 4),
       complete,
       checkpoint: (point) => {
@@ -771,8 +823,7 @@ async function load(id: WorldId) {
   }
   adventure =
     world.adventure?.({
-      dialog: (kicker, title, body, next) =>
-        modal(kicker, title, body, [{ label: "Continue", run: next }]),
+      dialog: storyDialog,
       toast: (text) => message(text, 4),
       complete,
       setAvatar: (role) => {
@@ -844,8 +895,67 @@ function near(
     Math.abs(player.y - p.y) < vertical
   );
 }
+let completionSceneSeen = false;
 function complete() {
   if (paused || transition || !isStoryId(worldId)) return;
+  if (
+    !completionSceneSeen &&
+    (worldId === "streets" || worldId === "house" || worldId === "palace")
+  ) {
+    completionSceneSeen = true;
+    const family = [
+      createCharacter(
+        worldId === "streets"
+          ? "sariah"
+          : worldId === "house"
+            ? "laman"
+            : "nephi",
+      ),
+      createCharacter(worldId === "streets" ? "nephi" : "sam"),
+    ];
+    family.forEach((actor, i) => {
+      const state = createPlayer(
+        player.x + (i ? 1.7 : -1.7),
+        player.y,
+        player.z + 1.8,
+      );
+      state.yaw = Math.PI;
+      actor.update(0, state);
+      scene.add(actor.group);
+    });
+    storyDialog(
+      "1 NEPHI 1–3",
+      worldId === "streets"
+        ? "Home, safely"
+        : worldId === "house"
+          ? "The family’s treasures"
+          : "Together again",
+      worldId === "streets"
+        ? "Lehi: Gather the family. The Lord has warned us to leave Jerusalem."
+        : worldId === "house"
+          ? "Nephi: We will offer these treasures for the brass plates."
+          : "Nephi: Do not give up. The Lord will prepare a way.",
+      () => {
+        family.forEach((actor) => actor.dispose());
+        complete();
+      },
+      {
+        actors: [
+          {
+            group: avatar.group,
+            gesture: "point",
+            speaker: worldId !== "palace",
+          },
+          ...family.map((actor, i) => ({
+            group: actor.group,
+            gesture: "talk" as const,
+            speaker: worldId === "palace" && i === 0,
+          })),
+        ],
+      },
+    );
+    return;
+  }
   completed.add(worldId);
   saveProgress();
   el("seal-count").textContent =
@@ -1115,6 +1225,25 @@ function update(dt: number) {
     pause();
     return;
   }
+  if (cinematic) {
+    if (cinematic.update(dt)) {
+      cinematic = null;
+      const next = cinematicContinue;
+      cinematicContinue = null;
+      paused = false;
+      input.reset();
+      next?.();
+      return;
+    }
+    if (cinematic.ready && !cinematic.restoring) {
+      const button =
+        el("modal-buttons").querySelector<HTMLButtonElement>("button");
+      if (button) button.disabled = false;
+      renderControlText(el("modal-hint"), "{jump} Continue", input.device);
+      if (state.jump || state.interact) closeModalFirst();
+    }
+    return;
+  }
   if (paused) {
     if (performance.now() - modalSince > 300) {
       const index = menuNavigation.update(state.y, dt);
@@ -1336,36 +1465,37 @@ function update(dt: number) {
     ) {
       prompt = "Laban · {action} to speak";
       if (state.interact) {
-        modal(
+        storyDialog(
           "1 NEPHI 3:11–14",
           "Laman asks for the plates.",
           "Laman asks for his family’s records. Laban refuses and threatens him. Laman flees.",
-          [
-            {
-              label: "Run to your brothers",
-              run: () => {
-                guardsActive = true;
-                caughtGrace = 3.8;
-                for (const g of guards) {
-                  g.actor.group.visible = true;
-                  const p = world.pursuers![guards.indexOf(g)];
-                  g.state.x = p.x;
-                  g.state.y = p.y;
-                  g.state.z = p.z;
-                }
-                if (goalMarker) {
-                  goalMarker.position.set(
-                    world.escapeGoal!.x,
-                    world.escapeGoal!.y + 0.04,
-                    world.escapeGoal!.z,
-                  );
-                }
-                follow.reset(player, 0, "palace");
-                updateObjective();
-                message("Through the gate! Keep running.", 3);
-              },
-            },
-          ],
+          () => {
+            guardsActive = true;
+            caughtGrace = 3.8;
+            for (const g of guards) {
+              g.actor.group.visible = true;
+              const p = world.pursuers![guards.indexOf(g)];
+              g.state.x = p.x;
+              g.state.y = p.y;
+              g.state.z = p.z;
+            }
+            if (goalMarker) {
+              goalMarker.position.set(
+                world.escapeGoal!.x,
+                world.escapeGoal!.y + 0.04,
+                world.escapeGoal!.z,
+              );
+            }
+            updateObjective();
+            message("Through the gate! Keep running.", 3);
+          },
+          {
+            actors: [
+              { group: extras[0].group, gesture: "point", speaker: true },
+              { group: avatar.group, gesture: "recoil" },
+            ],
+            focus: world.story!.laban,
+          },
         );
         return;
       }

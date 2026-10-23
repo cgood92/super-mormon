@@ -73,3 +73,11 @@ Sol agents implemented the shared vessel, Bountiful construction, ocean voyage, 
 The dedicated ground-floor movement studio was reached on foot. Both auditorium side-stair clearance and continuous front/side red carpet have geometry regressions; a browser route walked the center aisle to the right stage stair and onto the stage. Landscape viewport emulation at 852 × 393 had no page scrolling; this is not a physical-phone performance measurement.
 
 Final checks: 175 tests passed, production build passed, formatting passed. Ship model and new scenes load as separate chunks. Ship architecture and the child viewpoint are imagined; the scriptural sequence and fourth-day release follow 1 Nephi 17–18.
+
+## Physical scenery, story staging and radial darkness — October 22, 2026
+
+Foreground scenery now has explicit physical intent. Shared builders produce matching visible surfaces and colliders, and validation rejects missing registrations for named rock/trunk scenery. Regressions exercise walking into/around palms, climbing and jumping onto rock terraces, individually fitted cave surfaces, unique exposed rock/platform surfaces, scaled rooftop trunks, and instance-buffer disposal. Repeated rock tiers are batched per rock. Project acceptance rules live in `AGENTS.md`.
+
+Story dialogue uses staged camera framing and temporary actor gestures, with a short watch period and adaptive Continue control. The camera and poses restore before narrative callbacks advance. Browser routes checked Laban's palace and the treasure offer, mountain prayer, ore, forge and reconciliation, night search, and voyage opening; mobile landscape captions fit without panel or page scrolling. Unit tests cover interruption, camera/pose restoration and prop animation.
+
+Tree darkness now measures world-space distance from the player, preserving a small visible patch through a full camera orbit. Browser checks rotated from approximately 3.14 to 9.48 radians at (-42, 65), then walked to the garden, partook of fruit, crossed the river, ascended the eastern stairs and stood on the building at y16.2. The entry landing and crossing now join adjacent surfaces without coplanar overlap. Shader hooks initialize before opening dialogue and restore when leaving the scene.

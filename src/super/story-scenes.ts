@@ -1,3 +1,4 @@
+import type { StoryShot } from "./cinematic";
 import * as T from "three";
 import {
   createCharacter,
@@ -17,6 +18,7 @@ export type StoryHooks = {
     title: string,
     body: string,
     onContinue: () => void,
+    shot?: StoryShot,
   ): void;
   toast(text: string): void;
   complete(): void;
@@ -421,10 +423,53 @@ export function createStoryScene(
     action: () => void,
   ) => {
     dialogueOpen = true;
-    hooks.dialog(kicker, title, body, () => {
-      if (!dialogueOpen) return;
-      action();
-    });
+    hooks.dialog(
+      kicker,
+      title,
+      body,
+      () => {
+        if (!dialogueOpen) return;
+        action();
+      },
+      {
+        props:
+          phase === "offer"
+            ? treasure.map((parcel, i) => ({
+                object: parcel.group,
+                to: {
+                  x: story.laban.x + (i - 1.5) * 0.95,
+                  y: story.laban.y + 0.18,
+                  z: story.laban.z + 1.1,
+                },
+              }))
+            : [],
+        actors: (phase === "offer"
+          ? [laban, ...brothers, ...guards.slice(0, 1)]
+          : phase === "laban"
+            ? [laban]
+            : phase === "zoram" && zoram
+              ? [zoram]
+              : [...brothers, ...(zoram ? [zoram] : [])]
+        ).map((actor, i) => ({
+          group: actor.rig.group,
+          speaker: i === 0,
+          gesture:
+            phase === "offer"
+              ? actor === laban
+                ? "point"
+                : "recoil"
+              : phase === "cave"
+                ? "pray"
+                : "talk",
+        })),
+        focus:
+          phase === "offer" || phase === "laban"
+            ? laban.rig.group
+            : phase === "zoram"
+              ? zoram?.rig.group
+              : brothers[0].rig.group,
+      },
+    );
   };
   marker();
   hooks.checkpoint(checkpoint);
@@ -466,7 +511,7 @@ export function createStoryScene(
           speak(
             "1 Nephi 3:22–27",
             "Laban refuses",
-            "The brothers offer their family's gold, silver, and precious things for the brass plates. Laban refuses and seizes their property. His servants pursue them.",
+            "Laban: Your treasure is mine! Guards, seize them!",
             () => {
               advance("flee");
               for (const brother of brothers) brother.state.carrying = false;
@@ -501,7 +546,7 @@ export function createStoryScene(
           speak(
             "1 Nephi 3:27–4:3",
             "Courage to return",
-            "The brothers hide in a cave. After their disappointment, an angel encourages them to return. Nephi reminds them that the Lord can prepare a way.",
+            "Nephi: The Lord can prepare a way. We must return.",
             () => {
               advance("done");
               hooks.complete();
@@ -511,7 +556,7 @@ export function createStoryScene(
           speak(
             "1 Nephi 4:6–19",
             "A difficult account",
-            "The scripture tells how Nephi, directed by the Spirit, slays Laban. He then puts on Laban’s garments.",
+            "Directed by the Spirit, Nephi takes Laban’s life and puts on his garments. (1 Nephi 4)",
             () => {
               advance("zoram");
               hooks.setDisguise(true);
@@ -535,7 +580,7 @@ export function createStoryScene(
           speak(
             "1 Nephi 4:20–26",
             "Meet Zoram",
-            "Wearing Laban's garments, Nephi asks Zoram, keeper of the treasury, to bring the brass plates. Zoram leads him to the records.",
+            "Nephi: Bring the brass plates. Zoram: Follow me to the treasury.",
             () => advance("plates"),
           );
         } else if (
@@ -556,7 +601,7 @@ export function createStoryScene(
           speak(
             "1 Nephi 4:27–38",
             "Together outside the city",
-            "The brothers first mistake Nephi for Laban. He reveals himself and reassures Zoram. Zoram promises to join the family in the wilderness.",
+            "Nephi: It is I. Do not fear. Zoram promises to join the family.",
             () => {
               advance("done");
               hooks.complete();

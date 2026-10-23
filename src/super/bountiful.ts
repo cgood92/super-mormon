@@ -1,4 +1,5 @@
 import * as T from "three";
+import { markScenery, sceneryBox, terracedRock } from "./scenery";
 import { buildShip } from "./ship";
 import { createCharacter } from "./character";
 import type { WorldData, Point } from "./worlds";
@@ -61,9 +62,23 @@ export function buildBountiful(scene: T.Scene): WorldData {
     name = "",
   ) {
     const m = mesh(cube, color, x, y + h / 2, z, w, h, d, name);
-    if (solid) solids.push({ x, y, z, w, h, d });
+    if (solid) {
+      const shape = { x, y, z, w, h, d };
+      solids.push(shape);
+      markScenery(m, { kind: "solid", solids: [shape] });
+    }
     return m;
   }
+  const rock = (
+    x: number,
+    y: number,
+    z: number,
+    w: number,
+    h: number,
+    d: number,
+    color: number,
+    name: string,
+  ) => terracedRock(root, solids, mat(color), { x, y, z, w, h, d }, name);
   block(0, -1, 5, 190, 1, 170, 0xd5bd82, false, "Warm sandy coastal plain");
   const water = block(
     0,
@@ -87,7 +102,7 @@ export function buildBountiful(scene: T.Scene): WorldData {
   }
   for (let i = 0; i < 26; i++) {
     const x = -85 + i * 6.8;
-    mesh(
+    const ridge = mesh(
       cone,
       i % 2 ? 0x8d9774 : 0xadb18b,
       x,
@@ -98,11 +113,15 @@ export function buildBountiful(scene: T.Scene): WorldData {
       12,
       "Distant green mountain ridge",
     );
+    markScenery(ridge, {
+      kind: "backdrop",
+      reason: "Distant skyline outside playable mountain route",
+    });
   }
   for (let i = 0; i < 14; i++) {
     const x = 43 + (i % 4) * 9,
       z = -35 + Math.floor(i / 4) * 14;
-    mesh(sphere, 0xb6ab85, x, 2, z, 5, 4, 6, "Coastal limestone");
+    rock(x, 0, z, 8.8, 6, 12, 0xb6ab85, "Coastal limestone");
   }
   // A broad stair trail gives every mountain ascent a physically traversable surface.
   for (let i = 0; i < 30; i++)
@@ -122,33 +141,31 @@ export function buildBountiful(scene: T.Scene): WorldData {
     const z = 20 + i * 3,
       height = 2 + i * 0.9;
     for (const side of [-1, 1])
-      mesh(
-        sphere,
-        i % 2 ? 0x9a9e74 : 0xa8a47b,
+      rock(
         -36 + side * 5,
-        height * 0.35,
+        0,
         z,
-        4.3,
-        height * 0.7,
-        5,
+        8.6,
+        height * 1.05,
+        10,
+        i % 2 ? 0x9a9e74 : 0xa8a47b,
         "Mountain rock shoulders",
       );
   }
-  mesh(cone, 0x9b9e77, -43, 5, 43, 8, 12, 10, "Mountain western crag");
+  rock(-43, 0, 43, 16, 11, 20, 0x9b9e77, "Mountain western crag");
   const summit = point(-36, 39, 9),
     ore = point(-22, 18),
     forge = point(-8, 10),
     brothers = point(9, 4);
   for (let i = 0; i < 7; i++)
-    mesh(
-      sphere,
-      i % 2 ? 0x566572 : 0x9e6a3f,
+    rock(
       -23 + (i % 3),
-      0.5 + (i % 2) * 0.4,
+      0,
       18 + Math.floor(i / 3),
-      0.7,
-      0.8,
-      0.65,
+      1.4,
+      1.3 + (i % 2) * 0.4,
+      1.3,
+      i % 2 ? 0x566572 : 0x9e6a3f,
       "Ore outcrop",
     );
   block(-8, 0, 10, 3, 0.65, 2, 0x5f5c51);
@@ -193,7 +210,13 @@ export function buildBountiful(scene: T.Scene): WorldData {
   for (let i = 0; i < 12; i++) {
     const x = -65 + i * 10,
       z = -8 + (i % 3) * 6;
-    block(x, 0, z, 0.4, 5, 0.4, 0x8b7047);
+    sceneryBox(
+      root,
+      solids,
+      mat(0x8b7047),
+      { x, y: 0, z, w: 0.4, h: 5, d: 0.4 },
+      "Palm trunk",
+    );
     for (let j = 0; j < 5; j++) {
       const leaf = mesh(
         cone,
@@ -206,6 +229,10 @@ export function buildBountiful(scene: T.Scene): WorldData {
         0.6,
         "Palm frond",
       );
+      markScenery(leaf, {
+        kind: "decoration",
+        reason: "Flexible foliage above the solid palm trunk",
+      });
       leaf.rotation.z = 1.15;
       leaf.rotation.y = j * 1.256;
     }
@@ -305,6 +332,7 @@ export function buildBountiful(scene: T.Scene): WorldData {
   let disposed = false;
   const data: WorldData = {
     name: "Bountiful",
+    initialObjective: "Climb the mountain trail and pray",
     subtitle: "Build with faith • 1 Nephi 17–18 • Imagined vessel design",
     spawn: point(-27, 9),
     solids,
@@ -351,11 +379,53 @@ export function buildBountiful(scene: T.Scene): WorldData {
                       : ship.points.helm;
       const say = (title: string, body: string, next: string) => {
         dialog = true;
-        hooks.dialog("1 Nephi 17–18", title, body, () => {
-          phase = next;
-          dialog = false;
-          strikes = 0;
-        });
+        hooks.dialog(
+          "1 Nephi 17–18",
+          title,
+          body,
+          () => {
+            phase = next;
+            dialog = false;
+            strikes = 0;
+          },
+          {
+            playerGesture:
+              phase === "pray"
+                ? "pray"
+                : phase === "forge"
+                  ? "work"
+                  : phase === "power"
+                    ? "point"
+                    : "talk",
+            actors: (phase === "pray" || phase === "forge" || phase === "ore"
+              ? []
+              : phase === "oppose" || phase === "power" || next === "explore"
+                ? people
+                : [people[0]]
+            ).map((actor, i) => ({
+              group: actor.group,
+              speaker: i === 0,
+              gesture:
+                phase === "pray"
+                  ? "pray"
+                  : phase === "forge"
+                    ? "work"
+                    : phase === "oppose"
+                      ? "point"
+                      : "talk",
+            })),
+            focus:
+              phase === "pray"
+                ? summit
+                : phase === "forge"
+                  ? forge
+                  : phase === "ore"
+                    ? ore
+                    : next === "explore"
+                      ? ship.points.helm
+                      : brothers,
+          },
+        );
       };
       const objective = () =>
         phase === "pray"
@@ -469,13 +539,13 @@ export function buildBountiful(scene: T.Scene): WorldData {
             if (phase === "pray")
               say(
                 "A command to build",
-                "Nephi went into the mountain and prayed. The Lord commanded him to construct a ship and showed him how. Find ore to make tools. (1 Nephi 17:7–10)",
+                "Nephi prays on the mountain. The Lord commands him to build a ship and shows him how.",
                 "ore",
               );
             else if (phase === "ore")
               say(
                 "Ore for tools",
-                "Nephi found ore, made bellows, and made tools from the ore. Work at the forge. (1 Nephi 17:9–11, 16)",
+                "Nephi finds ore. Now make tools at the forge.",
                 "forge",
               );
             else if (phase === "forge") {
@@ -484,21 +554,21 @@ export function buildBountiful(scene: T.Scene): WorldData {
               if (++strikes === 3)
                 say(
                   "The work begins",
-                  "His brothers complained and would not labor. Go and hear them. (1 Nephi 17:17–18)",
+                  "His brothers refuse to help. Go and hear them.",
                   "oppose",
                 );
               else hooks.toast("Metal worked. Strike again.");
             } else if (phase === "oppose")
               say(
                 "Remember the Lord",
-                "Nephi reminded his brothers of the Lord’s power. They became angry; Nephi warned them not to touch him. (1 Nephi 17:23–49)",
+                "Nephi: Remember the Lord’s power. Do not touch me. His brothers draw back in anger.",
                 "power",
               );
             else if (phase === "power") {
               power = 1.8;
               say(
                 "Reconciliation",
-                "The Lord told Nephi to stretch forth his hand. His brothers were shaken and learned that the Lord was with him. They helped build. (1 Nephi 17:53–55; 18:1)",
+                "Nephi extends his hand. His brothers feel the Lord’s power, reconcile, and agree to help build.",
                 "timber",
               );
             } else if (phase === "timber" && !carrying) {

@@ -1,3 +1,4 @@
+import type { StoryShot } from "./cinematic";
 import type { PlayerState } from "./physics";
 
 export type AdventureInput = {
@@ -12,6 +13,7 @@ export type AdventureHooks = {
     title: string,
     body: string,
     next: () => void,
+    shot?: StoryShot,
   ) => void;
   toast: (text: string) => void;
   complete: () => void;

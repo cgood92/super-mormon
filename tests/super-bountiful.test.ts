@@ -7,6 +7,7 @@ import { createPlayer, stepPlayer } from "../src/super/physics";
 test("Bountiful requires prayer, tools, reconciliation and six individually aligned timbers", () => {
   const scene = new T.Scene(),
     world = buildBountiful(scene);
+  assert.equal(world.initialObjective, "Climb the mountain trail and pray");
   let completed = 0,
     dialogs = 0;
   let finishDialog: (() => void) | undefined;

@@ -152,11 +152,15 @@ test("crowds, the six family members, climbable tree and dense offpath mist are 
   Object.assign(s.player, { x: -78, z: 20 });
   for (let i = 0; i < 600; i++)
     s.runtime.update(1 / 60, s.player, { interact: false });
-  assert.ok((s.scene.fog as THREE.Fog).far < 12);
+  assert.equal((s.scene.background as THREE.Color).getHex(), 0x000000);
+  assert.equal(s.world.treeData.mist.visible, false);
+  // Keep camera-depth fog clear so an orbit camera can see the player bubble.
+  assert.equal((s.scene.fog as THREE.Fog).far, 149);
   Object.assign(s.player, s.world.treeData.tree);
   for (let i = 0; i < 600; i++)
     s.runtime.update(1 / 60, s.player, { interact: false });
-  assert.ok((s.scene.fog as THREE.Fog).far > 140);
+  assert.equal((s.scene.background as THREE.Color).getHex(), 0xbdcfd5);
+  assert.equal(s.world.treeData.mist.visible, true);
 });
 
 test("deep river returns gently while the visible crossing remains walkable", () => {

@@ -1317,3 +1317,99 @@ canvas {
     min-width: 37px;
   }
 }
+
+/* Story moments keep the actors and setting visible above a short subtitle. */
+#modal.story-subtitles {
+  backdrop-filter: none;
+  background: linear-gradient(transparent 55%, rgba(7, 14, 23, 0.78));
+  align-items: end;
+  padding: 0 5vw max(22px, env(safe-area-inset-bottom));
+  pointer-events: none;
+}
+#modal.story-subtitles .modal-card {
+  width: min(780px, 90vw);
+  max-height: 32vh;
+  padding: 16px 24px;
+  background: rgba(12, 25, 33, 0.9);
+  color: #fff8e7;
+  border: 1px solid #d6bb7b66;
+  box-shadow: none;
+  pointer-events: auto;
+}
+#modal.story-subtitles h2 {
+  font-size: clamp(18px, 2vw, 25px);
+  margin: 3px 0;
+}
+#modal.story-subtitles p {
+  font-size: clamp(14px, 1.55vw, 18px);
+  margin: 5px 0;
+  line-height: 1.4;
+}
+#modal.story-subtitles #modal-buttons {
+  margin-top: 6px;
+}
+#modal.story-subtitles button {
+  padding: 7px 18px;
+}
+#modal.story-subtitles button:disabled {
+  opacity: 0.45;
+}
+#modal.story-subtitles .modal-hint {
+  margin: 4px 0;
+}
+
+#modal.story-subtitles .modal-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 20px;
+  max-height: none;
+  overflow: visible;
+}
+#modal.story-subtitles .modal-card > .eyebrow,
+#modal.story-subtitles h2,
+#modal.story-subtitles p {
+  grid-column: 1;
+}
+#modal.story-subtitles p {
+  color: #fff8e7;
+}
+#modal.story-subtitles #modal-buttons {
+  grid-column: 2;
+  grid-row: 1 / 4;
+  align-content: center;
+  margin: 0;
+}
+#modal.story-subtitles .modal-hint {
+  display: none;
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  #modal.story-subtitles {
+    padding: 0 4vw max(8px, env(safe-area-inset-bottom));
+  }
+  #modal.story-subtitles .modal-card {
+    width: min(780px, 92vw);
+    height: auto;
+    padding: 8px 14px;
+    column-gap: 14px;
+  }
+  #modal.story-subtitles .eyebrow {
+    font-size: 8px;
+    line-height: 1.2;
+    letter-spacing: 1px;
+  }
+  #modal.story-subtitles h2 {
+    font-size: 17px;
+    line-height: 1.15;
+    margin: 2px 0;
+  }
+  #modal.story-subtitles p {
+    font-size: 12px;
+    line-height: 1.3;
+    margin: 2px 0;
+  }
+  #modal.story-subtitles button {
+    min-height: 34px;
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+}

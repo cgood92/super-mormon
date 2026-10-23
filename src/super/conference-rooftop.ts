@@ -1,3 +1,4 @@
+import { markScenery } from "./scenery";
 import * as T from "three";
 import type { Solid } from "./physics";
 
@@ -124,8 +125,9 @@ export function buildRooftop(parent: T.Group): {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     group.add(mesh);
+    return mesh;
   }
-  instances(
+  const trunkInstances = instances(
     "native grove trunks",
     new T.CylinderGeometry(0.22, 0.32, 1, 7),
     trunk,
@@ -138,9 +140,16 @@ export function buildRooftop(parent: T.Group): {
       sz: t.scale,
     })),
   );
-  trees.forEach((t) =>
-    solids.push({ x: t.x, y: 36.4, z: t.z, w: 0.6, h: 4.5, d: 0.6 }),
-  );
+  const trunkSolids = trees.map((t) => ({
+    x: t.x,
+    y: 38.5 - (4.3 * t.scale) / 2,
+    z: t.z,
+    w: 0.64 * t.scale,
+    h: 4.3 * t.scale,
+    d: 0.64 * t.scale,
+  }));
+  solids.push(...trunkSolids);
+  markScenery(trunkInstances, { kind: "solid", solids: trunkSolids });
   const conifers = trees.filter((t) => t.conifer),
     deciduous = trees.filter((t) => !t.conifer);
   instances(
