@@ -1,3 +1,8 @@
+import {
+  softBoxGeometry,
+  mountainGeometry,
+  palmFrondGeometry,
+} from "./soft-geometry";
 import * as T from "three";
 import { markScenery, sceneryBox, terracedRock } from "./scenery";
 import { buildShip } from "./ship";
@@ -61,7 +66,17 @@ export function buildBountiful(scene: T.Scene): WorldData {
     solid = false,
     name = "",
   ) {
-    const m = mesh(cube, color, x, y + h / 2, z, w, h, d, name);
+    const m = mesh(
+      softBoxGeometry(w, h, d, name),
+      color,
+      x,
+      y + h / 2,
+      z,
+      w,
+      h,
+      d,
+      name,
+    );
     if (solid) {
       const shape = { x, y, z, w, h, d };
       solids.push(shape);
@@ -103,11 +118,11 @@ export function buildBountiful(scene: T.Scene): WorldData {
   for (let i = 0; i < 26; i++) {
     const x = -85 + i * 6.8;
     const ridge = mesh(
-      cone,
+      mountainGeometry(i),
       i % 2 ? 0x8d9774 : 0xadb18b,
       x,
-      8 + (i % 4) * 2,
-      67,
+      0,
+      78,
       10,
       20 + (i % 4) * 5,
       12,
@@ -219,21 +234,21 @@ export function buildBountiful(scene: T.Scene): WorldData {
     );
     for (let j = 0; j < 5; j++) {
       const leaf = mesh(
-        cone,
+        palmFrondGeometry(),
         0x547f4e,
-        x + Math.sin(j * 1.256),
+        x,
         5,
-        z + Math.cos(j * 1.256),
-        0.55,
-        3,
-        0.6,
+        z,
+        1,
+        1,
+        1,
         "Palm frond",
       );
+      (leaf.material as T.MeshStandardMaterial).side = T.DoubleSide;
       markScenery(leaf, {
         kind: "decoration",
         reason: "Flexible foliage above the solid palm trunk",
       });
-      leaf.rotation.z = 1.15;
       leaf.rotation.y = j * 1.256;
     }
   }

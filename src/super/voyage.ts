@@ -1,3 +1,4 @@
+import { mountainGeometry } from "./soft-geometry";
 import * as T from "three";
 import { buildShip } from "./ship";
 import { createCharacter } from "./character";
@@ -60,10 +61,11 @@ export function buildVoyage(scene: T.Scene): WorldData {
   root.add(land);
   for (let i = 0; i < 13; i++) {
     const hill = new T.Mesh(
-      new T.ConeGeometry(18 + (i % 4) * 6, 18 + (i % 5) * 9, 5),
+      mountainGeometry(i),
       material(i % 2 ? 0x728b61 : 0x9caa75),
     );
-    hill.position.set((i - 6) * 22, 3, -290 - (i % 3) * 12);
+    hill.scale.set(18 + (i % 4) * 6, 18 + (i % 5) * 9, 22 + (i % 4) * 5);
+    hill.position.set((i - 6) * 22, -2, -290 - (i % 3) * 12);
     land.add(hill);
   }
   const brothers = { x: -1, y: 0, z: 16 };

@@ -1,3 +1,4 @@
+import { softBoxGeometry, mountainGeometry } from "./soft-geometry";
 import { markScenery } from "./scenery";
 import * as T from "three";
 import type { Solid } from "./physics";
@@ -49,9 +50,10 @@ export function buildRooftop(parent: T.Group): {
     mat: T.Material,
     solid = false,
   ) {
-    const mesh = new T.Mesh(new T.BoxGeometry(w, h, d), mat);
+    const mesh = new T.Mesh(softBoxGeometry(w, h, d, name), mat);
     mesh.name = name;
     mesh.position.set(x, y, z);
+    mesh.scale.set(w, h, d);
     mesh.receiveShadow = true;
     group.add(mesh);
     if (solid) solids.push({ x, y: y - h / 2, z, w, h, d });
@@ -235,12 +237,10 @@ export function buildRooftop(parent: T.Group): {
     roughness: 1,
   });
   for (let i = 0; i < 12; i++) {
-    const mountain = new T.Mesh(
-      new T.ConeGeometry(65, 65 + (i % 4) * 15, 4),
-      mountainMat,
-    );
+    const mountain = new T.Mesh(mountainGeometry(i), mountainMat);
     mountain.name = "Wasatch mountain backdrop";
     mountain.position.set(-300 + i * 56, 21, -280 - (i % 3) * 20);
+    mountain.scale.set(80, 65 + (i % 4) * 15, 65);
     mountain.rotation.y = 0.4;
     group.add(mountain);
   }

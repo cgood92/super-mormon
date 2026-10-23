@@ -69,8 +69,10 @@ const CROUCH_HEIGHT = 0.9;
 const STEP_HEIGHT = 0.43;
 const EPS = 0.0001;
 const SPEED = 6.5;
-const ACCEL = 28;
+const ACCEL = 26;
 const FRICTION = 26;
+const REVERSE_ACCEL = 32;
+const CORNER_ACCEL = 40;
 const GRAVITY = 27;
 const JUMP = 9.2;
 
@@ -453,15 +455,25 @@ export function stepPlayer(
     const targetVx = worldX * targetSpeed,
       targetVz = worldZ * targetSpeed;
     if (player.airMoveLock <= 0) {
-      const maxDelta = (length > 0.01 ? ACCEL : FRICTION) * subdt;
-      player.vx += Math.max(
-        -maxDelta,
-        Math.min(maxDelta, targetVx - player.vx),
-      );
-      player.vz += Math.max(
-        -maxDelta,
-        Math.min(maxDelta, targetVz - player.vz),
-      );
+      const reverse =
+        length > 0.01 && player.vx * worldX + player.vz * worldZ < -0.1;
+      const cornering =
+        length > 0.01 &&
+        Math.abs(player.vx * worldZ - player.vz * worldX) > 0.5;
+      const maxDelta =
+        (length < 0.01
+          ? FRICTION
+          : reverse
+            ? REVERSE_ACCEL
+            : cornering
+              ? CORNER_ACCEL
+              : ACCEL) * subdt;
+      const deltaVx = targetVx - player.vx;
+      const deltaVz = targetVz - player.vz;
+      const deltaLength = Math.hypot(deltaVx, deltaVz);
+      const fraction = deltaLength > maxDelta ? maxDelta / deltaLength : 1;
+      player.vx += deltaVx * fraction;
+      player.vz += deltaVz * fraction;
     }
     player.runSpeed = Math.hypot(player.vx, player.vz);
     if (player.runSpeed > 0.12) player.yaw = Math.atan2(player.vx, player.vz);

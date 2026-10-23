@@ -1,3 +1,4 @@
+import { softBoxGeometry } from "./soft-geometry";
 import * as THREE from "three";
 import type { Solid } from "./physics";
 
@@ -13,7 +14,6 @@ export function buildRostrum(parent: THREE.Group): {
   parent.add(group);
   const solids: Solid[] = [];
   const seats: RostrumSeat[] = [];
-  const geometry = new THREE.BoxGeometry(1, 1, 1);
   const wood = new THREE.MeshStandardMaterial({
     color: 0x97552e,
     roughness: 0.8,
@@ -26,7 +26,14 @@ export function buildRostrum(parent: THREE.Group): {
     color: 0x315c32,
     roughness: 0.9,
   });
-  const batches = new Map<THREE.Material, THREE.Matrix4[]>();
+  const batches = new Map<
+    string,
+    {
+      geometry: THREE.BufferGeometry;
+      material: THREE.Material;
+      matrices: THREE.Matrix4[];
+    }
+  >();
   const transform = new THREE.Object3D();
   function box(
     x: number,
@@ -42,9 +49,16 @@ export function buildRostrum(parent: THREE.Group): {
     transform.rotation.set(0, 0, 0);
     transform.scale.set(w, h, d);
     transform.updateMatrix();
-    const matrices = batches.get(material) ?? [];
-    matrices.push(transform.matrix.clone());
-    batches.set(material, matrices);
+    const geometry = softBoxGeometry(
+      w,
+      h,
+      d,
+      solid ? "platform" : "rostrum furniture",
+    );
+    const key = geometry.uuid + material.uuid;
+    const batch = batches.get(key) ?? { geometry, material, matrices: [] };
+    batch.matrices.push(transform.matrix.clone());
+    batches.set(key, batch);
     if (solid) solids.push({ x, y, z, w, h, d });
   }
   // The broad wooden stage has a continuous face beneath the central pulpit.
@@ -92,7 +106,7 @@ export function buildRostrum(parent: THREE.Group): {
       seats.push({ x, y, z, angle: Math.PI });
     }
   }
-  for (const [material, matrices] of batches) {
+  for (const { geometry, material, matrices } of batches.values()) {
     const batch = new THREE.InstancedMesh(geometry, material, matrices.length);
     batch.name = "rostrum architecture";
     matrices.forEach((matrix, i) => batch.setMatrixAt(i, matrix));

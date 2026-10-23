@@ -109,18 +109,22 @@ test("paused opening initializes darkness around spawn before the first update",
   world.dispose();
 });
 
-test("world disposal releases instanced meadow rock buffers exactly once", () => {
+test("world disposal releases natural meadow rock surfaces exactly once", () => {
   const scene = new T.Scene();
   const world = buildTreeOfLife(scene);
-  const rocks: T.InstancedMesh[] = [];
+  const rocks: T.Mesh[] = [];
   world.treeData.group.traverse((object) => {
-    if (object instanceof T.InstancedMesh) rocks.push(object);
+    if (object instanceof T.Mesh && object.name.endsWith("natural surface"))
+      rocks.push(object);
   });
-  assert.ok(rocks.length > 0, "actual meadow rocks use instanced terraces");
-  const counts = new Map(rocks.map((rock) => [rock, 0]));
+  assert.ok(
+    rocks.length > 0,
+    "actual meadow rocks have smooth natural surfaces",
+  );
+  const counts = new Map(rocks.map((rock) => [rock.geometry, 0]));
   for (const rock of rocks)
-    rock.addEventListener("dispose", () =>
-      counts.set(rock, counts.get(rock)! + 1),
+    rock.geometry.addEventListener("dispose", () =>
+      counts.set(rock.geometry, counts.get(rock.geometry)! + 1),
     );
   world.dispose();
   world.dispose();

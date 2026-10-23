@@ -1,3 +1,4 @@
+import { softBoxGeometry, palmFrondGeometry } from "./soft-geometry";
 import * as THREE from "three";
 import { layoutSign } from "./sign-layout";
 
@@ -33,8 +34,9 @@ export function box(
   color: THREE.ColorRepresentation,
   name = "",
 ): THREE.Mesh {
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material(color));
+  const mesh = new THREE.Mesh(softBoxGeometry(w, h, d, name), material(color));
   mesh.position.set(x, y + h / 2, z);
+  mesh.scale.set(w, h, d);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   mesh.name = name;
@@ -109,17 +111,10 @@ export function datePalm(
   group.add(trunk);
   for (let i = 0; i < 8; i++) {
     const angle = (i * Math.PI) / 4;
-    const leaf = new THREE.Mesh(
-      new THREE.ConeGeometry(0.37, 3.6, 5),
-      material(palette.leaf, 1),
-    );
-    leaf.position.set(
-      x + Math.sin(angle) * 1.15,
-      height + 0.12,
-      z + Math.cos(angle) * 1.15,
-    );
-    leaf.rotation.z = Math.sin(angle) * 1.17;
-    leaf.rotation.x = -Math.cos(angle) * 1.17;
+    const leaf = new THREE.Mesh(palmFrondGeometry(), material(palette.leaf, 1));
+    leaf.position.set(x, height, z);
+    leaf.rotation.y = angle;
+    (leaf.material as THREE.MeshStandardMaterial).side = THREE.DoubleSide;
     leaf.castShadow = true;
     group.add(leaf);
   }

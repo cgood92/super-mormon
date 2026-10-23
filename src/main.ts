@@ -293,6 +293,7 @@ function storyDialog(
       ],
     },
     world.solids,
+    scene,
   );
   modal(kicker, title, body, [{ label: "Continue", run: () => {} }]);
   el("modal").classList.add("story-subtitles");
@@ -1636,10 +1637,24 @@ el("pause").onclick = pause;
 el("home").onclick = () => {
   if (started && !transition) warp("hub");
 };
+let frameRequest: number | null = null;
+function queueFrame() {
+  if (!document.hidden && frameRequest === null)
+    frameRequest = requestAnimationFrame(frame);
+}
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden && started && !paused) pause();
+  if (document.hidden) {
+    if (frameRequest !== null) cancelAnimationFrame(frameRequest);
+    frameRequest = null;
+    if (started && !paused) pause();
+  } else {
+    previous = performance.now();
+    queueFrame();
+  }
 });
 function frame(now: number) {
+  frameRequest = null;
+  if (document.hidden) return;
   const dt = Math.min((now - previous) / 1000, 0.04);
   previous = now;
   update(dt);
@@ -1653,9 +1668,9 @@ function frame(now: number) {
     );
   renderer.render(scene, camera);
   diagnostics.sampleFrame(now);
-  requestAnimationFrame(frame);
+  queueFrame();
 }
-requestAnimationFrame(frame);
+queueFrame();
 if (import.meta.env.DEV || new URLSearchParams(location.search).has("playtest"))
   Object.assign(window, {
     superMormon: {
@@ -1668,6 +1683,7 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has("playtest"))
         cameraObstructed: follow.obstructed,
         story: storyScene?.snapshot(),
         vision: treeScene?.snapshot(),
+        cinematic: cinematic?.snapshot() ?? { active: false },
         adventure: adventure?.snapshot(),
         tutorials: world.tutorials,
         practiceBounds: world.practiceBounds,

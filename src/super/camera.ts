@@ -41,6 +41,45 @@ const angleDiff = (a: number, b: number) =>
 const ease = (speed: number, dt: number) =>
   1 - Math.exp(-speed * Math.min(Math.max(dt, 0), 0.1));
 
+/** Swept camera volume; unlike target-ray clamping, a blocked route is rejected. */
+export function cameraSegmentClear(
+  start: T.Vector3,
+  end: T.Vector3,
+  solids: readonly Solid[],
+  radius = 0.28,
+): boolean {
+  const direction = end.clone().sub(start);
+  return !solids.some((solid) => {
+    const min = [
+      solid.x - solid.w / 2 - radius,
+      solid.y - radius,
+      solid.z - solid.d / 2 - radius,
+    ];
+    const max = [
+      solid.x + solid.w / 2 + radius,
+      solid.y + solid.h + radius,
+      solid.z + solid.d / 2 + radius,
+    ];
+    let enter = 0,
+      exit = 1;
+    for (let axis = 0; axis < 3; axis++) {
+      const origin = start.getComponent(axis),
+        delta = direction.getComponent(axis);
+      if (Math.abs(delta) < 1e-9) {
+        if (origin < min[axis] || origin > max[axis]) return false;
+      } else {
+        let a = (min[axis] - origin) / delta,
+          b = (max[axis] - origin) / delta;
+        if (a > b) [a, b] = [b, a];
+        enter = Math.max(enter, a);
+        exit = Math.min(exit, b);
+        if (enter > exit) return false;
+      }
+    }
+    return exit >= 0 && enter <= 1;
+  });
+}
+
 /** Cast the target-to-camera segment against the axis-aligned level solids. */
 export function resolveCameraPosition(
   target: T.Vector3,

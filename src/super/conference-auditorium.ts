@@ -1,3 +1,4 @@
+import { softBoxGeometry, softSeatBackGeometry } from "./soft-geometry";
 import * as THREE from "three";
 import type { Solid } from "./physics";
 import { buildRostrum } from "./conference-rostrum";
@@ -27,7 +28,10 @@ export function buildAuditorium(parent: THREE.Group) {
     mat: THREE.Material,
     solid = false,
   ) {
-    const mesh = new THREE.Mesh(boxGeometry, mat);
+    const mesh = new THREE.Mesh(
+      mat === carpet ? boxGeometry : softBoxGeometry(w, h, d),
+      mat,
+    );
     // Carpet lies just above shared structural slabs; collision tops stay exact.
     mesh.position.set(x, y + h / 2 + (mat === carpet ? 0.02 : 0), z);
     mesh.scale.set(w, h, d);
@@ -243,7 +247,11 @@ export function buildAuditorium(parent: THREE.Group) {
     { mat: burgundy, w: 0.55, h: 0.16, d: 0.53, dy: 0.44, dz: 0 },
     { mat: dark, w: 0.08, h: 0.43, d: 0.4, dy: 0.215, dz: 0 },
   ]) {
-    const batch = new THREE.InstancedMesh(boxGeometry, part.mat, seats.length);
+    const batch = new THREE.InstancedMesh(
+      part.h > 0.5 ? softSeatBackGeometry() : boxGeometry,
+      part.mat,
+      seats.length,
+    );
     batch.name = "auditorium seating";
     seats.forEach((seat, i) => {
       transforms.position.set(

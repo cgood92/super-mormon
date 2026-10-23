@@ -125,7 +125,7 @@ test("adjacent limestone terraces have no duplicate coplanar top hits", () => {
   scene.updateMatrixWorld(true);
   const rocks: T.Object3D[] = [];
   scene.traverse((o) => {
-    if (o.name === "Coastal limestone terrace") rocks.push(o);
+    if (o.name === "Coastal limestone natural surface") rocks.push(o);
   });
   const ray = new T.Raycaster();
   for (let x = 46.8; x <= 48.2; x += 0.07)
@@ -168,33 +168,49 @@ test("each cave shell face has its own matching collider", async () => {
   world.dispose!();
 });
 
-test("rock batches preserve each surface and release instance buffers once", async () => {
-  const { buildJerusalem } = await import("../src/super/jerusalem");
+test("natural rock surfaces stay within a physical step of supporting layers", () => {
   const scene = new T.Scene(),
-    world = buildJerusalem("streets", scene);
-  let instances = 0,
-    releases = 0;
-  const matrix = new T.Matrix4();
+    world = buildBountiful(scene);
+  scene.updateMatrixWorld(true);
+  const ray = new T.Raycaster();
+  let samples = 0;
   scene.traverse((o) => {
-    if (!(o instanceof T.InstancedMesh) || !o.userData.scenery) return;
-    instances++;
-    o.addEventListener("dispose", () => releases++);
+    if (!(o instanceof T.Mesh) || !o.name.endsWith("natural surface")) return;
     const surfaces = o.userData.scenery.solids;
-    assert.equal(o.count, surfaces.length);
-    for (let i = 0; i < o.count; i++) {
-      o.getMatrixAt(i, matrix);
-      const b = new T.Box3(
-        new T.Vector3(-0.5, -0.5, -0.5),
-        new T.Vector3(0.5, 0.5, 0.5),
-      ).applyMatrix4(matrix);
-      const s = surfaces[i];
-      assert.ok(Math.abs(b.min.y - s.y) < 1e-5);
-      assert.ok(Math.abs(b.max.y - s.y - s.h) < 1e-5);
-      assert.ok(Math.abs(b.max.x - b.min.x - s.w) < 1e-5);
-    }
+    const bounds = new T.Box3().setFromObject(o);
+    for (
+      let x = bounds.min.x + 0.1;
+      x < bounds.max.x;
+      x += (bounds.max.x - bounds.min.x) / 9
+    )
+      for (
+        let z = bounds.min.z + 0.1;
+        z < bounds.max.z;
+        z += (bounds.max.z - bounds.min.z) / 9
+      ) {
+        ray.set(new T.Vector3(x, bounds.max.y + 2, z), new T.Vector3(0, -1, 0));
+        const hit = ray.intersectObject(o, false)[0];
+        if (!hit) continue;
+        const support = Math.max(
+          0,
+          ...surfaces
+            .filter(
+              (s: any) =>
+                x >= s.x - s.w / 2 &&
+                x <= s.x + s.w / 2 &&
+                z >= s.z - s.d / 2 &&
+                z <= s.z + s.d / 2,
+            )
+            .map((s: any) => s.y + s.h),
+        );
+        if (support === 0) continue;
+        assert.ok(
+          Math.abs(hit.point.y - support) <= 0.35,
+          `${o.name} render/support mismatch ${hit.point.y - support} at ${x},${z}`,
+        );
+        samples++;
+      }
   });
-  assert.ok(instances >= 5);
+  assert.ok(samples > 300);
   world.dispose!();
-  world.dispose!();
-  assert.equal(releases, instances);
 });

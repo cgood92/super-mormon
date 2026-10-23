@@ -54,3 +54,27 @@ test("story prop action is visible during watching and restored before narrative
   movie.finish();
   assert.deepEqual(parcel.position.toArray(), [-2, 1, 0]);
 });
+
+test("a staged turn compensates for the character body's existing heading", () => {
+  const camera = new T.PerspectiveCamera();
+  camera.position.set(0, 4, 9);
+  const first = new T.Group(),
+    body = new T.Group(),
+    second = new T.Group();
+  body.name = "body";
+  body.rotation.y = Math.PI / 2;
+  first.add(body);
+  second.position.set(0, 0, 3);
+  const movie = new StoryCinematic(camera, {
+    actors: [{ group: first, speaker: true }, { group: second }],
+  });
+  for (let i = 0; i < 40; i++) movie.update(0.05);
+  const yaw = new T.Euler().setFromQuaternion(
+    body.getWorldQuaternion(new T.Quaternion()),
+    "YXZ",
+  ).y;
+  assert.ok(Math.abs(yaw) < 0.01);
+  movie.finish();
+  assert.equal(first.rotation.y, 0);
+  assert.equal(body.rotation.y, Math.PI / 2);
+});

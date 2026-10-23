@@ -1,3 +1,4 @@
+import { softBoxGeometry } from "./soft-geometry";
 import * as THREE from "three";
 import type { Solid } from "./worlds";
 export type ConferenceBuild = {
@@ -15,7 +16,6 @@ export const conferencePalette = {
 /** Shared materials and box geometry keep the large building inexpensive. y is the base. */
 export function conferenceKit(group: THREE.Group) {
   const solids: Solid[] = [];
-  const geometry = new THREE.BoxGeometry(1, 1, 1);
   const materials = new Map<number, THREE.MeshStandardMaterial>();
   const decor = (
     x: number,
@@ -32,7 +32,7 @@ export function conferenceKit(group: THREE.Group) {
       material = new THREE.MeshStandardMaterial({ color, roughness: 0.72 });
       materials.set(color, material);
     }
-    const mesh = new THREE.Mesh(geometry, material);
+    const mesh = new THREE.Mesh(softBoxGeometry(w, h, d, name), material);
     mesh.position.set(x, y + h / 2, z);
     mesh.scale.set(w, h, d);
     mesh.name = name;
@@ -55,26 +55,32 @@ export function conferenceKit(group: THREE.Group) {
   };
   const batch = () => {
     for (const material of materials.values()) {
-      const meshes = group.children.filter(
-        (child): child is THREE.Mesh =>
+      const byGeometry = new Map<THREE.BufferGeometry, THREE.Mesh[]>();
+      for (const child of group.children)
+        if (
           child instanceof THREE.Mesh &&
-          child.geometry === geometry &&
-          child.material === material,
-      );
-      if (!meshes.length) continue;
-      const instances = new THREE.InstancedMesh(
-        geometry,
-        material,
-        meshes.length,
-      );
-      instances.name = "Conference Center stonework, windows and woodwork";
-      instances.receiveShadow = true;
-      meshes.forEach((mesh, index) => {
-        mesh.updateMatrix();
-        instances.setMatrixAt(index, mesh.matrix);
-        group.remove(mesh);
-      });
-      group.add(instances);
+          !(child instanceof THREE.InstancedMesh) &&
+          child.material === material
+        ) {
+          const list = byGeometry.get(child.geometry) ?? [];
+          list.push(child);
+          byGeometry.set(child.geometry, list);
+        }
+      for (const [shape, meshes] of byGeometry) {
+        const instances = new THREE.InstancedMesh(
+          shape,
+          material,
+          meshes.length,
+        );
+        instances.name = "Conference Center stonework, windows and woodwork";
+        instances.receiveShadow = true;
+        meshes.forEach((mesh, index) => {
+          mesh.updateMatrix();
+          instances.setMatrixAt(index, mesh.matrix);
+          group.remove(mesh);
+        });
+        group.add(instances);
+      }
     }
   };
   return { add, decor, solids, batch };

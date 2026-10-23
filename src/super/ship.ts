@@ -1,3 +1,4 @@
+import { softBoxGeometry } from "./soft-geometry";
 import * as T from "three";
 import type { Solid, Climbable } from "./physics";
 
@@ -47,8 +48,10 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
     side: T.DoubleSide,
     roughness: 1,
   });
-  const boxGeometry = new T.BoxGeometry(1, 1, 1);
-  const batches = new Map<T.Material, T.Matrix4[]>();
+  const batches = new Map<
+    string,
+    { geometry: T.BufferGeometry; material: T.Material; matrices: T.Matrix4[] }
+  >();
   const matrix = new T.Matrix4();
   const addBox = (
     x: number,
@@ -65,9 +68,16 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
       new T.Quaternion(),
       new T.Vector3(w, h, d),
     );
-    const list = batches.get(material) ?? [];
-    list.push(matrix.clone());
-    batches.set(material, list);
+    const geometry = softBoxGeometry(
+      w,
+      h,
+      d,
+      solid && h > 0.6 && d > 2 ? "deck" : "timber fitting",
+    );
+    const key = geometry.uuid + material.uuid;
+    const batch = batches.get(key) ?? { geometry, material, matrices: [] };
+    batch.matrices.push(matrix.clone());
+    batches.set(key, batch);
     if (solid)
       solids.push({
         x: x + origin.x,
@@ -204,8 +214,8 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
       radius: 0.3,
     });
   }
-  for (const [material, matrices] of batches) {
-    const mesh = new T.InstancedMesh(boxGeometry, material, matrices.length);
+  for (const { geometry, material, matrices } of batches.values()) {
+    const mesh = new T.InstancedMesh(geometry, material, matrices.length);
     matrices.forEach((m, i) => mesh.setMatrixAt(i, m));
     mesh.name = "Instanced deck planks, frames and fittings";
     mesh.receiveShadow = true;
