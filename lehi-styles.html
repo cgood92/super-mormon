@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#eee9df" />
+    <title>Lehi · Six style directions</title>
+  </head>
+  <body>
+    <main class="lab">
+      <header class="intro">
+        <div>
+          <p class="eyebrow">SUPER MORMON · TEMPORARY STYLE STUDY</p>
+          <h1>Which Lehi feels right?</h1>
+          <p class="description">
+            Six directions, side by side. Drag to turn, or let them rotate.
+            Nothing here changes the game.
+          </p>
+        </div>
+        <a class="back-link" href="./">Back to the game ↗</a>
+      </header>
+      <nav class="toolbar" aria-label="Model viewing controls">
+        <a class="back-link" href="./lehi-play.html">Walk as Lehi 9 ↗</a>
+        <button id="rotation" type="button">Pause rotation</button>
+        <div class="view-buttons">
+          <button id="front" type="button">Front</button
+          ><button id="back" type="button">Back</button
+          ><button id="closeup" type="button" aria-pressed="false">
+            Close-up
+          </button>
+        </div>
+        <span id="selection" role="status" aria-live="polite"
+          >Pick a number—or a mix of styles.</span
+        >
+      </nav>
+      <section
+        id="grid"
+        class="grid"
+        aria-label="Six Lehi character styles"
+      ></section>
+      <footer>
+        These are exploratory 3D models. Compare the face, proportions, beard,
+        clothing, and silhouette—not just how smooth the surface is.
+      </footer>
+    </main>
+    <dialog id="inspector" aria-labelledby="inspect-title">
+      <div class="inspect-header">
+        <div>
+          <p class="eyebrow">A CLOSER LOOK</p>
+          <h2 id="inspect-title"></h2>
+        </div>
+        <button
+          id="close-inspector"
+          type="button"
+          aria-label="Close larger view"
+        >
+          ✕
+        </button>
+      </div>
+      <div class="inspect-toolbar" aria-label="Enlarged model controls">
+        <button id="inspect-rotation" type="button">Pause rotation</button>
+        <button data-lab-control="front" type="button">Front</button>
+        <button data-lab-control="back" type="button">Back</button>
+        <button data-lab-control="closeup" type="button">
+          Face / full body
+        </button>
+      </div>
+      <div
+        id="inspect-stage"
+        class="inspect-stage"
+        aria-label="Drag to rotate the enlarged model"
+        tabindex="0"
+      ></div>
+      <div class="inspect-footer">
+        <button id="previous" type="button">← Previous</button
+        ><span>Drag to turn · arrow keys also rotate</span
+        ><button id="next" type="button">Next →</button>
+      </div>
+    </dialog>
+    <script type="module" src="/src/lehi-style-lab.ts"></script>
+  </body>
+</html>

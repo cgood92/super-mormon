@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#e7e8dc" />
+    <title>Walk as Lehi · Style 9</title>
+  </head>
+  <body>
+    <div id="play-view" data-look></div>
+    <header class="play-header">
+      <a href="./lehi-styles.html">← Style study</a
+      ><span><b>Lehi · 9</b><small>Coat & movement test</small></span>
+      <div>
+        <button id="pace" type="button" aria-pressed="false">Pace: run</button
+        ><button id="fullscreen" type="button">Full screen</button
+        ><button data-pause type="button" aria-label="Pause">Ⅱ</button>
+      </div>
+    </header>
+    <aside id="lesson">
+      <span>TRY THE MOVEMENT</span>
+      <h1 id="lesson-title">Make yourself at home.</h1>
+      <p id="lesson-body">
+        Walk, turn sharply, and release the stick to feel the stop.
+      </p>
+    </aside>
+    <div id="practice-count">Practice lights · 0 / 3</div>
+    <div id="move-state" aria-live="off"></div>
+    <div id="prompt" role="status" aria-live="polite"></div>
+    <div id="legend"></div>
+    <div id="touch-controls">
+      <div data-stick aria-label="Movement stick"><i></i></div>
+      <div class="touch-actions">
+        <button data-recenter aria-label="Recenter camera">↺</button
+        ><button data-crouch aria-label="Crouch">Z</button
+        ><button data-action aria-label="Action">B</button
+        ><button data-jump aria-label="Jump">A</button>
+      </div>
+    </div>
+    <dialog id="pause-menu">
+      <p class="eyebrow">TAKE YOUR TIME</p>
+      <h2>A little pause.</h2>
+      <p>
+        Explore at your own pace. This is a temporary test of Lehi’s appearance
+        and movement.
+      </p>
+      <div id="pause-buttons">
+        <button id="resume">Keep exploring</button
+        ><button id="moves">Moves & controls</button
+        ><button id="reset">Start again</button
+        ><a href="./lehi-styles.html">Back to the style study</a>
+      </div>
+      <div id="moves-list" hidden></div>
+    </dialog>
+    <script type="module" src="/src/lehi-play.ts"></script>
+  </body>
+</html>
