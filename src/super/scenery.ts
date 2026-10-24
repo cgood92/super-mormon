@@ -16,6 +16,14 @@ export function sceneryCollisionErrors(
 ): string[] {
   const errors: string[] = [];
   root.traverse((object) => {
+    // Deferred build stages retain their meshes while their collision is inactive.
+    // Only invisible ancestry may exclude a surface; visible scenery still validates.
+    for (
+      let ancestor: T.Object3D | null = object;
+      ancestor;
+      ancestor = ancestor.parent
+    )
+      if (!ancestor.visible) return;
     const policy = object.userData.scenery as SceneryPolicy | undefined;
     if (!policy) {
       if (

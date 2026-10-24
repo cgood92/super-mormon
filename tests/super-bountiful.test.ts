@@ -4,7 +4,7 @@ import * as T from "three";
 import { buildBountiful } from "../src/super/bountiful";
 import { createPlayer, stepPlayer } from "../src/super/physics";
 
-test("Bountiful requires prayer, tools, reconciliation and six individually aligned timbers", () => {
+test("Bountiful requires prayer, tools, reconciliation and four individually aligned timbers", () => {
   const scene = new T.Scene(),
     world = buildBountiful(scene);
   assert.equal(world.initialObjective, "Climb the mountain trail and pray");
@@ -31,6 +31,8 @@ test("Bountiful requires prayer, tools, reconciliation and six individually alig
       target: { x: number; y: number; z: number };
       placed: number;
       carrying: boolean;
+      hasAxe: boolean;
+      hasHammer: boolean;
       sockets: { yaw: number }[];
     };
   function act() {
@@ -44,25 +46,67 @@ test("Bountiful requires prayer, tools, reconciliation and six individually alig
     });
   }
   const originalSolids = world.solids.length;
-  for (let i = 0; i < 3; i++) act(); // prayer, ore, first forge blow
+  Object.assign(player, state().target);
+  runtime.update(0.016, player, {
+    interact: false,
+    interactHeld: false,
+    x: 0,
+    y: 0,
+  });
+  assert.equal(
+    scene.getObjectByName("Current task beacon")!.visible,
+    true,
+    "Prayer marker persists at the summit",
+  );
+  for (let i = 0; i < 4; i++) act(); // prayer, ore, hammer pickup, first forge blow
   assert.equal(state().phase, "forge");
   act();
   act();
   assert.equal(state().phase, "oppose");
   act();
-  act();
+  runtime.update(3, player, {
+    interact: false,
+    interactHeld: false,
+    x: 0,
+    y: 0,
+  });
   assert.equal(state().phase, "timber");
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 4; i++) {
+    act(); // pick up axe
     act();
     act();
-    act();
+    act(); // fell tree
+    assert.equal(state().carrying, false);
+    act(); // shoulder timber and leave axe
     assert.equal(state().carrying, true);
+    assert.equal(state().hasAxe, false);
+    runtime.update(0.016, player, {
+      interact: false,
+      interactHeld: false,
+      x: 0,
+      y: 0,
+    });
+    const beam = scene.getObjectByName("Carried timber")!;
+    assert.ok(
+      Math.hypot(beam.position.x - player.x, beam.position.z - player.z) > 0.6,
+    );
+    assert.equal(beam.position.y, player.y + 1.65);
     player.yaw = state().sockets[i].yaw + Math.PI / 2;
     act();
     assert.equal(state().placed, i, "misaligned timber must stay carried");
     player.yaw = state().sockets[i].yaw;
     act();
     assert.equal(state().placed, i + 1);
+    if (i < 3) {
+      const timber = world.solids.find(
+        (solid) =>
+          solid.x === (i % 2 ? 3 : -3) &&
+          solid.z === -27 - Math.floor(i / 2) * 7 &&
+          solid.h === 0.45,
+      );
+      assert.ok(timber, "Placed timber has ground collision");
+      assert.equal(timber.y, 0);
+    }
   }
   assert.equal(state().phase, "timber");
   assert.ok(
@@ -78,6 +122,7 @@ test("Bountiful requires prayer, tools, reconciliation and six individually alig
   });
   finishDialog!();
   assert.equal(state().phase, "explore");
+  assert.ok(player.y >= 4.2, "Finished ship places Nephi on its upper deck");
   assert.ok(world.solids.length > originalSolids + 40);
   assert.equal(world.climbables!.length, 2);
   assert.equal(completed, 0);
@@ -154,4 +199,34 @@ test("Bountiful releases ship instance buffers exactly once", () => {
   world.dispose!();
   world.dispose!();
   assert.equal(releases, instances);
+});
+
+test("forge table and bellows block walking and permit a route around", () => {
+  const world = buildBountiful(new T.Scene());
+  for (const [x, z, depth] of [
+    [-8, 10, 2],
+    [-11, 10, 1.6],
+  ]) {
+    const player = createPlayer(x, 0, z - depth / 2 - 2);
+    for (let i = 0; i < 90; i++)
+      stepPlayer(
+        player,
+        { x: 0, y: 1, jump: false, jumpHeld: false },
+        1 / 60,
+        0,
+        world.solids,
+      );
+    assert.ok(player.z < z, "Cannot walk through the work surface");
+    const around = createPlayer(-4, 0, z - 3);
+    for (let i = 0; i < 90; i++)
+      stepPlayer(
+        around,
+        { x: 0, y: 1, jump: false, jumpHeld: false },
+        1 / 60,
+        0,
+        world.solids,
+      );
+    assert.ok(around.z > z + 1, "Can walk around the work surface");
+  }
+  world.dispose!();
 });

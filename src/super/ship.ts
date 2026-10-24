@@ -1,3 +1,4 @@
+import { sceneryBox, markScenery } from "./scenery";
 import { softBoxGeometry } from "./soft-geometry";
 import * as T from "three";
 import type { Solid, Climbable } from "./physics";
@@ -8,6 +9,7 @@ export type ShipBuild = {
   solids: Solid[];
   climbables: Climbable[];
   points: Record<
+    | "deckArrival"
     | "helm"
     | "liahona"
     | "commonRoom"
@@ -143,6 +145,39 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
   const hull = new T.Mesh(hullGeometry, hullMaterial);
   hull.name = "Curved tapered plank hull";
   group.add(hull);
+  markScenery(hull, {
+    kind: "decoration",
+    reason:
+      "Outer curved waterproof skin; fitted solid inner planking owns the cabin boundary.",
+  });
+  // Continuous inner planking follows the tapered shell. Overlap consecutive
+  // one-metre bays so even the narrow bow cannot leak through collision gaps.
+  for (let z = -21; z <= 21; z++) {
+    const outer =
+      halfWidth(Math.max(-21.5, Math.min(21.5, z + (z < 0 ? -0.5 : 0.5)))) *
+      0.85;
+    for (const side of [-1, 1]) {
+      const shape = { x: side * outer, y: 0, z, w: 0.5, h: 3.95, d: 1.06 };
+      sceneryBox(group, solids, timber, shape, "Solid inner hull planking");
+      shape.x += origin.x;
+      shape.y += origin.y;
+      shape.z += origin.z;
+    }
+  }
+  for (const z of [-21.5, 21.5]) {
+    const shape = {
+      x: 0,
+      y: 0,
+      z,
+      w: halfWidth(z) * 1.7 + 0.5,
+      h: 3.95,
+      d: 0.5,
+    };
+    sceneryBox(group, solids, timber, shape, "Sealed bow and stern");
+    shape.x += origin.x;
+    shape.y += origin.y;
+    shape.z += origin.z;
+  }
   // The living floor is the world baseline; visible boards have no underground geometry.
   for (let z = -18; z <= 18; z += 1) {
     const w = halfWidth(z) - 0.45;
@@ -185,16 +220,28 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
   }
   for (const z of [-19, 19])
     addBox(0, 4.2, z, halfWidth(z) * 2, 1, 0.22, timber, true);
-  // A steering oar replaces a modern wheel.
-  beam({ x: 0, y: 5.1, z: 16 }, { x: 0, y: 4.5, z: 21.8 }, 0.14, darkWood);
-  const steeringOar = new T.Group();
-  steeringOar.name = "Steering oar pivot";
-  steeringOar.position.set(0, 4.5, 21.8);
-  const oarShaft = group.children[group.children.length - 1];
-  group.add(steeringOar);
-  group.updateMatrixWorld(true);
-  steeringOar.attach(oarShaft);
-  addBox(0, 4.25, 21, 0.8, 0.9, 1.4, timber);
+  // An imagined wheel helm, with a physical pedestal and upright wheel support.
+  addBox(0, 4.2, 16, 1.5, 1.65, 0.65, timber, true);
+  const wheel = new T.Group();
+  wheel.name = "Ship wheel pivot";
+  wheel.position.set(0, 5.65, 16.4);
+  group.add(wheel);
+  const rim = new T.Mesh(new T.TorusGeometry(0.9, 0.09, 8, 24), darkWood);
+  wheel.add(rim);
+  for (let i = 0; i < 8; i++) {
+    const spoke = new T.Mesh(
+      new T.CylinderGeometry(0.055, 0.055, 2.15, 6),
+      paleWood,
+    );
+    spoke.rotation.z = (i * Math.PI) / 4;
+    wheel.add(spoke);
+  }
+  // Low table, bedding and stores make distinct living spaces below deck.
+  addBox(-3.4, 0, 2, 2.2, 0.72, 3.4, darkWood, true);
+  for (const z of [-12, -8, -4]) {
+    addBox(-5.5, 0.5, z, 1.2, 0.12, 2.3, paleWood);
+    addBox(3.4, 0, z, 1.3, 0.7, 1.1, timber, true);
+  }
   for (const z of [-7, 6]) {
     beam({ x: 0, y: 4.2, z }, { x: 0, y: 18.2, z }, 0.25, darkWood);
     beam({ x: -6.5, y: 15.5, z }, { x: 6.5, y: 15.5, z }, 0.13, darkWood);
@@ -231,10 +278,11 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
     solids,
     climbables,
     points: {
+      deckArrival: point(3, 4.2, 13),
       helm: point(0, 4.2, 17),
       liahona: point(-3, 4.2, 12),
       commonRoom: point(0, 0, 0),
-      boundNephi: point(-4, 4.2, -4),
+      boundNephi: point(0, 4.2, -6.25),
       gangway: point(8.5, 4.2, 13),
       stairBottom: point(6, 0, 11),
       stairTop: point(6, 4.2, -1),

@@ -203,22 +203,22 @@ export function createSculptedCharacterRig(
   const footMatrix = new T.Matrix4();
   const clearFeet = (x: number, y: number, z: number) => {
     if (!walkingCloth) return z;
+    // Both sandals can influence the same hem vertex. Use their union rather
+    // than adding two bulges, which inflated the robe during side views.
+    let clearance = 0;
     for (const box of footBounds) {
       const centerX = (box.min.x + box.max.x) / 2;
       const influence =
-        Math.exp(-Math.pow((x - centerX) / 0.29, 2)) *
-        (1 - T.MathUtils.smoothstep(y, box.max.y, box.max.y + 0.22));
-      if (z > 0)
-        z +=
-          Math.max(0, box.max.z + 0.04 - 0.3) *
-          influence *
-          T.MathUtils.smoothstep(z, 0, 0.22);
-      else
-        z -=
-          Math.max(0, -0.3 - box.min.z + 0.04) *
-          influence *
-          T.MathUtils.smoothstep(-z, 0, 0.22);
+        Math.exp(-Math.pow((x - centerX) / 0.24, 2)) *
+        (1 - T.MathUtils.smoothstep(y, box.min.y + 0.1, box.max.y + 0.04));
+      const reach =
+        z > 0
+          ? Math.max(0, box.max.z + 0.035 - 0.3)
+          : Math.max(0, -0.3 - box.min.z + 0.035);
+      clearance = Math.max(clearance, reach * influence);
     }
+    z +=
+      Math.sign(z) * clearance * T.MathUtils.smoothstep(Math.abs(z), 0, 0.22);
     return z;
   };
   let walkingCloth = false;
@@ -362,7 +362,11 @@ export function createSculptedCharacterRig(
               i,
               rest[j] + clothX * w + panelSway * 0.025 * w,
               rest[j + 1],
-              clearFeet(rest[j], rest[j + 1], rest[j + 2] - clothZ * w),
+              clearFeet(
+                rest[j] + clothX * w + panelSway * 0.025 * w,
+                rest[j + 1],
+                rest[j + 2] - clothZ * w,
+              ),
             );
           }
           attribute.needsUpdate = true;

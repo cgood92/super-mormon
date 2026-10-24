@@ -518,3 +518,43 @@ test("eyes, irises and brows stay embedded in sculpted facial surfaces", () => {
     actor.dispose();
   }
 });
+
+test("side and diagonal strides keep the shared cast gait compact and cloth close", () => {
+  for (const role of ["nephi", "lehi", "lemuel"] as const) {
+    const actor = createCharacter(role);
+    const robe = actor.group.getObjectByName(
+      "continuous-robe-and-sleeves",
+    ) as T.Mesh;
+    const position = robe.geometry.getAttribute(
+      "position",
+    ) as T.BufferAttribute;
+    const rest = Float32Array.from(position.array);
+    for (const yaw of [Math.PI / 2, Math.PI / 4]) {
+      for (let frame = 0; frame < 90; frame++) {
+        actor.update(1 / 60, {
+          ...standing,
+          x: (frame + 1) * 0.1 * Math.sin(yaw),
+          z: (frame + 1) * 0.1 * Math.cos(yaw),
+          vx: 6 * Math.sin(yaw),
+          vz: 6 * Math.cos(yaw),
+          yaw,
+          runSpeed: 6,
+          move: "run",
+        });
+        for (const name of ["left-leg", "right-leg"]) {
+          assert.ok(
+            Math.abs(actor.group.getObjectByName(name)!.rotation.x) < 0.44,
+            role + " stance anchoring must respect the small-step gait",
+          );
+        }
+        for (let i = 0; i < position.count; i++) {
+          assert.ok(
+            Math.abs(position.getZ(i) - rest[i * 3 + 2]) < 0.23,
+            role + " robe must not balloon into a giant forward step",
+          );
+        }
+      }
+    }
+    actor.dispose();
+  }
+});

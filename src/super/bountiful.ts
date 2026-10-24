@@ -183,8 +183,9 @@ export function buildBountiful(scene: T.Scene): WorldData {
       i % 2 ? 0x566572 : 0x9e6a3f,
       "Ore outcrop",
     );
-  block(-8, 0, 10, 3, 0.65, 2, 0x5f5c51);
-  block(-8, 0.65, 10, 1, 0.18, 1, 0x343c3c);
+  block(-8, 0, 10, 3, 0.65, 2, 0x5f5c51, true, "Solid forge table");
+  block(-11, 0, 10, 1.2, 0.8, 1.6, 0x795b3d, true, "Solid forge bellows");
+  block(-8, 0.65, 10, 1, 0.18, 1, 0x343c3c, true, "Forge anvil");
   const fire = mesh(
     cone,
     0xe7a344,
@@ -215,7 +216,7 @@ export function buildBountiful(scene: T.Scene): WorldData {
       2.3,
       "Leaf canopy",
     );
-    if (i < 6) {
+    if (i < 4) {
       logs.push(trunk);
       crowns.push(crown);
       treeSolids.push(solids[solids.length - 1]);
@@ -273,7 +274,7 @@ export function buildBountiful(scene: T.Scene): WorldData {
       b.scale.set(0.3, 2, 0.3);
       scaffolding.add(b);
     }
-  const sockets = Array.from({ length: 6 }, (_, i) => ({
+  const sockets = Array.from({ length: 4 }, (_, i) => ({
     ...point((i % 2 ? 1 : -1) * 3, -27 - Math.floor(i / 2) * 7),
     yaw: i % 2 ? Math.PI / 2 : 0,
   }));
@@ -305,6 +306,20 @@ export function buildBountiful(scene: T.Scene): WorldData {
   );
   carried.visible = false;
   const placed: T.Mesh[] = [];
+  const placedSolids: WorldData["solids"] = [];
+  const hammerPoint = point(-6, 12);
+  const axePoint = point(-5, 11);
+  const axe = new T.Group();
+  axe.name = "Ground axe";
+  root.add(axe);
+  const axeHandle = new T.Mesh(cube, mat(0x765333));
+  axeHandle.scale.set(0.1, 1.1, 0.1);
+  const axeHead = new T.Mesh(cube, mat(0x65777c));
+  axeHead.scale.set(0.65, 0.3, 0.16);
+  axeHead.position.y = 0.4;
+  axe.add(axeHandle, axeHead);
+  axe.position.set(axePoint.x, 0.18, axePoint.z);
+  axe.rotation.z = Math.PI / 2;
   const marker = mesh(
     cone,
     0x45bfff,
@@ -320,7 +335,7 @@ export function buildBountiful(scene: T.Scene): WorldData {
   const tool = new T.Group();
   tool.name = "Animated work tool";
   root.add(tool);
-  tool.visible = false;
+  tool.visible = true;
   const handle = block(0, 0, 0, 0.11, 1.15, 0.11, 0x765333);
   tool.add(handle);
   const head = block(0, 0.88, 0, 0.62, 0.28, 0.2, 0x65777c);
@@ -370,11 +385,15 @@ export function buildBountiful(scene: T.Scene): WorldData {
         count = 0,
         carrying = false,
         dialog = false,
-        finished = false;
+        finished = false,
+        hasHammer = false,
+        hasAxe = false,
+        fallen = false;
       let animationTime = 0,
         swing = 0,
         spark = 0,
         power = 0,
+        reconciliationTime = 0,
         hitTree = -1;
       const target = () =>
         count >= sockets.length
@@ -383,15 +402,19 @@ export function buildBountiful(scene: T.Scene): WorldData {
             ? summit
             : phase === "ore"
               ? ore
-              : phase === "forge"
-                ? forge
-                : phase === "oppose" || phase === "power"
-                  ? brothers
-                  : phase === "timber" && !carrying
-                    ? point(logs[trees].position.x, logs[trees].position.z)
-                    : phase === "timber"
-                      ? sockets[count]
-                      : ship.points.helm;
+              : phase === "hammer"
+                ? hammerPoint
+                : phase === "forge"
+                  ? forge
+                  : phase === "oppose" || phase === "power"
+                    ? brothers
+                    : phase === "timber" && !carrying
+                      ? !hasAxe && !fallen
+                        ? axePoint
+                        : point(logs[trees].position.x, logs[trees].position.z)
+                      : phase === "timber"
+                        ? sockets[count]
+                        : ship.points.helm;
       const say = (title: string, body: string, next: string) => {
         dialog = true;
         hooks.dialog(
@@ -400,6 +423,10 @@ export function buildBountiful(scene: T.Scene): WorldData {
           body,
           () => {
             phase = next;
+            if (next === "power") {
+              power = 2.8;
+              reconciliationTime = 0;
+            }
             dialog = false;
             strikes = 0;
           },
@@ -409,7 +436,7 @@ export function buildBountiful(scene: T.Scene): WorldData {
                 ? "pray"
                 : phase === "forge"
                   ? "work"
-                  : phase === "power"
+                  : phase === "power" || phase === "oppose"
                     ? "point"
                     : "talk",
             actors: (phase === "pray" || phase === "forge" || phase === "ore"
@@ -426,7 +453,7 @@ export function buildBountiful(scene: T.Scene): WorldData {
                   : phase === "forge"
                     ? "work"
                     : phase === "oppose"
-                      ? "point"
+                      ? "recoil"
                       : "talk",
             })),
             focus:
@@ -447,25 +474,30 @@ export function buildBountiful(scene: T.Scene): WorldData {
           ? "Climb the mountain trail and pray"
           : phase === "ore"
             ? "Find ore near the mountain"
-            : phase === "forge"
-              ? `Forge tools • ${strikes}/3 blows`
-              : phase === "oppose"
-                ? "Speak with your brothers in the workyard"
-                : phase === "power"
-                  ? "Return to your brothers and extend your hand"
-                  : phase === "timber"
-                    ? carrying
-                      ? `Carry timber to plan ${count + 1}/6 • face along its length`
-                      : `Cut timber ${trees + 1}/6 • ${strikes}/3 axe blows`
-                    : "Explore the ship; climb the stairs and visit the steering oar";
+            : phase === "hammer"
+              ? "Pick up the hammer beside the forge"
+              : phase === "forge"
+                ? `Forge tools • ${strikes}/3 blows`
+                : phase === "oppose"
+                  ? "Speak with your brothers in the workyard"
+                  : phase === "power"
+                    ? "Nephi extends his hand; his brothers feel the Lord’s power"
+                    : phase === "timber"
+                      ? carrying
+                        ? `Carry timber to plan ${count + 1}/4 • face along its length`
+                        : `${fallen ? "Pick up the felled timber" : !hasAxe ? "Pick up the axe" : `Cut timber ${trees + 1}/4 • ${strikes}/3 axe blows`}`
+                      : "Explore the ship; climb the stairs and visit the ship’s wheel";
       return {
-        movementLocked: () => dialog,
+        movementLocked: () => dialog || phase === "power",
         snapshot: () => ({
           phase,
           strikes,
           trees,
           placed: count,
           carrying,
+          hasHammer,
+          hasAxe,
+          fallen,
           target: target(),
           sockets,
         }),
@@ -474,12 +506,38 @@ export function buildBountiful(scene: T.Scene): WorldData {
           swing = Math.max(0, swing - dt);
           spark = Math.max(0, spark - dt);
           power = Math.max(0, power - dt);
-          tool.visible = swing > 0;
-          tool.position.set(player.x + 0.6, player.y + 0.8, player.z);
+          tool.visible = phase === "hammer" || hasHammer;
+          if (hasHammer)
+            tool.position.set(
+              player.x + Math.cos(player.yaw) * 0.65,
+              player.y + 0.55,
+              player.z - Math.sin(player.yaw) * 0.65,
+            );
+          else tool.position.set(hammerPoint.x, 0.16, hammerPoint.z);
+          axe.visible = phase === "timber" && !carrying;
+          if (hasAxe) {
+            axe.position.set(
+              player.x + Math.cos(player.yaw) * 0.65,
+              player.y + 0.65,
+              player.z - Math.sin(player.yaw) * 0.65,
+            );
+            axe.rotation.set(
+              0,
+              player.yaw,
+              swing > 0 ? Math.sin((swing / 0.4) * Math.PI) * -1.5 : 0.2,
+            );
+          } else {
+            axe.position.set(axePoint.x, 0.18, axePoint.z);
+            axe.rotation.set(0, 0, Math.PI / 2);
+          }
           tool.rotation.set(
             0,
             player.yaw,
-            Math.sin((1 - swing / 0.4) * Math.PI) * -1.5,
+            hasHammer
+              ? swing > 0
+                ? Math.sin((1 - swing / 0.4) * Math.PI) * -1.5
+                : 0.2
+              : Math.PI / 2,
           );
           sparks.position.set(forge.x, 1.1, forge.z);
           sparks.scale.setScalar(0.15 + (1 - spark / 0.3) * 0.65);
@@ -492,6 +550,33 @@ export function buildBountiful(scene: T.Scene): WorldData {
               swing > 0 ? Math.sin(animationTime * 65) * swing * 0.09 : 0;
             logs[hitTree].rotation.z = shake;
             crowns[hitTree].rotation.z = shake;
+          }
+          if (phase === "power" && !dialog) {
+            reconciliationTime += dt;
+            people.forEach((actor, i) => {
+              actor.update(dt, {
+                x: brothers.x + i * 2,
+                y: 0,
+                z: brothers.z,
+                vx: 0,
+                vy: 0,
+                vz: 0,
+                yaw: Math.PI,
+                grounded: true,
+                runSpeed: 0,
+                pointing: true,
+              });
+              actor.group.rotation.z =
+                Math.sin(reconciliationTime * 48 + i) * 0.12;
+              actor.group.position.z +=
+                Math.sin(reconciliationTime * 40) * 0.09;
+            });
+            if (reconciliationTime >= 2.8)
+              say(
+                "Willing hands",
+                "His brothers feel the Lord’s power. They reconcile with Nephi and willingly help build the ship.",
+                "timber",
+              );
           }
           if (phase === "timber" || phase === "explore")
             people.forEach((actor, i) => {
@@ -518,7 +603,8 @@ export function buildBountiful(scene: T.Scene): WorldData {
               Math.hypot(player.x - p.x, player.z - p.z) <
                 (phase === "timber" && carrying ? 2.8 : 3.2) &&
               Math.abs(player.y - p.y) < 3;
-          marker.visible = Math.hypot(player.x - p.x, player.z - p.z) > 5;
+          marker.visible =
+            phase === "pray" || Math.hypot(player.x - p.x, player.z - p.z) > 5;
           marker.position.set(
             p.x,
             p.y + 3 + Math.sin(Date.now() * 0.002) * 0.15,
@@ -526,7 +612,11 @@ export function buildBountiful(scene: T.Scene): WorldData {
           );
           fire.scale.y = 1.1 + Math.sin(Date.now() * 0.012) * 0.1;
           carried.visible = carrying;
-          carried.position.set(player.x, player.y + 1.2, player.z);
+          carried.position.set(
+            player.x + Math.cos(player.yaw) * 0.62,
+            player.y + 1.65,
+            player.z - Math.sin(player.yaw) * 0.62,
+          );
           carried.rotation.y = player.yaw;
           const aligned =
             !carrying ||
@@ -536,19 +626,25 @@ export function buildBountiful(scene: T.Scene): WorldData {
               ? "Pray"
               : phase === "ore"
                 ? "Gather ore"
-                : phase === "forge"
-                  ? "Strike the tool"
-                  : phase === "oppose"
-                    ? "Listen to your brothers"
-                    : phase === "power"
-                      ? "Extend your hand"
-                      : phase === "timber"
-                        ? carrying
-                          ? aligned
-                            ? "Place aligned timber"
-                            : "Turn to face along the glowing timber plan"
-                          : "Swing axe"
-                        : "Inspect the finished ship"
+                : phase === "hammer"
+                  ? "Pick up hammer"
+                  : phase === "forge"
+                    ? "Strike the tool"
+                    : phase === "oppose"
+                      ? "Listen to your brothers"
+                      : phase === "power"
+                        ? "Extend your hand"
+                        : phase === "timber"
+                          ? carrying
+                            ? aligned
+                              ? "Place aligned timber"
+                              : "Turn to face along the glowing timber plan"
+                            : fallen
+                              ? "Pick up timber; leave axe here"
+                              : !hasAxe
+                                ? "Pick up axe"
+                                : "Swing axe"
+                          : "Inspect the finished ship"
             : "";
           if (!dialog && near && input.interact) {
             if (phase === "pray")
@@ -561,68 +657,94 @@ export function buildBountiful(scene: T.Scene): WorldData {
               say(
                 "Ore for tools",
                 "Nephi finds ore. Now make tools at the forge.",
-                "forge",
+                "hammer",
               );
-            else if (phase === "forge") {
+            else if (phase === "hammer") {
+              hasHammer = true;
+              phase = "forge";
+            } else if (phase === "forge") {
               swing = 0.4;
               spark = 0.3;
-              if (++strikes === 3)
+              if (++strikes === 3) {
+                hasHammer = false;
                 say(
                   "The work begins",
                   "His brothers refuse to help. Go and hear them.",
                   "oppose",
                 );
-              else hooks.toast("Metal worked. Strike again.");
+              } else hooks.toast("Metal worked. Strike again.");
             } else if (phase === "oppose")
               say(
                 "Remember the Lord",
-                "Nephi: Remember the Lord’s power. Do not touch me. His brothers draw back in anger.",
+                "Nephi: Remember the Lord’s power. Do not touch me. Nephi extends his hand, and his brothers draw back and tremble.",
                 "power",
               );
-            else if (phase === "power") {
-              power = 1.8;
-              say(
-                "Reconciliation",
-                "Nephi extends his hand. His brothers feel the Lord’s power, reconcile, and agree to help build.",
-                "timber",
-              );
-            } else if (phase === "timber" && !carrying) {
-              swing = 0.4;
-              hitTree = trees;
-              if (++strikes === 3) {
+            else if (phase === "timber" && !carrying) {
+              if (fallen) {
+                hasAxe = false;
+                fallen = false;
+                carrying = true;
+                axePoint.x = logs[trees].position.x;
+                axePoint.z = logs[trees].position.z;
                 logs[trees].visible = false;
-                crowns[trees].visible = false;
                 solids.splice(solids.indexOf(treeSolids[trees]), 1);
                 trees++;
-                strikes = 0;
-                carrying = true;
-                hooks.toast(
-                  "Timber lifted. Walk it to the glowing plan; face along its length.",
-                );
+              } else if (!hasAxe) {
+                hasAxe = true;
+              } else {
+                swing = 0.4;
+                hitTree = trees;
+                if (++strikes === 3) {
+                  logs[trees].rotation.set(Math.PI / 2, 0, 0);
+                  logs[trees].position.y = 0.325;
+                  crowns[trees].visible = false;
+                  Object.assign(treeSolids[trees], { y: 0, h: 0.65, d: 6 });
+                  strikes = 0;
+                  fallen = true;
+                  hooks.toast(
+                    "Tree felled. Pick up the timber and leave the axe here.",
+                  );
+                }
               }
             } else if (phase === "timber" && carrying && aligned) {
               plans[count].visible = false;
               const s = sockets[count];
               const beam = block(
                 s.x,
-                0.15 + Math.floor(count / 2) * 0.45,
+                0,
                 s.z,
                 0.45,
                 0.45,
                 5,
                 0x9b703e,
-                false,
+                true,
                 "Placed structural timber",
               );
               beam.rotation.y = s.yaw;
+              const beamSolid = solids[solids.length - 1];
+              if (s.yaw !== 0) {
+                beamSolid.w = 5;
+                beamSolid.d = 0.45;
+              }
+              placedSolids.push(beamSolid);
               placed.push(beam);
               count++;
               carrying = false;
-              hooks.toast(`Timber secured • ${count}/6`);
-              if (count === 6) {
+              hooks.toast(`Timber secured • ${count}/4`);
+              if (count === 4) {
                 ship.group.visible = true;
                 scaffolding.visible = false;
                 placed.forEach((m) => (m.visible = false));
+                placedSolids.forEach((solid) =>
+                  solids.splice(solids.indexOf(solid), 1),
+                );
+                Object.assign(player, ship.points.deckArrival, {
+                  vx: 0,
+                  vy: 0,
+                  vz: 0,
+                  grounded: true,
+                  yaw: Math.PI,
+                });
                 solids.push(...ship.solids);
                 for (let i = 0; i < 14; i++)
                   block(

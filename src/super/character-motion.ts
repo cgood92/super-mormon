@@ -98,7 +98,7 @@ export function createMotionDriver(role: CharacterRole): {
       );
       forwardLean += (leanTarget - forwardLean) * damp(8, dt);
       const strideAmplitude =
-        (0.38 + speed * 0.24) * Math.min(1, gaitBlend * 3);
+        (0.25 + speed * 0.18) * Math.min(1, gaitBlend * 3);
       if (state.grounded) {
         const traveled = Math.hypot(state.x - previousX, state.z - previousZ);
         const locomoting = state.runSpeed > 0.25;
@@ -106,7 +106,7 @@ export function createMotionDriver(role: CharacterRole): {
         wasLocomoting = locomoting;
         // A planted foot moves from front to back over the distance covered
         // during one stance. Short walking steps therefore have a faster cycle.
-        const halfStep = 0.63 * Math.sin(0.38 + speed * 0.24);
+        const halfStep = 0.63 * Math.sin(0.25 + speed * 0.18);
         phase +=
           (Math.min(traveled, state.runSpeed * dt * 1.5) * Math.PI) /
           (2 * halfStep);
@@ -137,7 +137,7 @@ export function createMotionDriver(role: CharacterRole): {
           legs[i].rotation.x = stance
             ? strideAmplitude * (2 * progress - 1)
             : strideAmplitude * (1 - 2 * returnStep);
-          knees[i].rotation.x = 0.025 * gaitBlend + swing * 0.68 * gaitBlend;
+          knees[i].rotation.x = 0.025 * gaitBlend + swing * 0.42 * gaitBlend;
         } else {
           legs[i].rotation.x =
             i === 0
@@ -147,7 +147,7 @@ export function createMotionDriver(role: CharacterRole): {
         }
         feet[i].rotation.x = -legs[i].rotation.x - knees[i].rotation.x * 0.9;
         feet[i].position.y =
-          -0.28 + (state.grounded ? gaitBlend * (0.045 + swing * 0.11) : 0);
+          -0.28 + (state.grounded ? gaitBlend * (0.025 + swing * 0.065) : 0);
         if (state.grounded && stance && !state.crouching) {
           const legLength = 0.35 - feet[i].position.y;
           const anchor = stanceAnchors[i];
@@ -155,7 +155,7 @@ export function createMotionDriver(role: CharacterRole): {
             const localZ =
               Math.sin(renderedYaw) * (anchor.x - state.x) +
               Math.cos(renderedYaw) * (anchor.z - state.z);
-            if (Math.abs(localZ) < legLength * 0.85) {
+            if (Math.abs(localZ) <= legLength * Math.sin(strideAmplitude)) {
               legs[i].rotation.x = -Math.asin(localZ / legLength);
             } else {
               stanceAnchors[i] = null;

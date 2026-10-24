@@ -30,6 +30,12 @@ export type AdventureRuntime = {
     carrying?: boolean;
   };
   movementLocked?: () => boolean;
+  camera?: () =>
+    | {
+        position: { x: number; y: number; z: number };
+        focus: { x: number; y: number; z: number };
+      }
+    | undefined;
   snapshot: () => unknown;
   dispose: () => void;
 };
