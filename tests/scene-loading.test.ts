@@ -42,3 +42,32 @@ test("initial load failures expose a retry action without resuming an absent wor
     "existing scenes should resume without a blocking error screen",
   );
 });
+
+test("later chapters prepare their own interactive worlds and leave no scene resources", async () => {
+  const { prepareWorld } = await import("../src/super/world-loading");
+  const { Scene } = await import("three");
+  for (const [id, phase] of [
+    ["promised", "camp"],
+    ["vineyard", "learn"],
+  ] as const) {
+    const scene = new Scene();
+    const prepared = await prepareWorld(id);
+    assert.equal(scene.children.length, 0);
+    const world = prepared.buildWorld(id, scene);
+    assert.ok(world.adventure, id + " must expose interactive progression");
+    let role = "";
+    const runtime = world.adventure!({
+      setAvatar: (value) => {
+        role = value;
+      },
+      toast: () => {},
+      complete: () => {},
+      dialog: (_k, _t, _b, next) => next(),
+    });
+    assert.equal((runtime.snapshot() as { phase: string }).phase, phase);
+    assert.equal(role, id === "promised" ? "nephi" : "child");
+    runtime.dispose();
+    world.dispose?.();
+    assert.equal(scene.children.length, 0);
+  }
+});

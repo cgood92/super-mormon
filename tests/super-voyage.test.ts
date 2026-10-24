@@ -33,6 +33,9 @@ test("voyage follows fourth-day release, prayer, Liahona and sustained steering"
       gateIndex: number;
       heading: number;
       targetHeading: number;
+      boat: { x: number; z: number };
+      contacts: number;
+      releaseReady: boolean;
       targets: Record<string, { x: number; y: number; z: number }>;
     };
   const visit = (target: string) => {
@@ -40,8 +43,21 @@ test("voyage follows fourth-day release, prayer, Liahona and sustained steering"
     runtime.update(0.016, p, click);
   };
   assert.equal(state().day, 4);
+  for (let i = 0; i < 42; i++)
+    runtime.update(0.1, p, { ...click, interact: false });
   visit("brothers");
   assert.equal(state().phase, "release");
+  assert.equal(runtime.movementLocked!(), true);
+  const childBelow = { x: p.x, z: p.z };
+  for (let i = 0; i < 260; i++)
+    runtime.update(0.1, p, { ...click, interact: false });
+  assert.ok(
+    p.y > 4.1,
+    "the child follows the stairs to the deck without teleporting",
+  );
+  assert.ok(Math.hypot(p.x - childBelow.x, p.z - childBelow.z) > 12);
+  assert.equal(state().releaseReady, true);
+  assert.equal(runtime.movementLocked!(), false);
   visit("nephi");
   assert.equal(avatar, "nephi");
   runtime.update(0.016, p, click);
@@ -51,6 +67,15 @@ test("voyage follows fourth-day release, prayer, Liahona and sustained steering"
   assert.equal(runtime.movementLocked!(), true);
   for (let i = 0; i < 120; i++) runtime.update(0.1, p, click);
   assert.equal(state().gateIndex, 0, "pressing B cannot finish the course");
+  assert.ok(
+    state().contacts > 0,
+    "sailing straight hits the first rocky island and resets",
+  );
+  assert.notEqual(
+    state().boat.z,
+    0,
+    "the ship advances through actual sea coordinates",
+  );
   for (let i = 0; i < 1500 && state().phase === "steer"; i++) {
     const s = state(),
       error = Math.atan2(
@@ -65,6 +90,10 @@ test("voyage follows fourth-day release, prayer, Liahona and sustained steering"
     });
   }
   assert.equal(state().phase, "arrived");
+  assert.ok(
+    state().boat.z <= -450,
+    "success crosses the last authored gate plane",
+  );
   assert.equal(complete, 1);
   assert.equal(runtime.movementLocked!(), false);
   runtime.dispose();
@@ -147,4 +176,72 @@ test("voyage releases every instanced ship buffer exactly once on repeated dispo
   world.dispose!();
   world.dispose!();
   for (const count of counts.values()) assert.equal(count, 1);
+});
+
+test("lower hull blocks walking through both sides and tapered ends", async () => {
+  const { stepPlayer } = await import("../src/super/physics");
+  const world = buildVoyage(new T.Scene());
+  for (const [x, z, ix, iz] of [
+    [0, -15, -1, 0],
+    [0, -15, 1, 0],
+    [0, -15, 0, -1],
+    [0, 19, 0, 1],
+  ]) {
+    const p = createPlayer(x, 0, z);
+    for (let i = 0; i < 360; i++)
+      stepPlayer(
+        p,
+        { x: -ix, y: iz, jump: false, jumpHeld: false },
+        1 / 60,
+        0,
+        world.solids,
+        world.climbables,
+      );
+    assert.ok(Math.abs(p.z) < 21.5, `escaped an end: ${p.z}`);
+    assert.ok(Math.abs(p.x) < 7, `escaped a side: ${p.x}`);
+  }
+  world.dispose!();
+});
+
+test("voyage beacon obeys depth and wheel camera faces the island passage", () => {
+  const scene = new T.Scene(),
+    world = buildVoyage(scene);
+  const beacon = scene.getObjectByName("Blue next task beacon") as T.Mesh;
+  assert.equal((beacon.material as T.Material).depthTest, true);
+  assert.ok(scene.getObjectByName("Ship wheel pivot"));
+  assert.equal(scene.getObjectByName("Steering oar pivot"), undefined);
+  world.dispose!();
+});
+
+test("ship hull scenery has live collision owners and deck surfaces have one owner", async () => {
+  const { sceneryCollisionErrors } = await import("../src/super/scenery");
+  const scene = new T.Scene(),
+    world = buildVoyage(scene);
+  assert.deepEqual(sceneryCollisionErrors(scene, world.solids), []);
+  scene.updateMatrixWorld(true);
+  const ray = new T.Raycaster();
+  for (const [x, z] of [
+    [2.3, -10.2],
+    [-2.3, 4.2],
+    [3.2, 13.2],
+  ]) {
+    ray.set(new T.Vector3(x, 8, z), new T.Vector3(0, -1, 0));
+    const hits = ray
+      .intersectObjects(scene.children, true)
+      .filter((hit) => Math.abs(hit.point.y - 4.2) < 0.01);
+    assert.equal(hits.length, 1, `deck ownership at ${x},${z}`);
+  }
+  world.dispose!();
+});
+
+test("hidden construction ships defer collision validation until revealed", async () => {
+  const { buildShip } = await import("../src/super/ship");
+  const { sceneryCollisionErrors } = await import("../src/super/scenery");
+  const root = new T.Group(),
+    ship = buildShip(root, { x: 0, y: 0, z: 0 });
+  ship.group.visible = false;
+  assert.deepEqual(sceneryCollisionErrors(root, []), []);
+  ship.group.visible = true;
+  assert.ok(sceneryCollisionErrors(root, []).length > 0);
+  assert.deepEqual(sceneryCollisionErrors(root, ship.solids), []);
 });

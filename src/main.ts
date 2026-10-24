@@ -159,6 +159,7 @@ let guards: Guard[] = [],
   treasureMeshes = new Map<string, T.Group>(),
   collected = new Set<string>();
 let goalMarker: T.Group | null = null;
+let organSeated = false;
 let carryObjects: CarryObject[] = [],
   carryMeshes = new Map<string, T.Group>(),
   tokenMeshes = new Map<string, T.Mesh>(),
@@ -657,6 +658,7 @@ async function load(id: WorldId) {
   if (world) disposeScene();
   worldId = id;
   completionSceneSeen = false;
+  organSeated = false;
   storyCheckpoint = null;
   storyObjective = "";
   learnedMoves = new Set();
@@ -685,7 +687,11 @@ async function load(id: WorldId) {
   follow.reset(
     player,
     player.yaw,
-    id === "tree" || id === "bountiful" || id === "voyage"
+    id === "tree" ||
+      id === "bountiful" ||
+      id === "voyage" ||
+      id === "promised" ||
+      id === "vineyard"
       ? "streets"
       : id === "hub"
         ? "conference"
@@ -783,9 +789,13 @@ async function load(id: WorldId) {
             ? "1 NEPHI 17 · BUILDING THE SHIP"
             : id === "voyage"
               ? "1 NEPHI 18 · THE OCEAN VOYAGE"
-              : id === "night"
-                ? "1 NEPHI 4 · ABOUT 600 BC"
-                : "1 NEPHI 3 · ABOUT 600 BC";
+              : id === "promised"
+                ? "1 NEPHI 18 · 2 NEPHI 1–5"
+                : id === "vineyard"
+                  ? "JACOB 5 · THE OLIVE VINEYARD"
+                  : id === "night"
+                    ? "1 NEPHI 4 · ABOUT 600 BC"
+                    : "1 NEPHI 3 · ABOUT 600 BC";
   el("seal-count").textContent =
     `Stories ${completed.size} / ${STORY_ORDER.length}`;
   if (id === "trade" || id === "night") {
@@ -856,15 +866,19 @@ async function load(id: WorldId) {
             ? "Find Laban at the far end of the courtyard."
             : id === "trade"
               ? "Your brothers will follow. Bring the treasures to Laban."
-              : id === "night"
-                ? "Enter the city and search its moonlit streets."
-                : id === "tree"
-                  ? "Take your time. Follow the path toward the tree."
-                  : id === "bountiful"
-                    ? "Explore the shore. Speak with Nephi and help build the ship."
-                    : id === "voyage"
-                      ? "Explore the ship and meet the family aboard."
-                      : "Find the blue door. Watch the streets.",
+              : id === "promised"
+                ? "Help the family settle, then follow the journey to a new home."
+                : id === "vineyard"
+                  ? "Explore the vineyard in Jacob’s retelling. Care for the trees."
+                  : id === "night"
+                    ? "Enter the city and search its moonlit streets."
+                    : id === "tree"
+                      ? "Take your time. Follow the path toward the tree."
+                      : id === "bountiful"
+                        ? "Climb the mountain trail and pray. Then help build the ship."
+                        : id === "voyage"
+                          ? "Explore the ship and meet the family aboard."
+                          : "Find the blue door. Watch the streets.",
       4,
     );
 }
@@ -908,21 +922,19 @@ function complete() {
     (worldId === "streets" || worldId === "house" || worldId === "palace")
   ) {
     completionSceneSeen = true;
-    const family = [
-      createCharacter(
-        worldId === "streets"
-          ? "sariah"
-          : worldId === "house"
-            ? "laman"
-            : "nephi",
-      ),
-      createCharacter(worldId === "streets" ? "nephi" : "sam"),
-    ];
+    // The palace reunion already has the three brothers in the world.
+    const family =
+      worldId === "palace"
+        ? []
+        : [
+            createCharacter(worldId === "streets" ? "sariah" : "laman"),
+            createCharacter(worldId === "streets" ? "nephi" : "sam"),
+          ];
     family.forEach((actor, i) => {
       const state = createPlayer(
-        player.x + (i ? 1.7 : -1.7),
+        player.x + (worldId === "streets" ? 0 : i ? 1.7 : -1.7),
         player.y,
-        player.z + 1.8,
+        player.z + (worldId === "streets" ? (i ? 1.5 : -1.5) : 1.8),
       );
       state.yaw = Math.PI;
       actor.update(0, state);
@@ -951,7 +963,10 @@ function complete() {
             gesture: "point",
             speaker: worldId !== "palace",
           },
-          ...family.map((actor, i) => ({
+          ...(worldId === "palace"
+            ? wavingExtras.map((entry) => entry.actor)
+            : family
+          ).map((actor, i) => ({
             group: actor.group,
             gesture: "talk" as const,
             speaker: worldId === "palace" && i === 0,
@@ -966,72 +981,11 @@ function complete() {
   el("seal-count").textContent =
     `Stories ${completed.size} / ${STORY_ORDER.length}`;
   sound("win");
-  const name = worldId;
-  const next = nextStory(completed);
-  if (name === "bountiful" || name === "voyage") {
-    modal(
-      name === "bountiful" ? "1 NEPHI 17" : "1 NEPHI 18",
-      name === "bountiful" ? "The ship is ready." : "A new shore.",
-      name === "bountiful"
-        ? "The family has built a ship together. Stay and explore the shore and the completed vessel."
-        : "The family has crossed the ocean. Stay and explore the ship and the promised land.",
-      [
-        { label: "Stay and explore", run: () => {} },
-        {
-          label: "Return to the gallery",
-          run: () => warp("hub"),
-          secondary: true,
-        },
-      ],
-    );
-    return;
-  }
-  if (name === "tree") {
-    modal(
-      "LEHI’S VISION · 1 NEPHI 8",
-      "Come and share the joy.",
-      "Sariah, Nephi, and Sam have come to the tree. Stay and explore the garden, the fountain, and the overlook at your own pace.",
-      [
-        { label: "Stay in the garden", run: () => {} },
-        {
-          label: "Return to the gallery",
-          run: () => warp("hub"),
-          secondary: true,
-        },
-      ],
-    );
-    return;
-  }
-  modal(
-    "A MEMORY FOR THE JOURNEY",
-    name === "house"
-      ? "The family’s treasures."
-      : name === "streets"
-        ? "Home, safely."
-        : name === "trade"
-          ? "Safe in the cave."
-          : name === "night"
-            ? "The records recovered."
-            : "Together again.",
-    name === "house"
-      ? "Nephi and his brothers gathered gold, silver, and precious things. They hoped to exchange them for the brass plates."
-      : name === "streets"
-        ? `Lehi’s family would soon leave Jerusalem. Their story was only beginning.${next ? ` Next: ${STORY_TITLES[next]}.` : ""}`
-        : name === "trade"
-          ? "The brothers escaped Laban’s servants and hid in the rocks. Nephi would return to Jerusalem."
-          : name === "night"
-            ? "The brass plates were safe. Zoram chose to join the family in the wilderness."
-            : `Laban refused the plates, and Laman fled. Nephi encouraged his brothers to keep trying.${next ? ` Next: ${STORY_TITLES[next]}.` : ""}`,
-    [
-      { label: "Back to the paintings", run: () => warp("hub") },
-      {
-        label: "Explore this scene again",
-        run: () => load(name),
-        secondary: true,
-      },
-    ],
-  );
+  // The story scene is the ending. Completed adventures return directly to
+  // the gallery; replay remains available by entering the painting again.
+  warp("hub");
 }
+
 function warp(id: WorldId) {
   if (transition) return;
   transition = true;
@@ -1095,7 +1049,11 @@ function resetCaughtCheckpoint() {
   follow.reset(
     player,
     player.yaw,
-    worldId === "tree" || worldId === "bountiful" || worldId === "voyage"
+    worldId === "tree" ||
+      worldId === "bountiful" ||
+      worldId === "voyage" ||
+      worldId === "promised" ||
+      worldId === "vineyard"
       ? "streets"
       : worldId === "hub"
         ? "conference"
@@ -1267,7 +1225,18 @@ function update(dt: number) {
   levelTime += dt;
   app.classList.toggle("chapter-faded", levelTime >= 10);
   caughtGrace = Math.max(0, caughtGrace - dt);
-  const movementLocked = !!adventure?.movementLocked?.();
+  if (
+    organSeated &&
+    (!world.organ?.playing() || state.interact || state.jump)
+  ) {
+    world.organ?.stop();
+    organSeated = false;
+    player.z = -91.7;
+    player.y = 4.5;
+    input.reset();
+    state.interact = state.jump = false;
+  }
+  const movementLocked = organSeated || !!adventure?.movementLocked?.();
   if (movementLocked) player.vx = player.vz = 0;
   const events = stepPlayer(
     player,
@@ -1279,6 +1248,14 @@ function update(dt: number) {
     world.solids,
     world.climbables,
   );
+  if (organSeated && world.organ) {
+    Object.assign(player, world.organ.seat, {
+      vx: 0,
+      vy: 0,
+      vz: 0,
+      yaw: Math.PI,
+    });
+  }
   world.update?.(dt, player);
   if (events.jumped) sound("jump");
   const b = world.bounds;
@@ -1324,6 +1301,7 @@ function update(dt: number) {
   }
   avatar.update(dt, {
     ...player,
+    crouching: organSeated || player.crouching,
     carrying:
       adventureCarrying ||
       carryObjects.some((object) => object.held) ||
@@ -1342,12 +1320,37 @@ function update(dt: number) {
       recenter: state.recenter,
       zoom: state.cameraZoom,
     },
-    worldId === "tree" || worldId === "bountiful" || worldId === "voyage"
+    worldId === "tree" ||
+      worldId === "bountiful" ||
+      worldId === "voyage" ||
+      worldId === "promised" ||
+      worldId === "vineyard"
       ? "streets"
       : worldId === "hub"
         ? "conference"
         : worldId,
   );
+  const adventureCamera = adventure?.camera?.();
+  if (adventureCamera) {
+    const blend = 1 - Math.exp(-5 * dt);
+    camera.position.lerp(
+      new T.Vector3(
+        adventureCamera.position.x,
+        adventureCamera.position.y,
+        adventureCamera.position.z,
+      ),
+      blend,
+    );
+    camera.lookAt(
+      adventureCamera.focus.x,
+      adventureCamera.focus.y,
+      adventureCamera.focus.z,
+    );
+  }
+  if (organSeated) {
+    camera.position.lerp(new T.Vector3(33, 8, -89), 1 - Math.exp(-5 * dt));
+    camera.lookAt(30, 6, -94);
+  }
   app.classList.toggle("camera-obstructed", follow.obstructed);
   for (const entry of wavingExtras)
     entry.actor.update(dt, {
@@ -1418,6 +1421,25 @@ function update(dt: number) {
       hubLocation = location.name;
       el("world-name").textContent = location.name;
       updateObjective();
+    }
+    if (world.organ && (organSeated || near(world.organ.point, 3, 2))) {
+      prompt = organSeated
+        ? "{action} Stand up · We Thank Thee, O God, for a Prophet"
+        : "{action} Sit at the organ and play";
+      if (state.interact && !organSeated) {
+        try {
+          audio ??= new AudioContext();
+          world.organ.start(audio);
+          organSeated = true;
+          input.reset();
+          message(
+            "We Thank Thee, O God, for a Prophet · {action} to stand up",
+            5,
+          );
+        } catch {
+          message("Organ audio is unavailable in this browser.", 3);
+        }
+      }
     }
     const p = world.portals?.find((p) => near(p, 2.2, 4));
     if (p && isStoryId(p.id)) {
@@ -1648,6 +1670,7 @@ function queueFrame() {
 }
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
+    world?.organ?.stop();
     if (frameRequest !== null) cancelAnimationFrame(frameRequest);
     frameRequest = null;
     if (started && !paused) pause();

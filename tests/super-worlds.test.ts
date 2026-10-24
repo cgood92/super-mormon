@@ -161,8 +161,9 @@ test("shared streets reach Lehi's indigo door and optional roof stairs", () => {
   for (const [x, z] of [
     [-12, 25],
     [-19.5, 25],
-    [-19.5, -15],
-    [-21, -15],
+    [-19.5, -8],
+    [-33.2, -8],
+    [-33.2, -15],
   ])
     go(player, x, z, data.solids, 0.3);
   assert.ok(Math.hypot(player.x - data.goal.x, player.z - data.goal.z) < 1);
@@ -173,6 +174,30 @@ test("shared streets reach Lehi's indigo door and optional roof stairs", () => {
   ])
     go(climber, x, z, data.solids, 0.3);
   assert.ok(climber.y >= 4.1);
+});
+
+test("Lehi doorway is discovered around the dwelling with clear family standing space", () => {
+  const { data, scene } = world("streets");
+  assert.ok(data.goal.x < -32);
+  assert.ok(standingClear(data.goal.x, 0, data.goal.z, data.solids));
+  for (const dz of [-1.5, 1.5])
+    assert.ok(standingClear(data.goal.x, 0, data.goal.z + dz, data.solids));
+  scene.updateMatrixWorld(true);
+  const start = new THREE.Vector3(-19.5, 1.5, -15),
+    end = new THREE.Vector3(data.goal.x, 1.5, data.goal.z);
+  const ray = new THREE.Raycaster(
+    start,
+    end.clone().sub(start).normalize(),
+    0,
+    start.distanceTo(end),
+  );
+  assert.ok(
+    ray
+      .intersectObjects(scene.children, true)
+      .some((hit) => hit.object.name === "Jerusalem dwelling"),
+    "dwelling conceals the outer-lane doorway from the old direct approach",
+  );
+  data.dispose?.();
 });
 
 test("audience hall has an accessible dais and two ground-level exits into the city", () => {

@@ -5,16 +5,21 @@ import { gallery, CONFERENCE_ESCALATORS } from "../src/super/conference-center";
 import { createPlayer, stepPlayer } from "../src/super/physics";
 import { canJumpIntoPainting } from "../src/super/gallery-entry";
 
-test("Conference Center has eight reachable canvases and nine optional lessons", () => {
+test("Conference Center has ten reachable canvases and nine optional lessons", () => {
   const world = gallery(new THREE.Scene());
-  assert.equal(world.portals?.length, 8);
+  assert.equal(world.portals?.length, 10);
   assert.equal(world.tutorials?.length, 9);
   for (const portal of world.portals!) {
     const player = createPlayer(world.spawn.x, 0, world.spawn.z);
-    for (const target of [
-      { x: portal.x, z: 36 },
-      { x: portal.x, z: portal.z + 2 },
-    ]) {
+    const aisle =
+      portal.id === "bountiful" || portal.id === "voyage"
+        ? [
+            { x: 25, z: 36 },
+            { x: 25, z: 20 },
+            { x: portal.x, z: 20 },
+          ]
+        : [{ x: portal.x, z: 36 }];
+    for (const target of [...aisle, { x: portal.x, z: portal.z + 2 }]) {
       for (let i = 0; i < 500; i++) {
         const dx = target.x - player.x,
           dz = target.z - player.z,
@@ -101,12 +106,15 @@ test("spawn connects through foyer landings to auditorium levels and roof", () =
     );
     assert.ok(Math.abs(player.y - y) < 0.32, `floor ${y}: ${player.y}`);
   }
-  walk(30, 36, 0);
+  walk(25, 36, 0);
+  walk(25, 4, 0);
   walk(30, 4, 0);
   walk(0, 4, 0);
   walk(0, -2, 0);
   walk(0, 4, 0);
   walk(30, 4, 0);
+  walk(25, 4, 0);
+  walk(25, 36, 0);
   walk(30, 36, 0);
   walk(-5, 36, 0);
   walk(-5, 47, 0);

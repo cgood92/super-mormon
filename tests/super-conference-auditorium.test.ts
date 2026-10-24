@@ -73,8 +73,10 @@ test("the center aisle reaches paired side stairs to the pulpit and returns", ()
     walk(p, -70, solids);
     walkAcross(p, side, solids);
     walk(p, -80.5, solids);
+    walkAcross(p, Math.sign(side) * 4, solids);
+    walk(p, -83, solids);
     walkAcross(p, 0, solids);
-    assert.ok(Math.abs(p.y - 2.4) < 0.01);
+    assert.ok(Math.abs(p.y - 3) < 0.01);
     walkAcross(p, side, solids);
     walk(p, -70, solids);
     walkAcross(p, 0, solids);

@@ -506,7 +506,13 @@ export function createStoryScene(
         marker();
         hooks.toast("The city gate is behind you. Find your brothers outside.");
       }
-      if (!dialogueOpen && input.interact) {
+      const arrivedWithRecords =
+        id === "night" &&
+        phase === "escape" &&
+        passedGate &&
+        near(p, story.brothers, 5.5) &&
+        (!zoram || near(zoram.state, p, 9));
+      if (!dialogueOpen && (input.interact || arrivedWithRecords)) {
         if (phase === "offer" && reachable(story.laban, 3.4)) {
           speak(
             "1 Nephi 3:22–27",

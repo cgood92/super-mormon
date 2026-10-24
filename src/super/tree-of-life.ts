@@ -936,6 +936,9 @@ export function createTreeOfLifeScene(
         0.12,
         0.8 + (index % 3) * 0.07,
       );
+      // A mother's muted plum mantle remains legible among the earth-colored
+      // fathers and children without adding another mesh or draw call.
+      if (role === "sariah") tint.setHSL(0.87 + (index % 3) * 0.015, 0.2, 0.77);
       crowdParts[0].setColorAt(index, tint);
       for (const part of [crowdParts[1], crowdParts[2]])
         for (let side = 0; side < 2; side++)
@@ -948,14 +951,20 @@ export function createTreeOfLifeScene(
             update(_dt: number, state: CharacterState) {
               const walking = Math.min(1, state.runSpeed),
                 stride = Math.sin(time * 4.8 + index * 1.7) * walking,
-                height = 0.92 + (index % 7) * 0.025;
+                height =
+                  role === "child"
+                    ? 0.59
+                    : (role === "sariah" ? 0.9 : 1.01) + (index % 3) * 0.025;
+              const seated = this.group.userData.seated === true;
               transform.position.set(
                 state.x,
-                state.y + Math.abs(stride) * 0.018,
+                state.y + (seated ? -0.3 * height : Math.abs(stride) * 0.018),
                 state.z,
               );
               transform.rotation.set(0, state.yaw, 0);
-              transform.scale.setScalar(height);
+              // Lower the body and bend the legs forward; preserve head and torso
+              // proportions instead of flattening the entire person into a squat.
+              transform.scale.set(height, height, height);
               transform.updateMatrix();
               crowdParts[0].setMatrixAt(index, transform.matrix);
               for (let i = 0; i < 2; i++) {
@@ -972,8 +981,12 @@ export function createTreeOfLifeScene(
                 local.updateMatrix();
                 instanceMatrix.multiplyMatrices(transform.matrix, local.matrix);
                 crowdParts[1].setMatrixAt(index * 2 + i, instanceMatrix);
-                local.position.set(side * 0.125, 0.47, 0);
-                local.rotation.set(-side * stride * 0.28, 0, 0);
+                local.position.set(
+                  side * 0.125,
+                  seated ? 0.65 : 0.47,
+                  seated ? 0.2 : 0,
+                );
+                local.rotation.set(seated ? -0.8 : -side * stride * 0.28, 0, 0);
                 local.updateMatrix();
                 instanceMatrix.multiplyMatrices(transform.matrix, local.matrix);
                 crowdParts[2].setMatrixAt(index * 2 + i, instanceMatrix);
@@ -988,6 +1001,7 @@ export function createTreeOfLifeScene(
             dispose() {},
           } as ReturnType<typeof createCharacter>)
         : createCharacter(role);
+    rig.group.userData.role = role;
     scene.add(rig.group);
     const state: CharacterState = {
       ...point,
@@ -1002,7 +1016,6 @@ export function createTreeOfLifeScene(
     actors.push({ rig, state, mock, home: { ...point } });
     return rig;
   };
-  makeActor("lehi", p(-25, -47)).group.name = "Lehi — dreamer and father";
   const sariah = makeActor("sariah", p(-9, -37));
   sariah.group.name = "Sariah";
   makeActor("nephi", p(-7, -34)).group.name = "Nephi";
@@ -1020,19 +1033,43 @@ export function createTreeOfLifeScene(
       ),
       true,
     ).group.name = "people pointing from the spacious building";
+  // Irregular family groups share the garden, rather than ordered ranks.
+  const gardenFamilies = [
+    [-8, 2],
+    [7, 7],
+    [-13, -8],
+    [14, -10],
+    [-5, 17],
+    [14, 17],
+  ];
   for (let i = 0; i < 72; i++) {
-    const mode = i % 4 === 0 ? "lost" : i % 4 === 1 ? "eat" : "press";
+    const mode = i < 30 ? "eat" : i % 3 === 0 ? "lost" : "press";
     const route = data.path[i % data.path.length];
+    const family = gardenFamilies[Math.floor(i / 5) % gardenFamilies.length];
+    const member = i % 5;
+    const jitter = Math.sin(i * 7.13) * 0.7;
     const point =
       mode === "eat"
-        ? p(data.tree.x + 3 + (i % 5), data.tree.z + (i % 7) - 3)
+        ? p(
+            data.tree.x + family[0] + (member % 3) * 1.25 + jitter,
+            data.tree.z +
+              family[1] +
+              Math.floor(member / 3) * 1.4 +
+              Math.cos(i * 4.7) * 0.7,
+          )
         : mode === "lost"
           ? p(-75 + (i % 13), 12 + (i % 40))
           : p(route.x - 2 - (i % 3), route.z + (i % 5));
-    makeActor(i % 2 ? "sam" : "sariah", point, false, true).group.name =
-      `vision crowd — ${mode}`;
+    const role = member > 1 ? "child" : member === 0 ? "sam" : "sariah";
+    const rig = makeActor(role, point, false, true);
+    rig.group.name = `vision family — ${mode}`;
+    rig.group.userData.seated = mode === "eat" && i % 6 === 0;
+    if (mode === "eat") rig.group.userData.family = Math.floor(i / 5);
     actors[actors.length - 1].behavior = mode;
-    if (mode === "eat") actors[actors.length - 1].state.z += 12;
+    actors[actors.length - 1].state.yaw = Math.atan2(
+      data.tree.x - point.x,
+      data.tree.z - point.z,
+    );
   }
   const familyWords: Record<string, string> = {
     "Lehi — dreamer and father":

@@ -222,10 +222,10 @@ export function buildJerusalem(
     [-6, 0, 14, 8, 5.2, 0xd1ac84],
   ])
     cityBlock(add, decor, group, x, z, w, d, h, c);
-  decor(-21.94, 0, -15, 0.12, 2.8, 2.8, palette.indigo, "Lehi indigo doorway");
-  decor(-21.85, 2.8, -15, 0.28, 0.2, 3.2, palette.timber, "Lehi door lintel");
-  const sign = label(group, "LEHI’S HOUSE", -21.78, 3.5, -15, 2.6);
-  sign.rotation.y = Math.PI / 2;
+  decor(-32.06, 0, -15, 0.12, 2.8, 2.8, palette.indigo, "Lehi indigo doorway");
+  decor(-32.15, 2.8, -15, 0.28, 0.2, 3.2, palette.timber, "Lehi door lintel");
+  const sign = label(group, "LEHI’S HOUSE", -32.22, 3.5, -15, 2.6);
+  sign.rotation.y = -Math.PI / 2;
   // A broad audience hall with a west exit passage and a separate east treasury.
   add(-18, 0, -19, 0.7, 7, 20, 0xb19472, "palace west exterior");
   add(18, 0, -19, 0.7, 7, 20, 0xb19472, "palace east exterior");
@@ -354,7 +354,9 @@ export function buildJerusalem(
   const audience = { x: 0, y: 0.8, z: -21.1 };
   const brothers = { x: 0, y: 0, z: 43 };
   const cave = { x: -8, y: 0, z: 72 };
-  const home = { x: -20.8, y: 0, z: -15, radius: 2.2 };
+  // The doorway faces the outer lane, discovered by turning around the dwelling
+  // at the cross street. Every story still builds exactly the same city.
+  const home = { x: -33.2, y: 0, z: -15, radius: 1.25 };
   const laban = id === "night" ? { x: -19.5, y: 0, z: -6 } : audience;
   return {
     name:
@@ -367,7 +369,7 @@ export function buildJerusalem(
             : "Jerusalem by Night",
     subtitle:
       id === "streets"
-        ? "Find Lehi’s indigo doorway in the west lane"
+        ? "Find the indigo doorway around the western homes"
         : id === "palace"
           ? "Ask Laban for the brass plates, then return to your brothers"
           : id === "trade"

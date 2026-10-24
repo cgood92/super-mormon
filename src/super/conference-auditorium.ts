@@ -1,6 +1,7 @@
 import { softBoxGeometry, softSeatBackGeometry } from "./soft-geometry";
 import * as THREE from "three";
 import type { Solid } from "./physics";
+import { buildConferenceOrgan } from "./conference-organ";
 import { buildRostrum } from "./conference-rostrum";
 
 /** The bowl is column-free; foyer connections are the three central south doors. */
@@ -316,10 +317,13 @@ export function buildAuditorium(parent: THREE.Group) {
     batch.instanceMatrix.needsUpdate = true;
     group.add(batch);
   }
+  const organ = buildConferenceOrgan(group);
+  solids.push(...organ.solids);
   group.userData.reference =
     "https://newsroom.churchofjesuschrist.org/media/orig/orig_auditorium_right_hr.jpg";
   group.userData.seatCount = seats.length;
   return {
+    organ,
     solids,
     landmarks: [
       { name: "Conference Center pulpit", x: 0, y: 2.4, z: -81 },

@@ -1,5 +1,6 @@
 import { mountainGeometry } from "./soft-geometry";
 import * as T from "three";
+import { stepPlayer } from "./physics";
 import { buildShip } from "./ship";
 import { createCharacter } from "./character";
 import { box, material } from "./art";
@@ -69,6 +70,16 @@ export function buildVoyage(scene: T.Scene): WorldData {
     land.add(hill);
   }
   const brothers = { x: -1, y: 0, z: 16 };
+  const releaseRoute = [
+    { x: -1, y: 0, z: 11 },
+    ship.points.stairBottom,
+    ship.points.stairTop,
+    { x: 3, y: 4.2, z: -3 },
+    { x: 0, y: 4.2, z: -5 },
+  ];
+  let releaseStep = 0,
+    releaseReady = false,
+    openingTime = 0;
   const npcs = [
     createCharacter("laman"),
     createCharacter("lemuel"),
@@ -92,12 +103,16 @@ export function buildVoyage(scene: T.Scene): WorldData {
     });
   });
   const rope = new T.Mesh(
-    new T.TorusGeometry(0.43, 0.065, 5, 12),
+    new T.TorusGeometry(0.65, 0.065, 6, 24),
     material(0xb79d6c),
   );
   rope.rotation.x = Math.PI / 2;
-  rope.position.set(-4, 5.05, -4);
+  rope.position.set(0, 5.05, -6.65);
+  rope.scale.set(0.72, 1.3, 1);
   ship.group.add(rope);
+  const secondRope = rope.clone();
+  secondRope.position.y = 5.4;
+  ship.group.add(secondRope);
   const compass = new T.Group();
   compass.position.set(-3, 4.65, 12);
   ship.group.add(compass);
@@ -111,6 +126,7 @@ export function buildVoyage(scene: T.Scene): WorldData {
   );
   compass.add(sphere);
   box(ship.group, -3, 4.2, 12, 1, 0.35, 1, 0x725039, "Liahona stand");
+  ship.solids.push({ x: -3, y: 4.2, z: 12, w: 1, h: 1, d: 1 });
   const needle = new T.Mesh(
     new T.ConeGeometry(0.17, 0.8, 3),
     material(0xfff2a7),
@@ -120,22 +136,37 @@ export function buildVoyage(scene: T.Scene): WorldData {
   compass.add(needle);
   const waypoint = new T.Mesh(
     new T.OctahedronGeometry(0.45),
-    new T.MeshBasicMaterial({ color: 0x48cfff, depthTest: false }),
+    new T.MeshBasicMaterial({ color: 0x48cfff, depthTest: true }),
   );
   waypoint.name = "Blue next task beacon";
-  waypoint.renderOrder = 20;
+  waypoint.renderOrder = 0;
   ship.group.add(waypoint);
-  const steeringOar = ship.group.getObjectByName("Steering oar pivot")!;
+  const steeringOar = ship.group.getObjectByName("Ship wheel pivot")!;
   let rudder = 0;
   const gate = new T.Group();
   gate.name = "Sunlit sailing passage";
   root.add(gate);
   gate.visible = false;
-  for (const side of [-1, 1]) {
-    const beacon = new T.Mesh(new T.ConeGeometry(3, 12, 5), material(0xefd686));
-    beacon.position.set(side * 11, 5, 0);
-    gate.add(beacon);
-  }
+  const channels = [
+    { x: 18, z: -90 },
+    { x: -12, z: -180 },
+    { x: 26, z: -270 },
+    { x: -10, z: -360 },
+    { x: 0, z: -450 },
+  ];
+  const islands: { object: T.Mesh; x: number; z: number }[] = [];
+  channels.forEach((channel, index) => {
+    for (const side of [-1, 1]) {
+      const rock = new T.Mesh(
+        mountainGeometry(index * 2 + side + 1),
+        material(0x666b5f),
+      );
+      rock.scale.set(20, 18, 24);
+      rock.name = "Rocky island passage";
+      gate.add(rock);
+      islands.push({ object: rock, x: channel.x + side * 25, z: channel.z });
+    }
+  });
   let time = 0,
     storm = 1,
     disposed = false,
@@ -144,12 +175,26 @@ export function buildVoyage(scene: T.Scene): WorldData {
     gateIndex = 0,
     passage = 0,
     steeringTime = 0;
-  const courses = [0.62, -0.48, 0.85, -0.25, 0];
+  let boatX = 0,
+    boatZ = 0,
+    contacts = 0;
+  let checkpoint = { x: 0, z: 0 };
+  let releaseCamera: { position: Point; focus: Point } | undefined;
+  const desiredHeading = () => {
+    const target = channels[Math.min(gateIndex, channels.length - 1)];
+    return Math.atan2(target.x - boatX, boatZ - target.z);
+  };
+  const resetCourse = () => {
+    contacts++;
+    boatX = checkpoint.x;
+    boatZ = checkpoint.z;
+    heading = desiredHeading();
+  };
   const updateVisuals = (dt: number) => {
     time += dt;
-    steeringOar.rotation.y = T.MathUtils.damp(
-      steeringOar.rotation.y,
-      rudder * 0.35,
+    steeringOar.rotation.z = T.MathUtils.damp(
+      steeringOar.rotation.z,
+      rudder * -0.8,
       5,
       dt,
     );
@@ -202,14 +247,15 @@ export function buildVoyage(scene: T.Scene): WorldData {
     clouds.position.y = (1 - storm) * 23;
     needle.rotation.z = -heading;
     if (phase === "steer") {
-      const error = wrap(courses[gateIndex] - heading);
-      const distance = 75 - passage * 7;
-      gate.position.set(
-        Math.sin(error) * distance,
-        0,
-        -Math.cos(error) * distance,
-      );
-      gate.rotation.y = -error;
+      for (const island of islands) {
+        const dx = island.x - boatX,
+          dz = island.z - boatZ;
+        island.object.position.set(
+          dx * Math.cos(heading) + dz * Math.sin(heading),
+          -2,
+          -dx * Math.sin(heading) + dz * Math.cos(heading),
+        );
+      }
       land.rotation.y = -heading;
     }
   };
@@ -227,7 +273,7 @@ export function buildVoyage(scene: T.Scene): WorldData {
       { name: "Common room · below deck", ...brothers },
       { name: "Nephi", ...ship.points.boundNephi },
       { name: "Liahona", ...ship.points.liahona },
-      { name: "Steering oar", ...ship.points.helm },
+      { name: "Ship wheel", ...ship.points.helm },
     ],
     update(dt, player) {
       if (!disposed) updateVisuals(Math.min(dt, 0.1));
@@ -243,23 +289,52 @@ export function buildVoyage(scene: T.Scene): WorldData {
     },
     adventure(hooks) {
       hooks.setAvatar("child");
+      npcs
+        .slice(0, 2)
+        .forEach((npc, i) =>
+          npc.group.position.set(i ? 0.85 : -0.85, 4.2, -6.2),
+        );
       hooks.dialog(
         "An imagined visit",
         "The fourth day",
         "An imagined visit: you are a child aboard during the fourth day of the storm. Find Laman and Lemuel below deck.",
         () => {},
         {
-          actors: [{ group: npcs[2].group, gesture: "bound", speaker: true }],
+          actors: [
+            { group: npcs[2].group, gesture: "bound", speaker: true },
+            ...npcs
+              .slice(0, 2)
+              .map((npc) => ({ group: npc.group, gesture: "work" as const })),
+          ],
           focus: npcs[2].group,
         },
       );
       return {
-        movementLocked: () => phase === "steer",
+        movementLocked: () =>
+          phase === "steer" ||
+          (phase === "release" && !releaseReady) ||
+          openingTime < 4,
+        camera: () =>
+          phase === "steer"
+            ? {
+                position: { x: 0, y: 7.4, z: 20 },
+                focus: { x: 0, y: 6, z: -70 },
+              }
+            : openingTime < 4
+              ? {
+                  position: { x: 8 - openingTime, y: 8, z: -12 },
+                  focus: { x: 0, y: 5.3, z: -6.5 },
+                }
+              : releaseCamera,
         snapshot: () => ({
           phase,
           day: 4,
           heading,
-          targetHeading: courses[Math.min(gateIndex, 4)],
+          targetHeading: desiredHeading(),
+          boat: { x: boatX, z: boatZ },
+          channels,
+          contacts,
+          releaseReady,
           gateIndex,
           passage,
           steeringTime,
@@ -273,6 +348,123 @@ export function buildVoyage(scene: T.Scene): WorldData {
         }),
         update(dt, player, input) {
           dt = Math.min(Math.max(dt, 0), 0.1);
+          openingTime += dt;
+          if (openingTime < 4) {
+            npcs.slice(0, 2).forEach((npc, i) =>
+              npc.update(dt, {
+                x: i ? 0.85 : -0.85,
+                y: 4.2,
+                z: -6.2,
+                vx: 0,
+                vy: 0,
+                vz: 0,
+                yaw: i ? -Math.PI / 2 : Math.PI / 2,
+                grounded: true,
+                runSpeed: 0,
+              }),
+            );
+            npcs.slice(0, 2).forEach((npc, i) => {
+              const arm = npc.group.getObjectByName("right-arm");
+              if (arm)
+                arm.rotation.x = -1.1 + Math.sin(openingTime * 7 + i) * 0.4;
+            });
+            for (const name of ["right-arm", "left-arm"]) {
+              const arm = npcs[2].group.getObjectByName(name);
+              if (arm) arm.rotation.x = -0.9;
+            }
+            rope.visible = secondRope.visible = openingTime > 1.2;
+            return {
+              objective: "Laman and Lemuel bind Nephi to the mast",
+              prompt: "The storm grows",
+            };
+          }
+          if (phase === "brothers")
+            npcs.slice(0, 2).forEach((npc, i) =>
+              npc.update(dt, {
+                ...positions[i],
+                vx: 0,
+                vy: 0,
+                vz: 0,
+                yaw: Math.PI,
+                grounded: true,
+                runSpeed: 0,
+              }),
+            );
+          if (phase === "release" && !releaseReady) {
+            const target = releaseRoute[releaseStep];
+            let arrived = true;
+            npcs.slice(0, 2).forEach((npc, i) => {
+              const pos = npc.group.position,
+                tx = target.x + (i ? 0.45 : -0.45),
+                dx = tx - pos.x,
+                dz = target.z - pos.z,
+                distance = Math.hypot(dx, dz),
+                advance = Math.min(distance, dt * 3);
+              if (distance > 0.15) arrived = false;
+              npc.update(dt, {
+                x: pos.x + (distance ? (dx / distance) * advance : 0),
+                y: T.MathUtils.damp(pos.y, target.y, 5, dt),
+                z: pos.z + (distance ? (dz / distance) * advance : 0),
+                vx: 0,
+                vy: 0,
+                vz: 0,
+                yaw: Math.atan2(dx, dz),
+                grounded: true,
+                runSpeed: distance > 0.15 ? 3 : 0,
+              });
+            });
+            // The child follows the same physical stair route while the brothers lead.
+            const dx = target.x - player.x,
+              dz = target.z - player.z,
+              distance = Math.hypot(dx, dz);
+            const strength = Math.min(0.48, distance);
+            player.vx = distance ? (dx / distance) * strength * 6.5 : 0;
+            player.vz = distance ? (dz / distance) * strength * 6.5 : 0;
+            stepPlayer(
+              player,
+              {
+                x: distance ? (-dx / distance) * strength : 0,
+                y: distance ? (dz / distance) * strength : 0,
+                jump: false,
+                jumpHeld: false,
+              },
+              dt,
+              0,
+              ship.solids,
+            );
+            releaseCamera = {
+              position: { x: player.x - 1.6, y: player.y + 2, z: player.z + 2 },
+              focus: { x: player.x, y: player.y + 1, z: player.z - 2 },
+            };
+            arrived =
+              arrived &&
+              distance < 0.45 &&
+              Math.abs(player.y - target.y) < 0.45;
+            if (arrived) {
+              releaseStep++;
+              releaseReady = releaseStep === releaseRoute.length;
+            }
+            if (releaseReady) {
+              rope.visible = false;
+              secondRope.visible = false;
+              releaseCamera = undefined;
+              hooks.dialog(
+                "1 Nephi 18:20",
+                "Nephi is released",
+                "At the mast, Laman and Lemuel loosen the ropes. The child stands beside them as Nephi is finally freed.",
+                () => {},
+                {
+                  actors: npcs.map((npc, i) => ({
+                    group: npc.group,
+                    gesture: i === 2 ? "talk" : "work",
+                    speaker: i === 2,
+                  })),
+                  focus: npcs[2].group,
+                  wide: 7,
+                },
+              );
+            }
+          }
           let objective = "",
             prompt = "";
           if (phase === "brothers") {
@@ -285,7 +477,7 @@ export function buildVoyage(scene: T.Scene): WorldData {
                 hooks.dialog(
                   "1 Nephi 18:13–15",
                   "The fourth day",
-                  "The storm has become terrible. Laman and Lemuel finally release Nephi. Go to him on deck.",
+                  "The storm has become terrible. Laman and Lemuel agree to release Nephi. You follow them up the stairs to the mast.",
                   () => {},
                   {
                     actors: npcs.slice(0, 2).map((npc, i) => ({
@@ -301,11 +493,12 @@ export function buildVoyage(scene: T.Scene): WorldData {
           } else if (phase === "release") {
             objective =
               "Return up the stairs. Find Nephi beside the forward mast.";
-            if (near(player, ship.points.boundNephi)) {
+            if (releaseReady && near(player, ship.points.boundNephi)) {
               prompt = "{action} · Stand with Nephi";
               if (input.interact) {
                 phase = "pray";
                 rope.visible = false;
+                secondRope.visible = false;
                 npcs[2].group.visible = false;
                 hooks.setAvatar("nephi");
                 hooks.dialog(
@@ -345,19 +538,19 @@ export function buildVoyage(scene: T.Scene): WorldData {
               if (input.interact) {
                 phase = "helm";
                 hooks.toast(
-                  "The Liahona works again. Take the steering oar at the stern.",
+                  "The Liahona works again. Take the ship wheel at the stern.",
                 );
               }
             }
           } else if (phase === "helm") {
-            objective = "Walk to the steering oar at the back of the ship.";
+            objective = "Walk to the ship wheel at the back of the ship.";
             if (near(player, ship.points.helm)) {
-              prompt = "{action} · Take the steering oar";
+              prompt = "{action} · Take the ship wheel";
               if (input.interact) {
                 phase = "steer";
                 gate.visible = true;
                 hooks.toast(
-                  "Stick left/right turns the ship. Keep each golden passage straight ahead.",
+                  "Steer left and right. Guide the bow through the open water between the rocky islands.",
                 );
               }
             }
@@ -367,18 +560,32 @@ export function buildVoyage(scene: T.Scene): WorldData {
             heading = wrap(
               heading + input.x * dt * 0.55 + Math.sin(time * 0.8) * dt * 0.018,
             );
-            const error = wrap(courses[gateIndex] - heading);
-            if (Math.abs(error) < 0.17) passage += dt;
-            else passage = Math.max(0, passage - dt * 0.22);
-            objective = `Sail through passage ${gateIndex + 1} of 5 · ${Math.round((passage / 6) * 100)}%`;
-            prompt =
-              Math.abs(error) < 0.17
-                ? "Hold this course · steady!"
-                : `${error > 0 ? "Turn right →" : "← Turn left"} · ${Math.round((Math.abs(error) * 180) / Math.PI)}°`;
-            if (passage >= 6) {
-              passage = 0;
+            const previousZ = boatZ;
+            boatX += Math.sin(heading) * dt * 9;
+            boatZ -= Math.cos(heading) * dt * 9;
+            const channel = channels[gateIndex];
+            const hit = islands.some(
+              (island) => Math.hypot(boatX - island.x, boatZ - island.z) < 15,
+            );
+            const crossing = previousZ > channel.z && boatZ <= channel.z;
+            const failed =
+              hit || (crossing && Math.abs(boatX - channel.x) > 10);
+            if (failed) {
+              resetCourse();
+              hooks.toast(
+                "Rocky water! Return to the last safe passage and aim for the open channel.",
+              );
+            }
+            passage = Math.max(
+              0,
+              (checkpoint.z - boatZ) / (checkpoint.z - channel.z),
+            );
+            objective = `Sail through rocky passage ${gateIndex + 1} of ${channels.length}`;
+            prompt = "Steer left / right · guide the bow through open water";
+            if (!failed && crossing && Math.abs(boatX - channel.x) <= 10) {
+              checkpoint = { x: boatX, z: boatZ - 16 };
               gateIndex++;
-              if (gateIndex === courses.length) {
+              if (gateIndex === channels.length) {
                 phase = "arrived";
                 gate.visible = false;
                 land.position.z = 190;
@@ -396,7 +603,9 @@ export function buildVoyage(scene: T.Scene): WorldData {
                   },
                 );
               } else
-                hooks.toast("Passage reached! Follow the next golden opening.");
+                hooks.toast(
+                  "Passage reached! Find the next gap between the islands.",
+                );
             }
           } else {
             objective = "The promised shore lies ahead.";

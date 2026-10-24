@@ -125,9 +125,15 @@ export function house(scene: THREE.Scene): WorldData {
     );
   add(8.8, 3, 0, 10, 0.28, 15.8, 0x8e6a48, "second-storey floor");
   for (const z of [-7.8, 7.8]) {
-    decor(8.8, 3.28, z, 10, 0.72, 0.22, 0x866342, "gallery rail");
+    if (z < 0) add(8.8, 3.28, z, 10, 0.72, 0.22, 0x866342, "gallery rail");
+    else {
+      // Keep the real stair opening clear while sealing both landing edges.
+      add(4.3, 3.28, z, 1, 0.72, 0.22, 0x866342, "gallery rail");
+      add(11, 3.28, z, 5.6, 0.72, 0.22, 0x866342, "gallery rail");
+    }
     for (const x of [4.1, 6.8, 9.5, 12.2])
-      decor(x, 3.28, z, 0.13, 0.75, 0.13, palette.timber);
+      if (z < 0 || x < 4.8 || x > 8.2)
+        decor(x, 3.28, z, 0.13, 0.75, 0.13, palette.timber);
   }
   // Tables, benches, baskets, jars and a low loft make the wealth tangible.
   for (const [x, z, w, d] of [

@@ -131,20 +131,16 @@ test("actual physics crosses the gulf, ascends building stair and returns", () =
   assert.ok(s.player.y < 0.5);
 });
 
-test("crowds, the six family members, climbable tree and dense offpath mist are present", () => {
+test("crowds, the five other family members, climbable tree and dense offpath mist are present", () => {
   const s = setup();
-  for (const name of [
-    "Sariah",
-    "Nephi",
-    "Sam",
-    "Laman",
-    "Lemuel",
-    "Lehi — dreamer and father",
-  ])
+  for (const name of ["Sariah", "Nephi", "Sam", "Laman", "Lemuel"])
     assert.ok(s.scene.getObjectByName(name), name);
+  assert.equal(s.scene.getObjectByName("Lehi — dreamer and father"), undefined);
   assert.ok(
-    s.scene.children.filter((o) => o.name.startsWith("vision crowd")).length >=
-      70,
+    s.scene.children.filter(
+      (o) =>
+        o.name.startsWith("vision crowd") || o.name.startsWith("vision family"),
+    ).length >= 70,
   );
   assert.ok(s.world.climbables?.some((c) => c.id === "living-tree"));
   s.runtime.update(1 / 60, s.player, { interact: false });
@@ -185,8 +181,9 @@ test("runtime disposes crowd GPU instances and removes actor groups exactly once
   instances.forEach((part, i) =>
     part.addEventListener("dispose", () => disposed[i]++),
   );
-  const crowds = s.scene.children.filter((o) =>
-    o.name.startsWith("vision crowd"),
+  const crowds = s.scene.children.filter(
+    (o) =>
+      o.name.startsWith("vision crowd") || o.name.startsWith("vision family"),
   );
   s.runtime.dispose();
   s.runtime.dispose();
@@ -231,10 +228,10 @@ test("instanced crowds have colored smooth bodies, paired moving arms and legs w
   s.runtime.update(1 / 60, s.player, { interact: false });
   s.dialogs.shift()!();
   const before = new THREE.Matrix4();
-  arms.getMatrixAt(72, before);
+  arms.getMatrixAt((36 + 31) * 2, before);
   s.runtime.update(0.4, s.player, { interact: false });
   const after = new THREE.Matrix4();
-  arms.getMatrixAt(72, after);
+  arms.getMatrixAt((36 + 31) * 2, after);
   assert.notDeepEqual(
     after.elements,
     before.elements,
@@ -244,6 +241,54 @@ test("instanced crowds have colored smooth bodies, paired moving arms and legs w
     bodies.instanceColor,
     "individual clothing varies across the crowd",
   );
+  s.runtime.dispose();
+  s.world.dispose?.();
+});
+
+test("the garden has six scattered families with parents, small children and naturally seated figures", () => {
+  const s = setup();
+  s.runtime.update(1 / 60, s.player, { interact: false });
+  const garden = s.scene.children.filter(
+    (o) => o.name === "vision family — eat",
+  );
+  assert.equal(garden.length, 30);
+  for (let family = 0; family < 6; family++) {
+    const members = garden.filter((o) => o.userData.family === family);
+    assert.equal(members.length, 5);
+    assert.deepEqual(
+      members.map((o) => o.userData.role),
+      ["sam", "sariah", "child", "child", "child"],
+    );
+  }
+  const seated = garden.filter((o) => o.userData.seated);
+  assert.ok(seated.length >= 4);
+  const parts = s.scene.children.filter(
+    (o): o is THREE.InstancedMesh => o instanceof THREE.InstancedMesh,
+  );
+  assert.equal(parts.length, 4, "family variety keeps four crowd draw calls");
+  const body = parts.find((o) => o.name === "vision crowd bodies")!;
+  const matrix = new THREE.Matrix4(),
+    position = new THREE.Vector3(),
+    scale = new THREE.Vector3(),
+    rotation = new THREE.Quaternion();
+  const centers: THREE.Vector3[] = [];
+  for (let family = 0; family < 6; family++) {
+    // 36 mockers precede the garden families in the shared instance buffers.
+    body.getMatrixAt(36 + family * 5, matrix);
+    matrix.decompose(position, rotation, scale);
+    centers.push(position.clone());
+  }
+  assert.ok(new Set(centers.map((p) => Math.round(p.x))).size >= 5);
+  assert.ok(new Set(centers.map((p) => Math.round(p.z))).size >= 5);
+  body.getMatrixAt(36, matrix);
+  matrix.decompose(position, rotation, scale);
+  assert.ok(
+    Math.abs(scale.x - scale.y) < 0.001,
+    "seating preserves head proportions",
+  );
+  body.getMatrixAt(38, matrix);
+  matrix.decompose(position, rotation, scale);
+  assert.ok(scale.y < 0.65, "children are visibly smaller than their parents");
   s.runtime.dispose();
   s.world.dispose?.();
 });

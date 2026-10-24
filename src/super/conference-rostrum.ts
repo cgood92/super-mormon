@@ -83,19 +83,43 @@ export function buildRostrum(parent: THREE.Group): {
     const y = 2.4 + row * 0.3;
     const z = -81 - row * 1.4;
     if (row) box(0, -0.4, z, 42, y + 0.4, 1.4, wood, true);
-    for (let x = -19.2; x <= 19.2; x += 1.2) {
+    for (let x = -19.2; row > 0 && x <= 19.2; x += 1.2) {
       if (Math.abs(x) < 3.1) continue;
       seats.push({ x, y, z, angle: Math.PI });
     }
     for (const side of [-1, 1])
       box(side * 12, y, z + 0.6, 17, 0.38, 0.15, wood);
   }
+  // Exactly twelve generously upholstered front-row chairs, six per side.
+  const velvet = new THREE.MeshStandardMaterial({
+    color: 0x962f3f,
+    roughness: 1,
+  });
+  for (let i = 0; i < 12; i++) {
+    const side = i < 6 ? -1 : 1;
+    const x = side * (5 + (i % 6) * 2.5);
+    const chair = new THREE.Group();
+    chair.name = "apostle armchair";
+    chair.position.set(x, 2.4, -81);
+    for (const [cx, cy, cz, w, h, d] of [
+      [0, 0.56, 0, 1.45, 0.38, 1.2],
+      [0, 1.14, -0.48, 1.5, 1.25, 0.42],
+      [-0.72, 0.86, 0, 0.3, 0.6, 1.2],
+      [0.72, 0.86, 0, 0.3, 0.6, 1.2],
+    ]) {
+      const cushion = new THREE.Mesh(softBoxGeometry(w, h, d), velvet);
+      cushion.scale.set(w, h, d);
+      cushion.position.set(cx, cy, cz);
+      chair.add(cushion);
+    }
+    group.add(chair);
+  }
   // Modest center pulpit and a planted apron, as in the reference photographs.
-  box(0, 2.4, -81.6, 1.5, 1.3, 1.1, wood);
-  box(0, 3.7, -81.6, 2, 0.16, 1.35, wood);
-  box(0, 2.4, -79.45, 5.2, 0.5, 0.65, wood);
+  box(0, 2.4, -81.6, 1.5, 1.3, 1.1, wood, true);
+  box(0, 3.7, -81.6, 2, 0.16, 1.35, wood, true);
+  box(0, 2.4, -79.45, 5.2, 0.5, 0.65, wood, true);
   for (let x = -2.2; x <= 2.2; x += 0.55)
-    box(x, 2.9, -79.45, 0.7, 0.3 + 0.1 * Math.cos(x * 3), 0.8, foliage);
+    box(x, 2.9, -79.45, 0.7, 0.3 + 0.1 * Math.cos(x * 3), 0.8, foliage, true);
   // Choir terraces rise behind the officials, filled down to the foundation.
   for (let row = 0; row < 7; row++) {
     const y = 3.3 + row * 0.3;

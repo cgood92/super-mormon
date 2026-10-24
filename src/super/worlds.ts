@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { buildBountiful } from "./bountiful";
+import { buildPromisedLand } from "./promised-land";
+import { buildOliveVineyard } from "./olive-vineyard";
 import { buildVoyage } from "./voyage";
 import { buildJerusalem } from "./jerusalem";
 import { buildTreeOfLife } from "./tree-of-life";
@@ -16,7 +18,9 @@ export type WorldId =
   | "night"
   | "tree"
   | "bountiful"
-  | "voyage";
+  | "voyage"
+  | "promised"
+  | "vineyard";
 export type Solid = {
   x: number;
   y: number;
@@ -34,6 +38,7 @@ export type WorldData = {
   solids: Solid[];
   adventure?: (hooks: AdventureHooks) => AdventureRuntime;
   actorParent?: THREE.Group;
+  organ?: ReturnType<typeof import("./conference-organ").buildConferenceOrgan>;
   landmarks?: { name: string; x: number; y: number; z: number }[];
   portals?: {
     id: WorldId;
@@ -90,6 +95,10 @@ export function buildWorld(id: WorldId, scene: THREE.Scene): WorldData {
       return buildJerusalem("night", scene);
     case "bountiful":
       return buildBountiful(scene);
+    case "promised":
+      return buildPromisedLand(scene);
+    case "vineyard":
+      return buildOliveVineyard(scene);
     case "voyage":
       return buildVoyage(scene);
     case "tree":

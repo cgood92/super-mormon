@@ -265,7 +265,8 @@ export function gallery(scene: THREE.Scene): WorldData {
       `${import.meta.env?.BASE_URL ?? "/"}art/gallery/${file}`,
       0xffffff,
     );
-    label(group, title, x, 0.55, 16, 6, 0.52);
+    label(group, title, x, 0.55, 15.7, 6, 0.52);
+    solids.push({ x, y: 0.55, z: 15.7, w: 6, h: 0.52, d: 0.18 });
     const portal = {
       id,
       x,
@@ -278,11 +279,14 @@ export function gallery(scene: THREE.Scene): WorldData {
     solids.push(paintingCollider(portal));
   });
   // Later chapters sit together in the open east foyer, with a clear south approach.
-  for (const [id, title, x] of [
-    ["bountiful", "BUILDING THE SHIP", 34],
-    ["voyage", "THE OCEAN VOYAGE", 44],
+  for (const [id, title, x, wallZ] of [
+    ["bountiful", "BUILDING THE SHIP", 34, 15],
+    ["voyage", "THE OCEAN VOYAGE", 44, 15],
+    ["promised", "A NEW HOME", 34, 32],
+    ["vineyard", "THE OLIVE VINEYARD", 44, 32],
   ] as const) {
-    const image = painting(group, x, 0.7, 15.3, "", 0xffffff);
+    add(x, 0, wallZ, 8, 6, 0.45, C.pale, "later story wall");
+    const image = painting(group, x, 0.7, wallZ + 0.3, "", 0xffffff);
     image.onBeforeRender = () => {};
     image.name = `${id} story painting`;
     if (typeof document !== "undefined") {
@@ -360,17 +364,71 @@ export function gallery(scene: THREE.Scene): WorldData {
             ctx.stroke();
           }
         }
+        if (id === "promised" || id === "vineyard") {
+          ctx.fillStyle = "#b9d4d3";
+          ctx.fillRect(0, 0, 384, 512);
+          ctx.fillStyle = "#789560";
+          ctx.fillRect(0, 260, 384, 252);
+          if (id === "promised") {
+            ctx.fillStyle = "#cfba8f";
+            ctx.fillRect(90, 220, 205, 135);
+            ctx.fillStyle = "#806548";
+            ctx.beginPath();
+            ctx.moveTo(70, 220);
+            ctx.lineTo(190, 155);
+            ctx.lineTo(315, 220);
+            ctx.fill();
+            ctx.fillStyle = "#70523a";
+            ctx.fillRect(170, 285, 40, 70);
+            ctx.fillStyle = "#e4d09e";
+            ctx.beginPath();
+            ctx.moveTo(0, 512);
+            ctx.lineTo(175, 355);
+            ctx.lineTo(210, 355);
+            ctx.lineTo(290, 512);
+            ctx.fill();
+          } else {
+            for (const [tx, ty, scale] of [
+              [190, 310, 1.5],
+              [65, 390, 0.65],
+              [310, 400, 0.8],
+            ]) {
+              ctx.fillStyle = "#70513c";
+              ctx.fillRect(
+                tx - 7 * scale,
+                ty - 50 * scale,
+                14 * scale,
+                90 * scale,
+              );
+              ctx.fillStyle = "#4e6b47";
+              for (let crown = 0; crown < 5; crown++) {
+                ctx.beginPath();
+                ctx.ellipse(
+                  tx + Math.cos(crown * 1.4) * 24 * scale,
+                  ty - 80 * scale + Math.sin(crown * 1.4) * 22 * scale,
+                  42 * scale,
+                  30 * scale,
+                  0,
+                  0,
+                  Math.PI * 2,
+                );
+                ctx.fill();
+              }
+            }
+          }
+        }
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
         (image.material as THREE.MeshBasicMaterial).map = texture;
       }
     }
-    label(group, title, x, 0.55, 16, 7, 0.52);
+    label(group, title, x, 0.55, wallZ + 0.7, 7, 0.52);
+    solids.push({ x, y: 0.55, z: wallZ + 0.7, w: 7, h: 0.52, d: 0.18 });
     const portal = {
       id,
       x,
       y: 0.59,
-      z: 15.58,
+      z: wallZ + 0.58,
       title,
       facing: "north" as const,
     };
@@ -582,6 +640,7 @@ export function gallery(scene: THREE.Scene): WorldData {
     ],
     solids,
     portals,
+    organ: auditorium.organ,
     climbables: [
       { id: "gallery-pole", x: -84, z: 14, y: 0, height: 3.6, radius: 0.2 },
     ],
@@ -610,6 +669,7 @@ export function gallery(scene: THREE.Scene): WorldData {
     dispose() {
       if (disposed) return;
       disposed = true;
+      auditorium.organ.dispose();
       disposeConference(group);
       scene.background = priorBackground;
       scene.fog = priorFog;
