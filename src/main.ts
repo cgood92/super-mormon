@@ -162,6 +162,7 @@ let guards: Guard[] = [],
   collected = new Set<string>();
 let goalMarker: T.Group | null = null;
 let organSeated = false;
+let pendingAdventureReset: (() => void) | null = null;
 let carryObjects: CarryObject[] = [],
   carryMeshes = new Map<string, T.Group>(),
   tokenMeshes = new Map<string, T.Mesh>(),
@@ -660,6 +661,7 @@ async function load(id: WorldId) {
   if (world) disposeScene();
   worldId = id;
   completionSceneSeen = false;
+  pendingAdventureReset = null;
   organSeated = false;
   app.classList.remove("bow-aiming");
   storyCheckpoint = null;
@@ -695,7 +697,9 @@ async function load(id: WorldId) {
       id === "bountiful" ||
       id === "voyage" ||
       id === "promised" ||
-      id === "vineyard"
+      id === "vineyard" ||
+      id === "jacob" ||
+      id === "waters"
       ? "streets"
       : id === "hub"
         ? "conference"
@@ -795,13 +799,17 @@ async function load(id: WorldId) {
               ? "1 NEPHI 17 · BUILDING THE SHIP"
               : id === "voyage"
                 ? "1 NEPHI 18 · THE OCEAN VOYAGE"
-                : id === "promised"
-                  ? "1 NEPHI 18 · 2 NEPHI 1–5"
-                  : id === "vineyard"
-                    ? "JACOB 5 · THE OLIVE VINEYARD"
-                    : id === "night"
-                      ? "1 NEPHI 4 · ABOUT 600 BC"
-                      : "1 NEPHI 3 · ABOUT 600 BC";
+                : id === "jacob"
+                  ? "JACOB 7 · FAITH IN CHRIST"
+                  : id === "waters"
+                    ? "MOSIAH 18 · ABOUT 147–145 BC"
+                    : id === "promised"
+                      ? "1 NEPHI 18 · 2 NEPHI 1–5"
+                      : id === "vineyard"
+                        ? "JACOB 5 · THE OLIVE VINEYARD"
+                        : id === "night"
+                          ? "1 NEPHI 4 · ABOUT 600 BC"
+                          : "1 NEPHI 3 · ABOUT 600 BC";
   el("seal-count").textContent =
     `Stories ${completed.size} / ${STORY_ORDER.length}`;
   if (id === "trade" || id === "night") {
@@ -848,6 +856,13 @@ async function load(id: WorldId) {
       dialog: storyDialog,
       toast: (text) => message(text, 4),
       complete,
+      caught: (reset) => {
+        pendingAdventureReset = reset;
+        beginCaughtTransition();
+        el("caught-heading").textContent = "Spotted!";
+        el("caught-detail").textContent =
+          "A spy saw you. Back to the beginning.";
+      },
       setAvatar: (role) => {
         avatar.dispose();
         avatar = createCharacter(role, { quality: "hero" });
@@ -872,21 +887,25 @@ async function load(id: WorldId) {
             ? "Find Laban at the far end of the courtyard."
             : id === "trade"
               ? "Your brothers will follow. Bring the treasures to Laban."
-              : id === "promised"
-                ? "Help the family settle, then follow the journey to a new home."
-                : id === "vineyard"
-                  ? "Explore the vineyard in Jacob’s retelling. Care for the trees."
-                  : id === "night"
-                    ? "Enter the city and search its moonlit streets."
-                    : id === "tree"
-                      ? "Take your time. Follow the path toward the tree."
-                      : id === "broken-bow"
-                        ? "Hunt in the mountains and help feed the family."
-                        : id === "bountiful"
-                          ? "Climb the mountain trail and pray. Then help build the ship."
-                          : id === "voyage"
-                            ? "Explore the ship and meet the family aboard."
-                            : "Find the blue door. Watch the streets.",
+              : id === "jacob"
+                ? "Explore the settlement and meet Jacob’s neighbors."
+                : id === "waters"
+                  ? "Many generations later: slip past Noah’s spies and find Alma."
+                  : id === "promised"
+                    ? "Help the family settle, then follow the journey to a new home."
+                    : id === "vineyard"
+                      ? "Explore the vineyard in Jacob’s retelling. Care for the trees."
+                      : id === "night"
+                        ? "Enter the city and search its moonlit streets."
+                        : id === "tree"
+                          ? "Take your time. Follow the path toward the tree."
+                          : id === "broken-bow"
+                            ? "Hunt in the mountains and help feed the family."
+                            : id === "bountiful"
+                              ? "Climb the mountain trail and pray. Then help build the ship."
+                              : id === "voyage"
+                                ? "Explore the ship and meet the family aboard."
+                                : "Find the blue door. Watch the streets.",
       4,
     );
 }
@@ -1051,6 +1070,8 @@ function resetCaughtCheckpoint() {
     guards[i].timer = 0;
     guards[i].actor.update(0, guards[i].state);
   }
+  pendingAdventureReset?.();
+  pendingAdventureReset = null;
   storyScene?.respawn(player);
   avatar.update(0, player);
   treeScene?.respawn(player);
@@ -1062,7 +1083,9 @@ function resetCaughtCheckpoint() {
       worldId === "bountiful" ||
       worldId === "voyage" ||
       worldId === "promised" ||
-      worldId === "vineyard"
+      worldId === "vineyard" ||
+      worldId === "jacob" ||
+      worldId === "waters"
       ? "streets"
       : worldId === "hub"
         ? "conference"
@@ -1344,7 +1367,9 @@ function update(dt: number) {
         worldId === "bountiful" ||
         worldId === "voyage" ||
         worldId === "promised" ||
-        worldId === "vineyard"
+        worldId === "vineyard" ||
+        worldId === "jacob" ||
+        worldId === "waters"
         ? "streets"
         : worldId === "hub"
           ? "conference"

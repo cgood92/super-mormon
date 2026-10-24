@@ -304,6 +304,10 @@ export function createMotionDriver(role: CharacterRole): {
         head.rotation.y = -0.06;
         body.rotation.x = 0.025;
       }
+      // Sight checks and the visible head use the same world-space gaze.
+      if (state.lookYaw !== undefined)
+        head.rotation.y = angleDiff(state.lookYaw, renderedYaw);
+      if (state.lookPitch !== undefined) head.rotation.x = -state.lookPitch;
     },
     dispose() {
       group.removeFromParent();

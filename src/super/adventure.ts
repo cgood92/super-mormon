@@ -1,3 +1,4 @@
+import type { CharacterRole } from "./character-types";
 import type { StoryShot } from "./cinematic";
 import type { PlayerState } from "./physics";
 
@@ -19,7 +20,8 @@ export type AdventureHooks = {
   ) => void;
   toast: (text: string) => void;
   complete: () => void;
-  setAvatar: (role: "nephi" | "child") => void;
+  setAvatar: (role: CharacterRole) => void;
+  caught?: (reset: () => void) => void;
 };
 export type AdventureRuntime = {
   update: (

@@ -285,6 +285,8 @@ export function gallery(scene: THREE.Scene): WorldData {
     ["voyage", "THE OCEAN VOYAGE", 44, 15],
     ["promised", "A NEW HOME", 34, 32],
     ["vineyard", "THE OLIVE VINEYARD", 44, 32],
+    ["jacob", "JACOB AND SHEREM", -44, 32],
+    ["waters", "THE WATERS OF MORMON", -34, 32],
   ] as const) {
     add(x, 0, wallZ, 8, 6, 0.45, C.pale, "later story wall");
     const image = painting(group, x, 0.7, wallZ + 0.3, "", 0xffffff);
@@ -469,6 +471,57 @@ export function gallery(scene: THREE.Scene): WorldData {
           ctx.moveTo(316, 262);
           ctx.quadraticCurveTo(325, 220, 309, 222);
           ctx.stroke();
+        }
+        if (id === "jacob" || id === "waters") {
+          ctx.fillStyle = id === "waters" ? "#a8c9c5" : "#c5d2d1";
+          ctx.fillRect(0, 0, 384, 512);
+          ctx.fillStyle = id === "waters" ? "#71865a" : "#c5ad83";
+          ctx.fillRect(0, 245, 384, 267);
+          if (id === "waters") {
+            ctx.fillStyle = "#448fa3";
+            ctx.beginPath();
+            ctx.ellipse(200, 390, 145, 77, -0.1, 0, Math.PI * 2);
+            ctx.fill();
+            for (const [x, y] of [
+              [20, 245],
+              [65, 215],
+              [310, 230],
+              [360, 190],
+            ]) {
+              ctx.fillStyle = "#65543b";
+              ctx.fillRect(x - 6, y, 12, 110);
+              ctx.fillStyle = "#41674a";
+              ctx.beginPath();
+              ctx.ellipse(x, y, 57, 76, 0, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            ctx.fillStyle = "#f0e2c0";
+            ctx.fillRect(180, 280, 25, 70);
+            ctx.fillStyle = "#987859";
+            ctx.beginPath();
+            ctx.arc(192, 270, 13, 0, Math.PI * 2);
+            ctx.fill();
+          } else {
+            ctx.fillStyle = "#b69a73";
+            ctx.fillRect(20, 150, 120, 140);
+            ctx.fillRect(260, 170, 105, 130);
+            for (const [x, color] of [
+              [145, "#536b83"],
+              [235, "#69526f"],
+            ] as const) {
+              ctx.fillStyle = color;
+              ctx.beginPath();
+              ctx.moveTo(x - 17, 310);
+              ctx.lineTo(x + 17, 310);
+              ctx.lineTo(x + 27, 425);
+              ctx.lineTo(x - 27, 425);
+              ctx.fill();
+              ctx.fillStyle = "#b88d67";
+              ctx.beginPath();
+              ctx.arc(x, 291, 18, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
         }
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;

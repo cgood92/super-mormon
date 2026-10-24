@@ -46,6 +46,14 @@ export async function prepareWorld(id: WorldId): Promise<PreparedWorld> {
     const module = await import("./olive-vineyard");
     return { buildWorld: (_, scene) => module.buildOliveVineyard(scene) };
   }
+  if (id === "jacob") {
+    const module = await import("./jacob-sherem");
+    return { buildWorld: (_, scene) => module.buildJacobSherem(scene) };
+  }
+  if (id === "waters") {
+    const module = await import("./waters-of-mormon");
+    return { buildWorld: (_, scene) => module.buildWatersOfMormon(scene) };
+  }
   const module = await import("./jerusalem");
   const story =
     id === "trade" || id === "night"

@@ -1,4 +1,5 @@
 import * as T from "three";
+import type { CharacterRole } from "./character-types";
 import { APPROVED_NEPHI_FACE } from "./nephi-appearance";
 import { mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
 import {
@@ -11,19 +12,7 @@ import {
 
 export type SculptedLehi = { group: T.Group; dispose: () => void };
 
-export type SculptedCharacterRole =
-  | "lehi"
-  | "nephi"
-  | "nephi-disguised"
-  | "sam"
-  | "laman"
-  | "lemuel"
-  | "sariah"
-  | "laban"
-  | "laban-undressed"
-  | "guard"
-  | "zoram"
-  | "child";
+export type SculptedCharacterRole = CharacterRole;
 export type SculptedCharacterQuality = "hero" | "npc" | "crowd";
 /** Optional anatomical study; ordinary cast builds never apply a profile. */
 export type SculptedFaceProfile = {
@@ -85,8 +74,14 @@ type CastTraits = {
 
 // Identity changes anatomy, hair and the garment cut as well as color. These
 // are storybook costume choices, not claims about historical royal clothing.
-export const SCULPTED_CAST_TRAITS: Readonly<
-  Record<SculptedCharacterRole, CastTraits>
+const ORIGINAL_CAST_TRAITS: Readonly<
+  Record<
+    Exclude<
+      SculptedCharacterRole,
+      "jacob" | "sherem" | "alma" | "convert" | "spy"
+    >,
+    CastTraits
+  >
 > = {
   lehi: {
     skin: 0xba8665,
@@ -303,6 +298,58 @@ export const SCULPTED_CAST_TRAITS: Readonly<
     width: 0.34,
     brow: 0.05,
     outfit: "travel",
+  },
+};
+
+// New story identities retain the approved garment construction and motion rig.
+export const SCULPTED_CAST_TRAITS: Readonly<
+  Record<SculptedCharacterRole, CastTraits>
+> = {
+  ...ORIGINAL_CAST_TRAITS,
+  jacob: {
+    ...ORIGINAL_CAST_TRAITS.lehi,
+    hair: 0x645648,
+    beard: "trimmed",
+    head: 0.32,
+    faceWidth: 0.88,
+    width: 0.35,
+    tall: 1.05,
+    robe: 0xdfd0b2,
+    coat: 0x536b83,
+    trim: 0x9a8360,
+  },
+  sherem: {
+    ...ORIGINAL_CAST_TRAITS.zoram,
+    hairStyle: "swept",
+    beard: "none",
+    coat: 0x69526f,
+    robe: 0xccbaa1,
+    trim: 0xa78961,
+    brow: -0.01,
+  },
+  alma: {
+    ...ORIGINAL_CAST_TRAITS.sam,
+    beard: "trimmed",
+    hair: 0x514235,
+    robe: 0xe5d9be,
+    coat: 0x718877,
+    trim: 0xa08d70,
+    tall: 1.08,
+  },
+  convert: {
+    ...ORIGINAL_CAST_TRAITS.sam,
+    beard: "none",
+    hairStyle: "cropped",
+    coat: 0x9b7654,
+    robe: 0xd6c5a4,
+    width: 0.34,
+  },
+  spy: {
+    ...ORIGINAL_CAST_TRAITS.guard,
+    hairStyle: "cropped",
+    coat: 0x51465b,
+    trim: 0x776578,
+    robe: 0x5c5665,
   },
 };
 

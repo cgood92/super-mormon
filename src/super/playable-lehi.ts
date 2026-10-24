@@ -193,6 +193,9 @@ export function createSculptedCharacterRig(
       ),
     }));
   const clothPoint = new T.Vector3();
+  const worldGaze = new T.Vector3();
+  const gazeParentInverse = new T.Matrix4();
+  const headForward = new T.Vector3(0, 0, 1);
 
   const footBounds = [new T.Box3(), new T.Box3()];
   const footMeshes = ["left-sandal", "right-sandal"].map(
@@ -374,6 +377,20 @@ export function createSculptedCharacterRig(
         }
       }
       clothWasMoving = clothMoving;
+      if (state.lookYaw !== undefined) {
+        // Compensate the complete parent transform, including turn lean and
+        // nonuniform scale, so the rendered face matches world-space sight tests.
+        const pitch = state.lookPitch ?? 0;
+        worldGaze.set(
+          Math.sin(state.lookYaw) * Math.cos(pitch),
+          Math.sin(pitch),
+          Math.cos(state.lookYaw) * Math.cos(pitch),
+        );
+        head.parent!.updateWorldMatrix(true, false);
+        gazeParentInverse.copy(head.parent!.matrixWorld).invert();
+        worldGaze.transformDirection(gazeParentInverse);
+        head.quaternion.setFromUnitVectors(headForward, worldGaze);
+      }
       // Keep inverse bind transforms in step with actors placed above ground or
       // translated during play; callers can inspect posed bounds before render.
       group.updateMatrixWorld(true);

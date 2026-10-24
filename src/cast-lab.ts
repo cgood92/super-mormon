@@ -14,6 +14,15 @@ const cast: [CharacterRole, string, string][] = [
   ["lemuel", "Lemuel", "A different face and hairline, with scruff."],
   ["laban", "Laban", "Regal robes, bronze headband, and formal bearing."],
   ["zoram", "Zoram", "The treasury keeper, in his own civilian palette."],
+  ["jacob", "Jacob", "A mature teacher with a blue mantle and trimmed beard."],
+  ["sherem", "Sherem", "A distinct civilian face and plum mantle."],
+  ["alma", "Alma", "A teacher beside the Waters of Mormon."],
+  [
+    "convert",
+    "Alma’s potential convert",
+    "The civilian player in Noah’s city.",
+  ],
+  ["spy", "Noah’s spy", "Dark clothing and a visibly scanning gaze."],
   ["guard", "Palace servant / guard", "Helmet, armor, and clear pursuer cues."],
   ["child", "Nephi’s child", "A smaller, youthful character for the voyage."],
   [

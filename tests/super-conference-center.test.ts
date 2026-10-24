@@ -5,17 +5,17 @@ import { gallery, CONFERENCE_ESCALATORS } from "../src/super/conference-center";
 import { createPlayer, stepPlayer } from "../src/super/physics";
 import { canJumpIntoPainting } from "../src/super/gallery-entry";
 
-test("Conference Center has eleven reachable canvases and nine optional lessons", () => {
+test("Conference Center has thirteen reachable canvases and nine optional lessons", () => {
   const world = gallery(new THREE.Scene());
-  assert.equal(world.portals?.length, 11);
+  assert.equal(world.portals?.length, 13);
   assert.equal(world.tutorials?.length, 9);
   for (const portal of world.portals!) {
     const player = createPlayer(world.spawn.x, 0, world.spawn.z);
     const aisle =
-      portal.id === "bountiful" || portal.id === "voyage"
+      portal.z < 20 && Math.abs(portal.x) > 25
         ? [
-            { x: 25, z: 36 },
-            { x: 25, z: 20 },
+            { x: Math.sign(portal.x) * 25, z: 36 },
+            { x: Math.sign(portal.x) * 25, z: 20 },
             { x: portal.x, z: 20 },
           ]
         : [{ x: portal.x, z: 36 }];

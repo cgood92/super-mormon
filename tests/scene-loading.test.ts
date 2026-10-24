@@ -50,6 +50,8 @@ test("later chapters prepare their own interactive worlds and leave no scene res
     ["broken-bow", "camp"],
     ["promised", "camp"],
     ["vineyard", "learn"],
+    ["jacob", "settlement"],
+    ["waters", "city"],
   ] as const) {
     const scene = new Scene();
     const prepared = await prepareWorld(id);
@@ -66,7 +68,16 @@ test("later chapters prepare their own interactive worlds and leave no scene res
       dialog: (_k, _t, _b, next) => next(),
     });
     assert.equal((runtime.snapshot() as { phase: string }).phase, phase);
-    assert.equal(role, id === "vineyard" ? "child" : "nephi");
+    assert.equal(
+      role,
+      id === "vineyard"
+        ? "child"
+        : id === "jacob"
+          ? "jacob"
+          : id === "waters"
+            ? "convert"
+            : "nephi",
+    );
     runtime.dispose();
     world.dispose?.();
     assert.equal(scene.children.length, 0);

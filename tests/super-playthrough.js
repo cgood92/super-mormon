@@ -87,9 +87,9 @@ export async function enter(id) {
     await go(70, p.z, 0.3);
     await go(p.x - 1.8, p.z, 0.25);
   } else {
-    if (p.x > 25 && p.z < 20) {
-      await go(25, 36, 0.3);
-      await go(25, 22, 0.3);
+    if (Math.abs(p.x) > 25 && p.z < 20) {
+      await go(Math.sign(p.x) * 25, 36, 0.3);
+      await go(Math.sign(p.x) * 25, 22, 0.3);
       await go(p.x, 22, 0.3);
     } else await go(p.x, 36, 0.3);
     await go(p.x, p.z + 1.8, 0.25);

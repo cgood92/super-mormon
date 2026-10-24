@@ -55,6 +55,11 @@ test("scenes unlock in story order and completed scenes stay replayable", () => 
   assert.equal(nextStory(completed), "vineyard");
   assert.equal(canEnter("vineyard", completed), true);
   completed.add("vineyard");
+  assert.equal(nextStory(completed), "jacob");
+  assert.equal(canEnter("waters", completed), false);
+  completed.add("jacob");
+  assert.equal(nextStory(completed), "waters");
+  completed.add("waters");
   assert.equal(nextStory(completed), null);
   assert.equal(canEnter("bountiful", completed), true);
 });

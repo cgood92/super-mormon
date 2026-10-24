@@ -10,7 +10,12 @@ export type CharacterRole =
   | "sariah"
   | "lemuel"
   | "zoram"
-  | "child";
+  | "child"
+  | "jacob"
+  | "sherem"
+  | "alma"
+  | "convert"
+  | "spy";
 export type CharacterMove =
   | "idle"
   | "run"
@@ -44,4 +49,6 @@ export type CharacterState = {
   pointing?: boolean;
   aiming?: boolean;
   draw?: number;
+  lookYaw?: number;
+  lookPitch?: number;
 };

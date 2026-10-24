@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { buildBrokenBow } from "./broken-bow";
+import { buildJacobSherem } from "./jacob-sherem";
+import { buildWatersOfMormon } from "./waters-of-mormon";
 import { buildBountiful } from "./bountiful";
 import { buildPromisedLand } from "./promised-land";
 import { buildOliveVineyard } from "./olive-vineyard";
@@ -22,7 +24,9 @@ export type WorldId =
   | "bountiful"
   | "voyage"
   | "promised"
-  | "vineyard";
+  | "vineyard"
+  | "jacob"
+  | "waters";
 export type Solid = {
   x: number;
   y: number;
@@ -101,6 +105,10 @@ export function buildWorld(id: WorldId, scene: THREE.Scene): WorldData {
       return buildBountiful(scene);
     case "promised":
       return buildPromisedLand(scene);
+    case "jacob":
+      return buildJacobSherem(scene);
+    case "waters":
+      return buildWatersOfMormon(scene);
     case "vineyard":
       return buildOliveVineyard(scene);
     case "voyage":
