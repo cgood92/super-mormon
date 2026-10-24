@@ -200,7 +200,7 @@ export function createMotionDriver(role: CharacterRole): {
         : Math.max(-0.12, Math.min(0.15, -state.vy * 0.018));
 
       const move =
-        state.crouching && !state.grounded
+        state.crouching && !state.grounded && state.move !== "groundPound"
           ? "crouch"
           : (state.move ??
             (state.crouching
@@ -248,6 +248,19 @@ export function createMotionDriver(role: CharacterRole): {
         legs[1].rotation.x = 0.55;
         arms[0].rotation.x = -1.1;
         arms[1].rotation.x = -1.1;
+      } else if (move === "groundPound" || move === "poundLand") {
+        const impact = move === "poundLand";
+        const tuck = impact ? Math.max(0, 1 - moveTime / 0.18) : 1;
+        body.scale.y = 0.84 * (1 - tuck * (impact ? 0.42 : 0.24));
+        body.scale.x = body.scale.z = 1 + tuck * (impact ? 0.22 : 0.06);
+        body.rotation.x = impact ? 0.08 : moveTime < 0.14 ? -0.3 : 0;
+        body.rotation.z = 0;
+        body.position.y = 0;
+        legs[0].rotation.x = legs[1].rotation.x = -0.9 * tuck;
+        knees[0].rotation.x = knees[1].rotation.x = 1.25 * tuck;
+        feet[0].rotation.x = feet[1].rotation.x = -0.2;
+        arms[0].rotation.x = arms[1].rotation.x = impact ? -0.5 : -1.35;
+        head.rotation.x = -0.08;
       } else if (move === "longJump") {
         body.rotation.x = 0.28;
         body.scale.z = 1.2;
@@ -301,6 +314,11 @@ export function createMotionDriver(role: CharacterRole): {
         const draw = Math.max(0, Math.min(1, state.draw ?? 0));
         arms[0].rotation.set(-1.48, -0.25, -0.22);
         arms[1].rotation.set(-1.28, 0.15 + draw * 0.75, 0.25 + draw * 0.45);
+        if (role === "ammon") {
+          // The sling turns from a raised right hand; the free arm balances.
+          arms[0].rotation.set(-0.25, 0, -0.18);
+          arms[1].rotation.set(-0.95, 0.15, 0.65);
+        }
         head.rotation.y = -0.06;
         body.rotation.x = 0.025;
       }

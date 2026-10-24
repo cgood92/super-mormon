@@ -25,6 +25,8 @@ export type PlayerMove =
   | "longJump"
   | "backflip"
   | "sideflip"
+  | "groundPound"
+  | "poundLand"
   | "wallKick"
   | "ledgeHang"
   | "climb";
@@ -60,8 +62,13 @@ export type PlayerState = {
   climbId?: string;
   climbAway?: { x: number; z: number };
   airMoveLock: number;
+  crouchHeld: boolean;
 };
-export type StepEvents = { jumped: boolean; landed: boolean };
+export type StepEvents = {
+  jumped: boolean;
+  landed: boolean;
+  pounded?: boolean;
+};
 
 const RADIUS = 0.32;
 const HEIGHT = 1.65;
@@ -98,6 +105,7 @@ export function createPlayer(x = 0, y = 0, z = 0): PlayerState {
     wallKickCooldown: 0,
     climbCooldown: 0,
     airMoveLock: 0,
+    crouchHeld: false,
   };
 }
 
@@ -324,7 +332,7 @@ export function stepPlayer(
   solids: Solid[],
   climbables: Climbable[] = [],
 ): StepEvents {
-  const events = { jumped: false, landed: false };
+  const events: StepEvents = { jumped: false, landed: false };
   if (!Number.isFinite(dt) || dt <= 0) return events;
   const count = Math.ceil(Math.min(dt, 0.1) / (1 / 120));
   const subdt = Math.min(dt, 0.1) / count;
@@ -334,7 +342,29 @@ export function stepPlayer(
   const uy = magnitude ? (input.y / magnitude) * length : 0;
   const worldX = -Math.cos(cameraYaw) * ux + Math.sin(cameraYaw) * uy;
   const worldZ = Math.sin(cameraYaw) * ux + Math.cos(cameraYaw) * uy;
-  if (input.jump) player.jumpBufferTime = 0.13;
+  const crouchPressed = !!input.crouch && !player.crouchHeld;
+  player.crouchHeld = !!input.crouch;
+  if (
+    crouchPressed &&
+    !player.grounded &&
+    !player.ledge &&
+    !player.climbId &&
+    player.move !== "groundPound" &&
+    player.move !== "poundLand"
+  ) {
+    setMove(player, "groundPound");
+    player.vx *= 0.12;
+    player.vz *= 0.12;
+    player.vy = 0;
+    player.coyoteTime = 0;
+    player.jumpBufferTime = 0;
+  }
+  if (
+    input.jump &&
+    player.move !== "groundPound" &&
+    player.move !== "poundLand"
+  )
+    player.jumpBufferTime = 0.13;
   for (let i = 0; i < count; i++) {
     player.moveTime += subdt;
     player.comboTime = Math.max(0, player.comboTime - subdt);
@@ -416,6 +446,7 @@ export function stepPlayer(
       !player.grounded &&
       !player.ledge &&
       !player.climbId &&
+      player.move !== "groundPound" &&
       input.traversal !== false &&
       player.climbCooldown <= 0 &&
       climbables.length &&
@@ -454,7 +485,13 @@ export function stepPlayer(
     const targetSpeed = player.crouching ? SPEED * 0.43 : SPEED;
     const targetVx = worldX * targetSpeed,
       targetVz = worldZ * targetSpeed;
-    if (player.airMoveLock <= 0) {
+    if (
+      player.move === "groundPound" ||
+      (player.move === "poundLand" && player.moveTime < 0.18)
+    ) {
+      player.vx *= Math.exp(-18 * subdt);
+      player.vz *= Math.exp(-18 * subdt);
+    } else if (player.airMoveLock <= 0) {
       const reverse =
         length > 0.01 && player.vx * worldX + player.vz * worldZ < -0.1;
       const cornering =
@@ -551,6 +588,7 @@ export function stepPlayer(
       !player.grounded &&
       player.vy < -0.4 &&
       !player.ledge &&
+      player.move !== "groundPound" &&
       input.traversal !== false &&
       length > 0.1 &&
       player.climbCooldown <= 0
@@ -572,7 +610,10 @@ export function stepPlayer(
       player.vy > 0 && input.jumpHeld && player.jumpHoldTime < 0.22
         ? GRAVITY * 0.48
         : GRAVITY;
-    player.vy -= gravity * subdt;
+    if (player.move === "groundPound") {
+      // A brief suspended tuck precedes a committed, feet-first descent.
+      player.vy = player.moveTime < 0.14 ? 0 : -24;
+    } else player.vy -= gravity * subdt;
     if (input.jumpHeld) player.jumpHoldTime += subdt;
     const oldY = player.y;
     let nextY = oldY + player.vy * subdt;
@@ -596,6 +637,12 @@ export function stepPlayer(
         if (!player.grounded) {
           events.landed = true;
           player.comboTime = 0.22;
+          if (player.move === "groundPound") {
+            events.pounded = true;
+            player.comboTime = 0;
+            player.jumpStage = 0;
+            setMove(player, "poundLand");
+          }
         }
         player.grounded = true;
       } else player.grounded = false;
@@ -603,16 +650,17 @@ export function stepPlayer(
     player.y = nextY;
     if (player.grounded) {
       if (player.comboTime <= 0) player.jumpStage = 0;
-      setMove(
-        player,
-        player.crouching
-          ? player.runSpeed > 0.3
-            ? "crawl"
-            : "crouch"
-          : player.runSpeed > 0.3
-            ? "run"
-            : "idle",
-      );
+      if (player.move !== "poundLand" || player.moveTime >= 0.18)
+        setMove(
+          player,
+          player.crouching
+            ? player.runSpeed > 0.3
+              ? "crawl"
+              : "crouch"
+            : player.runSpeed > 0.3
+              ? "run"
+              : "idle",
+        );
     }
   }
   return events;

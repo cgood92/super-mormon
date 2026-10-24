@@ -33,6 +33,7 @@ import {
   type Solid,
 } from "./super/physics";
 import { createCharacter } from "./super/character";
+import { createPoundImpact } from "./super/pound-impact";
 import { applyAdventureCamera } from "./super/adventure-camera";
 import { FollowCamera } from "./super/camera";
 import type { WorldData, WorldId } from "./super/worlds";
@@ -161,6 +162,7 @@ let guards: Guard[] = [],
   treasureMeshes = new Map<string, T.Group>(),
   collected = new Set<string>();
 let goalMarker: T.Group | null = null;
+let poundImpact: ReturnType<typeof createPoundImpact> | null = null;
 let organSeated = false;
 let pendingAdventureReset: (() => void) | null = null;
 let carryObjects: CarryObject[] = [],
@@ -184,7 +186,9 @@ function saveProgress() {
     /* optional */
   }
 }
-function sound(kind: "jump" | "collect" | "caught" | "portal" | "win") {
+function sound(
+  kind: "jump" | "collect" | "caught" | "portal" | "win" | "pound",
+) {
   if (!soundOn || worldId === "tree") return;
   try {
     audio ??= new AudioContext();
@@ -196,11 +200,24 @@ function sound(kind: "jump" | "collect" | "caught" | "portal" | "win") {
     g.connect(audio.destination);
     o.type = kind === "collect" ? "sine" : "triangle";
     o.frequency.setValueAtTime(
-      { jump: 250, collect: 740, caught: 190, portal: 220, win: 520 }[kind],
+      {
+        jump: 250,
+        collect: 740,
+        caught: 190,
+        portal: 220,
+        win: 520,
+        pound: 100,
+      }[kind],
       t,
     );
     o.frequency.exponentialRampToValueAtTime(
-      kind === "caught" ? 90 : kind === "jump" ? 430 : 1100,
+      kind === "pound"
+        ? 40
+        : kind === "caught"
+          ? 90
+          : kind === "jump"
+            ? 430
+            : 1100,
       t + 0.18,
     );
     g.gain.setValueAtTime(0.045, t);
@@ -413,7 +430,7 @@ function showMoves(page = 0) {
     [
       "RUN & JUMP",
       "Try a new move.",
-      "Use {crouch} to crouch. Move to crawl. Run + {crouch} + {jump} for a long jump. Stand still + {crouch} + {jump} for a backflip.",
+      "Use {crouch} to crouch. Move to crawl. Run + {crouch} + {jump} for a long jump. Stand still + {crouch} + {jump} for a backflip. While airborne, press {crouch} for a ground pound.",
     ],
     [
       "JUMP COMBINATIONS",
@@ -598,6 +615,8 @@ function updatePracticeLesson() {
     `Tokens ${bonusCollected.size} / ${world.tokens?.length ?? 0} · ${learnedMoves.size} moves tried`;
 }
 function disposeScene() {
+  poundImpact?.dispose();
+  poundImpact = null;
   adventure?.dispose();
   adventure = null;
   treeScene?.dispose();
@@ -673,6 +692,7 @@ async function load(id: WorldId) {
   el("app").classList.remove("chapter-faded");
   scene = new T.Scene();
   world = buildWorld(id, scene);
+  poundImpact = createPoundImpact(scene);
   storyObjective = world.initialObjective ?? "";
   if (id === "hub") decorateGalleryProgress();
   player = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
@@ -699,7 +719,8 @@ async function load(id: WorldId) {
       id === "promised" ||
       id === "vineyard" ||
       id === "jacob" ||
-      id === "waters"
+      id === "waters" ||
+      id === "ammon"
       ? "streets"
       : id === "hub"
         ? "conference"
@@ -801,15 +822,17 @@ async function load(id: WorldId) {
                 ? "1 NEPHI 18 · THE OCEAN VOYAGE"
                 : id === "jacob"
                   ? "JACOB 7 · FAITH IN CHRIST"
-                  : id === "waters"
-                    ? "MOSIAH 18 · ABOUT 147–145 BC"
-                    : id === "promised"
-                      ? "1 NEPHI 18 · 2 NEPHI 1–5"
-                      : id === "vineyard"
-                        ? "JACOB 5 · THE OLIVE VINEYARD"
-                        : id === "night"
-                          ? "1 NEPHI 4 · ABOUT 600 BC"
-                          : "1 NEPHI 3 · ABOUT 600 BC";
+                  : id === "ammon"
+                    ? "ALMA 17 · ABOUT 91 BC"
+                    : id === "waters"
+                      ? "MOSIAH 18 · ABOUT 147–145 BC"
+                      : id === "promised"
+                        ? "1 NEPHI 18 · 2 NEPHI 1–5"
+                        : id === "vineyard"
+                          ? "JACOB 5 · THE OLIVE VINEYARD"
+                          : id === "night"
+                            ? "1 NEPHI 4 · ABOUT 600 BC"
+                            : "1 NEPHI 3 · ABOUT 600 BC";
   el("seal-count").textContent =
     `Stories ${completed.size} / ${STORY_ORDER.length}`;
   if (id === "trade" || id === "night") {
@@ -889,23 +912,25 @@ async function load(id: WorldId) {
               ? "Your brothers will follow. Bring the treasures to Laban."
               : id === "jacob"
                 ? "Explore the settlement and meet Jacob’s neighbors."
-                : id === "waters"
-                  ? "Many generations later: slip past Noah’s spies and find Alma."
-                  : id === "promised"
-                    ? "Help the family settle, then follow the journey to a new home."
-                    : id === "vineyard"
-                      ? "Explore the vineyard in Jacob’s retelling. Care for the trees."
-                      : id === "night"
-                        ? "Enter the city and search its moonlit streets."
-                        : id === "tree"
-                          ? "Take your time. Follow the path toward the tree."
-                          : id === "broken-bow"
-                            ? "Hunt in the mountains and help feed the family."
-                            : id === "bountiful"
-                              ? "Climb the mountain trail and pray. Then help build the ship."
-                              : id === "voyage"
-                                ? "Explore the ship and meet the family aboard."
-                                : "Find the blue door. Watch the streets.",
+                : id === "ammon"
+                  ? "Meet Lamoni, gather the flocks, and guard the waters of Sebus."
+                  : id === "waters"
+                    ? "Many generations later: slip past Noah’s spies and find Alma."
+                    : id === "promised"
+                      ? "Help the family settle, then follow the journey to a new home."
+                      : id === "vineyard"
+                        ? "Explore the vineyard in Jacob’s retelling. Care for the trees."
+                        : id === "night"
+                          ? "Enter the city and search its moonlit streets."
+                          : id === "tree"
+                            ? "Take your time. Follow the path toward the tree."
+                            : id === "broken-bow"
+                              ? "Hunt in the mountains and help feed the family."
+                              : id === "bountiful"
+                                ? "Climb the mountain trail and pray. Then help build the ship."
+                                : id === "voyage"
+                                  ? "Explore the ship and meet the family aboard."
+                                  : "Find the blue door. Watch the streets.",
       4,
     );
 }
@@ -1085,7 +1110,8 @@ function resetCaughtCheckpoint() {
       worldId === "promised" ||
       worldId === "vineyard" ||
       worldId === "jacob" ||
-      worldId === "waters"
+      worldId === "waters" ||
+      worldId === "ammon"
       ? "streets"
       : worldId === "hub"
         ? "conference"
@@ -1290,6 +1316,11 @@ function update(dt: number) {
   }
   world.update?.(dt, player);
   if (events.jumped) sound("jump");
+  if (events.pounded) {
+    poundImpact?.trigger(player);
+    sound("pound");
+  }
+  poundImpact?.update(dt);
   const b = world.bounds;
   if (b) {
     player.x = T.MathUtils.clamp(player.x, b.minX + 0.35, b.maxX - 0.35);
@@ -1369,7 +1400,8 @@ function update(dt: number) {
         worldId === "promised" ||
         worldId === "vineyard" ||
         worldId === "jacob" ||
-        worldId === "waters"
+        worldId === "waters" ||
+        worldId === "ammon"
         ? "streets"
         : worldId === "hub"
           ? "conference"

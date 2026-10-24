@@ -52,6 +52,7 @@ test("later chapters prepare their own interactive worlds and leave no scene res
     ["vineyard", "learn"],
     ["jacob", "settlement"],
     ["waters", "city"],
+    ["ammon", "meet"],
   ] as const) {
     const scene = new Scene();
     const prepared = await prepareWorld(id);
@@ -76,7 +77,9 @@ test("later chapters prepare their own interactive worlds and leave no scene res
           ? "jacob"
           : id === "waters"
             ? "convert"
-            : "nephi",
+            : id === "ammon"
+              ? "ammon"
+              : "nephi",
     );
     runtime.dispose();
     world.dispose?.();

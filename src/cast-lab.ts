@@ -17,6 +17,8 @@ const cast: [CharacterRole, string, string][] = [
   ["jacob", "Jacob", "A mature teacher with a blue mantle and trimmed beard."],
   ["sherem", "Sherem", "A distinct civilian face and plum mantle."],
   ["alma", "Alma", "A teacher beside the Waters of Mormon."],
+  ["ammon", "Ammon", "A strong young servant with a cord sling."],
+  ["lamoni", "King Lamoni", "Regal green and gold clothing."],
   [
     "convert",
     "Alma’s potential convert",
@@ -24,7 +26,11 @@ const cast: [CharacterRole, string, string][] = [
   ],
   ["spy", "Noah’s spy", "Dark clothing and a visibly scanning gaze."],
   ["guard", "Palace servant / guard", "Helmet, armor, and clear pursuer cues."],
-  ["child", "Nephi’s child", "A smaller, youthful character for the voyage."],
+  [
+    "child",
+    "Nephi’s child",
+    "A smaller, youthful character with a distinct rust-orange coat.",
+  ],
   [
     "nephi-disguised",
     "Nephi in Laban’s clothes",

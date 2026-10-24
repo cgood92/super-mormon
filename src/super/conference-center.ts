@@ -287,6 +287,7 @@ export function gallery(scene: THREE.Scene): WorldData {
     ["vineyard", "THE OLIVE VINEYARD", 44, 32],
     ["jacob", "JACOB AND SHEREM", -44, 32],
     ["waters", "THE WATERS OF MORMON", -34, 32],
+    ["ammon", "AMMON AND THE KING’S FLOCKS", -44, 15],
   ] as const) {
     add(x, 0, wallZ, 8, 6, 0.45, C.pale, "later story wall");
     const image = painting(group, x, 0.7, wallZ + 0.3, "", 0xffffff);
@@ -522,6 +523,49 @@ export function gallery(scene: THREE.Scene): WorldData {
               ctx.fill();
             }
           }
+        }
+        if (id === "ammon") {
+          ctx.fillStyle = "#b5d6ce";
+          ctx.fillRect(0, 0, 384, 512);
+          ctx.fillStyle = "#879b64";
+          ctx.fillRect(0, 255, 384, 257);
+          ctx.fillStyle = "#68aeb5";
+          ctx.beginPath();
+          ctx.ellipse(220, 360, 135, 46, 0, 0, Math.PI * 2);
+          ctx.fill();
+          for (const [x, y] of [
+            [100, 395],
+            [185, 430],
+            [280, 411],
+            [315, 340],
+          ]) {
+            ctx.fillStyle = "#eee1c2";
+            ctx.beginPath();
+            ctx.ellipse(x, y, 23, 17, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#765c46";
+            ctx.fillRect(x + 17, y - 5, 9, 11);
+            ctx.fillRect(x - 12, y + 10, 4, 18);
+            ctx.fillRect(x + 10, y + 10, 4, 18);
+          }
+          ctx.fillStyle = "#8c5145";
+          ctx.beginPath();
+          ctx.moveTo(63, 290);
+          ctx.lineTo(86, 290);
+          ctx.lineTo(97, 370);
+          ctx.lineTo(52, 370);
+          ctx.fill();
+          ctx.fillStyle = "#b78a65";
+          ctx.beginPath();
+          ctx.arc(74, 276, 14, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#705035";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.ellipse(93, 235, 38, 18, -0.4, 0, Math.PI * 2);
+          ctx.moveTo(74, 305);
+          ctx.lineTo(120, 230);
+          ctx.stroke();
         }
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;

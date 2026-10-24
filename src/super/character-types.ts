@@ -1,4 +1,6 @@
 export type CharacterRole =
+  | "ammon"
+  | "lamoni"
   | "nephi"
   | "nephi-disguised"
   | "sam"
@@ -27,6 +29,8 @@ export type CharacterMove =
   | "longJump"
   | "backflip"
   | "sideflip"
+  | "groundPound"
+  | "poundLand"
   | "wallKick"
   | "ledgeHang"
   | "climb";

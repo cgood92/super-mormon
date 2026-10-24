@@ -5,9 +5,9 @@ import { gallery, CONFERENCE_ESCALATORS } from "../src/super/conference-center";
 import { createPlayer, stepPlayer } from "../src/super/physics";
 import { canJumpIntoPainting } from "../src/super/gallery-entry";
 
-test("Conference Center has thirteen reachable canvases and nine optional lessons", () => {
+test("Conference Center has fourteen reachable canvases and nine optional lessons", () => {
   const world = gallery(new THREE.Scene());
-  assert.equal(world.portals?.length, 13);
+  assert.equal(world.portals?.length, 14);
   assert.equal(world.tutorials?.length, 9);
   for (const portal of world.portals!) {
     const player = createPlayer(world.spawn.x, 0, world.spawn.z);

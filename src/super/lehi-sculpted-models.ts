@@ -78,7 +78,7 @@ const ORIGINAL_CAST_TRAITS: Readonly<
   Record<
     Exclude<
       SculptedCharacterRole,
-      "jacob" | "sherem" | "alma" | "convert" | "spy"
+      "jacob" | "sherem" | "alma" | "convert" | "spy" | "ammon" | "lamoni"
     >,
     CastTraits
   >
@@ -284,7 +284,7 @@ const ORIGINAL_CAST_TRAITS: Readonly<
   child: {
     skin: 0xc59373,
     robe: 0xe3c68e,
-    coat: 0x7e9c88,
+    coat: 0xb56745,
     trim: 0xaa885b,
     hair: 0x4a3427,
     head: 0.35,
@@ -343,6 +343,24 @@ export const SCULPTED_CAST_TRAITS: Readonly<
     coat: 0x9b7654,
     robe: 0xd6c5a4,
     width: 0.34,
+  },
+  ammon: {
+    ...ORIGINAL_CAST_TRAITS.nephi,
+    hair: 0x4d3628,
+    hairStyle: "cropped",
+    coat: 0x8c5145,
+    robe: 0xe0ccab,
+    trim: 0xab8b5d,
+    beard: "none",
+  },
+  lamoni: {
+    ...ORIGINAL_CAST_TRAITS.laban,
+    hair: 0x30291f,
+    coat: 0x456e62,
+    robe: 0xc7b386,
+    trim: 0xbca45d,
+    beard: "trimmed",
+    faceWidth: 0.94,
   },
   spy: {
     ...ORIGINAL_CAST_TRAITS.guard,
@@ -643,7 +661,8 @@ function makeSculpted(
     return mesh;
   };
 
-  const athletic = role === "nephi" || role === "nephi-disguised";
+  const athletic =
+    role === "nephi" || role === "nephi-disguised" || role === "ammon";
   // Chest and shoulders retain their breadth while the waist and garment depth
   // taper. The tunic, fitted coat and sash all sample these same dimensions.
   const body = athletic
