@@ -47,7 +47,7 @@ export function buildLehiPlayground(scene: T.Scene): WorldData {
 
   // A clear central lane connects every exercise, with space to circle each obstacle.
   sign("WALK · RUN · TURN", 0, 13);
-  sign("CROUCH & CRAWL", -9, 7);
+  sign("CRAWL", -9, 7);
   for (const x of [-11.2, -6.8])
     block(x, 0, 3.5, 0.6, 1.6, 2, pale, "Crawl arch pillar");
   block(-9, 1.08, 3.5, 5, 0.52, 2, pale, "Low crawl arch lintel");

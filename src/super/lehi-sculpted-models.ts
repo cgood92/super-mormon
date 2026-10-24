@@ -78,7 +78,16 @@ const ORIGINAL_CAST_TRAITS: Readonly<
   Record<
     Exclude<
       SculptedCharacterRole,
-      "jacob" | "sherem" | "alma" | "convert" | "spy" | "ammon" | "lamoni"
+      | "jacob"
+      | "sherem"
+      | "alma"
+      | "convert"
+      | "spy"
+      | "ammon"
+      | "lamoni"
+      | "wife"
+      | "lamans-wife"
+      | "lemuels-wife"
     >,
     CastTraits
   >
@@ -361,6 +370,45 @@ export const SCULPTED_CAST_TRAITS: Readonly<
     trim: 0xbca45d,
     beard: "trimmed",
     faceWidth: 0.94,
+  },
+  wife: {
+    ...ORIGINAL_CAST_TRAITS.sariah,
+    hairStyle: "waves",
+    outfit: "travel",
+    hair: 0x49352b,
+    coat: 0x9d8069,
+    robe: 0xe1cfaf,
+    head: 0.3,
+    faceWidth: 0.86,
+    width: 0.33,
+    hem: 0.2,
+    brow: 0.045,
+  },
+  "lamans-wife": {
+    ...ORIGINAL_CAST_TRAITS.sariah,
+    hairStyle: "waves",
+    outfit: "undertunic",
+    hair: 0x49322b,
+    robe: 0x886690,
+    coat: 0x886690,
+    trim: 0xc9a46c,
+    head: 0.3,
+    faceWidth: 0.87,
+    width: 0.33,
+    hem: 0.5,
+  },
+  "lemuels-wife": {
+    ...ORIGINAL_CAST_TRAITS.sariah,
+    hairStyle: "waves",
+    outfit: "undertunic",
+    hair: 0x684632,
+    robe: 0xba715f,
+    coat: 0xba715f,
+    trim: 0xd3af70,
+    head: 0.3,
+    faceWidth: 0.85,
+    width: 0.32,
+    hem: 0.47,
   },
   spy: {
     ...ORIGINAL_CAST_TRAITS.guard,

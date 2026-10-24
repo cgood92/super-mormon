@@ -217,20 +217,31 @@ export function createMotionDriver(role: CharacterRole): {
                     ? "doubleJump"
                     : "jump"));
       const moveTime = Math.max(0, state.moveTime ?? 0);
-      if (move === "crouch" || move === "crawl") {
-        // Scale around the feet; even the head and cloak fit under a 0.9 opening.
-        body.scale.y = move === "crawl" ? 0.43 : 0.4599;
-        body.scale.z = move === "crawl" ? 1.16 : 1;
-        body.position.y = move === "crawl" ? 0.04 : 0;
-        body.rotation.x = move === "crawl" ? 0.16 : 0;
-        legs[0].rotation.x = move === "crawl" ? Math.sin(phase) * 0.4 : -0.85;
-        legs[1].rotation.x = move === "crawl" ? -Math.sin(phase) * 0.4 : -0.85;
+      if (move === "crawl") {
+        // Rotate a full-size body onto hands and knees, rather than shrinking
+        // an upright walk. Diagonal supports alternate with distance traveled.
+        body.scale.set(1, 0.84, 1);
+        body.position.y = 0.53;
+        body.rotation.x = Math.PI / 2;
+        body.rotation.z = 0;
+        for (let i = 0; i < 2; i++) {
+          const cycle = Math.sin(phase + i * Math.PI);
+          arms[i].rotation.set(-Math.PI / 2 + cycle * 0.12, 0, 0);
+          legs[i].rotation.set(-Math.PI / 2 - cycle * 0.1, 0, 0);
+          knees[i].rotation.x = Math.PI / 2;
+          feet[i].rotation.x = 0;
+        }
+        head.rotation.set(-Math.PI / 2, 0, 0);
+      } else if (move === "crouch") {
+        // Stationary duck retains the take-off pose for backflips/long jumps.
+        body.scale.y = 0.4599;
+        body.scale.z = 1;
+        body.position.y = 0;
+        body.rotation.x = 0;
+        legs[0].rotation.x = legs[1].rotation.x = -0.85;
         knees[0].rotation.x = knees[1].rotation.x = 1.1;
         feet[0].rotation.x = feet[1].rotation.x = -0.25;
-        arms[0].rotation.x =
-          move === "crawl" ? -0.7 - Math.sin(phase) * 0.3 : -0.55;
-        arms[1].rotation.x =
-          move === "crawl" ? -0.7 + Math.sin(phase) * 0.3 : -0.55;
+        arms[0].rotation.x = arms[1].rotation.x = -0.55;
         head.rotation.x = -0.1;
       } else if (
         move === "backflip" ||
@@ -293,7 +304,23 @@ export function createMotionDriver(role: CharacterRole): {
         legs[0].rotation.x = -0.55;
         legs[1].rotation.x = -0.55;
       }
-      if (state.carrying && move !== "ledgeHang" && move !== "climb") {
+      if (state.dancing && move === "idle") {
+        const beat = (state.danceTime ?? idlePhase) * 4;
+        body.rotation.z = Math.sin(beat) * 0.07;
+        body.position.y += Math.abs(Math.sin(beat)) * 0.045;
+        arms[0].rotation.set(-1.1, 0, -0.4 - Math.sin(beat) * 0.25);
+        arms[1].rotation.set(-1.1, 0, 0.4 + Math.sin(beat) * 0.25);
+        legs[0].rotation.x = Math.max(0, Math.sin(beat)) * -0.25;
+        legs[1].rotation.x = Math.max(0, -Math.sin(beat)) * -0.25;
+        knees[0].rotation.x = Math.max(0, Math.sin(beat)) * 0.3;
+        knees[1].rotation.x = Math.max(0, -Math.sin(beat)) * 0.3;
+      }
+      if (
+        state.carrying &&
+        move !== "crawl" &&
+        move !== "ledgeHang" &&
+        move !== "climb"
+      ) {
         arms[0].rotation.x = -1.1;
         arms[1].rotation.x = -1.1;
         arms[0].rotation.z = -0.28;
@@ -309,7 +336,7 @@ export function createMotionDriver(role: CharacterRole): {
         body.rotation.x = 0.1;
         head.rotation.x = 0.12;
       }
-      if (state.aiming) {
+      if (state.aiming && move !== "crawl") {
         // Left arm presents the bow while the string hand draws back to the cheek.
         const draw = Math.max(0, Math.min(1, state.draw ?? 0));
         arms[0].rotation.set(-1.48, -0.25, -0.22);

@@ -19,6 +19,9 @@ const cast: [CharacterRole, string, string][] = [
   ["alma", "Alma", "A teacher beside the Waters of Mormon."],
   ["ammon", "Ammon", "A strong young servant with a cord sling."],
   ["lamoni", "King Lamoni", "Regal green and gold clothing."],
+  ["wife", "Family camp wife", "Adult family member in long travel clothing."],
+  ["lamans-wife", "Laman’s wife", "An imagined purple festive dress."],
+  ["lemuels-wife", "Lemuel’s wife", "An imagined coral festive dress."],
   [
     "convert",
     "Alma’s potential convert",

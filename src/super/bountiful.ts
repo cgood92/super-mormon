@@ -5,6 +5,7 @@ import {
 } from "./soft-geometry";
 import * as T from "three";
 import { markScenery, sceneryBox, terracedRock } from "./scenery";
+import { buildFamilyCamp } from "./family-camp";
 import { buildShip } from "./ship";
 import { createCharacter } from "./character";
 import type { WorldData, Point } from "./worlds";
@@ -253,11 +254,7 @@ export function buildBountiful(scene: T.Scene): WorldData {
       leaf.rotation.y = j * 1.256;
     }
   }
-  for (const x of [-2, 8]) {
-    block(x, 0, 22, 5, 0.15, 5, 0xb49b6a);
-    const roof = mesh(cone, 0xc2ac7e, x, 2.6, 22, 4, 2, 4, "Family shelter");
-    roof.rotation.y = Math.PI / 4;
-  }
+  const familyCamp = buildFamilyCamp(root, solids);
   const people = [createCharacter("laman"), createCharacter("lemuel")];
   people.forEach((actor, i) => {
     actor.group.position.set(brothers.x + i * 2, 0, brothers.z);
@@ -376,7 +373,11 @@ export function buildBountiful(scene: T.Scene): WorldData {
       { name: "Forge", ...forge },
       { name: "Timber grove", ...grove },
       { name: "Shipyard", ...point(0, -25) },
+      { name: "Family camp", ...point(-4, 24) },
     ],
+    update(dt, player) {
+      if (!disposed) familyCamp.update(dt, player);
+    },
     adventure(hooks) {
       hooks.setAvatar("nephi");
       let phase = "pray",
@@ -796,6 +797,7 @@ export function buildBountiful(scene: T.Scene): WorldData {
       if (disposed) return;
       disposed = true;
       people.forEach((a) => a.dispose());
+      familyCamp.dispose();
       const geometries = new Set<T.BufferGeometry>(),
         mats = new Set<T.Material>();
       root.traverse((o) => {

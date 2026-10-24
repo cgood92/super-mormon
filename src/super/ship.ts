@@ -13,6 +13,10 @@ export type ShipBuild = {
     | "helm"
     | "liahona"
     | "commonRoom"
+    | "sleepingQuarters"
+    | "pantry"
+    | "workNook"
+    | "stores"
     | "boundNephi"
     | "gangway"
     | "stairBottom"
@@ -208,6 +212,29 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
     for (const z of [14.5, 17]) addBox(x, 0, z, 2, 0.48, 1.4, darkWood, true);
   for (const z of [-12, -8, -4])
     addBox(-6.6, 0, z, 1.2, 0.5, 2.6, darkWood, true);
+  // Connected fore-cabins share a clear two-metre central passage. Doorways
+  // face that passage, so each room is reachable from the existing stairs.
+  for (const x of [-2.8, 2.8]) {
+    for (const z of [-13.5, -6, 1.5]) {
+      // Each bay leaves a broad gap at its center rather than a fake painted door.
+      for (const dz of [-2.4, 2.4])
+        addBox(x, 0, z + dz, 0.18, 2.8, 2.6, timber, true);
+      addBox(x, 2.65, z, 0.18, 0.15, 2.2, timber, true);
+    }
+  }
+  for (const z of [-17.2, -9.7, -2.2, 5.2]) {
+    addBox(-4.9, 0, z, 4.1, 2.8, 0.18, timber, true);
+    // Starboard partitions stop short of the stair well at x=4.5.
+    addBox(3.6, 0, z, 1.4, 2.8, 0.18, timber, true);
+  }
+  // Pantry shelves and jars, low workbench and folded bedding make the rooms legible.
+  addBox(3.65, 0, -15.2, 1.1, 1.5, 1, darkWood, true);
+  addBox(3.65, 1.5, -15.2, 1.15, 0.12, 1.1, paleWood);
+  addBox(-5.4, 0, 3.9, 2.5, 0.8, 1, darkWood, true);
+  addBox(-5.4, 0.8, 3.9, 1.3, 0.12, 0.6, paleWood);
+  for (const z of [-15.8, -13.6]) {
+    addBox(-5.8, 0.5, z, 1.4, 0.1, 1.5, paleWood);
+  }
   // Repeated ribs expose the structure below deck. Rails follow the changing hull width.
   for (let z = -19; z <= 19; z += 2) {
     const w = halfWidth(z);
@@ -237,7 +264,6 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
     wheel.add(spoke);
   }
   // Low table, bedding and stores make distinct living spaces below deck.
-  addBox(-3.4, 0, 2, 2.2, 0.72, 3.4, darkWood, true);
   for (const z of [-12, -8, -4]) {
     addBox(-5.5, 0.5, z, 1.2, 0.12, 2.3, paleWood);
     addBox(3.4, 0, z, 1.3, 0.7, 1.1, timber, true);
@@ -281,7 +307,11 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
       deckArrival: point(3, 4.2, 13),
       helm: point(0, 4.2, 17),
       liahona: point(-3, 4.2, 12),
-      commonRoom: point(0, 0, 0),
+      commonRoom: point(-1, 0, 15),
+      sleepingQuarters: point(-4, 0, -13.5),
+      pantry: point(3.6, 0, -13.5),
+      stores: point(3.6, 0, -6),
+      workNook: point(-4, 0, 1.5),
       boundNephi: point(0, 4.2, -6.25),
       gangway: point(8.5, 4.2, 13),
       stairBottom: point(6, 0, 11),

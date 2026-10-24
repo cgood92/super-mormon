@@ -133,7 +133,7 @@ const legendCache = new WeakMap<HTMLElement, ControlDevice>();
 const legendTokens: { token: ControlToken; title: string }[] = [
   { token: "move", title: "MOVE" },
   { token: "jump", title: "JUMP" },
-  { token: "crouch", title: "CROUCH" },
+  { token: "crouch", title: "CRAWL" },
   { token: "camera", title: "CAMERA" },
   { token: "action", title: "ACTION" },
   { token: "recenter", title: "RECENTER" },

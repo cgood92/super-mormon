@@ -274,3 +274,114 @@ test("coat sleeves share the tunic skeleton instead of floating over swinging ar
   assert.ok(after.distanceTo(before) > 0.02, "coat sleeve must visibly swing");
   actor.dispose();
 });
+
+test("every playable rig crawls on alternating hands and bent knees below the low arch", async () => {
+  const { createSculptedCharacterRig } =
+    await import("../src/super/playable-lehi.ts");
+  const point = new T.Vector3();
+  // Read posed vertices, including skinning; cached mesh boxes can hide a hand
+  // or a garment crossing the floor after the skeleton changes.
+  const posedBounds = (object: T.Object3D) => {
+    const box = new T.Box3();
+    object.traverse((node) => {
+      if (!(node instanceof T.Mesh)) return;
+      if (node instanceof T.SkinnedMesh) node.skeleton.update();
+      for (let i = 0; i < node.geometry.getAttribute("position").count; i++) {
+        node.getVertexPosition(i, point).applyMatrix4(node.matrixWorld);
+        assert.ok(Number.isFinite(point.x + point.y + point.z));
+        box.expandByPoint(point);
+      }
+    });
+    return box;
+  };
+  for (const role of [
+    "nephi",
+    "lehi",
+    "laman",
+    "child",
+    "jacob",
+    "convert",
+    "ammon",
+  ] as const) {
+    const actor = createSculptedCharacterRig(role, { quality: "crowd" });
+    const hands = ["left-hand", "right-hand"].map((name) =>
+      actor.group.getObjectByName(name)!,
+    );
+    const knees = ["left-knee", "right-knee"].map((name) =>
+      actor.group.getObjectByName(name)!,
+    );
+    const handZ: number[][] = [[], []];
+    for (let frame = 0; frame < 48; frame++) {
+      actor.update(1 / 60, {
+        ...standing,
+        z: frame * 0.025,
+        vz: 1.5,
+        runSpeed: 1.5,
+        move: "crawl",
+        crouching: true,
+      });
+      const box = posedBounds(actor.group);
+      assert.ok(
+        box.max.y <= 0.9,
+        `${role}: head or garment crosses arch (${box.max.y})`,
+      );
+      assert.ok(
+        box.min.y >= -0.025,
+        `${role}: pose crosses floor (${box.min.y})`,
+      );
+      for (const name of [
+        "left-trouser",
+        "right-trouser",
+        "left-sandal",
+        "right-sandal",
+      ]) {
+        const mesh = actor.group.getObjectByName(name);
+        if (mesh)
+          assert.ok(
+            posedBounds(mesh).max.y < (role === "child" ? 0.33 : 0.46),
+            `${role}: ${name} must stay below the hips, not point upward through the coat`,
+          );
+      }
+      const body = actor.group.getObjectByName("body")!;
+      assert.ok(
+        Math.abs(body.rotation.x - Math.PI / 2) < 0.01,
+        `${role}: spine must be horizontal`,
+      );
+      assert.ok(
+        Math.abs(body.scale.y - body.scale.x) < 0.01,
+        `${role}: no flattened upright body`,
+      );
+      for (let side = 0; side < 2; side++) {
+        const hand = posedBounds(hands[side]);
+        assert.ok(
+          hand.min.y >= -0.02 && hand.min.y < 0.065,
+          `${role}: palm must reach ground`,
+        );
+        handZ[side].push(hand.getCenter(new T.Vector3()).z - frame * 0.025);
+        const knee = knees[side].getWorldPosition(new T.Vector3());
+        assert.ok(
+          knee.y > 0.05 && knee.y < 0.18,
+          `${role}: knee must support the body`,
+        );
+        assert.ok(Math.abs(knees[side].rotation.x - Math.PI / 2) < 0.01);
+      }
+      const faceForward = new T.Vector3(0, 0, 1).transformDirection(
+        actor.group.getObjectByName("head")!.matrixWorld,
+      );
+      assert.ok(faceForward.z > 0.99, `${role}: look ahead while crawling`);
+    }
+    for (const positions of handZ)
+      assert.ok(
+        Math.max(...positions) - Math.min(...positions) > 0.04,
+        `${role}: hands must step`,
+      );
+    assert.ok(
+      (handZ[0][12] - handZ[0][0]) * (handZ[1][12] - handZ[1][0]) < 0,
+      `${role}: diagonal gait must alternate`,
+    );
+    actor.update(1 / 60, standing);
+    const restored = posedBounds(actor.group);
+    assert.ok(restored.max.y > (role === "child" ? 1.0 : 1.5));
+    actor.dispose();
+  }
+});

@@ -165,6 +165,24 @@ export function createSculptedCharacterRig(
   attach("left-sandal", footPivots[0]);
   attach("right-sandal", footPivots[1]);
 
+  // Split the sculpted trouser at its knee using the same transform hierarchy
+  // as the sandals. A rigid full-length trouser cannot bend into a crawl.
+  for (let side = 0; side < 2; side++) {
+    const mesh = model.group.getObjectByName(
+      side ? "right-trouser" : "left-trouser",
+    ) as T.Mesh | undefined;
+    if (!mesh) continue;
+    const attribute = mesh.geometry.getAttribute(
+      "position",
+    ) as T.BufferAttribute;
+    const rest = Float32Array.from(attribute.array);
+    mesh.userData.crawlRest = rest;
+  }
+  const trousers = ["left-trouser", "right-trouser"].map(
+    (name) => model.group.getObjectByName(name) as T.Mesh | undefined,
+  );
+  const trouserPoint = new T.Vector3();
+
   const cloth = [
     "flowing-mantle",
     "mantle-edge",
@@ -193,6 +211,26 @@ export function createSculptedCharacterRig(
       ),
     }));
   const clothPoint = new T.Vector3();
+  let wasCrawling = false;
+  const drape = (point: T.Vector3, crawling: boolean) => {
+    if (!crawling) return;
+    // With the spine horizontal, gravity is local +Z. Gather the skirt around
+    // the hips and let its hem hang below the back, clear of the trailing feet.
+    const weight = 1 - T.MathUtils.smoothstep(point.y, 0.45, 1.16);
+    const backDrape = T.MathUtils.lerp(
+      0.36,
+      -0.2,
+      T.MathUtils.smoothstep(point.y, 0.18, 0.65),
+    );
+    point.y += (0.55 - point.y) * weight;
+    point.z *= 0.68;
+    const hemDepth = T.MathUtils.lerp(
+      backDrape,
+      0.36,
+      T.MathUtils.smoothstep(point.z, -0.08, 0.12),
+    );
+    point.z += (hemDepth - point.z) * weight;
+  };
   const worldGaze = new T.Vector3();
   const gazeParentInverse = new T.Matrix4();
   const headForward = new T.Vector3(0, 0, 1);
@@ -243,24 +281,70 @@ export function createSculptedCharacterRig(
       group.position.set(state.x, state.y, state.z);
       body.rotation.copy(driverBody.rotation);
       body.position.y = driverBody.position.y;
-      const crouchScale = state.crouching
-        ? Math.min(
-            state.move === "crawl" ? 0.49 : 0.525,
-            driverBody.scale.y / 0.84,
-          )
-        : driverBody.scale.y / 0.84;
+      const crawling =
+        state.grounded &&
+        (state.move === "crawl" ||
+          (!state.move && !!state.crouching && state.runSpeed > 0.25));
+      const crouchScale =
+        state.crouching && !crawling
+          ? Math.min(
+              state.move === "crawl" ? 0.49 : 0.525,
+              driverBody.scale.y / 0.84,
+            )
+          : driverBody.scale.y / 0.84;
       body.scale.set(
         actorScale * driverBody.scale.x,
         actorScale * crouchScale,
         actorScale * driverBody.scale.z,
       );
       head.rotation.copy(driverHead.rotation);
+      head.position.z = crawling ? 0.13 : 0;
+      body.position.z = crawling ? (-0.77 * actorScale) / 0.825 : 0;
+      if (crawling) body.position.y *= actorScale / 0.825;
+      if (crawling) body.scale.setScalar(actorScale);
+      for (let i = 0; i < 2; i++) {
+        legPivots[i].scale.y = crawling ? 1.4 : 1;
+        legPivots[i].position.z = crawling ? -0.02 : 0;
+        armPivots[i].scale.y = 1;
+      }
       for (let i = 0; i < 2; i++) {
         armPivots[i].rotation.copy(driverArms[i].rotation);
         legPivots[i].rotation.copy(driverLegs[i].rotation);
         kneePivots[i].rotation.copy(driverKnees[i].rotation);
         footPivots[i].rotation.copy(driverFeet[i].rotation);
+        footPivots[i].scale.setScalar(crawling ? 0.65 : 1);
+        footPivots[i].position.z = crawling ? -0.14 : 0;
         footPivots[i].position.y = -0.27 + (driverFeet[i].position.y + 0.28);
+      }
+      if (crawling || wasCrawling) {
+        for (let side = 0; side < 2; side++) {
+          const mesh = trousers[side];
+          if (!mesh) continue;
+          const attribute = mesh.geometry.getAttribute(
+            "position",
+          ) as T.BufferAttribute;
+          const rest = mesh.userData.crawlRest as Float32Array;
+          for (let i = 0; i < attribute.count; i++) {
+            const j = i * 3;
+            trouserPoint.set(rest[j], rest[j + 1], rest[j + 2]);
+            if (crawling) {
+              trouserPoint.y = Math.min(trouserPoint.y, 0.6);
+              const weight =
+                1 - T.MathUtils.smoothstep(trouserPoint.y - 0.72, -0.4, -0.29);
+              const y = trouserPoint.y - 0.72 + 0.35;
+              const z = trouserPoint.z;
+              const angle = kneePivots[side].rotation.x * weight;
+              trouserPoint.y =
+                0.72 - 0.35 + y * Math.cos(angle) - z * Math.sin(angle);
+              trouserPoint.z = y * Math.sin(angle) + z * Math.cos(angle);
+            }
+            attribute.setXYZ(i, trouserPoint.x, trouserPoint.y, trouserPoint.z);
+          }
+          attribute.needsUpdate = true;
+          mesh.geometry.computeVertexNormals();
+          mesh.geometry.computeBoundingBox();
+          mesh.geometry.computeBoundingSphere();
+        }
       }
       // Plant the actual sculpted sole, rather than assuming the old primitive
       // sandal's thickness. This preserves the motion driver's horizontal anchor.
@@ -328,7 +412,7 @@ export function createSculptedCharacterRig(
         clothX = 0;
         clothZ = 0;
       }
-      if (clothMoving || clothWasMoving) {
+      if (clothMoving || clothWasMoving || crawling || wasCrawling) {
         for (const { attribute, rest, updateNormals } of cloth) {
           for (let i = 0; i < attribute.count; i++) {
             const j = i * 3;
@@ -342,6 +426,11 @@ export function createSculptedCharacterRig(
               Math.min(1, state.runSpeed / 5);
             clothPoint.x += clothX * w + panelSway * 0.025 * w;
             clothPoint.z -= clothZ * w;
+            drape(clothPoint, crawling);
+            if (crawling) {
+              clothPoint.x += Math.sign(clothPoint.x) * 0.035;
+              clothPoint.z += Math.sign(clothPoint.z) * 0.025;
+            }
             attribute.setXYZ(
               i,
               clothPoint.x,
@@ -361,15 +450,17 @@ export function createSculptedCharacterRig(
               1.5,
             );
             const panelSway = Math.sin(gaitPhase - rest[j] * 2) * stepWeight;
-            attribute.setXYZ(
-              i,
+            clothPoint.set(
               rest[j] + clothX * w + panelSway * 0.025 * w,
               rest[j + 1],
-              clearFeet(
-                rest[j] + clothX * w + panelSway * 0.025 * w,
-                rest[j + 1],
-                rest[j + 2] - clothZ * w,
-              ),
+              rest[j + 2] - clothZ * w,
+            );
+            drape(clothPoint, crawling);
+            attribute.setXYZ(
+              i,
+              clothPoint.x,
+              clothPoint.y,
+              clearFeet(clothPoint.x, clothPoint.y, clothPoint.z),
             );
           }
           attribute.needsUpdate = true;
@@ -377,6 +468,7 @@ export function createSculptedCharacterRig(
         }
       }
       clothWasMoving = clothMoving;
+      wasCrawling = crawling;
       if (state.lookYaw !== undefined) {
         // Compensate the complete parent transform, including turn lean and
         // nonuniform scale, so the rendered face matches world-space sight tests.

@@ -7,6 +7,7 @@ import {
   conferencePalette as C,
   disposeConference,
 } from "./conference-kit";
+import { buildConferenceChristus } from "./conference-christus";
 import { buildAuditorium } from "./conference-auditorium";
 import { buildRooftop } from "./conference-rooftop";
 
@@ -769,6 +770,8 @@ export function gallery(scene: THREE.Scene): WorldData {
     group.add(artwork);
   }
   batch();
+  const christus = buildConferenceChristus(group);
+  solids.push(...christus.solids);
   const auditorium = buildAuditorium(group),
     roof = buildRooftop(group);
   solids.push(...auditorium.solids, ...roof.solids);
@@ -781,6 +784,7 @@ export function gallery(scene: THREE.Scene): WorldData {
     subtitle: "Explore three floors, the auditorium and roof gardens",
     spawn: { x: 0, y: 0, z: 36, yaw: Math.PI },
     landmarks: [
+      ...christus.landmarks,
       { name: "Movement studio", x: -74, y: 0, z: 35 },
       { name: "Story gallery", x: 0, y: 0, z: 20 },
       { name: "Auditorium ground entrance", x: 0, y: 0, z: -2 },

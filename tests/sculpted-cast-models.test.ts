@@ -129,7 +129,8 @@ test("every NPC and crowd role fits the vertex budget and keeps its coat outside
         "continuous-robe-and-sleeves",
       ) as T.Mesh;
       assert.ok(tunic);
-      if (role === "laban-undressed") assert.equal(coat, undefined);
+      if (SCULPTED_CAST_TRAITS[role].outfit === "undertunic")
+        assert.equal(coat, undefined);
       else {
         assert.ok(coat, label);
         actor.group.updateMatrixWorld(true);

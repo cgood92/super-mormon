@@ -102,6 +102,15 @@ export function buildVoyage(scene: T.Scene): WorldData {
       runSpeed: 0,
     });
   });
+  // Festive costumes and compressed timing are imagined; 1 Nephi 18:9 describes rudeness, not clothing.
+  const wives = [
+    createCharacter("lamans-wife", { quality: "npc" }),
+    createCharacter("lemuels-wife", { quality: "npc" }),
+  ];
+  wives.forEach((wife, i) => {
+    ship.group.add(wife.group);
+    wife.group.position.set(i ? 0.7 : -3.3, 0, 14);
+  });
   const rope = new T.Mesh(
     new T.TorusGeometry(0.65, 0.065, 6, 24),
     material(0xb79d6c),
@@ -192,6 +201,21 @@ export function buildVoyage(scene: T.Scene): WorldData {
   };
   const updateVisuals = (dt: number) => {
     time += dt;
+    wives.forEach((wife, i) =>
+      wife.update(dt, {
+        x: i ? 0.7 : -3.3,
+        y: 0,
+        z: 14,
+        vx: 0,
+        vy: 0,
+        vz: 0,
+        yaw: i ? -0.4 : 0.4,
+        grounded: true,
+        runSpeed: 0,
+        dancing: phase === "brothers" && openingTime >= 4,
+        danceTime: time + i * 1.3,
+      }),
+    );
     steeringOar.rotation.z = T.MathUtils.damp(
       steeringOar.rotation.z,
       rudder * -0.8,
@@ -297,7 +321,7 @@ export function buildVoyage(scene: T.Scene): WorldData {
       hooks.dialog(
         "An imagined visit",
         "The fourth day",
-        "An imagined visit: you are a child aboard during the fourth day of the storm. Find Laman and Lemuel below deck.",
+        "This shortened retelling brings together the earlier rude celebration and the fourth day of the storm. The trouble was their rudeness and forgetting God. Find Laman and Lemuel below deck.",
         () => {},
         {
           actors: [
@@ -388,6 +412,8 @@ export function buildVoyage(scene: T.Scene): WorldData {
                 yaw: Math.PI,
                 grounded: true,
                 runSpeed: 0,
+                dancing: true,
+                danceTime: time + i * 1.3,
               }),
             );
           if (phase === "release" && !releaseReady) {
@@ -622,6 +648,7 @@ export function buildVoyage(scene: T.Scene): WorldData {
       if (disposed) return;
       disposed = true;
       npcs.forEach((n) => n.dispose());
+      wives.forEach((wife) => wife.dispose());
       const geometries = new Set<T.BufferGeometry>(),
         materials = new Set<T.Material>();
       root.traverse((o) => {

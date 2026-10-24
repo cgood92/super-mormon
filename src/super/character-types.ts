@@ -17,7 +17,10 @@ export type CharacterRole =
   | "sherem"
   | "alma"
   | "convert"
-  | "spy";
+  | "spy"
+  | "wife"
+  | "lamans-wife"
+  | "lemuels-wife";
 export type CharacterMove =
   | "idle"
   | "run"
@@ -55,4 +58,6 @@ export type CharacterState = {
   draw?: number;
   lookYaw?: number;
   lookPitch?: number;
+  dancing?: boolean;
+  danceTime?: number;
 };

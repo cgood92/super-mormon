@@ -200,7 +200,7 @@ function updateHud() {
   renderControlLegend(el("legend"), input.device);
   renderControlText(
     el("moves-list"),
-    "{move} Walk / run · {jump} Jump (repeat on landing for double / triple) · {crouch} Crouch / crawl · Run + {crouch} + {jump} Long jump · Still + {crouch} + {jump} Backflip · Reverse direction + {jump} Side somersault · Touch wall + {jump} Wall kick · {up} Pull up / climb · {action} Pick up / throw · {crouch} + {action} Put down · {camera} Camera · {recenter} Recenter",
+    "{move} Walk / run · {jump} Jump (repeat on landing for double / triple) · {crouch} Crawl · Run + {crouch} + {jump} Long jump · Still + {crouch} + {jump} Backflip · Reverse direction + {jump} Side somersault · Touch wall + {jump} Wall kick · {up} Pull up / climb · {action} Pick up / throw · {crouch} + {action} Put down · {camera} Camera · {recenter} Recenter",
     input.device,
   );
   renderControlText(el("resume"), "{jump} Keep exploring", input.device);

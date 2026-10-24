@@ -104,7 +104,7 @@ test("legend switches device glyphs and names every action", () => {
         .descendants()
         .filter((node) => node.tag === "b")
         .map((node) => node.allText),
-      ["MOVE", "JUMP", "CROUCH", "CAMERA", "ACTION", "RECENTER", "PAUSE"],
+      ["MOVE", "JUMP", "CRAWL", "CAMERA", "ACTION", "RECENTER", "PAUSE"],
     );
     assert.equal(
       target
