@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { buildBrokenBow } from "./broken-bow";
 import { buildBountiful } from "./bountiful";
 import { buildPromisedLand } from "./promised-land";
 import { buildOliveVineyard } from "./olive-vineyard";
@@ -17,6 +18,7 @@ export type WorldId =
   | "trade"
   | "night"
   | "tree"
+  | "broken-bow"
   | "bountiful"
   | "voyage"
   | "promised"
@@ -93,6 +95,8 @@ export function buildWorld(id: WorldId, scene: THREE.Scene): WorldData {
       return buildJerusalem("trade", scene);
     case "night":
       return buildJerusalem("night", scene);
+    case "broken-bow":
+      return buildBrokenBow(scene);
     case "bountiful":
       return buildBountiful(scene);
     case "promised":

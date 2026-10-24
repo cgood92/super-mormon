@@ -296,6 +296,14 @@ export function createMotionDriver(role: CharacterRole): {
         body.rotation.x = 0.1;
         head.rotation.x = 0.12;
       }
+      if (state.aiming) {
+        // Left arm presents the bow while the string hand draws back to the cheek.
+        const draw = Math.max(0, Math.min(1, state.draw ?? 0));
+        arms[0].rotation.set(-1.48, -0.25, -0.22);
+        arms[1].rotation.set(-1.28, 0.15 + draw * 0.75, 0.25 + draw * 0.45);
+        head.rotation.y = -0.06;
+        body.rotation.x = 0.025;
+      }
     },
     dispose() {
       group.removeFromParent();

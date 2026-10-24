@@ -33,6 +33,7 @@ import {
   type Solid,
 } from "./super/physics";
 import { createCharacter } from "./super/character";
+import { applyAdventureCamera } from "./super/adventure-camera";
 import { FollowCamera } from "./super/camera";
 import type { WorldData, WorldId } from "./super/worlds";
 import { prepareWorld } from "./super/world-loading";
@@ -57,6 +58,7 @@ app.innerHTML = `<div id="viewport" data-look></div><div class="vignette"></div>
 <div id="collect-count" class="collect-count" hidden></div><div id="prompt" class="prompt" aria-live="polite"></div><div id="toast" class="toast" role="status"></div>
 <div class="touch-controls"><div class="stick" data-stick aria-label="Movement thumbstick"><i></i><span>MOVE</span></div><div class="touch-actions"><button class="crouch" data-crouch aria-pressed="false" aria-label="Toggle crouch or crawl">Z<small>CROUCH</small></button><button class="action" data-action aria-label="Talk, search, pick up or throw">B<small>ACTION</small></button><button class="jump" data-jump aria-label="Jump">A<small>JUMP</small></button></div><button class="camera-button" data-recenter aria-label="Center camera">↻</button></div>
 <div class="desktop-controls" aria-label="Controls"></div>
+<div id="bow-aim" class="bow-aim" aria-hidden="true"><span class="bow-reticle">+</span><span class="bow-draw"><i></i></span></div>
 <aside id="practice-lesson" class="practice-lesson" hidden><span class="eyebrow">MOVEMENT STUDIO</span><h3 id="lesson-title"></h3><p id="lesson-body"></p><small id="lesson-progress"></small></aside>
 <div class="orientation-hint">↻ Best played with your phone sideways</div><div id="curtain"></div>
 <div id="caught-overlay" class="caught-overlay" aria-live="assertive" aria-atomic="true" hidden><div class="caught-wipe"></div><div class="caught-card"><span class="caught-symbol" aria-hidden="true">↺</span><strong id="caught-heading">Caught!</strong><span id="caught-detail">Let’s try again.</span></div></div>
@@ -659,6 +661,7 @@ async function load(id: WorldId) {
   worldId = id;
   completionSceneSeen = false;
   organSeated = false;
+  app.classList.remove("bow-aiming");
   storyCheckpoint = null;
   storyObjective = "";
   learnedMoves = new Set();
@@ -688,6 +691,7 @@ async function load(id: WorldId) {
     player,
     player.yaw,
     id === "tree" ||
+      id === "broken-bow" ||
       id === "bountiful" ||
       id === "voyage" ||
       id === "promised" ||
@@ -785,17 +789,19 @@ async function load(id: WorldId) {
         ? "1 NEPHI 1–2 · ABOUT 600 BC"
         : id === "tree"
           ? "1 NEPHI 8 · LEHI’S VISION"
-          : id === "bountiful"
-            ? "1 NEPHI 17 · BUILDING THE SHIP"
-            : id === "voyage"
-              ? "1 NEPHI 18 · THE OCEAN VOYAGE"
-              : id === "promised"
-                ? "1 NEPHI 18 · 2 NEPHI 1–5"
-                : id === "vineyard"
-                  ? "JACOB 5 · THE OLIVE VINEYARD"
-                  : id === "night"
-                    ? "1 NEPHI 4 · ABOUT 600 BC"
-                    : "1 NEPHI 3 · ABOUT 600 BC";
+          : id === "broken-bow"
+            ? "1 NEPHI 16 · THE BROKEN BOW"
+            : id === "bountiful"
+              ? "1 NEPHI 17 · BUILDING THE SHIP"
+              : id === "voyage"
+                ? "1 NEPHI 18 · THE OCEAN VOYAGE"
+                : id === "promised"
+                  ? "1 NEPHI 18 · 2 NEPHI 1–5"
+                  : id === "vineyard"
+                    ? "JACOB 5 · THE OLIVE VINEYARD"
+                    : id === "night"
+                      ? "1 NEPHI 4 · ABOUT 600 BC"
+                      : "1 NEPHI 3 · ABOUT 600 BC";
   el("seal-count").textContent =
     `Stories ${completed.size} / ${STORY_ORDER.length}`;
   if (id === "trade" || id === "night") {
@@ -874,11 +880,13 @@ async function load(id: WorldId) {
                     ? "Enter the city and search its moonlit streets."
                     : id === "tree"
                       ? "Take your time. Follow the path toward the tree."
-                      : id === "bountiful"
-                        ? "Climb the mountain trail and pray. Then help build the ship."
-                        : id === "voyage"
-                          ? "Explore the ship and meet the family aboard."
-                          : "Find the blue door. Watch the streets.",
+                      : id === "broken-bow"
+                        ? "Hunt in the mountains and help feed the family."
+                        : id === "bountiful"
+                          ? "Climb the mountain trail and pray. Then help build the ship."
+                          : id === "voyage"
+                            ? "Explore the ship and meet the family aboard."
+                            : "Find the blue door. Watch the streets.",
       4,
     );
 }
@@ -1050,6 +1058,7 @@ function resetCaughtCheckpoint() {
     player,
     player.yaw,
     worldId === "tree" ||
+      worldId === "broken-bow" ||
       worldId === "bountiful" ||
       worldId === "voyage" ||
       worldId === "promised" ||
@@ -1264,6 +1273,8 @@ function update(dt: number) {
     player.z = T.MathUtils.clamp(player.z, b.minZ + 0.35, b.maxZ - 0.35);
   }
   let adventureCarrying = false;
+  let adventureAiming = false;
+  let adventureDraw = 0;
   let treePrompt = "";
   if (adventure) {
     const result = adventure.update(dt, player, state);
@@ -1272,6 +1283,8 @@ function update(dt: number) {
         ? `{action} · ${result.prompt}`
         : result.prompt;
     adventureCarrying = !!result.carrying;
+    adventureAiming = !!result.aiming;
+    adventureDraw = result.draw ?? 0;
     if (storyObjective !== result.objective) {
       storyObjective = result.objective;
       updateObjective();
@@ -1299,9 +1312,13 @@ function update(dt: number) {
       message("A little more room to throw.", 1.5);
     state.interact = false;
   }
+  app.classList.toggle("bow-aiming", adventureAiming);
+  el("bow-aim").style.setProperty("--draw", String(adventureDraw));
   avatar.update(dt, {
     ...player,
     crouching: organSeated || player.crouching,
+    aiming: adventureAiming,
+    draw: adventureDraw,
     carrying:
       adventureCarrying ||
       carryObjects.some((object) => object.held) ||
@@ -1310,43 +1327,32 @@ function update(dt: number) {
       (worldId === "night" &&
         !!(storyScene?.snapshot() as { plates?: boolean } | undefined)?.plates),
   });
-  follow.update(
-    dt,
-    player,
-    world.solids,
-    {
-      orbitX: state.cameraX,
-      orbitY: state.cameraY,
-      recenter: state.recenter,
-      zoom: state.cameraZoom,
-    },
-    worldId === "tree" ||
-      worldId === "bountiful" ||
-      worldId === "voyage" ||
-      worldId === "promised" ||
-      worldId === "vineyard"
-      ? "streets"
-      : worldId === "hub"
-        ? "conference"
-        : worldId,
-  );
   const adventureCamera = adventure?.camera?.();
-  if (adventureCamera) {
-    const blend = 1 - Math.exp(-5 * dt);
-    camera.position.lerp(
-      new T.Vector3(
-        adventureCamera.position.x,
-        adventureCamera.position.y,
-        adventureCamera.position.z,
-      ),
-      blend,
-    );
-    camera.lookAt(
-      adventureCamera.focus.x,
-      adventureCamera.focus.y,
-      adventureCamera.focus.z,
+  if (!adventureCamera && !organSeated) {
+    follow.update(
+      dt,
+      player,
+      world.solids,
+      {
+        orbitX: state.cameraX,
+        orbitY: state.cameraY,
+        recenter: state.recenter,
+        zoom: state.cameraZoom,
+      },
+      worldId === "tree" ||
+        worldId === "broken-bow" ||
+        worldId === "bountiful" ||
+        worldId === "voyage" ||
+        worldId === "promised" ||
+        worldId === "vineyard"
+        ? "streets"
+        : worldId === "hub"
+          ? "conference"
+          : worldId,
     );
   }
+  if (adventureCamera)
+    applyAdventureCamera(camera, adventureCamera, world.solids, dt);
   if (organSeated) {
     camera.position.lerp(new T.Vector3(33, 8, -89), 1 - Math.exp(-5 * dt));
     camera.lookAt(30, 6, -94);

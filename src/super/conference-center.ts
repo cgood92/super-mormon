@@ -280,6 +280,7 @@ export function gallery(scene: THREE.Scene): WorldData {
   });
   // Later chapters sit together in the open east foyer, with a clear south approach.
   for (const [id, title, x, wallZ] of [
+    ["broken-bow", "THE BROKEN BOW", -34, 15],
     ["bountiful", "BUILDING THE SHIP", 34, 15],
     ["voyage", "THE OCEAN VOYAGE", 44, 15],
     ["promised", "A NEW HOME", 34, 32],
@@ -416,6 +417,58 @@ export function gallery(scene: THREE.Scene): WorldData {
               }
             }
           }
+        }
+        if (id === "broken-bow") {
+          ctx.fillStyle = "#b7ccd0";
+          ctx.fillRect(0, 0, 384, 512);
+          for (const [mx, my, color] of [
+            [-40, 170, "#b59b7b"],
+            [170, 105, "#8d7a63"],
+            [60, 240, "#d2b48a"],
+          ] as const) {
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(mx - 120, 512);
+            ctx.lineTo(mx + 100, my);
+            ctx.lineTo(mx + 310, 512);
+            ctx.fill();
+          }
+          ctx.strokeStyle = "#795439";
+          ctx.lineWidth = 11;
+          ctx.beginPath();
+          ctx.moveTo(90, 280);
+          ctx.quadraticCurveTo(170, 360, 90, 450);
+          ctx.stroke();
+          ctx.strokeStyle = "#eee1b7";
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(90, 280);
+          ctx.lineTo(120, 365);
+          ctx.lineTo(90, 450);
+          ctx.stroke();
+          ctx.strokeStyle = "#584b3a";
+          ctx.lineWidth = 5;
+          ctx.beginPath();
+          ctx.moveTo(100, 365);
+          ctx.lineTo(230, 345);
+          ctx.stroke();
+          ctx.fillStyle = "#655a47";
+          ctx.beginPath();
+          ctx.ellipse(280, 303, 33, 18, 0, 0, Math.PI * 2);
+          ctx.fill();
+          for (const dx of [-23, -10, 17, 27])
+            ctx.fillRect(280 + dx, 307, 5, 37);
+          ctx.beginPath();
+          ctx.ellipse(310, 280, 10, 23, -0.4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#655a47";
+          ctx.lineWidth = 4;
+          ctx.beginPath();
+          ctx.moveTo(311, 260);
+          ctx.quadraticCurveTo(304, 215, 288, 225);
+          ctx.moveTo(316, 262);
+          ctx.quadraticCurveTo(325, 220, 309, 222);
+          ctx.stroke();
         }
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;

@@ -26,6 +26,10 @@ export async function prepareWorld(id: WorldId): Promise<PreparedWorld> {
       createTreeOfLifeScene: module.createTreeOfLifeScene,
     };
   }
+  if (id === "broken-bow") {
+    const module = await import("./broken-bow");
+    return { buildWorld: (_, scene) => module.buildBrokenBow(scene) };
+  }
   if (id === "bountiful") {
     const module = await import("./bountiful");
     return { buildWorld: (_, scene) => module.buildBountiful(scene) };

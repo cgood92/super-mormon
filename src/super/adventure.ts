@@ -6,6 +6,8 @@ export type AdventureInput = {
   interactHeld: boolean;
   x: number;
   y: number;
+  jump?: boolean;
+  crouch?: boolean;
 };
 export type AdventureHooks = {
   dialog: (
@@ -28,6 +30,8 @@ export type AdventureRuntime = {
     objective: string;
     prompt: string;
     carrying?: boolean;
+    aiming?: boolean;
+    draw?: number;
   };
   movementLocked?: () => boolean;
   camera?: () =>

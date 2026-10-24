@@ -47,6 +47,7 @@ test("later chapters prepare their own interactive worlds and leave no scene res
   const { prepareWorld } = await import("../src/super/world-loading");
   const { Scene } = await import("three");
   for (const [id, phase] of [
+    ["broken-bow", "camp"],
     ["promised", "camp"],
     ["vineyard", "learn"],
   ] as const) {
@@ -65,7 +66,7 @@ test("later chapters prepare their own interactive worlds and leave no scene res
       dialog: (_k, _t, _b, next) => next(),
     });
     assert.equal((runtime.snapshot() as { phase: string }).phase, phase);
-    assert.equal(role, id === "promised" ? "nephi" : "child");
+    assert.equal(role, id === "vineyard" ? "child" : "nephi");
     runtime.dispose();
     world.dispose?.();
     assert.equal(scene.children.length, 0);

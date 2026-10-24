@@ -42,4 +42,6 @@ export type CharacterState = {
   carrying?: boolean;
   wave?: boolean;
   pointing?: boolean;
+  aiming?: boolean;
+  draw?: number;
 };
