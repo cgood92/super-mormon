@@ -108,3 +108,151 @@ test("walking cast keeps boot cuffs behind the coat without flaring its hem", ()
     }
   }
 });
+
+test("turning coats cover the lower side while retaining their open fronts", () => {
+  for (const quality of ["hero", "npc"] as const) {
+    for (const role of [
+      "nephi",
+      "lehi",
+      "laman",
+      "child",
+      "jacob",
+      "convert",
+      "ammon",
+      "moroni",
+    ] as const) {
+      const actor = createSculptedCharacterRig(role, { quality });
+      const coat = actor.group.getObjectByName(
+        "flowing-mantle",
+      ) as T.SkinnedMesh;
+      const tunic = actor.group.getObjectByName(
+        "continuous-robe-and-sleeves",
+      ) as T.SkinnedMesh;
+      const model = coat.parent!;
+      let x = 0;
+      let z = 0;
+      for (let frame = 0; frame <= 42; frame++) {
+        const yaw = frame < 10 ? 0 : frame < 30 ? Math.PI / 2 : -Math.PI / 2;
+        const velocityYaw =
+          frame < 16 ? 0 : frame < 36 ? Math.PI / 2 : -Math.PI / 2;
+        const vx = Math.sin(velocityYaw) * 4;
+        const vz = Math.cos(velocityYaw) * 4;
+        x += vx / 60;
+        z += vz / 60;
+        actor.update(1 / 60, {
+          ...walking,
+          x,
+          z,
+          vx,
+          vz,
+          yaw,
+        });
+        if (frame !== 23 && frame !== 42) continue;
+        actor.group.updateMatrixWorld(true);
+        coat.skeleton.update();
+        for (const [degrees, projectedX] of [
+          [80, -0.2],
+          [90, -0.25],
+          [270, 0.25],
+          [280, 0.2],
+        ]) {
+          const angle = (degrees * Math.PI) / 180;
+          const radial = new T.Vector3(Math.sin(angle), 0, Math.cos(angle));
+          const across = new T.Vector3(Math.cos(angle), 0, -Math.sin(angle));
+          const direction = radial
+            .clone()
+            .negate()
+            .transformDirection(model.matrixWorld);
+          for (const y of [0.44, 0.48, 0.6]) {
+            const origin = radial
+              .clone()
+              .multiplyScalar(2)
+              .addScaledVector(across, projectedX);
+            origin.y = y;
+            const ray = new T.Raycaster(
+              origin.applyMatrix4(model.matrixWorld),
+              direction,
+            );
+            const tunicHit = ray.intersectObject(tunic, false)[0];
+            if (!tunicHit) continue;
+            const coatHit = ray.intersectObject(coat, false)[0];
+            assert.ok(
+              coatHit && coatHit.distance + 0.002 < tunicHit.distance,
+              `${role} ${quality} turn frame ${frame} side ${degrees}° at y=${y}: lower tunic visible through coat`,
+            );
+          }
+        }
+        for (const y of [0.42, 0.7]) {
+          const front = new T.Raycaster(
+            new T.Vector3(0, y, 2).applyMatrix4(model.matrixWorld),
+            new T.Vector3(0, 0, -1).transformDirection(model.matrixWorld),
+          );
+          const frontTunic = front.intersectObject(tunic, false)[0];
+          const frontCoat = front.intersectObject(coat, false)[0];
+          assert.ok(frontTunic);
+          assert.ok(
+            !frontCoat || frontTunic.distance < frontCoat.distance,
+            `${role} ${quality}: front opening should remain visible at y=${y}`,
+          );
+        }
+      }
+      actor.dispose();
+    }
+  }
+});
+
+test("a reversing coat stays in front of its posed trousers at the side camera", () => {
+  // This camera is framed at adult height; child garment coverage is sampled
+  // in the model-local side rays above.
+  const camera = new T.PerspectiveCamera(32, 0.8, 0.03, 30);
+  camera.position.set(0, 1.1, 4.2);
+  camera.lookAt(0, 0.83, 0);
+  camera.updateMatrixWorld(true);
+  for (const quality of ["hero", "npc"] as const) {
+    for (const role of [
+      "nephi",
+      "lehi",
+      "laman",
+      "jacob",
+      "convert",
+      "ammon",
+      "moroni",
+    ] as const) {
+      const actor = createSculptedCharacterRig(role, { quality });
+      let x = 0;
+      let z = 0;
+      for (let frame = 0; frame <= 42; frame++) {
+        const yaw = frame < 10 ? 0 : frame < 30 ? Math.PI / 2 : -Math.PI / 2;
+        const velocityYaw =
+          frame < 16 ? 0 : frame < 36 ? Math.PI / 2 : -Math.PI / 2;
+        const vx = Math.sin(velocityYaw) * 4;
+        const vz = Math.cos(velocityYaw) * 4;
+        x += vx / 60;
+        z += vz / 60;
+        actor.update(1 / 60, { ...walking, x, z, vx, vz, yaw });
+      }
+      const body = actor.group.getObjectByName("body")!;
+      actor.group.position.set(0, 0, 0);
+      actor.group.rotation.y = Math.PI * 1.25 - 2.35 - body.rotation.y;
+      actor.group.updateMatrixWorld(true);
+      const coat = actor.group.getObjectByName("flowing-mantle")!;
+      const trousers = ["left-trouser", "right-trouser"].map((name) =>
+        actor.group.getObjectByName(name)!,
+      );
+      for (const ndcX of [-0.05, -0.03, -0.01]) {
+        for (const ndcY of [-0.32, -0.3, -0.28, -0.26]) {
+          const ray = new T.Raycaster();
+          ray.setFromCamera(new T.Vector2(ndcX, ndcY), camera);
+          const coatHit = ray.intersectObject(coat, false)[0];
+          const trouserHit = ray.intersectObjects(trousers, false)[0];
+          if (coatHit && trouserHit && coatHit.point.y > 0.35)
+            assert.ok(
+              coatHit.distance + 0.002 < trouserHit.distance,
+              `${role} ${quality}: ${trouserHit.object.name} appears through coat at ${ndcX},${ndcY}`,
+            );
+        }
+      }
+      actor.dispose();
+    }
+  }
+});

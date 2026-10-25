@@ -398,11 +398,13 @@ export function createSculptedCharacterRig(
       const yawRate = dt > 0 ? angleDiff(yaw, lastYaw) / dt : 0;
       lastYaw = yaw;
       const localLateral = Math.cos(yaw) * state.vx - Math.sin(yaw) * state.vz;
+      // Keep the lower panels inside their clearance around the moving thighs
+      // during sharp turns; larger sideways sweeps expose the trousers.
       clothX +=
         (T.MathUtils.clamp(
           -localLateral * 0.012 - yawRate * 0.018,
-          -0.11,
-          0.11,
+          -0.04,
+          0.04,
         ) -
           clothX) *
         damp(5, dt);

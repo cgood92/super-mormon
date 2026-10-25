@@ -1105,7 +1105,12 @@ function makeSculpted(
     const bottom = (cast?.hem ?? 0.24) - 0.05;
     const geometry = surface(uCount, vCount, (u, v) => {
       const y = T.MathUtils.lerp(bottom, 1.58, v);
-      const a = 0.77 + u * (Math.PI * 2 - 1.54);
+      const opening = T.MathUtils.lerp(
+        0.2,
+        0.77,
+        T.MathUtils.smoothstep(y, 0.65, 1.12),
+      );
+      const a = opening + u * (Math.PI * 2 - 2 * opening);
       let lo = 0,
         hi = 0.9;
       for (let step = 0; step < 20; step++) {
@@ -1138,7 +1143,15 @@ function makeSculpted(
               const thickness = 0.018;
               let shell = Math.abs(base - (0.027 + thickness)) - thickness;
               // Open front and shorter coat sleeves reveal a clean tunic and cuffs.
-              const frontOpening = Math.max(0.025 - z, Math.abs(x) - 0.245);
+              const openingWidth = T.MathUtils.lerp(
+                0.075,
+                0.245,
+                T.MathUtils.smoothstep(y, 0.65, 1.12),
+              );
+              const frontOpening = Math.max(
+                0.025 - z,
+                Math.abs(x) - openingWidth,
+              );
               shell = Math.max(shell, -frontOpening);
               if (Math.abs(x) > 0.45) shell = Math.max(shell, 1.015 - y);
               return shell;
