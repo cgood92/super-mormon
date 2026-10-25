@@ -37,6 +37,11 @@ import { createPoundImpact } from "./super/pound-impact";
 import { applyAdventureCamera } from "./super/adventure-camera";
 import { FollowCamera } from "./super/camera";
 import type { WorldData, WorldId } from "./super/worlds";
+import {
+  sceneEntry,
+  cameraModeForWorld,
+  WAR_CHAPTERS,
+} from "./super/scene-entry";
 import { prepareWorld } from "./super/world-loading";
 import { createPerformanceDiagnostics } from "./super/performance";
 import { conferenceLocation } from "./super/conference-location";
@@ -109,6 +114,7 @@ let audio: AudioContext | undefined,
   soundOn = true,
   previous = performance.now(),
   toastUntil = 0;
+const testScene = sceneEntry(location.search);
 const completed = readProgress();
 let controllerSetup: ReturnType<typeof createControllerSetup> | null = null;
 let waitForControllerRelease = false;
@@ -180,6 +186,7 @@ function readProgress(): Set<StoryId> {
   }
 }
 function saveProgress() {
+  if (testScene) return;
   try {
     localStorage.setItem("super-mormon-v1", JSON.stringify([...completed]));
   } catch {
@@ -644,7 +651,7 @@ function disposeScene() {
 }
 let loadGeneration = 0;
 async function load(id: WorldId) {
-  if (isStoryId(id) && !canEnter(id, completed)) {
+  if (isStoryId(id) && id !== testScene && !canEnter(id, completed)) {
     id = "hub";
   }
   const generation = ++loadGeneration;
@@ -709,23 +716,7 @@ async function load(id: WorldId) {
   );
   (world.actorParent ?? scene).add(avatar.group);
   avatar.update(0, player);
-  follow.reset(
-    player,
-    player.yaw,
-    id === "tree" ||
-      id === "broken-bow" ||
-      id === "bountiful" ||
-      id === "voyage" ||
-      id === "promised" ||
-      id === "vineyard" ||
-      id === "jacob" ||
-      id === "waters" ||
-      id === "ammon"
-      ? "streets"
-      : id === "hub"
-        ? "conference"
-        : id,
-  );
+  follow.reset(player, player.yaw, cameraModeForWorld(id));
   levelTime = 0;
   guardsActive = id === "streets";
   caughtGrace = 3;
@@ -808,7 +799,8 @@ async function load(id: WorldId) {
   }
   el("world-name").textContent = world.name;
   el("chapter-label").textContent =
-    id === "hub"
+    WAR_CHAPTERS[id] ??
+    (id === "hub"
       ? "SALT LAKE CITY · THE CONFERENCE CENTER"
       : id === "streets"
         ? "1 NEPHI 1–2 · ABOUT 600 BC"
@@ -832,7 +824,7 @@ async function load(id: WorldId) {
                           ? "JACOB 5 · THE OLIVE VINEYARD"
                           : id === "night"
                             ? "1 NEPHI 4 · ABOUT 600 BC"
-                            : "1 NEPHI 3 · ABOUT 600 BC";
+                            : "1 NEPHI 3 · ABOUT 600 BC");
   el("seal-count").textContent =
     `Stories ${completed.size} / ${STORY_ORDER.length}`;
   if (id === "trade" || id === "night") {
@@ -900,37 +892,39 @@ async function load(id: WorldId) {
   updateObjective();
   if (started)
     message(
-      id === "hub"
-        ? nextStory(completed)
-          ? `Next story: ${STORY_TITLES[nextStory(completed)!]}. Jump into its painting.`
-          : "All stories complete. Jump into any painting to replay."
-        : id === "house"
-          ? "Five treasures. Every room has a story."
-          : id === "palace"
-            ? "Find Laban at the far end of the courtyard."
-            : id === "trade"
-              ? "Your brothers will follow. Bring the treasures to Laban."
-              : id === "jacob"
-                ? "Explore the settlement and meet Jacob’s neighbors."
-                : id === "ammon"
-                  ? "Meet Lamoni, gather the flocks, and guard the waters of Sebus."
-                  : id === "waters"
-                    ? "Many generations later: slip past Noah’s spies and find Alma."
-                    : id === "promised"
-                      ? "Help the family settle, then follow the journey to a new home."
-                      : id === "vineyard"
-                        ? "Explore the vineyard in Jacob’s retelling. Care for the trees."
-                        : id === "night"
-                          ? "Enter the city and search its moonlit streets."
-                          : id === "tree"
-                            ? "Take your time. Follow the path toward the tree."
-                            : id === "broken-bow"
-                              ? "Hunt in the mountains and help feed the family."
-                              : id === "bountiful"
-                                ? "Climb the mountain trail and pray. Then help build the ship."
-                                : id === "voyage"
-                                  ? "Explore the ship and meet the family aboard."
-                                  : "Find the blue door. Watch the streets.",
+      WAR_CHAPTERS[id]
+        ? (world.initialObjective ?? world.subtitle)
+        : id === "hub"
+          ? nextStory(completed)
+            ? `Next story: ${STORY_TITLES[nextStory(completed)!]}. Jump into its painting.`
+            : "All stories complete. Jump into any painting to replay."
+          : id === "house"
+            ? "Five treasures. Every room has a story."
+            : id === "palace"
+              ? "Find Laban at the far end of the courtyard."
+              : id === "trade"
+                ? "Your brothers will follow. Bring the treasures to Laban."
+                : id === "jacob"
+                  ? "Explore the settlement and meet Jacob’s neighbors."
+                  : id === "ammon"
+                    ? "Meet Lamoni, gather the flocks, and guard the waters of Sebus."
+                    : id === "waters"
+                      ? "Many generations later: slip past Noah’s spies and find Alma."
+                      : id === "promised"
+                        ? "Help the family settle, then follow the journey to a new home."
+                        : id === "vineyard"
+                          ? "Explore the vineyard in Jacob’s retelling. Care for the trees."
+                          : id === "night"
+                            ? "Enter the city and search its moonlit streets."
+                            : id === "tree"
+                              ? "Take your time. Follow the path toward the tree."
+                              : id === "broken-bow"
+                                ? "Hunt in the mountains and help feed the family."
+                                : id === "bountiful"
+                                  ? "Climb the mountain trail and pray. Then help build the ship."
+                                  : id === "voyage"
+                                    ? "Explore the ship and meet the family aboard."
+                                    : "Find the blue door. Watch the streets.",
       4,
     );
 }
@@ -1100,23 +1094,7 @@ function resetCaughtCheckpoint() {
   storyScene?.respawn(player);
   avatar.update(0, player);
   treeScene?.respawn(player);
-  follow.reset(
-    player,
-    player.yaw,
-    worldId === "tree" ||
-      worldId === "broken-bow" ||
-      worldId === "bountiful" ||
-      worldId === "voyage" ||
-      worldId === "promised" ||
-      worldId === "vineyard" ||
-      worldId === "jacob" ||
-      worldId === "waters" ||
-      worldId === "ammon"
-      ? "streets"
-      : worldId === "hub"
-        ? "conference"
-        : worldId,
-  );
+  follow.reset(player, player.yaw, cameraModeForWorld(worldId));
   for (const object of carryObjects) if (object.held) resetCarryObject(object);
   caughtGrace = 3.4;
 }
@@ -1305,6 +1283,7 @@ function update(dt: number) {
     follow.yaw,
     world.solids,
     world.climbables,
+    world.swimRegions,
   );
   if (organSeated && world.organ) {
     Object.assign(player, world.organ.seat, {
@@ -1393,19 +1372,7 @@ function update(dt: number) {
         recenter: state.recenter,
         zoom: state.cameraZoom,
       },
-      worldId === "tree" ||
-        worldId === "broken-bow" ||
-        worldId === "bountiful" ||
-        worldId === "voyage" ||
-        worldId === "promised" ||
-        worldId === "vineyard" ||
-        worldId === "jacob" ||
-        worldId === "waters" ||
-        worldId === "ammon"
-        ? "streets"
-        : worldId === "hub"
-          ? "conference"
-          : worldId,
+      cameraModeForWorld(worldId),
     );
   }
   if (adventureCamera)
@@ -1683,7 +1650,7 @@ function resize() {
 window.addEventListener("resize", resize);
 resize();
 refreshControlHints();
-load("hub");
+void load(testScene ?? "hub");
 function startGame() {
   if (started || !world) return;
   started = true;
@@ -1710,7 +1677,9 @@ function startGame() {
   else if (document.fullscreenElement || navigator.userActivation?.isActive)
     void requestFullScreen();
   message(
-    "Run toward a painting, then press {jump}. {pause} → Moves for practice.",
+    worldId === "hub"
+      ? "Run toward a painting, then press {jump}. {pause} → Moves for practice."
+      : (world.initialObjective ?? world.subtitle),
     6,
   );
 }
@@ -1754,7 +1723,7 @@ function frame(now: number) {
       player,
       world.solids,
       { orbitX: 0, orbitY: 0, recenter: false },
-      "conference",
+      cameraModeForWorld(worldId),
     );
   renderer.render(scene, camera);
   diagnostics.sampleFrame(now);

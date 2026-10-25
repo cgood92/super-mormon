@@ -78,6 +78,12 @@ const ORIGINAL_CAST_TRAITS: Readonly<
   Record<
     Exclude<
       SculptedCharacterRole,
+      | "moroni"
+      | "teancum"
+      | "morianton"
+      | "amalickiah"
+      | "lehonti"
+      | "lamanite-laman"
       | "jacob"
       | "sherem"
       | "alma"
@@ -315,6 +321,70 @@ export const SCULPTED_CAST_TRAITS: Readonly<
   Record<SculptedCharacterRole, CastTraits>
 > = {
   ...ORIGINAL_CAST_TRAITS,
+  moroni: {
+    ...ORIGINAL_CAST_TRAITS.guard,
+    outfit: "armor",
+    beard: "none",
+    hair: 0x60452e,
+    coat: 0x335b78,
+    robe: 0xd7c3a0,
+    trim: 0xb8a16d,
+    faceWidth: 0.87,
+    width: 0.36,
+    brow: 0.035,
+  },
+  teancum: {
+    ...ORIGINAL_CAST_TRAITS.guard,
+    outfit: "armor",
+    beard: "trimmed",
+    hairStyle: "cropped",
+    hair: 0x3e3027,
+    coat: 0x3f7066,
+    robe: 0x88785d,
+    trim: 0x9a9e85,
+    faceWidth: 0.82,
+    width: 0.34,
+    tall: 1.07,
+  },
+  morianton: {
+    ...ORIGINAL_CAST_TRAITS.laman,
+    beard: "scruff",
+    hairStyle: "swept",
+    coat: 0x8c5944,
+    robe: 0xb99a6a,
+    trim: 0x65513f,
+    brow: -0.025,
+  },
+  amalickiah: {
+    ...ORIGINAL_CAST_TRAITS.laban,
+    beard: "trimmed",
+    hairStyle: "swept",
+    coat: 0x623955,
+    robe: 0x9b795d,
+    trim: 0xc0a168,
+    faceWidth: 0.93,
+    brow: -0.04,
+    tall: 1.12,
+  },
+  lehonti: {
+    ...ORIGINAL_CAST_TRAITS.zoram,
+    beard: "trimmed",
+    hairStyle: "cropped",
+    coat: 0x967947,
+    robe: 0xbcb598,
+    trim: 0x5c706a,
+    faceWidth: 0.9,
+    tall: 1.04,
+  },
+  "lamanite-laman": {
+    ...ORIGINAL_CAST_TRAITS.sam,
+    beard: "scruff",
+    hairStyle: "cropped",
+    coat: 0x7b6f8f,
+    robe: 0xc1b49b,
+    trim: 0x76634d,
+    faceWidth: 0.84,
+  },
   jacob: {
     ...ORIGINAL_CAST_TRAITS.lehi,
     hair: 0x645648,

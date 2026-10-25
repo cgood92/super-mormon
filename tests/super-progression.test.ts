@@ -5,6 +5,7 @@ import {
   nextStory,
   prerequisite,
   readCompleted,
+  STORY_ORDER,
 } from "../src/super/progression";
 
 test("scenes unlock in story order and completed scenes stay replayable", () => {
@@ -62,6 +63,12 @@ test("scenes unlock in story order and completed scenes stay replayable", () => 
   completed.add("waters");
   assert.equal(nextStory(completed), "ammon");
   completed.add("ammon");
+  assert.equal(nextStory(completed), "title-liberty");
+  for (const id of STORY_ORDER.slice(STORY_ORDER.indexOf("title-liberty"))) {
+    assert.equal(nextStory(completed), id);
+    assert.ok(canEnter(id, completed));
+    completed.add(id);
+  }
   assert.equal(nextStory(completed), null);
   assert.equal(canEnter("bountiful", completed), true);
 });

@@ -1,3 +1,10 @@
+export type SwimRegion = {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+  surfaceY: number;
+};
 export type Solid = {
   x: number;
   y: number;
@@ -15,6 +22,7 @@ export type Climbable = {
   radius: number;
 };
 export type PlayerMove =
+  | "swim"
   | "idle"
   | "run"
   | "crouch"
@@ -331,6 +339,7 @@ export function stepPlayer(
   cameraYaw: number,
   solids: Solid[],
   climbables: Climbable[] = [],
+  swimRegions: SwimRegion[] = [],
 ): StepEvents {
   const events: StepEvents = { jumped: false, landed: false };
   if (!Number.isFinite(dt) || dt <= 0) return events;
@@ -342,6 +351,82 @@ export function stepPlayer(
   const uy = magnitude ? (input.y / magnitude) * length : 0;
   const worldX = -Math.cos(cameraYaw) * ux + Math.sin(cameraYaw) * uy;
   const worldZ = Math.sin(cameraYaw) * ux + Math.cos(cameraYaw) * uy;
+  // Water is opt-in per world: dry-world physics remains identical. A swimmer
+  // stays afloat and must return toward shore rather than walking off the sea.
+  let water = swimRegions.find(
+    (r) =>
+      player.x >= r.minX &&
+      player.x <= r.maxX &&
+      player.z >= r.minZ &&
+      player.z <= r.maxZ,
+  );
+  if (player.move === "swim" && !water) {
+    const shore = swimRegions.find(
+      (r) => player.z >= r.maxZ && player.x >= r.minX && player.x <= r.maxX,
+    );
+    if (shore) {
+      player.y = Math.max(0, supportHeight(player, solids));
+      player.grounded = true;
+      player.vy = 0;
+      setMove(player, "idle");
+    } else if (swimRegions.length) {
+      const r = swimRegions[0];
+      player.x = Math.max(r.minX + RADIUS, Math.min(r.maxX - RADIUS, player.x));
+      player.z = Math.max(r.minZ + RADIUS, Math.min(r.maxZ, player.z));
+      water = r;
+    }
+  }
+  if (
+    water &&
+    player.y < water.surfaceY + 0.8 &&
+    !player.climbId &&
+    !player.ledge
+  ) {
+    player.crouching = false;
+    player.grounded = false;
+    player.crouchHeld = !!input.crouch;
+    player.jumpBufferTime = player.coyoteTime = player.comboTime = 0;
+    setMove(player, "swim");
+    for (let i = 0; i < count; i++) {
+      player.moveTime += subdt;
+      const drag = 1 - Math.exp(-4 * subdt);
+      player.vx += (worldX * 2.8 - player.vx) * drag;
+      player.vz += (worldZ * 2.8 - player.vz) * drag;
+      // Feet rest on shallow seabed while the torso stays buoyant. Check the
+      // next footprint so a swimmer can step out onto the beach, and do not
+      // sink while the capsule still straddles dry ground at the shoreline.
+      let seabed = water.surfaceY - 0.95;
+      for (const solid of solids) {
+        const top = solid.y + solid.h;
+        if (
+          top <= water.surfaceY + 0.4 &&
+          horizontalOverlap(
+            player.x + player.vx * subdt,
+            player.z + player.vz * subdt,
+            solid,
+          )
+        )
+          seabed = Math.max(seabed, top);
+      }
+      player.y = Math.max(player.y, seabed);
+      moveHorizontal(player, "x", player.vx * subdt, solids);
+      moveHorizontal(player, "z", player.vz * subdt, solids);
+      player.x = Math.max(
+        water.minX + RADIUS,
+        Math.min(water.maxX - RADIUS, player.x),
+      );
+      player.z = Math.max(water.minZ + RADIUS, player.z);
+      const targetY = Math.max(
+        seabed,
+        water.surfaceY - 0.95 + Math.sin(player.moveTime * 3) * 0.055,
+      );
+      player.vy = (targetY - player.y) * 6;
+      player.y += player.vy * subdt;
+      player.runSpeed = Math.hypot(player.vx, player.vz);
+      if (player.runSpeed > 0.12) player.yaw = Math.atan2(player.vx, player.vz);
+    }
+    return events;
+  }
   const crouchPressed = !!input.crouch && !player.crouchHeld;
   player.crouchHeld = !!input.crouch;
   if (

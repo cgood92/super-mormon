@@ -217,7 +217,17 @@ export function createMotionDriver(role: CharacterRole): {
                     ? "doubleJump"
                     : "jump"));
       const moveTime = Math.max(0, state.moveTime ?? 0);
-      if (move === "crawl") {
+      if (move === "swim") {
+        const stroke = state.moveTime ?? idlePhase;
+        body.rotation.x = 0.32;
+        body.rotation.z = Math.sin(stroke * 3) * 0.045;
+        head.rotation.x = -0.23;
+        arms[0].rotation.set(-1.5 + Math.sin(stroke * 3) * 1.1, 0, -0.35);
+        arms[1].rotation.set(-1.5 - Math.sin(stroke * 3) * 1.1, 0, 0.35);
+        legs[0].rotation.x = Math.sin(stroke * 5) * 0.23;
+        legs[1].rotation.x = -Math.sin(stroke * 5) * 0.23;
+        knees[0].rotation.x = knees[1].rotation.x = 0.25;
+      } else if (move === "crawl") {
         // Rotate a full-size body onto hands and knees, rather than shrinking
         // an upright walk. Diagonal supports alternate with distance traveled.
         body.scale.set(1, 0.84, 1);

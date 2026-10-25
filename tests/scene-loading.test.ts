@@ -86,3 +86,28 @@ test("later chapters prepare their own interactive worlds and leave no scene res
     assert.equal(scene.children.length, 0);
   }
 });
+
+test("six war chapters prepare playable worlds and dispose their scenes", async () => {
+  const { prepareWorld } = await import("../src/super/world-loading");
+  const { Scene } = await import("three");
+  for (const id of [
+    "title-liberty",
+    "lehonti",
+    "morianton",
+    "teancum",
+    "gid",
+    "nephihah",
+  ] as const) {
+    const scene = new Scene();
+    const prepared = await prepareWorld(id);
+    assert.equal(scene.children.length, 0, `${id} import is inert`);
+    const world = prepared.buildWorld(id, scene);
+    assert.ok(world.name, `${id} has a title`);
+    assert.ok(world.adventure, `${id} has playable progression`);
+    assert.ok(world.solids.length > 0, `${id} has physical surfaces`);
+    assert.ok(world.bounds, `${id} has playable bounds`);
+    assert.ok(scene.children.length > 0, `${id} builds a scene`);
+    world.dispose?.();
+    assert.equal(scene.children.length, 0, `${id} releases its scene`);
+  }
+});

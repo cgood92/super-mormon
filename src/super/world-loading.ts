@@ -11,6 +11,30 @@ type PreparedWorld = {
 
 // Load code first, then let the caller atomically replace the active scene.
 export async function prepareWorld(id: WorldId): Promise<PreparedWorld> {
+  if (id === "title-liberty") {
+    const module = await import("./title-of-liberty");
+    return { buildWorld: (_, scene) => module.buildTitleOfLiberty(scene) };
+  }
+  if (id === "lehonti") {
+    const module = await import("./lehonti-mountain");
+    return { buildWorld: (_, scene) => module.buildLehontiMountain(scene) };
+  }
+  if (id === "morianton") {
+    const module = await import("./morianton-flight");
+    return { buildWorld: (_, scene) => module.buildMoriantonFlight(scene) };
+  }
+  if (id === "teancum") {
+    const module = await import("./teancum-night");
+    return { buildWorld: (_, scene) => module.buildTeancumNight(scene) };
+  }
+  if (id === "gid") {
+    const module = await import("./gid-rescue");
+    return { buildWorld: (_, scene) => module.buildGidRescue(scene) };
+  }
+  if (id === "nephihah") {
+    const module = await import("./nephihah");
+    return { buildWorld: (_, scene) => module.buildNephihah(scene) };
+  }
   if (id === "hub") {
     const module = await import("./conference-center");
     return { buildWorld: (_, scene) => module.gallery(scene) };

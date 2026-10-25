@@ -1,3 +1,9 @@
+import { buildTitleOfLiberty } from "./title-of-liberty";
+import { buildLehontiMountain } from "./lehonti-mountain";
+import { buildMoriantonFlight } from "./morianton-flight";
+import { buildTeancumNight } from "./teancum-night";
+import { buildGidRescue } from "./gid-rescue";
+import { buildNephihah } from "./nephihah";
 import * as THREE from "three";
 import { buildAmmonFlocks } from "./ammon-flocks";
 import { buildBrokenBow } from "./broken-bow";
@@ -14,6 +20,12 @@ import { gallery } from "./conference-center";
 import type { Climbable, PlayerState } from "./physics";
 import type { AdventureHooks, AdventureRuntime } from "./adventure";
 export type WorldId =
+  | "title-liberty"
+  | "lehonti"
+  | "morianton"
+  | "teancum"
+  | "gid"
+  | "nephihah"
   | "hub"
   | "streets"
   | "house"
@@ -39,6 +51,7 @@ export type Solid = {
 };
 export type Point = { x: number; y: number; z: number; yaw?: number };
 export type WorldData = {
+  swimRegions?: import("./physics").SwimRegion[];
   name: string;
   subtitle: string;
   initialObjective?: string;
@@ -89,6 +102,19 @@ export type WorldData = {
 
 export function buildWorld(id: WorldId, scene: THREE.Scene): WorldData {
   switch (id) {
+    case "title-liberty":
+      return buildTitleOfLiberty(scene);
+    case "lehonti":
+      return buildLehontiMountain(scene);
+    case "morianton":
+      return buildMoriantonFlight(scene);
+    case "teancum":
+      return buildTeancumNight(scene);
+    case "gid":
+      return buildGidRescue(scene);
+    case "nephihah":
+      return buildNephihah(scene);
+
     case "hub":
       return gallery(scene);
     case "streets":

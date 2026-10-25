@@ -13,10 +13,22 @@ export const STORY_ORDER = [
   "jacob",
   "waters",
   "ammon",
+  "title-liberty",
+  "lehonti",
+  "morianton",
+  "teancum",
+  "gid",
+  "nephihah",
 ] as const;
 export type StoryId = (typeof STORY_ORDER)[number];
 
 export const STORY_TITLES: Record<StoryId, string> = {
+  "title-liberty": "The Title of Liberty",
+  lehonti: "Lehonti’s Mountain",
+  morianton: "The Narrow Pass",
+  teancum: "Teancum by Night",
+  gid: "The Prisoners of Gid",
+  nephihah: "The Walls of Nephihah",
   streets: "Jerusalem Streets",
   palace: "Laban’s Palace",
   house: "Lehi’s House",

@@ -6,6 +6,16 @@ import {
 } from "./super/character";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 const cast: [CharacterRole, string, string][] = [
+  ["moroni", "Captain Moroni", "Blue cloak, armor and determined expression."],
+  ["teancum", "Teancum", "Lean veteran with teal clothing and cropped hair."],
+  ["morianton", "Morianton", "Rust mantle and an impatient expression."],
+  ["amalickiah", "Amalickiah", "Tall commander in plum and bronze."],
+  ["lehonti", "Lehonti", "Ochre mantle and a trimmed beard."],
+  [
+    "lamanite-laman",
+    "Laman of Gid",
+    "The descendant of Laman who helps free the prisoners.",
+  ],
   ["nephi", "Nephi", "Young, clean-shaven, and confident."],
   ["lehi", "Lehi", "The approved elder, with his long robe and coat."],
   ["sariah", "Sariah", "Mature face, linen head covering, sage clothing."],

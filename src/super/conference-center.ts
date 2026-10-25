@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { label, painting } from "./art";
+import { STORY_ORDER } from "./progression";
+import { laterPainting } from "./gallery-layout";
 import { paintingCollider } from "./gallery-entry";
 import type { WorldData } from "./worlds";
 import {
@@ -279,19 +281,12 @@ export function gallery(scene: THREE.Scene): WorldData {
     portals.push(portal);
     solids.push(paintingCollider(portal));
   });
-  // Later chapters sit together in the open east foyer, with a clear south approach.
-  for (const [id, title, x, wallZ] of [
-    ["broken-bow", "THE BROKEN BOW", -34, 15],
-    ["bountiful", "BUILDING THE SHIP", 34, 15],
-    ["voyage", "THE OCEAN VOYAGE", 44, 15],
-    ["promised", "A NEW HOME", 34, 32],
-    ["vineyard", "THE OLIVE VINEYARD", 44, 32],
-    ["jacob", "JACOB AND SHEREM", -44, 32],
-    ["waters", "THE WATERS OF MORMON", -34, 32],
-    ["ammon", "AMMON AND THE KING’S FLOCKS", -44, 15],
-  ] as const) {
-    add(x, 0, wallZ, 8, 6, 0.45, C.pale, "later story wall");
-    const image = painting(group, x, 0.7, wallZ + 0.3, "", 0xffffff);
+  // Later stories are hung in side hallways, then on successively higher floors.
+  for (const { id, title, x, y, z: wallZ } of STORY_ORDER.slice(6).map(
+    laterPainting,
+  )) {
+    add(x, y, wallZ, 8, 6, 0.45, C.pale, "side hallway story wall");
+    const image = painting(group, x, y + 0.7, wallZ + 0.3, "", 0xffffff);
     image.onBeforeRender = () => {};
     image.name = `${id} story painting`;
     if (typeof document !== "undefined") {
@@ -568,17 +563,77 @@ export function gallery(scene: THREE.Scene): WorldData {
           ctx.lineTo(120, 230);
           ctx.stroke();
         }
+        if (
+          [
+            "title-liberty",
+            "lehonti",
+            "morianton",
+            "teancum",
+            "gid",
+            "nephihah",
+          ].includes(id)
+        ) {
+          const night = id === "teancum" || id === "gid";
+          ctx.fillStyle = night ? "#1d2949" : "#95b9bf";
+          ctx.fillRect(0, 0, 384, 512);
+          ctx.fillStyle = "#62765c";
+          ctx.beginPath();
+          ctx.moveTo(0, 390);
+          ctx.lineTo(160, 90);
+          ctx.lineTo(384, 380);
+          ctx.lineTo(384, 512);
+          ctx.lineTo(0, 512);
+          ctx.fill();
+          if (id === "lehonti" || id === "morianton") {
+            ctx.strokeStyle = "#c0ad80";
+            ctx.lineWidth = 15;
+            ctx.beginPath();
+            ctx.moveTo(190, 480);
+            ctx.lineTo(290, 350);
+            ctx.lineTo(110, 270);
+            ctx.lineTo(180, 160);
+            ctx.stroke();
+          } else if (id === "title-liberty") {
+            ctx.fillStyle = "#665039";
+            ctx.fillRect(124, 140, 12, 335);
+            ctx.fillStyle = "#e9dcc0";
+            ctx.fillRect(136, 140, 165, 110);
+            ctx.fillStyle = "#3f4a58";
+            ctx.font = "bold 18px serif";
+            ctx.fillText("LIBERTY", 155, 202);
+          } else {
+            ctx.fillStyle = "#aa916d";
+            ctx.fillRect(20, 310, 344, 202);
+            for (let n = 0; n < 6; n++) ctx.fillRect(20 + n * 58, 280, 30, 40);
+            ctx.fillStyle = "#fff1ce";
+            ctx.beginPath();
+            ctx.arc(292, 76, 23, 0, Math.PI * 2);
+            ctx.fill();
+            if (id === "nephihah") {
+              ctx.strokeStyle = "#dbc49c";
+              ctx.lineWidth = 6;
+              ctx.beginPath();
+              ctx.moveTo(150, 470);
+              ctx.lineTo(150, 255);
+              ctx.moveTo(195, 470);
+              ctx.lineTo(195, 255);
+              ctx.stroke();
+              for (let n = 0; n < 10; n++)
+                ctx.fillRect(150, 270 + n * 20, 45, 5);
+            }
+          }
+        }
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
         (image.material as THREE.MeshBasicMaterial).map = texture;
       }
     }
-    label(group, title, x, 0.55, wallZ + 0.7, 7, 0.52);
-    solids.push({ x, y: 0.55, z: wallZ + 0.7, w: 7, h: 0.52, d: 0.18 });
+    label(group, title, x, y + 0.55, wallZ + 0.7, 7, 0.52);
+    solids.push({ x, y: y + 0.55, z: wallZ + 0.7, w: 7, h: 0.52, d: 0.18 });
     const portal = {
       id,
       x,
-      y: 0.59,
+      y: y + 0.59,
       z: wallZ + 0.58,
       title,
       facing: "north" as const,
@@ -588,7 +643,7 @@ export function gallery(scene: THREE.Scene): WorldData {
   }
   label(
     group,
-    "THE JOURNEY CONTINUES · 1 NEPHI 17–18",
+    "MORE STORIES · SIDE HALLWAYS & UPPER FLOORS",
     39,
     6.8,
     15.65,

@@ -1,5 +1,6 @@
 import * as T from "three";
 import { adventureLandscape, withinTask } from "./adventure-landscape";
+import { buildNephiteTemple } from "./nephite-temple";
 import type { Point, WorldData } from "./worlds";
 
 /** Jacob 7:1–23. Architecture and exploration staging are interpretive. */
@@ -9,9 +10,10 @@ export function buildJacobSherem(scene: T.Scene): WorldData {
     "Jacob's settlement",
     0xb3b081,
     140,
-    140,
+    190,
   );
   const { root, solids, solid } = land;
+  const temple = buildNephiteTemple(root, solids);
   // Open doorways face the streets. Walls and roofs share their physical dimensions.
   function home(x: number, z: number, tint: number) {
     solid({ x: x - 4, y: 0, z, w: 0.6, h: 4.2, d: 8 }, tint, "Home west wall");
@@ -135,13 +137,14 @@ export function buildJacobSherem(scene: T.Scene): WorldData {
     spawn: { x: 0, y: 0, z: 38 },
     solids,
     actorParent: root,
-    bounds: { minX: -55, maxX: 55, minZ: -55, maxZ: 55 },
+    bounds: { minX: -55, maxX: 55, minZ: -86, maxZ: 55 },
     goal: { ...peace, radius: 3 },
     landmarks: [
       { name: "Jacob's home", ...study },
       { name: "Meeting square", ...square },
       { name: "House of care", ...care },
       { name: "Quiet garden", ...discovery },
+      { name: "Nephi's temple · interpretive", ...temple.entrance },
     ],
     update(dt) {
       if (index === 3 && !ended) {
@@ -172,10 +175,18 @@ export function buildJacobSherem(scene: T.Scene): WorldData {
           const stage = stages[index];
           const close = withinTask(player, stage.at);
           const optional = !discovered && withinTask(player, discovery);
+          const atTemple =
+            withinTask(player, temple.entrance, 3.2) ||
+            withinTask(player, temple.hall, 3.2) ||
+            withinTask(player, temple.inner, 3.2);
           if (!pending && input.interact && optional) {
             discovered = true;
             hooks.toast(
               "Quiet garden · Jacob's confidence came from revelation, not a contest of eloquence (Jacob 7:4–5). This resting place is imagined.",
+            );
+          } else if (!pending && atTemple && input.interact && !close) {
+            hooks.toast(
+              "Nephi built a temple after the manner of Solomon's, with fewer precious things (2 Nephi 5:16). This layout and its furnishings are interpretive; explore the porch, hall, and inner room.",
             );
           } else if (!pending && close && input.interact) {
             pending = true;
@@ -227,9 +238,11 @@ export function buildJacobSherem(scene: T.Scene): WorldData {
               ? ""
               : optional
                 ? "{action} · Reflect in the quiet garden"
-                : close
-                  ? `{action} · ${stage.action}`
-                  : "",
+                : atTemple
+                  ? "{action} · Explore Nephi's temple"
+                  : close
+                    ? `{action} · ${stage.action}`
+                    : "",
           };
         },
         dispose() {

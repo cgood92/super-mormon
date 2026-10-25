@@ -68,6 +68,40 @@ export function sceneryBox(
   markScenery(mesh, { kind: "solid", solids: [shape] });
   return mesh;
 }
+/** A round column with one shared diameter/height source and fitted body collision. */
+export function sceneryColumn(
+  parent: T.Group,
+  solids: Solid[],
+  material: T.Material,
+  shape: { x: number; y: number; z: number; diameter: number; height: number },
+  name: string,
+): T.Mesh {
+  const mesh = new T.Mesh(
+    new T.CylinderGeometry(
+      shape.diameter / 2,
+      shape.diameter / 2,
+      shape.height,
+      12,
+    ),
+    material,
+  );
+  mesh.position.set(shape.x, shape.y + shape.height / 2, shape.z);
+  mesh.name = name;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  const body = {
+    x: shape.x,
+    y: shape.y,
+    z: shape.z,
+    w: shape.diameter,
+    h: shape.height,
+    d: shape.diameter,
+  };
+  solids.push(body);
+  markScenery(mesh, { kind: "solid", solids: [body] });
+  parent.add(mesh);
+  return mesh;
+}
 /** Smooth faceted rock shell over fitted shallow physical layers. The shell stays within one step of support. */
 export function terracedRock(
   parent: T.Group,

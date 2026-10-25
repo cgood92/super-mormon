@@ -3,24 +3,41 @@ import assert from "node:assert/strict";
 import * as THREE from "three";
 import { gallery, CONFERENCE_ESCALATORS } from "../src/super/conference-center";
 import { createPlayer, stepPlayer } from "../src/super/physics";
+import { STORY_ORDER } from "../src/super/progression";
 import { canJumpIntoPainting } from "../src/super/gallery-entry";
 
-test("Conference Center has fourteen reachable canvases and nine optional lessons", () => {
+test("Conference Center has reachable canvases on their assigned floors and nine optional lessons", () => {
   const world = gallery(new THREE.Scene());
-  assert.equal(world.portals?.length, 14);
+  assert.equal(world.portals?.length, STORY_ORDER.length);
   assert.equal(world.tutorials?.length, 9);
   for (const portal of world.portals!) {
     const player = createPlayer(world.spawn.x, 0, world.spawn.z);
     const aisle =
-      portal.z < 20 && Math.abs(portal.x) > 25
-        ? [
-            { x: Math.sign(portal.x) * 25, z: 36 },
-            { x: Math.sign(portal.x) * 25, z: 20 },
-            { x: portal.x, z: 20 },
-          ]
-        : [{ x: portal.x, z: 36 }];
+      Math.abs(portal.x) < 26
+        ? [{ x: portal.x, z: 36 }]
+        : (portal.y ?? 0) > 10
+          ? [
+              { x: -5, z: 47 },
+              { x: -56, z: 47 },
+              { x: -56, z: -1 },
+              { x: -48, z: -1 },
+              { x: -48, z: 47 },
+              { x: Math.sign(portal.x) * 65, z: 47 },
+              { x: Math.sign(portal.x) * 65, z: 1 },
+              { x: Math.sign(portal.x) * 85, z: 1 },
+              { x: Math.sign(portal.x) * 85, z: -1 },
+              { x: Math.sign(portal.x) * 85, z: portal.z + 2 },
+            ]
+          : [
+              { x: -5, z: 47 },
+              { x: Math.sign(portal.x) * 65, z: 47 },
+              { x: Math.sign(portal.x) * 65, z: 1 },
+              { x: Math.sign(portal.x) * 85, z: 1 },
+              { x: Math.sign(portal.x) * 85, z: -1 },
+              { x: Math.sign(portal.x) * 85, z: portal.z + 2 },
+            ];
     for (const target of [...aisle, { x: portal.x, z: portal.z + 2 }]) {
-      for (let i = 0; i < 500; i++) {
+      for (let i = 0; i < 1800; i++) {
         const dx = target.x - player.x,
           dz = target.z - player.z,
           distance = Math.hypot(dx, dz);
@@ -35,9 +52,15 @@ test("Conference Center has fourteen reachable canvases and nine optional lesson
       }
       assert.ok(
         Math.hypot(player.x - target.x, player.z - target.z) < 0.15,
-        `spawn route to ${portal.id}`,
+        `spawn route to ${portal.id} via ${target.x},${target.z}: stopped at ${player.x.toFixed(2)},${player.y.toFixed(2)},${player.z.toFixed(2)}`,
       );
     }
+    assert.ok(
+      Math.abs(player.y - ((portal.y ?? 0.59) - 0.59)) < 0.1,
+      `${portal.id} floor ${player.y}`,
+    );
+    if (Math.abs(portal.x) > 26)
+      assert.ok(Math.abs(portal.x) > 67, "later art outside auditorium");
     let entered = false;
     for (let i = 0; i < 100; i++) {
       stepPlayer(

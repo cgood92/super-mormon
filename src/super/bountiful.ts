@@ -95,18 +95,28 @@ export function buildBountiful(scene: T.Scene): WorldData {
     color: number,
     name: string,
   ) => terracedRock(root, solids, mat(color), { x, y, z, w, h, d }, name);
-  block(0, -1, 5, 190, 1, 170, 0xd5bd82, false, "Warm sandy coastal plain");
+  // A single dry beach ends at z=-50; shallow, physically supported seabed
+  // descends under the water. Adjacent surfaces meet without coplanar floors.
+  block(0, -1, 20, 190, 1, 140, 0xd5bd82, true, "Warm sandy coastal plain");
+  block(0, -1.75, -52.5, 190, 1, 5, 0xc5b482, true, "Wading seabed");
+  block(0, -2.3, -58.5, 190, 1, 7, 0xb5aa80, true, "Nearshore seabed");
+  block(0, -3.2, -66, 190, 1, 8, 0x9fa484, true, "Outer swimming seabed");
   const water = block(
     0,
     -0.55,
     -96,
     240,
     0.2,
-    90,
+    92,
     0x318d9b,
     false,
     "Irreantum — many waters",
   );
+  markScenery(water, {
+    kind: "decoration",
+    reason:
+      "Water is a visible surface; its bounded buoyancy region provides swimming, not a solid floor.",
+  });
   for (let i = 0; i < 8; i++)
     block(0, -0.35, -58 - i * 5, 180, 0.035, 0.35, 0x9bd5cc);
   for (let i = 0; i < 18; i++) {
@@ -365,7 +375,10 @@ export function buildBountiful(scene: T.Scene): WorldData {
     solids,
     climbables,
     actorParent: root,
-    bounds: { minX: -78, maxX: 63, minZ: -65, maxZ: 62 },
+    swimRegions: [
+      { minX: -78, maxX: 63, minZ: -68, maxZ: -50, surfaceY: -0.35 },
+    ],
+    bounds: { minX: -78, maxX: 63, minZ: -69, maxZ: 62 },
     goal: point(0, -23),
     landmarks: [
       { name: "Mountain prayer trail", ...summit },

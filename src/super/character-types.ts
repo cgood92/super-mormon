@@ -1,4 +1,10 @@
 export type CharacterRole =
+  | "moroni"
+  | "teancum"
+  | "morianton"
+  | "amalickiah"
+  | "lehonti"
+  | "lamanite-laman"
   | "ammon"
   | "lamoni"
   | "nephi"
@@ -22,6 +28,7 @@ export type CharacterRole =
   | "lamans-wife"
   | "lemuels-wife";
 export type CharacterMove =
+  | "swim"
   | "idle"
   | "run"
   | "crouch"

@@ -1,0 +1,15 @@
+# Title of Liberty and Mount Antipas
+
+These levels adapt [Alma 46](https://www.churchofjesuschrist.org/study/scriptures/bofm/alma/46?lang=eng) and [Alma 47](https://www.churchofjesuschrist.org/study/scriptures/bofm/alma/47?lang=eng). They preserve the recorded order and outcome while making traversal and conversation playable.
+
+## The Title of Liberty
+
+Alma 46:11–13 records Moroni rending his coat, writing on it, fastening it to a pole, arming himself, and praying. Verses 19–22 record his public call and the people running together and making a covenant. Verse 28 says he sent people elsewhere to gather defenders of liberty. Verse 36 says the standard was raised on towers throughout Nephite land. The playable city puts the player in Moroni's role: prepare the banner, carry it through a large street network, pray, wave it while moving among three roaming groups, then climb three physical switchbacks to plant it on a tower roof. The cloth displays Alma 46:12's inscription when a browser canvas is available. The exact street plan, houses, watch patrols, number and placement of groups, and their dialogue are **imagined staging**. The banner's visible pole and fabric follow the player's position after it is made; groups move toward the southern gathering point after answering the call.
+
+## Lehonti on Mount Antipas
+
+Alma 47:5–10 identifies Onidah, the gathered army on Mount Antipas, Amalickiah's camp in the valley, and his secret night embassy. Verse 11 gives three successive requests that Lehonti come to the mountain foot; he refuses. Verse 12 says Amalickiah climbs nearly to Lehonti's camp and makes a fourth request, asking him to come down with guards. Verses 13–19 describe the surrounding maneuver, Amalickiah's appointment as second leader, Lehonti's death by poison administered by degrees, and Amalickiah's succession.
+
+The **warning runner, three timed races, spiral trail, quick returns, pennants, and direct warnings to Lehonti are game inventions**. Each race is a full ascent from the trailhead to Lehonti's summit camp; a brief imagined return sets up the next messenger. The messenger actors represent the three recorded embassies; the runner's success never erases their requests or changes Lehonti's decisions. The fourth approach and fatal outcome stay fixed. The physical spiral consists of individually supported, short terraces with tops 0.34 m apart; the player can walk each rise with `stepPlayer`. Fitted central rock masses, outer terraces, and tree trunks use registered collision geometry. Batched terrace scrub, shallow stone facets, pennants, and foliage have explicit nonphysical intent.
+
+`buildTitleOfLiberty(scene)` and `buildLehontiMountain(scene)` return `WorldData` with `adventure` hooks. The city exports `LIBERTY_TOWER_ROUTE`; the mountain exports `ANTIPAS_ROUTE` for route validation and guidance. `tests/super-war-levels.test.ts` exercises the rally, physical tower climb, every mountain ascent, semantic scenery collision, three races, ending, and idempotent disposal. The scene sources use the named cast roles `moroni`, `lehonti`, and `amalickiah` provided by the shared character system.
