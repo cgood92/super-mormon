@@ -242,25 +242,28 @@ export function createSculptedCharacterRig(
   footMeshes.forEach((mesh) => mesh.geometry.computeBoundingBox());
   const intoModel = new T.Matrix4();
   const footMatrix = new T.Matrix4();
-  const clearFeet = (x: number, y: number, z: number) => {
+  const clearFeet = (x: number, y: number, z: number, outer: boolean) => {
     if (!walkingCloth) return z;
-    // Both sandals can influence the same hem vertex. Use their union rather
-    // than adding two bulges, which inflated the robe during side views.
-    let clearance = 0;
+    // Let only the nearby panel respond to a passing boot cuff. The outer
+    // coat gets first clearance; the tunic stays within that outer surface.
+    let back = z;
+    let front = z;
     for (const box of footBounds) {
       const centerX = (box.min.x + box.max.x) / 2;
       const influence =
-        Math.exp(-Math.pow((x - centerX) / 0.24, 2)) *
-        (1 - T.MathUtils.smoothstep(y, box.min.y + 0.1, box.max.y + 0.04));
-      const reach =
-        z > 0
-          ? Math.max(0, box.max.z + 0.035 - 0.3)
-          : Math.max(0, -0.3 - box.min.z + 0.035);
-      clearance = Math.max(clearance, reach * influence);
+        Math.exp(-Math.pow((x - centerX) / 0.25, 2)) *
+        (1 - T.MathUtils.smoothstep(y, box.max.y - 0.04, box.max.y + 0.11));
+      const margin = outer ? 0.025 : 0.005;
+      back = Math.min(
+        back,
+        z - Math.min(0.05, Math.max(0, z - box.min.z + margin)) * influence,
+      );
+      front = Math.max(
+        front,
+        z + Math.min(0.05, Math.max(0, box.max.z + margin - z)) * influence,
+      );
     }
-    z +=
-      Math.sign(z) * clearance * T.MathUtils.smoothstep(Math.abs(z), 0, 0.22);
-    return z;
+    return z < 0 ? back : front;
   };
   let walkingCloth = false;
   const worldFootBox = new T.Box3();
@@ -435,7 +438,7 @@ export function createSculptedCharacterRig(
               i,
               clothPoint.x,
               clothPoint.y,
-              clearFeet(clothPoint.x, clothPoint.y, clothPoint.z),
+              clearFeet(clothPoint.x, clothPoint.y, clothPoint.z, true),
             );
           }
           attribute.needsUpdate = true;
@@ -460,7 +463,7 @@ export function createSculptedCharacterRig(
               i,
               clothPoint.x,
               clothPoint.y,
-              clearFeet(clothPoint.x, clothPoint.y, clothPoint.z),
+              clearFeet(clothPoint.x, clothPoint.y, clothPoint.z, false),
             );
           }
           attribute.needsUpdate = true;

@@ -97,8 +97,8 @@ export function createMotionDriver(role: CharacterRole): {
         Math.min(0.13, localForward * 0.016 + forwardAcceleration * 0.003),
       );
       forwardLean += (leanTarget - forwardLean) * damp(8, dt);
-      const strideAmplitude =
-        (0.25 + speed * 0.18) * Math.min(1, gaitBlend * 3);
+      const fullStrideAngle = 0.21 + speed * 0.12;
+      const strideAmplitude = fullStrideAngle * Math.min(1, gaitBlend * 3);
       if (state.grounded) {
         const traveled = Math.hypot(state.x - previousX, state.z - previousZ);
         const locomoting = state.runSpeed > 0.25;
@@ -106,7 +106,7 @@ export function createMotionDriver(role: CharacterRole): {
         wasLocomoting = locomoting;
         // A planted foot moves from front to back over the distance covered
         // during one stance. Short walking steps therefore have a faster cycle.
-        const halfStep = 0.63 * Math.sin(0.25 + speed * 0.18);
+        const halfStep = 0.63 * Math.sin(fullStrideAngle);
         phase +=
           (Math.min(traveled, state.runSpeed * dt * 1.5) * Math.PI) /
           (2 * halfStep);
@@ -137,7 +137,7 @@ export function createMotionDriver(role: CharacterRole): {
           legs[i].rotation.x = stance
             ? strideAmplitude * (2 * progress - 1)
             : strideAmplitude * (1 - 2 * returnStep);
-          knees[i].rotation.x = 0.025 * gaitBlend + swing * 0.42 * gaitBlend;
+          knees[i].rotation.x = 0.025 * gaitBlend + swing * 0.3 * gaitBlend;
         } else {
           legs[i].rotation.x =
             i === 0
