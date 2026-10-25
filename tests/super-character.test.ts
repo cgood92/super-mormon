@@ -247,17 +247,31 @@ test("Sariah has an adult face, ankle length robe and linen head covering", () =
     sariah.group.getObjectByName("one-piece-sculpted-beard"),
     undefined,
   );
-  const robe = sariah.group.getObjectByName(
+  const shirt = sariah.group.getObjectByName(
     "continuous-robe-and-sleeves",
   ) as T.Mesh;
+  const coat = sariah.group.getObjectByName("flowing-mantle") as T.Mesh;
+  const frontPanel = sariah.group.getObjectByName(
+    "visible-front-tunic",
+  ) as T.Mesh;
   const veil = sariah.group.getObjectByName("character-headwear") as T.Mesh;
-  assert.ok(robe && veil);
+  assert.ok(shirt && coat && frontPanel && veil);
   sariah.update(1 / 60, standing);
   sariah.group.updateMatrixWorld(true);
-  const robeBounds = new T.Box3().setFromObject(robe);
+  const coatBounds = new T.Box3().setFromObject(coat);
+  const panelBounds = new T.Box3().setFromObject(frontPanel);
+  const shirtBounds = new T.Box3().setFromObject(shirt);
   const veilBounds = new T.Box3().setFromObject(veil);
-  assert.ok(robeBounds.min.y < 0.2, "robe must reach the ankles");
-  assert.ok(robeBounds.max.y - robeBounds.min.y > 0.9);
+  assert.ok(coatBounds.min.y < 0.2, "outer robe must reach the ankles");
+  assert.ok(coatBounds.max.y - coatBounds.min.y > 0.9);
+  assert.ok(
+    panelBounds.min.y < 0.2,
+    "the ankle-length front opening stays covered",
+  );
+  assert.ok(
+    panelBounds.max.y > shirtBounds.min.y,
+    "front panel meets the upper tunic",
+  );
   assert.ok(
     veilBounds.max.y > 1.5 && veilBounds.min.y < 1.4,
     "head covering must drape from the crown",

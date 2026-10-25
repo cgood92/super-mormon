@@ -891,19 +891,54 @@ function makeSculpted(
     );
     return smoothUnion(shirt(x, y, z), skirt, 0.075);
   };
+  const hasOuterCoat = cast?.outfit !== "undertunic";
   add(
     sculpt({
       bounds: [
-        [-0.82, index === 2 ? 0.16 : 0.66, -0.5],
+        [-0.82, index === 2 && !hasOuterCoat ? 0.16 : 0.66, -0.5],
         [0.82, 1.64, 0.5],
       ],
-      resolution: resolution(index === 2 ? 64 : 48),
-      field: index === 2 ? longGarment : shirt,
+      resolution: resolution(index === 2 && !hasOuterCoat ? 64 : 48),
+      field: index === 2 && !hasOuterCoat ? longGarment : shirt,
       material: materials.robe,
     }).geometry,
     materials.robe,
     "continuous-robe-and-sleeves",
   );
+  if (index === 2 && hasOuterCoat) {
+    // The coat's opening reveals a narrow, actual front panel. The rest of the
+    // old full-length white skirt was buried inside the coat and could escape
+    // through its side during a turn. This surface ends beneath the shirt.
+    add(
+      surface(16, 20, (u, v) => {
+        const y = T.MathUtils.lerp(cast?.hem ?? 0.24, 0.82, v);
+        const width = T.MathUtils.lerp(0.09, 0.135, v);
+        const x = (u * 2 - 1) * width;
+        const t = T.MathUtils.clamp(
+          (y - (cast?.hem ?? 0.24)) / (1.08 - (cast?.hem ?? 0.24)),
+          0,
+          1,
+        );
+        const rx = T.MathUtils.lerp(
+          body?.hemWidth ?? cast?.width ?? 0.37,
+          body?.skirtWaist ?? 0.31,
+          t,
+        );
+        const rz = T.MathUtils.lerp(
+          body?.hemDepth ?? 0.31,
+          body?.skirtDepth ?? 0.29,
+          t,
+        );
+        return new T.Vector3(
+          x,
+          y,
+          0.015 + rz * Math.sqrt(Math.max(0, 1 - (x / rx) ** 2)),
+        );
+      }),
+      materials.robe,
+      "visible-front-tunic",
+    );
+  }
 
   // The adventure, animated, guardian and film silhouettes expose real legs.
   // Each trouser is a tapered sculpted volume under its shorter tunic.
@@ -939,7 +974,9 @@ function makeSculpted(
           ),
           0.05,
         );
-        return d;
+        // The coat conceals the hip. Keep the knee-reaching leg for crawling
+        // and climbing, but do not build a full buried white thigh volume.
+        return index === 2 && hasOuterCoat ? Math.max(d, y - 0.64) : d;
       };
       add(
         sculpt({
@@ -1117,7 +1154,11 @@ function makeSculpted(
         const r = (lo + hi) / 2;
         const x = Math.sin(a) * r,
           z = Math.cos(a) * r;
-        let d = longGarment(x, y, z, bottom) - 0.065;
+        const rearReach =
+          0.055 *
+          (1 - T.MathUtils.smoothstep(y, 0.35, 0.68)) *
+          T.MathUtils.smoothstep(-z, 0, 0.17);
+        let d = longGarment(x, y, z, bottom) - 0.065 - rearReach;
         if (Math.abs(x) > 0.45 && y < 1.015)
           d = Math.max(d, Math.abs(x) - 0.45);
         if (d < 0) lo = r;
@@ -1141,7 +1182,12 @@ function makeSculpted(
             field: (x, y, z) => {
               const base = longGarment(x, y, z, cast ? cast.hem - 0.05 : 0.19);
               const thickness = 0.018;
-              let shell = Math.abs(base - (0.027 + thickness)) - thickness;
+              const rearReach =
+                0.055 *
+                (1 - T.MathUtils.smoothstep(y, 0.35, 0.68)) *
+                T.MathUtils.smoothstep(-z, 0, 0.17);
+              let shell =
+                Math.abs(base - (0.027 + thickness + rearReach)) - thickness;
               // Open front and shorter coat sleeves reveal a clean tunic and cuffs.
               const openingWidth = T.MathUtils.lerp(
                 0.075,
@@ -2020,7 +2066,7 @@ function makeSculpted(
         capsule(x, y, z, cx, 0.17, -0.045, cx, 0.095, 0.13, 0.087),
         0.045,
       );
-      if (index === 0 || index === 2 || index === 3)
+      if (index === 0 || index === 3)
         d = smoothUnion(
           d,
           capsule(
@@ -2028,7 +2074,7 @@ function makeSculpted(
             y,
             z,
             cx,
-            index === 3 ? 0.36 : 0.3,
+            index === 3 ? 0.36 : 0.205,
             -0.01,
             cx,
             0.12,
@@ -2047,7 +2093,7 @@ function makeSculpted(
     const supportMin: [number, number, number] = [cx - 0.18, -0.02, -0.18];
     const supportMax: [number, number, number] = [
       cx + 0.18,
-      index === 3 ? 0.51 : 0.44,
+      index === 3 ? 0.51 : 0.32,
       0.38,
     ];
     const padding = supportMin.map(
@@ -2077,8 +2123,8 @@ function makeSculpted(
         if (foot(cx, y, 0.105) < 0) bottomHi = y;
         else bottomLo = y;
       }
-      let topLo = 0.3,
-        topHi = 0.46;
+      let topLo = index === 3 ? 0.3 : 0.18,
+        topHi = index === 3 ? 0.46 : 0.32;
       for (let i = 0; i < 24; i++) {
         const y = (topLo + topHi) / 2;
         if (foot(cx, y, -0.01) < 0) topLo = y;

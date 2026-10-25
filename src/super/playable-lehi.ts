@@ -4,11 +4,6 @@ import type { CharacterState, CharacterRole } from "./character-types";
 import { createMotionDriver } from "./character-motion";
 import { acquireCharacterModel } from "./character-model-cache";
 
-const damp = (rate: number, dt: number) =>
-  1 - Math.exp(-rate * Math.min(0.1, Math.max(0, dt)));
-const angleDiff = (a: number, b: number) =>
-  Math.atan2(Math.sin(a - b), Math.cos(a - b));
-
 export function createSculptedCharacterRig(
   role: CharacterRole,
   options: { quality?: "hero" | "npc" | "crowd" } = {},
@@ -181,6 +176,9 @@ export function createSculptedCharacterRig(
   const trousers = ["left-trouser", "right-trouser"].map(
     (name) => model.group.getObjectByName(name) as T.Mesh | undefined,
   );
+  const trouserNormals = trousers.map((mesh) =>
+    mesh ? createClothNormalUpdater(mesh.geometry) : undefined,
+  );
   const trouserPoint = new T.Vector3();
 
   const cloth = [
@@ -199,7 +197,7 @@ export function createSculptedCharacterRig(
         (mesh.geometry.getAttribute("position") as T.BufferAttribute).array,
       ),
     }));
-  const tunic = ["continuous-robe-and-sleeves"]
+  const tunic = ["continuous-robe-and-sleeves", "visible-front-tunic"]
     .map((name) => model.group.getObjectByName(name) as T.Mesh | undefined)
     .filter((mesh): mesh is T.Mesh => !!mesh)
     .map((mesh) => ({
@@ -222,8 +220,13 @@ export function createSculptedCharacterRig(
       -0.2,
       T.MathUtils.smoothstep(point.y, 0.18, 0.65),
     );
-    point.y += (0.55 - point.y) * weight;
-    point.z *= 0.68;
+    const gatheredY = T.MathUtils.lerp(
+      0.62,
+      0.71,
+      T.MathUtils.smoothstep(point.y, 0.15, 0.65),
+    );
+    point.y += (gatheredY - point.y) * weight;
+    point.z *= 1 - 0.32 * weight;
     const hemDepth = T.MathUtils.lerp(
       backDrape,
       0.36,
@@ -235,46 +238,12 @@ export function createSculptedCharacterRig(
   const gazeParentInverse = new T.Matrix4();
   const headForward = new T.Vector3(0, 0, 1);
 
-  const footBounds = [new T.Box3(), new T.Box3()];
   const footMeshes = ["left-sandal", "right-sandal"].map(
     (name) => model.group.getObjectByName(name) as T.Mesh,
   );
   footMeshes.forEach((mesh) => mesh.geometry.computeBoundingBox());
-  const intoModel = new T.Matrix4();
-  const footMatrix = new T.Matrix4();
-  const clearFeet = (x: number, y: number, z: number, outer: boolean) => {
-    if (!walkingCloth) return z;
-    // Let only the nearby panel respond to a passing boot cuff. The outer
-    // coat gets first clearance; the tunic stays within that outer surface.
-    let back = z;
-    let front = z;
-    for (const box of footBounds) {
-      const centerX = (box.min.x + box.max.x) / 2;
-      const influence =
-        Math.exp(-Math.pow((x - centerX) / 0.25, 2)) *
-        (1 - T.MathUtils.smoothstep(y, box.max.y - 0.04, box.max.y + 0.11));
-      const margin = outer ? 0.025 : 0.005;
-      back = Math.min(
-        back,
-        z - Math.min(0.05, Math.max(0, z - box.min.z + margin)) * influence,
-      );
-      front = Math.max(
-        front,
-        z + Math.min(0.05, Math.max(0, box.max.z + margin - z)) * influence,
-      );
-    }
-    return z < 0 ? back : front;
-  };
-  let walkingCloth = false;
   const worldFootBox = new T.Box3();
-  let clothX = 0;
-  let clothZ = 0;
-  let lastYaw = 0;
-  let lastX = 0;
-  let lastZ = 0;
-  let gaitPhase = 0;
   let clothWasMoving = true;
-  let first = true;
   body.scale.setScalar(actorScale);
   return {
     group,
@@ -282,6 +251,7 @@ export function createSculptedCharacterRig(
       dt = Math.min(0.1, Math.max(0, dt));
       driver.update(dt, state);
       group.position.set(state.x, state.y, state.z);
+      group.rotation.y = driver.group.rotation.y;
       body.rotation.copy(driverBody.rotation);
       body.position.y = driverBody.position.y;
       const crawling =
@@ -344,7 +314,7 @@ export function createSculptedCharacterRig(
             attribute.setXYZ(i, trouserPoint.x, trouserPoint.y, trouserPoint.z);
           }
           attribute.needsUpdate = true;
-          mesh.geometry.computeVertexNormals();
+          trouserNormals[side]?.();
           mesh.geometry.computeBoundingBox();
           mesh.geometry.computeBoundingSphere();
         }
@@ -369,107 +339,31 @@ export function createSculptedCharacterRig(
                 (state.y - worldFootBox.min.y) / worldYPerLocalY;
           }
       }
-      walkingCloth =
-        state.grounded && !state.crouching && state.runSpeed > 0.25;
-      if (walkingCloth) {
-        model.group.updateWorldMatrix(true, true);
-        intoModel.copy(model.group.matrixWorld).invert();
-        footMeshes.forEach((mesh, i) => {
-          footMatrix.multiplyMatrices(intoModel, mesh.matrixWorld);
-          footBounds[i]
-            .copy(mesh.geometry.boundingBox!)
-            .applyMatrix4(footMatrix);
-        });
-      }
-      const yaw = driverBody.rotation.y;
-      if (first) {
-        lastYaw = yaw;
-        lastX = state.x;
-        lastZ = state.z;
-        first = false;
-      }
-      const travel = Math.min(
-        Math.hypot(state.x - lastX, state.z - lastZ),
-        state.runSpeed * dt * 1.5,
-      );
-      lastX = state.x;
-      lastZ = state.z;
-      if (state.grounded) gaitPhase += travel * 5;
-      const yawRate = dt > 0 ? angleDiff(yaw, lastYaw) / dt : 0;
-      lastYaw = yaw;
-      const localLateral = Math.cos(yaw) * state.vx - Math.sin(yaw) * state.vz;
-      // Keep the lower panels inside their clearance around the moving thighs
-      // during sharp turns; larger sideways sweeps expose the trousers.
-      clothX +=
-        (T.MathUtils.clamp(
-          -localLateral * 0.012 - yawRate * 0.018,
-          -0.04,
-          0.04,
-        ) -
-          clothX) *
-        damp(5, dt);
-      clothZ += (Math.min(0.07, state.runSpeed * 0.009) - clothZ) * damp(4, dt);
-      const clothMoving =
-        state.runSpeed > 0.05 ||
-        Math.abs(clothX) > 0.0001 ||
-        Math.abs(clothZ) > 0.0001;
-      if (!clothMoving) {
-        clothX = 0;
-        clothZ = 0;
-      }
+      // Only the outer coat gathers for a crawl. Ordinary walking keeps its
+      // authored geometry; no independently lagging inner/outer cloth fields.
+      const clothMoving = crawling;
       if (clothMoving || clothWasMoving || crawling || wasCrawling) {
-        for (const { attribute, rest, updateNormals } of cloth) {
+        for (const { mesh, attribute, rest, updateNormals } of cloth) {
           for (let i = 0; i < attribute.count; i++) {
             const j = i * 3;
-            const w = Math.pow(
-              T.MathUtils.clamp((1.1 - rest[j + 1]) / 0.9, 0, 1),
-              1.5,
-            );
             clothPoint.set(rest[j], rest[j + 1], rest[j + 2]);
-            const panelSway =
-              Math.sin(gaitPhase - rest[j] * 2) *
-              Math.min(1, state.runSpeed / 5);
-            clothPoint.x += clothX * w + panelSway * 0.025 * w;
-            clothPoint.z -= clothZ * w;
             drape(clothPoint, crawling);
-            if (crawling) {
-              clothPoint.x += Math.sign(clothPoint.x) * 0.035;
-              clothPoint.z += Math.sign(clothPoint.z) * 0.025;
-            }
-            attribute.setXYZ(
-              i,
-              clothPoint.x,
-              clothPoint.y,
-              clearFeet(clothPoint.x, clothPoint.y, clothPoint.z, true),
-            );
+            attribute.setXYZ(i, clothPoint.x, clothPoint.y, clothPoint.z);
           }
           attribute.needsUpdate = true;
           updateNormals();
+          mesh.geometry.computeBoundingSphere();
         }
-        const stepWeight = Math.min(1, state.runSpeed / 5);
-        for (const { attribute, rest, updateNormals } of tunic) {
+        for (const { geometry, attribute, rest, updateNormals } of tunic) {
           for (let i = 0; i < attribute.count; i++) {
             const j = i * 3;
-            const w = Math.pow(
-              T.MathUtils.clamp((1.1 - rest[j + 1]) / 0.9, 0, 1),
-              1.5,
-            );
-            const panelSway = Math.sin(gaitPhase - rest[j] * 2) * stepWeight;
-            clothPoint.set(
-              rest[j] + clothX * w + panelSway * 0.025 * w,
-              rest[j + 1],
-              rest[j + 2] - clothZ * w,
-            );
+            clothPoint.set(rest[j], rest[j + 1], rest[j + 2]);
             drape(clothPoint, crawling);
-            attribute.setXYZ(
-              i,
-              clothPoint.x,
-              clothPoint.y,
-              clearFeet(clothPoint.x, clothPoint.y, clothPoint.z, false),
-            );
+            attribute.setXYZ(i, clothPoint.x, clothPoint.y, clothPoint.z);
           }
           attribute.needsUpdate = true;
           updateNormals();
+          geometry.computeBoundingSphere();
         }
       }
       clothWasMoving = clothMoving;

@@ -261,19 +261,31 @@ test("holding a lateral direction does not make the camera and player spiral", (
   assert.ok(Math.abs(p.z) < 2, `lateral movement curved ${p.z} units`);
 });
 
-test("character faces its spawn heading on the first frame", () => {
-  const character = createCharacter("nephi");
-  character.update(1 / 60, {
-    x: 0,
-    y: 0,
-    z: 0,
-    vx: 0,
-    vy: 0,
-    vz: 0,
-    yaw: Math.PI,
-    grounded: true,
-    runSpeed: 0,
-  });
-  assert.ok(Math.abs(character.group.children[0].rotation.y - Math.PI) < 0.01);
-  character.dispose();
+test("character visibly faces its spawn heading on the first frame", () => {
+  for (const yaw of [0, Math.PI / 2, Math.PI]) {
+    const character = createCharacter("nephi");
+    character.update(1 / 60, {
+      x: 0,
+      y: 0,
+      z: 0,
+      vx: 0,
+      vy: 0,
+      vz: 0,
+      yaw,
+      grounded: true,
+      runSpeed: 0,
+    });
+    character.group.updateMatrixWorld(true);
+    const head = character.group.getObjectByName("head")!;
+    const face = new T.Vector3(0, 0, 1)
+      .transformDirection(head.matrixWorld)
+      .setY(0)
+      .normalize();
+    const heading = new T.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+    assert.ok(
+      face.dot(heading) > 0.995,
+      `spawn yaw ${yaw}: face ${face.toArray()}`,
+    );
+    character.dispose();
+  }
 });

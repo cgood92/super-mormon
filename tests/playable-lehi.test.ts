@@ -177,42 +177,28 @@ test("playable Lehi responds to traversal poses and keeps crouch under a low cei
   actor.dispose();
 });
 
-test("mantle collar remains fixed while the hem responds softly to movement", () => {
+test("mantle keeps its authored hem while walking and restores it after a crawl", () => {
   const actor = createPlayableLehi();
   const mantle = actor.group.getObjectByName("flowing-mantle") as T.Mesh;
-  const robe = actor.group.getObjectByName(
-    "continuous-robe-and-sleeves",
-  ) as T.Mesh;
   const position = mantle.geometry.getAttribute(
     "position",
   ) as T.BufferAttribute;
-  const robePosition = robe.geometry.getAttribute(
-    "position",
-  ) as T.BufferAttribute;
-  let top = -1;
+  let collar = -1;
   let hem = -1;
   for (let i = 0; i < position.count; i++) {
-    if (top < 0 && position.getY(i) > 1.58 && Math.abs(position.getX(i)) < 0.12)
-      top = i;
+    if (
+      collar < 0 &&
+      position.getY(i) > 1.58 &&
+      Math.abs(position.getX(i)) < 0.12
+    )
+      collar = i;
     if (hem < 0 && position.getY(i) < 0.3) hem = i;
   }
-  assert.ok(top >= 0 && hem >= 0);
-  let robeTop = -1;
-  let robeHem = -1;
-  for (let i = 0; i < robePosition.count; i++) {
-    if (
-      robeTop < 0 &&
-      robePosition.getY(i) > 1.4 &&
-      Math.abs(robePosition.getX(i)) < 0.12
-    )
-      robeTop = i;
-    if (robeHem < 0 && robePosition.getY(i) < 0.3) robeHem = i;
-  }
-  assert.ok(robeTop >= 0 && robeHem >= 0);
-  const robeTopZ = robePosition.getZ(robeTop);
-  const robeHemZ = robePosition.getZ(robeHem);
-  const topZ = position.getZ(top);
-  const hemZ = position.getZ(hem);
+  assert.ok(collar >= 0 && hem >= 0);
+  const collarRest = new T.Vector3().fromBufferAttribute(position, collar);
+  const hemRest = new T.Vector3().fromBufferAttribute(position, hem);
+  const current = (index: number) =>
+    new T.Vector3().fromBufferAttribute(position, index);
   for (let i = 0; i < 30; i++)
     actor.update(1 / 60, {
       ...standing,
@@ -221,12 +207,37 @@ test("mantle collar remains fixed while the hem responds softly to movement", ()
       runSpeed: 5,
       move: "run",
     });
-  assert.ok(Math.abs(position.getZ(top) - topZ) < 0.003);
-  assert.ok(position.getZ(hem) < hemZ - 0.015);
-  assert.ok(Math.abs(robePosition.getZ(robeTop) - robeTopZ) < 0.003);
   assert.ok(
-    Math.abs(robePosition.getZ(robeHem) - robeHemZ) > 0.005,
-    "the tunic hem should respond to the stride",
+    current(collar).distanceTo(collarRest) < 0.003,
+    "collar stays anchored while running",
+  );
+  assert.ok(
+    current(hem).distanceTo(hemRest) < 0.003,
+    "walking does not accumulate hem distortion",
+  );
+  actor.update(1 / 60, {
+    ...standing,
+    crouching: true,
+    runSpeed: 1.5,
+    vz: 1.5,
+    move: "crawl",
+  });
+  assert.ok(
+    current(collar).distanceTo(collarRest) < 0.003,
+    "collar stays anchored during crawl",
+  );
+  assert.ok(
+    current(hem).distanceTo(hemRest) > 0.015,
+    "hem gathers for crawl clearance",
+  );
+  actor.update(1 / 60, standing);
+  assert.ok(
+    current(collar).distanceTo(collarRest) < 0.003,
+    "collar restores after crawl",
+  );
+  assert.ok(
+    current(hem).distanceTo(hemRest) < 0.003,
+    "authored hem restores after crawl",
   );
   actor.dispose();
 });
@@ -382,6 +393,168 @@ test("every playable rig crawls on alternating hands and bent knees below the lo
     actor.update(1 / 60, standing);
     const restored = posedBounds(actor.group);
     assert.ok(restored.max.y > (role === "child" ? 1.0 : 1.5));
+    actor.dispose();
+  }
+});
+
+test("playable crawl keeps its face and grounded supports in the travel direction", async () => {
+  const { createSculptedCharacterRig } =
+    await import("../src/super/playable-lehi.ts");
+  const vertex = new T.Vector3();
+  const posedBounds = (root: T.Object3D) => {
+    const box = new T.Box3();
+    root.updateMatrixWorld(true);
+    root.traverse((object) => {
+      if (!(object instanceof T.Mesh)) return;
+      if (object instanceof T.SkinnedMesh) object.skeleton.update();
+      const positions = object.geometry.getAttribute("position");
+      for (let i = 0; i < positions.count; i++) {
+        object.getVertexPosition(i, vertex).applyMatrix4(object.matrixWorld);
+        box.expandByPoint(vertex);
+      }
+    });
+    return box;
+  };
+  for (const role of ["nephi", "lehi", "child", "guard"] as const) {
+    for (const yaw of [
+      0,
+      Math.PI / 4,
+      Math.PI / 2,
+      Math.PI,
+      (3 * Math.PI) / 2,
+    ]) {
+      const actor = createSculptedCharacterRig(role, { quality: "crowd" });
+      const travel = new T.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+      actor.update(1 / 60, standing);
+      for (let frame = 0; frame < 48; frame++)
+        actor.update(1 / 60, {
+          ...standing,
+          x: frame * 0.025 * travel.x,
+          z: frame * 0.025 * travel.z,
+          vx: 1.5 * travel.x,
+          vz: 1.5 * travel.z,
+          yaw,
+          runSpeed: 1.5,
+          crouching: true,
+          move: "crawl",
+        });
+      actor.group.updateMatrixWorld(true);
+      const head = actor.group.getObjectByName("head")!;
+      const body = actor.group.getObjectByName("body")!;
+      const face = new T.Vector3(0, 0, 1)
+        .transformDirection(head.matrixWorld)
+        .setY(0)
+        .normalize();
+      assert.ok(
+        face.dot(travel) > 0.95,
+        `${role} yaw ${yaw}: face follows travel`,
+      );
+      const headAhead = head
+        .getWorldPosition(new T.Vector3())
+        .sub(body.getWorldPosition(new T.Vector3()))
+        .setY(0);
+      assert.ok(
+        headAhead.dot(travel) > 0.6,
+        `${role} yaw ${yaw}: head ahead of hips`,
+      );
+      const bounds = posedBounds(actor.group);
+      assert.ok(
+        bounds.max.y < 0.9,
+        `${role} yaw ${yaw}: low enough for arch (${bounds.max.y})`,
+      );
+      assert.ok(
+        bounds.min.y >= -0.025,
+        `${role} yaw ${yaw}: no floor penetration (${bounds.min.y})`,
+      );
+      for (const side of ["left", "right"]) {
+        const hand = posedBounds(actor.group.getObjectByName(`${side}-hand`)!);
+        assert.ok(
+          hand.min.y >= -0.02 && hand.min.y < 0.065,
+          `${role} yaw ${yaw}: ${side} hand grounded at ${hand.min.y}`,
+        );
+        const kneeY = actor.group
+          .getObjectByName(`${side}-knee`)!
+          .getWorldPosition(new T.Vector3()).y;
+        assert.ok(
+          kneeY > 0.05 && kneeY < 0.18,
+          `${role} yaw ${yaw}: ${side} knee supports body at ${kneeY}`,
+        );
+      }
+      actor.update(1 / 60, { ...standing, yaw });
+      assert.ok(
+        posedBounds(actor.group).max.y > (role === "child" ? 1 : 1.5),
+        `${role} yaw ${yaw}: upright pose returns after crawl`,
+      );
+      actor.dispose();
+    }
+  }
+});
+
+test("crawl can resume after an upright stop without losing its heading", async () => {
+  const { createSculptedCharacterRig } =
+    await import("../src/super/playable-lehi.ts");
+  const actor = createSculptedCharacterRig("nephi", { quality: "hero" });
+  const yaw = Math.PI / 2;
+  const crawl: CharacterState = {
+    ...standing,
+    yaw,
+    vx: 1.5,
+    runSpeed: 1.5,
+    crouching: true,
+    move: "crawl",
+  };
+  for (const move of ["idle", "crawl", "idle", "crawl", "idle"] as const) {
+    actor.update(1 / 60, move === "crawl" ? crawl : { ...standing, yaw });
+    actor.group.updateMatrixWorld(true);
+    const body = actor.group.getObjectByName("body")!;
+    const head = actor.group.getObjectByName("head")!;
+    const face = new T.Vector3(0, 0, 1)
+      .transformDirection(head.matrixWorld)
+      .setY(0)
+      .normalize();
+    assert.ok(face.x > 0.95, `${move}: face remains oriented with heading`);
+    const headY = head.getWorldPosition(new T.Vector3()).y;
+    assert.ok(
+      move === "crawl" ? headY < 0.6 : headY > 1.2,
+      `${move}: head returns to the expected height (${headY})`,
+    );
+    assert.ok(Number.isFinite(body.matrixWorld.determinant()));
+  }
+  actor.dispose();
+});
+
+test("NPC crawl gaze remains a world direction while the body turns", async () => {
+  const { createSculptedCharacterRig } =
+    await import("../src/super/playable-lehi.ts");
+  const actor = createSculptedCharacterRig("guard", { quality: "npc" });
+  try {
+    for (const yaw of [0, Math.PI / 4, Math.PI / 2, Math.PI]) {
+      const lookYaw = -0.8;
+      const lookPitch = 0.12;
+      actor.update(1 / 60, {
+        ...standing,
+        yaw,
+        lookYaw,
+        lookPitch,
+        runSpeed: 1.5,
+        crouching: true,
+        move: "crawl",
+      });
+      actor.group.updateMatrixWorld(true);
+      const face = new T.Vector3(0, 0, 1).transformDirection(
+        actor.group.getObjectByName("head")!.matrixWorld,
+      );
+      const expected = new T.Vector3(
+        Math.sin(lookYaw) * Math.cos(lookPitch),
+        Math.sin(lookPitch),
+        Math.cos(lookYaw) * Math.cos(lookPitch),
+      );
+      assert.ok(
+        face.angleTo(expected) < 1e-5,
+        `body yaw ${yaw}: world gaze error ${face.angleTo(expected)}`,
+      );
+    }
+  } finally {
     actor.dispose();
   }
 });

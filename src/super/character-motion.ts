@@ -71,7 +71,10 @@ export function createMotionDriver(role: CharacterRole): {
         firstUpdate = false;
       }
       renderedYaw += angleDiff(state.yaw, renderedYaw) * damp(14, dt);
-      body.rotation.y = renderedYaw;
+      // Heading belongs to the parent; body rotations are local pose only.
+      // This keeps crawl pitch, flips, limbs, and offsets aligned to travel.
+      group.rotation.y = renderedYaw;
+      body.rotation.y = 0;
       const speed = Math.min(1, state.runSpeed / 6.5);
       gaitBlend += ((state.grounded ? speed : 0) - gaitBlend) * damp(10, dt);
       const localForward =
