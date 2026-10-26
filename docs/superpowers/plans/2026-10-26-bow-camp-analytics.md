@@ -33,5 +33,7 @@ Third shot counts misses; completion only once; sockets follow rendered yaw and 
 - Verified 369/369 full tests, formatting and production build with the actual configured measurement ID. Full normal-controller Broken Bow route completed: nine jump landings, three practice shots, family cutaway, descent, separated material pickups, counsel, Liahona, climb, three ballistic hunt hits, automatic return and completion. Saved test progress stayed in memory only.
 - Review found and fixed tent rope disposal, pre-splash level starts, stalled-frame timing, missing story/tree phase events, and practice arrows collecting hunting food. Added relevant regressions.
 - Rendered hero/NPC side/quarter turn/reversal/crawl-to-stand QA now shows an arched rear hem instead of a flat cut plane; walking-cloth tests remain green.
-- GA property 560764360, stream 16206783522, measurement G-Y0M4GM5HMT created. Ten custom dimensions and two time metrics registered; exploration report configuration underway. No local/test tag loaded.
+- GA property 560764360, stream 16206783522, measurement G-Y0M4GM5HMT created. Ten custom dimensions and two time metrics registered; six exploration report tabs configured. No local/test tag loaded.
 - Publishing and live GA receipt verification remain pending.
+
+- Personal SSH push succeeded. GitHub CLI uses an Adobe Enterprise Managed User and cannot create a PR in the personal repository; publishing the verified batch through the personal SSH remote instead. Main remains at the verified base 704e502 before publication.

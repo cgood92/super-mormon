@@ -8,6 +8,7 @@ The production game uses GA4, owned by Clint’s Google account:
 - Public measurement ID: `G-Y0M4GM5HMT`
 - Production: https://cgood92.github.io/super-mormon/
 - Property: https://analytics.google.com/analytics/web/#/a174023464p560764360/reports/intelligenthome
+- Saved exploration: https://analytics.google.com/analytics/web/#/analysis/a174023464p560764360/edit/4ImfJ5dNQy-wJFrTmKP-6Q
 
 The GitHub Pages build sets `VITE_GA_MEASUREMENT_ID`. Missing ID disables collection. Development always stays silent, including when that variable is present. Only the exact production entry URL (or index.html) with no query/hash may load the tag. Localhost, copies, previews, debug scene links, cast/pose pages and tests never send events. No analytics queue is persisted locally. GA’s normal first-party cookies support aggregate returning-user reports; the game adds no player ID. Advertising storage/personalization and Google Signals are disabled. Enhanced measurement is off.
 
@@ -38,7 +39,7 @@ The physics currently exposes ground pound/landing, wall kick, crouch/backflip, 
 
 Custom event dimensions are registered for Level, Move, Camera action, Secret, Activity, Story phase, Exit reason, Input device, Entry reason and Retry reason. Custom metrics are Active play seconds (`active_seconds`, Seconds) and Attempt total seconds (`total_active_seconds`, Seconds).
 
-Use the saved **Super Mormon — gameplay overview** exploration for level behavior and the same imported fields to compare moves, camera use and discoveries. New dimensions/events can take time to appear in processed reporting; Realtime is the initial verification view. For level completion rate, compare `level_end` event count with `level_start`, excluding hub. For unfinished gallery returns, filter `level_exit` with Exit reason = gallery. For move adoption, compare Total users with event count by Move and Level. Returning-player totals use GA’s new/returning user and retention reports; visits do not prove enjoyment.
+Use the saved **Super Mormon — gameplay overview** exploration: Levels and active time; Camera controls; Discoveries and side activities; Moves used; Unfinished exits and gallery returns; New and returning players. Each tab is configured with the relevant dimensions, metrics and event filters. New dimensions/events can take time to appear in processed reporting; Realtime is the initial verification view. For level completion rate, compare `level_end` event count with `level_start`, excluding hub. For unfinished gallery returns, filter `level_exit` with Exit reason = gallery. For move adoption, compare Total users with event count by Move and Level. Returning-player totals use GA’s new/returning user and retention reports; visits do not prove enjoyment.
 
 ## Tests and maintenance
 
