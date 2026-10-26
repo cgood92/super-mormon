@@ -84,6 +84,7 @@ const ORIGINAL_CAST_TRAITS: Readonly<
       | "amalickiah"
       | "lehonti"
       | "lamanite-laman"
+      | "samuel"
       | "jacob"
       | "sherem"
       | "alma"
@@ -384,6 +385,24 @@ export const SCULPTED_CAST_TRAITS: Readonly<
     robe: 0xc1b49b,
     trim: 0x76634d,
     faceWidth: 0.84,
+  },
+  // Samuel's face and clothing are an illustrative reading, not details
+  // specified by Helaman 13–16 or 3 Nephi 1.
+  samuel: {
+    ...ORIGINAL_CAST_TRAITS.zoram,
+    hair: 0x28231f,
+    hairStyle: "cropped",
+    beard: "trimmed",
+    robe: 0xc6a16f,
+    coat: 0x8d503d,
+    trim: 0x665f48,
+    head: 0.318,
+    faceWidth: 0.9,
+    jaw: 0.72,
+    nose: 0.069,
+    tall: 1.07,
+    width: 0.35,
+    brow: 0.045,
   },
   jacob: {
     ...ORIGINAL_CAST_TRAITS.lehi,

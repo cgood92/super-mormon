@@ -19,6 +19,7 @@ export const STORY_ORDER = [
   "teancum",
   "gid",
   "nephihah",
+  "samuel",
 ] as const;
 export type StoryId = (typeof STORY_ORDER)[number];
 
@@ -29,6 +30,7 @@ export const STORY_TITLES: Record<StoryId, string> = {
   teancum: "Teancum by Night",
   gid: "The Prisoners of Gid",
   nephihah: "The Walls of Nephihah",
+  samuel: "Samuel the Lamanite",
   streets: "Jerusalem Streets",
   palace: "Laban’s Palace",
   house: "Lehi’s House",

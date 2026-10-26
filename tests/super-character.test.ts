@@ -11,6 +11,7 @@ const roles: CharacterRole[] = [
   "nephi",
   "nephi-disguised",
   "sam",
+  "samuel",
   "lehi",
   "laman",
   "lemuel",
@@ -131,6 +132,36 @@ test("Sam looks young and wears a distinct mantle", () => {
   assert.ok(bounds(sam).max.y <= 1.66);
   sam.dispose();
   nephi.dispose();
+});
+
+test("Samuel has a distinct prophetic silhouette in hero, NPC, and crowd rigs", () => {
+  const nephi = createCharacter("nephi");
+  const laman = createCharacter("laman");
+  const mantleColor = (actor: ReturnType<typeof createCharacter>) =>
+    (
+      (actor.group.getObjectByName("flowing-mantle") as T.Mesh)
+        .material as T.MeshStandardMaterial
+    ).color.getHex();
+  const hairColor = (actor: ReturnType<typeof createCharacter>) =>
+    (
+      (actor.group.getObjectByName("single-sculpted-hair-cap") as T.Mesh)
+        .material as T.MeshStandardMaterial
+    ).color.getHex();
+
+  for (const quality of ["hero", "npc", "crowd"] as const) {
+    const samuel = createCharacter("samuel", { quality });
+    assert.equal(samuel.group.name, "samuel-character");
+    assert.ok(samuel.group.getObjectByName("continuous-robe-and-sleeves"));
+    assert.ok(samuel.group.getObjectByName("flowing-mantle"));
+    assert.ok(samuel.group.getObjectByName("one-piece-sculpted-beard"));
+    assert.notEqual(mantleColor(samuel), mantleColor(nephi));
+    assert.notEqual(mantleColor(samuel), mantleColor(laman));
+    assert.notEqual(hairColor(samuel), hairColor(nephi));
+    samuel.update(1 / 60, { ...standing, runSpeed: 3, move: "run" });
+    samuel.dispose();
+  }
+  nephi.dispose();
+  laman.dispose();
 });
 
 test("all character roles keep crouch and flip poses above the floor", () => {

@@ -34,7 +34,10 @@ import {
 } from "./super/physics";
 import { createCharacter } from "./super/character";
 import { createPoundImpact } from "./super/pound-impact";
-import { applyAdventureCamera } from "./super/adventure-camera";
+import {
+  applyAdventureCamera,
+  adventureCameraYaw,
+} from "./super/adventure-camera";
 import { FollowCamera } from "./super/camera";
 import type { WorldData, WorldId } from "./super/worlds";
 import {
@@ -1280,7 +1283,7 @@ function update(dt: number) {
       ? { ...state, x: 0, y: 0, jump: false, jumpHeld: false }
       : state,
     dt,
-    follow.yaw,
+    adventureCameraYaw(adventure?.camera?.(), follow.yaw),
     world.solids,
     world.climbables,
     world.swimRegions,
@@ -1375,8 +1378,10 @@ function update(dt: number) {
       cameraModeForWorld(worldId),
     );
   }
-  if (adventureCamera)
+  if (adventureCamera) {
     applyAdventureCamera(camera, adventureCamera, world.solids, dt);
+    follow.yaw = adventureCameraYaw(adventureCamera, follow.yaw);
+  }
   if (organSeated) {
     camera.position.lerp(new T.Vector3(33, 8, -89), 1 - Math.exp(-5 * dt));
     camera.lookAt(30, 6, -94);

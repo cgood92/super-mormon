@@ -36,3 +36,18 @@ export function applyAdventureCamera(
   );
   camera.lookAt(shot.focus.x, shot.focus.y, shot.focus.z);
 }
+
+/** Movement follows the visible authored view, even after orbiting the follow camera. */
+export function adventureCameraYaw(
+  shot:
+    | { position: { x: number; z: number }; focus: { x: number; z: number } }
+    | undefined,
+  fallback: number,
+): number {
+  if (!shot) return fallback;
+  const dx = shot.focus.x - shot.position.x;
+  const dz = shot.focus.z - shot.position.z;
+  return Number.isFinite(dx) && Number.isFinite(dz) && Math.hypot(dx, dz) > 1e-5
+    ? Math.atan2(dx, dz)
+    : fallback;
+}

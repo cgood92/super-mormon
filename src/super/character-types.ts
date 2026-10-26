@@ -5,6 +5,7 @@ export type CharacterRole =
   | "amalickiah"
   | "lehonti"
   | "lamanite-laman"
+  | "samuel"
   | "ammon"
   | "lamoni"
   | "nephi"

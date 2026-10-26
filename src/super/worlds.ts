@@ -1,3 +1,4 @@
+import { buildSamuelWall } from "./samuel-wall";
 import { buildTitleOfLiberty } from "./title-of-liberty";
 import { buildLehontiMountain } from "./lehonti-mountain";
 import { buildMoriantonFlight } from "./morianton-flight";
@@ -20,6 +21,7 @@ import { gallery } from "./conference-center";
 import type { Climbable, PlayerState } from "./physics";
 import type { AdventureHooks, AdventureRuntime } from "./adventure";
 export type WorldId =
+  | "samuel"
   | "title-liberty"
   | "lehonti"
   | "morianton"
@@ -102,6 +104,8 @@ export type WorldData = {
 
 export function buildWorld(id: WorldId, scene: THREE.Scene): WorldData {
   switch (id) {
+    case "samuel":
+      return buildSamuelWall(scene);
     case "title-liberty":
       return buildTitleOfLiberty(scene);
     case "lehonti":

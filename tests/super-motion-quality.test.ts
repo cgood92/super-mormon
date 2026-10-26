@@ -59,6 +59,7 @@ const castRoles: CharacterRole[] = [
   "nephi",
   "nephi-disguised",
   "sam",
+  "samuel",
   "lehi",
   "laman",
   "lemuel",

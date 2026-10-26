@@ -14,6 +14,7 @@ export function cameraModeForWorld(id: WorldId): CameraMode {
   return "streets";
 }
 export const WAR_CHAPTERS: Partial<Record<WorldId, string>> = {
+  samuel: "HELAMAN 13–16 · ABOUT 6 BC",
   "title-liberty": "ALMA 46 · THE TITLE OF LIBERTY",
   lehonti: "ALMA 47 · MOUNT ANTIPAS",
   morianton: "ALMA 50 · THE NARROW PASS",

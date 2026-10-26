@@ -1,0 +1,9 @@
+# Samuel the Lamanite: source and playable interpretation
+
+The level follows [Helaman 13:2–6](https://www.churchofjesuschrist.org/study/scriptures/bofm/hel/13?lang=eng) and [Helaman 16:1–8](https://www.churchofjesuschrist.org/study/scriptures/bofm/hel/16?lang=eng), set in Zarahemla around 6 BC. Samuel returns after being expelled, speaks from the city wall, calls the people to repentance and faith in Christ, is protected from stones and arrows, and jumps down to escape when captains come to seize him. Some listeners believe and go to Nephi for baptism; not everyone rejects him.
+
+The city's exact appearance, climbing blocks, costumes, dialogue condensation, projectile timing and one-minute challenge are gameplay interpretations. No exact historical geography or Indigenous clothing tradition is claimed. Samuel uses the approved sculpted cast with a distinct, dignified costume. Allegiance is expressed through behavior, not ethnicity or skin color.
+
+The player starts outside the wall and jumps up broad protruding stone blocks. An action prompt anywhere on the usable wall top begins a brief acted call to repent. The next phase gives 60 seconds of active wall-top gameplay with slow, clearly telegraphed stones and visible flying arrows, enough space and time to move aside. Projectiles never injure Samuel; protection preserves the scriptural outcome. After the minute ends, the player jumps down on the exterior and lands to finish. Early falls have a fair wall-top retry. The time does not run in dialogue or while the game is paused/hidden.
+
+The painting joins later stories in an upper side hallway, never the auditorium. Developer direct scene entry remains private and does not change saved progress. The entire new scene loads lazily and releases its actors, projectiles and scenery when leaving.

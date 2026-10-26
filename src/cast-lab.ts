@@ -20,6 +20,11 @@ const cast: [CharacterRole, string, string][] = [
   ["lehi", "Lehi", "The approved elder, with his long robe and coat."],
   ["sariah", "Sariah", "Mature face, linen head covering, sage clothing."],
   ["sam", "Sam", "Gentle expression and a distinct olive mantle."],
+  [
+    "samuel",
+    "Samuel the Lamanite",
+    "Calm prophet in an imagined rust mantle and ochre tunic.",
+  ],
   ["laman", "Laman", "Civilian clothes, scruff, a reserved expression."],
   ["lemuel", "Lemuel", "A different face and hairline, with scruff."],
   ["laban", "Laban", "Regal robes, bronze headband, and formal bearing."],
