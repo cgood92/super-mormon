@@ -7,10 +7,13 @@ import { warWorld } from "./war-world-kit";
 import type { Point, WorldData } from "./worlds";
 import { createSamuelAdventure } from "./samuel-adventure";
 import {
-  SAMUEL_CLIMB,
+  SAMUEL_BLOCKS,
   SAMUEL_EXIT,
   SAMUEL_SPAWN,
+  SAMUEL_SPEAKING_POINT,
   SAMUEL_WALL,
+  samuelBlockPoint,
+  samuelBlockSolid,
 } from "./samuel-layout";
 
 /** Helaman 13:2–6; 16:1–8. City layout, stone route and unnamed people are imagined. */
@@ -37,13 +40,14 @@ export function buildSamuelWall(scene: T.Scene): WorldData {
     0xb8a078,
     "Samuel solid city wall",
   );
-  // The six separated protrusions must each be jumped to. They are shallow
-  // stone slabs, not full columns or an invisible ramp.
-  SAMUEL_CLIMB.slice(0, -1).forEach((point, index) => {
+  // Every authored protrusion is both visible and physical. Their varied
+  // widths, depths, and branching heights make several routes through the
+  // field, while each block's rear edge attaches to the wall face.
+  SAMUEL_BLOCKS.forEach((block, index) => {
     solid(
-      { x: point.x, y: point.y - 0.42, z: point.z, w: 1.95, h: 0.42, d: 2.65 },
-      index % 2 ? 0xc7af84 : 0xd0ba91,
-      `Samuel exterior jumping stone ${index + 1}`,
+      samuelBlockSolid(block),
+      index % 3 === 0 ? 0xd0ba91 : index % 3 === 1 ? 0xc7af84 : 0xbda47c,
+      `Samuel exterior jumping stone · ${block.id}`,
     );
   });
   // Short corner towers identify the entrance to the city without obstructing
@@ -194,11 +198,8 @@ export function buildSamuelWall(scene: T.Scene): WorldData {
     bounds: { minX: -52, maxX: 52, minZ: -65, maxZ: 65 },
     goal: { ...SAMUEL_EXIT, radius: 3 },
     landmarks: [
-      { name: "Stone climbing route", ...SAMUEL_CLIMB[0] },
-      {
-        name: "Wall-top speaking place",
-        ...SAMUEL_CLIMB[SAMUEL_CLIMB.length - 1],
-      },
+      { name: "Stone climbing field", ...samuelBlockPoint(SAMUEL_BLOCKS[0]) },
+      { name: "Wall-top speaking place", ...SAMUEL_SPEAKING_POINT },
       { name: "City gathering square", x: 0, y: 0, z: -16 },
       { name: "Open countryside", x: 0, y: 0, z: 38 },
     ],

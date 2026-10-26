@@ -100,7 +100,7 @@ function harness() {
   };
 }
 
-test("the preaching minute begins after the acted moment and completes at 60 active seconds", () => {
+test("the 30-second dodge begins after the acted moment and completes at 30 active seconds", () => {
   const h = harness();
   assert.deepEqual(h.avatars, ["samuel"]);
   const ready = h.runtime.update(0.1, h.player, idle);
@@ -115,12 +115,15 @@ test("the preaching minute begins after the acted moment and completes at 60 act
   h.dialogs[0]();
   assert.equal(h.runtime.movementLocked?.(), false);
 
-  for (let i = 0; i < 599; i++) h.runtime.update(0.1, h.player, idle);
+  for (let i = 0; i < 299; i++) {
+    h.runtime.update(0.1, h.player, idle);
+    if (i === 99) assert.ok(h.state().believersDeparted > 0);
+  }
   assert.equal(h.state().phase, "endure");
-  assert.ok(h.state().elapsed > 59.8 && h.state().elapsed < 60);
+  assert.ok(h.state().elapsed > 29.8 && h.state().elapsed < 30);
   assert.equal(h.completed(), 0);
   h.runtime.update(0.1, h.player, idle);
-  assert.equal(h.state().elapsed, 60);
+  assert.equal(h.state().elapsed, 30);
   assert.equal(h.state().remaining, 0);
   assert.equal(h.state().phase, "escape");
   assert.equal(h.completed(), 0);
@@ -132,7 +135,7 @@ test("the preaching minute begins after the acted moment and completes at 60 act
   h.runtime.dispose();
 });
 
-test("early falls return Samuel to the wall without changing the active minute", () => {
+test("early falls return Samuel to the wall without changing the active dodge timer", () => {
   const h = harness();
   h.begin();
   for (let i = 0; i < 27; i++) h.runtime.update(0.1, h.player, idle);
@@ -150,7 +153,7 @@ test("early falls return Samuel to the wall without changing the active minute",
   h.runtime.dispose();
 });
 
-test("the active minute advances at both physically supported wall edges", () => {
+test("the active dodge timer advances at both physically supported wall edges", () => {
   const h = harness();
   h.begin();
   h.player.x = SAMUEL_WALL.x + SAMUEL_WALL.w / 2 - 0.2;
@@ -189,10 +192,10 @@ test("warnings lock an avoidable target; stones and arrows arc visibly and cause
   h.runtime.dispose();
 });
 
-test("a post-minute landing anywhere outside the wall completes once", () => {
+test("a post-dodge landing anywhere outside the wall completes once", () => {
   const h = harness();
   h.begin();
-  for (let i = 0; i < 600; i++) h.runtime.update(0.1, h.player, idle);
+  for (let i = 0; i < 300; i++) h.runtime.update(0.1, h.player, idle);
   assert.equal(h.state().phase, "escape");
   Object.assign(h.player, {
     x: SAMUEL_EXIT.x,

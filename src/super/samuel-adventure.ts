@@ -32,7 +32,7 @@ type Projectile = {
   to: T.Vector3;
 };
 
-const PREACH_SECONDS = 60;
+const PREACH_SECONDS = 30;
 const WARNING_SECONDS = 1.1;
 const FLIGHT_SECONDS = 1.8;
 const SHOT_GAP_SECONDS = 3.4;
@@ -192,7 +192,7 @@ export function createSamuelAdventure(
 
   function updateCrowd(dt: number) {
     crowd.forEach((member, index) => {
-      if (member.believer && elapsed >= 17 + index * 4) member.departed = true;
+      if (member.believer && elapsed >= 5 + index * 1.5) member.departed = true;
       if (member.departed) {
         const dx = 20 - member.x;
         const dz = -26 - member.z;
