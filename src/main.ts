@@ -102,6 +102,11 @@ const analytics = new GameplayAnalytics(
     import.meta.env.VITE_GA_MEASUREMENT_ID,
   ),
 );
+// Observe the actual browser state, including Escape exits and failed requests.
+analytics.setFullscreen(document.fullscreenElement !== null);
+document.addEventListener("fullscreenchange", () => {
+  analytics.setFullscreen(document.fullscreenElement !== null);
+});
 const diagnostics = createPerformanceDiagnostics(renderer, {
   enabled:
     import.meta.env.DEV &&

@@ -129,6 +129,7 @@ export function movementActions(
 export class GameplayAnalytics {
   private level: string | undefined;
   private device = "keyboard";
+  private fullscreenMode = "windowed";
   private active = 0;
   private unreported = 0;
   private ended = true;
@@ -143,6 +144,7 @@ export class GameplayAnalytics {
         level_id: this.level ?? "hub",
         input_device: this.device,
         ...params,
+        fullscreen_mode: this.fullscreenMode,
       });
     } catch {
       /* Analytics never owns game control flow. */
@@ -162,6 +164,13 @@ export class GameplayAnalytics {
   }
   setDevice(device: string) {
     this.device = device;
+  }
+  setFullscreen(fullscreen: boolean) {
+    const mode = fullscreen ? "fullscreen" : "windowed";
+    if (mode === this.fullscreenMode) return;
+    if (!this.ended) this.flush();
+    this.fullscreenMode = mode;
+    if (!this.ended) this.send("fullscreen_changed");
   }
   tick(dt: number) {
     if (this.ended || !Number.isFinite(dt) || dt <= 0) return;

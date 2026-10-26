@@ -16,7 +16,7 @@ The pause menu links to `privacy.html`, which explains collection and cookies an
 
 ## Events
 
-All events carry stable `level_id` and `input_device` categories. `hub` means gallery.
+All gameplay events carry stable `level_id`, `input_device` and `fullscreen_mode` categories. Fullscreen mode is `fullscreen` or `windowed`, based on the actual browser Fullscreen API state (not screen size or a request to enter fullscreen). `hub` means gallery.
 
 | Event | Parameters / interpretation |
 | --- | --- |
@@ -29,7 +29,10 @@ All events carry stable `level_id` and `input_device` categories. `hub` means ga
 | `camera_used` | `camera_action` rotate or recenter, grouped per gesture |
 | `story_step` | `story_phase`; stable objective phase from runtime snapshot |
 | `secret_found` | `secret_id`; once per page session, including organ, discovery tokens, gallery areas and delivery |
+| `fullscreen_changed` | `fullscreen_mode`; one event for each actual mode change during a level visit, including Escape exits |
 | `activity_used` | `activity_id`; successful repeated optional activity use |
+
+A fullscreen change flushes accumulated `play_time` under the previous mode before recording the new mode. Use Active play seconds by Fullscreen mode to compare time spent in each; attempt totals describe the whole visit and are not split by mode. Browser window maximization or browser F11 mode is not game fullscreen.
 
 Active duration excludes loading, splash, menus, dialogue/cinematics and hidden tabs. Long stalled/suspended frames over one second are discarded. Ordinary frame duration is measured separately from the simulation cap. Checkpoint retries stay inside the same level visit; manual restart ends a visit and begins another. Summing `active_seconds` is safe: attempt summaries use a different parameter. Sum `total_active_seconds` only for the desired end/exit event; use event count to derive average time per completed/abandoned visit. Page close delivery is best effort, especially after force quit or lost connectivity; explicit gallery-return exits are distinct.
 
@@ -37,10 +40,10 @@ The physics currently exposes ground pound/landing, wall kick, crouch/backflip, 
 
 ## Reports
 
-Custom event dimensions are registered for Level, Move, Camera action, Secret, Activity, Story phase, Exit reason, Input device, Entry reason and Retry reason. Custom metrics are Active play seconds (`active_seconds`, Seconds) and Attempt total seconds (`total_active_seconds`, Seconds).
+Custom event dimensions are registered for Level, Move, Camera action, Secret, Activity, Story phase, Exit reason, Input device, Entry reason, Retry reason and Fullscreen mode (`fullscreen_mode`). Custom metrics are Active play seconds (`active_seconds`, Seconds) and Attempt total seconds (`total_active_seconds`, Seconds).
 
-Use the saved **Super Mormon — gameplay overview** exploration: Levels and active time; Camera controls; Discoveries and side activities; Moves used; Unfinished exits and gallery returns; New and returning players. Each tab is configured with the relevant dimensions, metrics and event filters. New dimensions/events can take time to appear in processed reporting; Realtime is the initial verification view. For level completion rate, compare `level_end` event count with `level_start`, excluding hub. For unfinished gallery returns, filter `level_exit` with Exit reason = gallery. For move adoption, compare Total users with event count by Move and Level. Returning-player totals use GA’s new/returning user and retention reports; visits do not prove enjoyment.
+Use the saved **Super Mormon — gameplay overview** exploration: Levels and active time; Camera controls; Discoveries and side activities; Moves used; Unfinished exits and gallery returns; New and returning players; Fullscreen usage. The Fullscreen usage tab compares active play seconds, users and event counts by Level and Fullscreen mode. A player who switches modes can appear in both mode columns. Each tab is configured with the relevant dimensions, metrics and event filters. New dimensions/events can take time to appear in processed reporting; Realtime is the initial verification view. For level completion rate, compare `level_end` event count with `level_start`, excluding hub. For unfinished gallery returns, filter `level_exit` with Exit reason = gallery. For move adoption, compare Total users with event count by Move and Level. Returning-player totals use GA’s new/returning user and retention reports; visits do not prove enjoyment.
 
 ## Tests and maintenance
 
-`tests/analytics.test.ts` injects a transport and makes no network calls. It checks exact deployment gating, disabled initialization, time accounting, once-only completion, exits/retries, camera grouping, discoveries, successful movement and blocked transports. Keep normal local QA untracked. Verify production with the actual tag/network and GA Realtime after deployment; do not enable collection on local development to populate reports. The public measurement ID is not a secret; never add service-account keys or OAuth tokens to the browser.
+`tests/analytics.test.ts` injects a transport and makes no network calls. It checks exact deployment gating, disabled initialization, time accounting, once-only completion, exits/retries, camera grouping, discoveries, successful movement, fullscreen transitions/timing allocation and blocked transports. Keep normal local QA untracked. Verify production with the actual tag/network and GA Realtime after deployment; do not enable collection on local development to populate reports. The public measurement ID is not a secret; never add service-account keys or OAuth tokens to the browser.

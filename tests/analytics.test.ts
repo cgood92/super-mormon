@@ -87,6 +87,82 @@ test("gallery returns, retries and replay attempts keep distinct timing", () => 
   );
 });
 
+test("fullscreen changes split active time and carry the current mode on every event", () => {
+  const sent: {
+    name: string;
+    params: Record<string, string | number | boolean>;
+  }[] = [];
+  const a = new GameplayAnalytics((name, params) =>
+    sent.push({ name, params }),
+  );
+  a.start("broken-bow", "painting", "keyboard");
+  a.tick(12);
+  a.setFullscreen(true);
+  a.setFullscreen(true);
+  a.move("jump");
+  a.tick(7);
+  a.setFullscreen(false);
+  a.tick(3);
+  a.finish();
+
+  assert.deepEqual(
+    sent.map(({ name, params }) => [name, params.fullscreen_mode]),
+    [
+      ["level_start", "windowed"],
+      ["play_time", "windowed"],
+      ["fullscreen_changed", "fullscreen"],
+      ["move_used", "fullscreen"],
+      ["play_time", "fullscreen"],
+      ["fullscreen_changed", "windowed"],
+      ["play_time", "windowed"],
+      ["level_end", "windowed"],
+    ],
+  );
+  assert.deepEqual(
+    sent
+      .filter(({ name }) => name === "play_time")
+      .map(({ params }) => params.active_seconds),
+    [12, 7, 3],
+  );
+});
+
+test("fullscreen initialization and changes outside attempts remain silent but persist", () => {
+  const sent: {
+    name: string;
+    params: Record<string, string | number | boolean>;
+  }[] = [];
+  const a = new GameplayAnalytics((name, params) =>
+    sent.push({ name, params }),
+  );
+  a.setFullscreen(true);
+  a.start("hub", "initial", "keyboard");
+  a.finish();
+  a.setFullscreen(false);
+  a.setFullscreen(false);
+  a.start("broken-bow", "painting", "touch");
+  a.exit("gallery");
+  a.setFullscreen(true);
+  a.start("streets", "painting", "touch");
+
+  assert.deepEqual(
+    sent
+      .filter(({ name }) => name === "level_start")
+      .map(({ params }) => params.fullscreen_mode),
+    ["fullscreen", "windowed", "fullscreen"],
+  );
+  assert.equal(
+    sent.filter(({ name }) => name === "fullscreen_changed").length,
+    0,
+  );
+  assert.ok(
+    sent.every(
+      ({ params }) =>
+        params.fullscreen_mode === "fullscreen" ||
+        params.fullscreen_mode === "windowed",
+    ),
+  );
+});
+
 test("camera holds and repeated discoveries are bounded episodes", () => {
   const names: string[] = [];
   const a = new GameplayAnalytics((name) => names.push(name));
