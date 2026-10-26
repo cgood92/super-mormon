@@ -31,9 +31,9 @@ export function stop() {
 export function snapshot() {
   return window.superMormon.snapshot();
 }
-export async function press(index = 1) {
+export async function press(index = 1, duration = 120) {
   pad.buttons[index].pressed = true;
-  await new Promise((r) => setTimeout(r, 120));
+  await new Promise((r) => setTimeout(r, duration));
   pad.buttons[index].pressed = false;
   await new Promise((r) => setTimeout(r, 120));
 }
@@ -181,5 +181,83 @@ export async function palaceEscape() {
     [0, 43],
   ])
     await go(x, z, 0.6, 18000);
+  return snapshot();
+}
+
+// Jump using the same public controller state as the normal-route driver.
+export async function jumpTo(x, z, top, timeout = 8000) {
+  const start = performance.now();
+  try {
+    while (performance.now() - start < timeout) {
+      const s = snapshot(),
+        dx = x - s.player.x,
+        dz = z - s.player.z,
+        d = Math.hypot(dx, dz);
+      if (d < 0.4 && Math.abs(s.player.y - top) < 0.15 && s.player.grounded) {
+        stop();
+        return s;
+      }
+      const right = -Math.cos(s.cameraYaw) * dx + Math.sin(s.cameraYaw) * dz;
+      const forward = Math.sin(s.cameraYaw) * dx + Math.cos(s.cameraYaw) * dz;
+      const strength = Math.min(1, d * 1.5);
+      const axis = (v) =>
+        Math.abs(v) < 0.025
+          ? 0
+          : Math.sign(v) * (0.14 + 0.86 * Math.abs(v) * strength);
+      pad.axes[0] = axis(right / Math.max(d, 0.001));
+      pad.axes[1] = -axis(forward / Math.max(d, 0.001));
+      pad.buttons[0].pressed =
+        !s.player.grounded || (s.player.y < top - 0.3 && d < 3.1);
+      await tick();
+    }
+    throw Error(
+      `Jump blocked toward ${x},${top},${z}: ${JSON.stringify(snapshot().player)}`,
+    );
+  } finally {
+    stop();
+  }
+}
+export async function huntShot(timeout = 7000) {
+  const start = performance.now();
+  pad.buttons[1].pressed = true;
+  try {
+    while (performance.now() - start < timeout) {
+      const s = snapshot(),
+        a = s.adventure,
+        t = a.animals.find((t) => !t.taken);
+      if (!t) return s;
+      const dx = t.position.x - s.player.x,
+        dz = t.position.z - s.player.z,
+        d = Math.hypot(dx, dz);
+      const yaw = Math.atan2(dx, dz),
+        pitch =
+          Math.atan2(t.position.y - (s.player.y + 1.15), d) +
+          (0.5 * 9.81 * d) / (42 * 42);
+      const error = Math.atan2(Math.sin(yaw - a.yaw), Math.cos(yaw - a.yaw)),
+        pe = pitch - a.pitch;
+      const axis = (v) =>
+        Math.abs(v) < 0.004
+          ? 0
+          : Math.sign(v) * (0.14 + 0.86 * Math.min(1, Math.abs(v) * 4));
+      pad.axes[0] = axis(-error);
+      pad.axes[1] = axis(-pe);
+      if (Math.abs(error) < 0.018 && Math.abs(pe) < 0.018 && a.charge > 0.98)
+        break;
+      await tick();
+    }
+    pad.axes.fill(0);
+    pad.buttons[1].pressed = false;
+    await new Promise((r) => setTimeout(r, 850));
+    return snapshot();
+  } finally {
+    stop();
+  }
+}
+export async function orbit(x, y = 0, duration = 500) {
+  pad.axes[2] = x;
+  pad.axes[3] = y;
+  await new Promise((r) => setTimeout(r, duration));
+  stop();
+  await new Promise((r) => setTimeout(r, 100));
   return snapshot();
 }

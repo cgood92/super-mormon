@@ -1,5 +1,5 @@
 import * as T from "three";
-import { sceneryBox, markScenery } from "./scenery";
+import { sceneryBox, sceneryCanvasTent } from "./scenery";
 import { createCharacter } from "./character";
 import type { Solid, PlayerState } from "./physics";
 
@@ -46,43 +46,24 @@ export function buildFamilyCamp(parent: T.Group, solids: Solid[]) {
   ]) {
     const { x, z, name } = tent;
     const half = name === "Shared family shelter" ? 4 : 3;
-    // Front faces the shared southern courtyard. Wide doorway has no invisible slab.
-    box(x - half, 0, z, 0.16, 2.5, 6, `${name} · left canvas wall`);
-    box(x + half, 0, z, 0.16, 2.5, 6, `${name} · right canvas wall`);
-    box(x, 0, z + 3, half * 2, 2.5, 0.16, `${name} · back canvas wall`);
-    for (const side of [-1, 1])
-      box(
-        x + side * ((half + 1.3) / 2),
-        0,
-        z - 3,
-        half - 1.3,
-        2.5,
-        0.16,
-        `${name} · doorway canvas`,
-      );
-    box(x, 2.5, z - 3, 2.6, 0.5, 0.16, `${name} · door lintel`);
+    // Front faces the shared southern courtyard. Roof bands sit above an open interior.
+    sceneryCanvasTent(
+      group,
+      solids,
+      { canvas: cloth, wood },
+      {
+        x,
+        y: 0,
+        z,
+        width: half * 2,
+        depth: 6,
+        eaveHeight: 2.5,
+        ridgeHeight: 4.25,
+        doorWidth: 2.6,
+      },
+      name,
+    );
     box(x, 0, z + 1.8, 4.4, 0.1, 1.8, `${name} · sleeping mat`, mat);
-    for (const side of [-1, 1])
-      box(
-        x + side * (half - 0.2),
-        0,
-        z - 2.8,
-        0.14,
-        3,
-        0.14,
-        `${name} · tent pole`,
-        wood,
-      );
-    const roof = new T.Mesh(new T.ConeGeometry(4.4, 1.8, 4), cloth);
-    roof.position.set(x, 3.35, z);
-    roof.rotation.y = Math.PI / 4;
-    roof.scale.x = half / 3;
-    roof.name = `${name} · canopy`;
-    markScenery(roof, {
-      kind: "decoration",
-      reason: "Overhead canvas canopy above solid wall and doorway supports",
-    });
-    group.add(roof);
     box(x + 2, 0, z - 4, 0.4, 0.7, 0.4, `${name} · lamp stand`, wood);
     const lamp = new T.Mesh(
       new T.SphereGeometry(0.16, 6, 4),

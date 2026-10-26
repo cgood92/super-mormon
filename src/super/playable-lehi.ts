@@ -9,6 +9,7 @@ export function createSculptedCharacterRig(
   options: { quality?: "hero" | "npc" | "crowd" } = {},
 ): {
   group: T.Group;
+  sockets: { leftHand: T.Group; rightHand: T.Group; back: T.Group };
   update(dt: number, state: CharacterState): void;
   dispose(): void;
 } {
@@ -155,6 +156,23 @@ export function createSculptedCharacterRig(
     attach(name, head);
   attach("left-hand", armPivots[0]);
   attach("right-hand", armPivots[1]);
+  const handSocket = (side: "left" | "right") => {
+    const hand = model.group.getObjectByName(`${side}-hand`) as T.Mesh;
+    hand.geometry.computeBoundingBox();
+    const socket = new T.Group();
+    socket.name = `${side}-hand-socket`;
+    socket.position.copy(hand.geometry.boundingBox!.getCenter(new T.Vector3()));
+    hand.add(socket);
+    return socket;
+  };
+  const sockets = {
+    leftHand: handSocket("left"),
+    rightHand: handSocket("right"),
+    back: new T.Group(),
+  };
+  sockets.back.name = "back-socket";
+  sockets.back.position.set(0, 1.16, -0.29);
+  model.group.add(sockets.back);
   attach("left-trouser", legPivots[0]);
   attach("right-trouser", legPivots[1]);
   attach("left-sandal", footPivots[0]);
@@ -216,22 +234,21 @@ export function createSculptedCharacterRig(
     // the hips and let its hem hang below the back, clear of the trailing feet.
     const weight = 1 - T.MathUtils.smoothstep(point.y, 0.45, 1.16);
     const backDrape = T.MathUtils.lerp(
-      0.36,
+      0.05,
       -0.2,
       T.MathUtils.smoothstep(point.y, 0.18, 0.65),
     );
-    const gatheredY = T.MathUtils.lerp(
-      0.62,
-      0.71,
-      T.MathUtils.smoothstep(point.y, 0.15, 0.65),
-    );
+    // The trailing shoes reach local Y ~= 0.61 in a crawl. Lift the low hem
+    // past them, while mapping its authored height into a curved sweep.
+    const hem = 1 - T.MathUtils.smoothstep(point.y, 0.18, 0.48);
+    const gatheredY = 0.67 + (point.y - 0.122) * 0.55;
     point.y += (gatheredY - point.y) * weight;
     point.z *= 1 - 0.32 * weight;
-    const hemDepth = T.MathUtils.lerp(
-      backDrape,
-      0.36,
-      T.MathUtils.smoothstep(point.z, -0.08, 0.12),
-    );
+    // Preserve the authored front-to-back arc at the hem. Interpolating the
+    // entire low ring to one Z coordinate makes a flat cut face in rear views.
+    const rear = 1 - T.MathUtils.smoothstep(point.z, -0.03, 0.06);
+    const center = 1 - T.MathUtils.smoothstep(Math.abs(point.x), 0.04, 0.34);
+    const hemDepth = backDrape + point.z * 0.5 - 0.13 * rear * center * hem;
     point.z += (hemDepth - point.z) * weight;
   };
   const worldGaze = new T.Vector3();
@@ -247,6 +264,7 @@ export function createSculptedCharacterRig(
   body.scale.setScalar(actorScale);
   return {
     group,
+    sockets,
     update(dt, state) {
       dt = Math.min(0.1, Math.max(0, dt));
       driver.update(dt, state);

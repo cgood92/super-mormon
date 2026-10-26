@@ -47,7 +47,7 @@ test("later chapters prepare their own interactive worlds and leave no scene res
   const { prepareWorld } = await import("../src/super/world-loading");
   const { Scene } = await import("three");
   for (const [id, phase] of [
-    ["broken-bow", "camp"],
+    ["broken-bow", "practice"],
     ["promised", "camp"],
     ["vineyard", "learn"],
     ["jacob", "settlement"],

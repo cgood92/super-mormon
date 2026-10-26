@@ -349,6 +349,12 @@ export function createMotionDriver(role: CharacterRole): {
         body.rotation.x = 0.1;
         head.rotation.x = 0.12;
       }
+      if (state.holdingBow && move !== "crawl") {
+        // Keep both hands on the equipment while the legs follow the gait.
+        // Aiming below replaces this ready pose with a full draw.
+        arms[0].rotation.set(-1.22, -0.18, -0.2);
+        arms[1].rotation.set(-0.82, 0.16, 0.2);
+      }
       if (state.aiming && move !== "crawl") {
         // Left arm presents the bow while the string hand draws back to the cheek.
         const draw = Math.max(0, Math.min(1, state.draw ?? 0));

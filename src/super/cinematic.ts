@@ -8,6 +8,8 @@ export type StoryActor = {
   speaker?: boolean;
 };
 export type StoryShot = {
+  /** An edited scene at a distant actor; enter and leave with a safe camera cut. */
+  cutaway?: boolean;
   playerGesture?: StoryActor["gesture"];
   props?: { object: T.Object3D; to: { x: number; y: number; z: number } }[];
   actors?: StoryActor[];
@@ -308,6 +310,9 @@ export class StoryCinematic {
   private returnVia = new T.Vector3();
   private returnFirstLength = 0;
   private returnTotalLength = 0;
+  private cutaway = false;
+  private entrancePosition = new T.Vector3();
+  private entranceRotation = new T.Quaternion();
   constructor(
     private camera: T.PerspectiveCamera,
     private shot: StoryShot,
@@ -320,9 +325,73 @@ export class StoryCinematic {
       (shot.actors ?? []).find((a) => a.speaker) ?? shot.actors?.[0];
     this.solids = solids;
     this.meshes = new StoryMeshObstacles(environment, shot.actors ?? []);
-    const plan = planStoryCamera(camera, shot, solids, this.meshes);
+    const actor = shot.actors?.[0]?.group;
+    let plan: StoryCameraPlan;
+    if (shot.cutaway && actor) {
+      const radius = Math.max(
+        0.28,
+        Math.hypot(
+          camera.near *
+            Math.tan(T.MathUtils.degToRad(camera.fov / 2)) *
+            camera.aspect,
+          camera.near * Math.tan(T.MathUtils.degToRad(camera.fov / 2)),
+          camera.near,
+        ) + 0.12,
+      );
+      const safe = (point: T.Vector3) =>
+        cameraSegmentClear(point, point, solids, radius) &&
+        this.meshes.clear(point, point, radius);
+      if (!safe(this.originalPosition)) {
+        const origin = this.originalPosition.clone();
+        for (const offset of [
+          ...Array.from(
+            { length: 48 },
+            (_, i) => new T.Vector3(0, (i + 1) * 0.3, 0),
+          ),
+          ...[1, 2, 3, 5].flatMap((distance) =>
+            [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2].map(
+              (angle) =>
+                new T.Vector3(
+                  Math.sin(angle) * distance,
+                  distance,
+                  Math.cos(angle) * distance,
+                ),
+            ),
+          ),
+        ]) {
+          const candidate = origin.clone().add(offset);
+          if (safe(candidate)) {
+            this.originalPosition.copy(candidate);
+            break;
+          }
+        }
+      }
+      const anchor = actor.getWorldPosition(new T.Vector3());
+      const seeds = [
+        new T.Vector3(0, 3, 6),
+        new T.Vector3(6, 3, 0),
+        new T.Vector3(-6, 3, 0),
+        new T.Vector3(0, 3, -6),
+        new T.Vector3(0, 5, 8),
+        new T.Vector3(8, 5, 0),
+        new T.Vector3(-8, 5, 0),
+        new T.Vector3(0, 5, -8),
+      ];
+      const planned = seeds.map((offset) => {
+        const probe = camera.clone();
+        probe.position.copy(anchor).add(offset);
+        probe.lookAt(anchor.clone().add(new T.Vector3(0, 1, 0)));
+        return planStoryCamera(probe, shot, solids, this.meshes);
+      });
+      plan = planned.find((candidate) => !candidate.fallback) ?? planned[0];
+      this.cutaway = safe(plan.wide) && !plan.fallback;
+      if (this.cutaway) {
+        camera.position.copy(plan.wide);
+        camera.lookAt(plan.focus);
+      } else plan = planStoryCamera(camera, shot, solids, this.meshes);
+    } else plan = planStoryCamera(camera, shot, solids, this.meshes);
     this.fallback = plan.fallback;
-    if (plan.recovery) {
+    if (plan.recovery && !this.cutaway) {
       camera.position.copy(plan.recovery);
       camera.lookAt(plan.focus);
       this.originalPosition.copy(camera.position);
@@ -332,6 +401,8 @@ export class StoryCinematic {
     this.wide.copy(plan.wide);
     this.close.copy(plan.close);
     this.radius = plan.radius;
+    this.entrancePosition.copy(camera.position);
+    this.entranceRotation.copy(camera.quaternion);
     for (const prop of shot.props ?? [])
       this.poses.push({
         object: prop.object,
@@ -360,6 +431,10 @@ export class StoryCinematic {
   finish() {
     if (this.returning || !this.ready) return false;
     this.returning = true;
+    if (this.cutaway) {
+      this.restoreActors();
+      return true;
+    }
     this.returnPosition.copy(this.camera.position);
     this.returnRotation.copy(this.camera.quaternion);
     this.returnVia.copy(
@@ -374,6 +449,11 @@ export class StoryCinematic {
   update(dt: number): boolean {
     dt = Math.max(0, Math.min(dt, 0.1));
     if (this.returning) {
+      if (this.cutaway) {
+        this.camera.position.copy(this.originalPosition);
+        this.camera.quaternion.copy(this.originalRotation);
+        return true;
+      }
       this.returnElapsed += dt;
       const t = smooth(this.returnElapsed / 0.65);
       const travel = t * this.returnTotalLength;
@@ -435,7 +515,7 @@ export class StoryCinematic {
       .clone()
       .lerp(this.close, smooth((this.elapsed - 1) / 2.8));
     this.moveSafely(
-      this.originalPosition.clone().lerp(target, smooth(this.elapsed / 1.15)),
+      this.entrancePosition.clone().lerp(target, smooth(this.elapsed / 1.15)),
     );
     const rotation = new T.Matrix4().lookAt(
       this.camera.position,
@@ -444,7 +524,7 @@ export class StoryCinematic {
     );
     const wanted = new T.Quaternion().setFromRotationMatrix(rotation);
     this.camera.quaternion.slerpQuaternions(
-      this.originalRotation,
+      this.entranceRotation,
       wanted,
       smooth(this.elapsed / 1.15),
     );
@@ -538,6 +618,7 @@ export class StoryCinematic {
       ready: this.ready,
       returning: this.returning,
       fallback: this.fallback,
+      cutaway: this.cutaway,
       view: this.camera.position.toArray(),
       wide: this.wide.toArray(),
       close: this.close.toArray(),

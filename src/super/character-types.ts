@@ -60,6 +60,7 @@ export type CharacterState = {
   moveTime?: number;
   jumpStage?: number;
   carrying?: boolean;
+  holdingBow?: boolean;
   wave?: boolean;
   pointing?: boolean;
   aiming?: boolean;

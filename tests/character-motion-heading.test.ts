@@ -131,3 +131,37 @@ test("crawl support and facing recover after turning and returning upright", () 
   );
   driver.dispose();
 });
+
+test("held bow arms stay steady while walking and draw only when aiming", () => {
+  const driver = createMotionDriver("nephi");
+  const left = driver.group.getObjectByName("left-arm")!;
+  const right = driver.group.getObjectByName("right-arm")!;
+  const pitches: number[][] = [[], []];
+  for (let frame = 0; frame < 32; frame++) {
+    driver.update(1 / 60, {
+      ...state,
+      z: frame * 0.075,
+      vz: 4.5,
+      runSpeed: 4.5,
+      move: "run",
+      holdingBow: true,
+    });
+    pitches[0].push(left.rotation.x);
+    pitches[1].push(right.rotation.x);
+  }
+  for (const values of pitches)
+    assert.ok(Math.max(...values) - Math.min(...values) < 0.08);
+  const readyRight = right.rotation.clone();
+  driver.update(1 / 60, {
+    ...state,
+    z: 2.5,
+    holdingBow: true,
+    aiming: true,
+    draw: 1,
+  });
+  assert.ok(
+    Math.abs(right.rotation.y - readyRight.y) > 0.3,
+    "draw hand moves back toward cheek",
+  );
+  driver.dispose();
+});

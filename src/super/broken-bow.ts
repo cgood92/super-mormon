@@ -1,6 +1,11 @@
 import * as T from "three";
 import type { WorldData, Point } from "./worlds";
-import { sceneryBox, terracedRock, markScenery } from "./scenery";
+import {
+  sceneryBox,
+  sceneryCanvasTent,
+  terracedRock,
+  markScenery,
+} from "./scenery";
 import { createCharacter } from "./character";
 import { aimDirection, createArrowState, stepArrow } from "./hunting-physics";
 import {
@@ -40,6 +45,11 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
     stone = mat(0xa68c68),
     wood = mat(0x71543b),
     green = mat(0x6f7950);
+  const canvas = new T.MeshStandardMaterial({
+    color: 0xbfa77e,
+    roughness: 0.98,
+    side: T.DoubleSide,
+  });
   sceneryBox(
     root,
     solids,
@@ -47,38 +57,57 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
     { x: 0, y: -1, z: 7, w: 140, h: 1, d: 140 },
     "Wilderness ground",
   );
-  // A single broad ascending trail: adjacent steps have no coplanar overlap.
-  for (let i = 0; i < 32; i++)
+  // Distinct landings leave short crevices. The first rise requires a normal
+  // jump, and each later rise remains within the ordinary jump envelope.
+  const trail = [
+    { x: 0, z: 14, top: 0.85, w: 5, d: 3.4 },
+    { x: -1, z: 18, top: 1.7, w: 4.5, d: 3.1 },
+    { x: 0.8, z: 22, top: 2.6, w: 5.1, d: 3.1 },
+    { x: 1.3, z: 26, top: 3.5, w: 4.8, d: 3.1 },
+    { x: -0.7, z: 30, top: 4.45, w: 5.2, d: 3.1 },
+    { x: -1.2, z: 34, top: 5.4, w: 4.8, d: 3.1 },
+    { x: 0.6, z: 38, top: 6.35, w: 5, d: 3.1 },
+    { x: 0.2, z: 42, top: 7.3, w: 5.5, d: 3.3 },
+  ];
+  for (const [i, ledge] of trail.entries())
     sceneryBox(
       root,
       solids,
       i % 2 ? stone : sand,
       {
-        x: Math.sin(i * 0.15) * 1.8,
+        x: ledge.x,
         y: 0,
-        z: 12 + i * 0.8,
-        w: 7 + Math.sin(i * 0.7) * 0.4,
-        h: (i + 1) * 0.25,
-        d: 0.8,
+        z: ledge.z,
+        w: ledge.w,
+        h: ledge.top,
+        d: ledge.d,
       },
-      "Mountain trail step",
+      "Weathered trail boulder",
     );
-  // Adjacent ledges form an irregular mountain table, each surface owned once.
-  for (let i = 0; i < 7; i++)
+  // Three touching ledges share no area. Staggered fronts and backs break the
+  // tabletop outline while preserving the central practice/hunting route.
+  for (const ledge of [
+    { x: -8.25, z: 48.5, w: 6.5, d: 7 },
+    { x: 0, z: 48, w: 10, d: 8 },
+    { x: 8.25, z: 48.3, w: 6.5, d: 8 },
+  ])
     sceneryBox(
       root,
       solids,
       stone,
-      {
-        x: Math.sin(i * 1.6) * 0.8,
-        y: 0,
-        z: 38.8 + i * 3.2,
-        w: [23, 31, 36, 39, 36, 30, 24][i],
-        h: 8,
-        d: 3.2,
-      },
-      "Natural summit ledge",
+      { ...ledge, y: 0, h: 8 },
+      "Practice and hunting summit ledge",
     );
+  // A fitted, lower rock apron masks the tall front face while keeping the
+  // broad hunting surface owned by the summit itself. Its top is 0.9m lower,
+  // so the overlap cannot introduce a coplanar walk surface.
+  terracedRock(
+    root,
+    solids,
+    stone,
+    { x: 0, y: 0, z: 43, w: 12, h: 7.1, d: 9 },
+    "Fitted summit apron",
+  );
   // Rounded fitted shoulders bury the vertical edges, leaving the hunting ledge clear.
   for (const side of [-1, 1])
     for (let i = 0; i < 6; i++)
@@ -89,9 +118,9 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
         {
           x: side * (12 + [0, 3, 6, 7, 5, 2][i]),
           y: 0,
-          z: 38 + i * 4,
+          z: 46 + i * 4,
           w: 14,
-          h: 7.7,
+          h: 7.2,
           d: 14,
         },
         "Rounded mountain escarpment",
@@ -127,19 +156,62 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
         "Weathered mountain shoulder",
       );
   const camp = p(0, -13),
-    branch = p(-14, -5),
-    stick = p(-18, 0),
-    bench = p(7, -9),
+    branch = p(-18, -4),
+    stick = p(19, 2),
     lehi = p(-5, -15),
-    guide = p(1, -18),
-    summit = p(0, 41, 8);
-  sceneryBox(
-    root,
-    solids,
-    wood,
-    { x: 8, y: 0, z: -11, w: 3, h: 0.75, d: 1.4 },
-    "Crafting bench",
-  );
+    guide = p(7, -19),
+    summit = p(0, 46, 8);
+  for (const [x, z, width, depth] of [
+    [-13, -23, 5.8, 5.4],
+    [10, -24, 6.2, 5.8],
+    [17, -17, 5.3, 5],
+  ])
+    sceneryCanvasTent(
+      root,
+      solids,
+      { canvas, wood },
+      {
+        x,
+        y: 0,
+        z,
+        width,
+        depth,
+        eaveHeight: 1.4,
+        ridgeHeight: 3.15,
+        doorWidth: 1.8,
+      },
+      "Family canvas shelter",
+    );
+  // A sheltered side path reaches a small view terrace west of the ascent.
+  for (const [x, z, w, h, d] of [
+    [-23, 6, 3.2, 1.3, 3],
+    [-28, 12, 4.8, 1.6, 4],
+    [-26, 19, 6.4, 1.8, 5],
+  ])
+    sceneryBox(
+      root,
+      solids,
+      stone,
+      { x, y: 0, z, w, h, d },
+      "Foothill lookout rock",
+    );
+  for (const [x, z] of [
+    [-8, -17],
+    [13, -14],
+    [19, -20],
+  ]) {
+    const jar = new T.Mesh(
+      new T.CylinderGeometry(0.24, 0.2, 0.52, 9),
+      mat(0x987c5b),
+    );
+    jar.position.set(x, 0.27, z);
+    jar.name = "Household water jar";
+    root.add(jar);
+    markScenery(jar, {
+      kind: "decoration",
+      reason: "Small household vessel below foot clearance",
+    });
+  }
   for (const x of [-15, -20, 22]) {
     sceneryBox(
       root,
@@ -218,7 +290,7 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
   bow.group.add(nocked);
   nocked.visible = false;
   const steel = new T.Group();
-  steel.name = "Steel bow breaking";
+  steel.name = "Steel bow";
   root.add(steel);
   const steelMat = new T.MeshStandardMaterial({
     color: 0x7f8d98,
@@ -227,14 +299,35 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
   });
   const steelHalves = [-1, 1].map((sign) => {
     const piece = new T.Mesh(
-      new T.CylinderGeometry(0.04, 0.04, 0.7, 8),
+      new T.TubeGeometry(
+        new T.CatmullRomCurve3([
+          new T.Vector3(0, 0, -0.03),
+          new T.Vector3(0, sign * 0.28, -0.11),
+          new T.Vector3(0, sign * 0.52, -0.05),
+          new T.Vector3(0, sign * 0.72, 0.15),
+        ]),
+        12,
+        0.036,
+        6,
+        false,
+      ),
       steelMat,
     );
-    piece.position.y = sign * 0.35;
-    piece.rotation.z = sign * 0.22;
     steel.add(piece);
     return piece;
   });
+  const steelString = new T.Line(
+    new T.BufferGeometry().setFromPoints([
+      new T.Vector3(0, -0.72, 0.15),
+      new T.Vector3(0, 0, 0.15),
+      new T.Vector3(0, 0.72, 0.15),
+    ]),
+    new T.LineBasicMaterial({ color: 0xdad9cf }),
+  );
+  steel.add(steelString);
+  const steelNocked = createArrowModel();
+  steel.add(steelNocked);
+  steelNocked.visible = false;
   const arrowModel = createArrowModel();
   root.add(arrowModel);
   arrowModel.visible = false;
@@ -242,13 +335,42 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
   marker.rotation.z = Math.PI;
   root.add(marker);
   const bundles = new T.Group();
+  bundles.name = "Secured hunted animals";
   root.add(bundles);
   for (let i = 0; i < 3; i++) {
-    const m = new T.Mesh(new T.SphereGeometry(0.28, 8, 6), mat(0xb68c60));
-    m.scale.set(1.4, 0.7, 1);
-    m.position.set(i * 0.6 - 0.6, 0.25, 0);
-    bundles.add(m);
+    const animal = new T.Group();
+    animal.name = `Carried ibex silhouette ${i + 1}`;
+    animal.position.set((i - 1) * 0.24, -0.18 - i * 0.05, -0.14);
+    animal.rotation.x = Math.PI / 2;
+    animal.rotation.z = (i - 1) * 0.18;
+    const coat = mat(i === 1 ? 0xb79b70 : 0x927252);
+    const body = new T.Mesh(new T.SphereGeometry(1, 9, 7), coat);
+    body.scale.set(0.15, 0.12, 0.34);
+    animal.add(body);
+    const head = new T.Mesh(new T.SphereGeometry(1, 8, 6), coat);
+    head.position.z = 0.37;
+    head.scale.set(0.11, 0.1, 0.14);
+    animal.add(head);
+    for (const side of [-1, 1]) {
+      const horn = new T.Mesh(new T.ConeGeometry(0.025, 0.18, 5), wood);
+      horn.position.set(side * 0.07, 0.12, 0.36);
+      horn.rotation.z = side * 0.35;
+      animal.add(horn);
+      for (const z of [-0.16, 0.18]) {
+        const leg = new T.Mesh(
+          new T.CylinderGeometry(0.025, 0.018, 0.26, 5),
+          coat,
+        );
+        leg.position.set(side * 0.1, -0.17, z);
+        animal.add(leg);
+      }
+    }
+    bundles.add(animal);
   }
+  const carrierTie = new T.Mesh(new T.BoxGeometry(0.82, 0.045, 0.045), wood);
+  carrierTie.name = "Carrier tie across provisions";
+  carrierTie.position.set(0, -0.19, -0.27);
+  bundles.add(carrierTie);
   bundles.visible = false;
   const blockers = solids.map(
     (s) =>
@@ -275,7 +397,7 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
     name: "The Broken Bow",
     subtitle:
       "Provide for the family • 1 Nephi 16:18–32 • Imagined Arabian wildlife",
-    initialObjective: "Meet the hungry family at camp",
+    initialObjective: "Climb the mountain for target practice",
     spawn: p(0, -22),
     solids,
     actorParent: root,
@@ -285,14 +407,15 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
       { name: "Family camp", ...camp },
       { name: "Bow wood", ...branch },
       { name: "Straight stick", ...stick },
-      { name: "Crafting bench", ...bench },
       { name: "Mountain trail", ...summit },
     ],
     adventure(hooks) {
       hooks.setAvatar("nephi");
-      let phase = "camp",
+      hooks.attachEquipment?.("leftHand", steel);
+      hooks.attachEquipment?.("back", bundles);
+      let phase = "practice",
         dialog = false,
-        effort = 0,
+        practiceShots = 0,
         food = 0,
         aiming = false,
         charge = 0,
@@ -300,23 +423,22 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
         pitch = 0.03,
         time = 0,
         finished = false,
+        optionalTalked = false,
         breakTime = -1;
       let arrow: ReturnType<typeof createArrowState> | undefined;
       let aimCamera: { position: T.Vector3; focus: T.Vector3 } | undefined;
       const target = () =>
-        phase === "camp" || phase === "return"
+        phase === "return"
           ? camp
           : phase === "wood"
             ? branch
             : phase === "arrow"
               ? stick
-              : phase === "craft"
-                ? bench
-                : phase === "counsel"
-                  ? lehi
-                  : phase === "guide"
-                    ? guide
-                    : summit;
+              : phase === "counsel"
+                ? lehi
+                : phase === "guide"
+                  ? guide
+                  : summit;
       const say = (title: string, body: string, next: string) => {
         dialog = true;
         hooks.dialog(
@@ -326,31 +448,34 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
           () => {
             phase = next;
             dialog = false;
-            effort = 0;
           },
           {
             focus: target(),
-            playerGesture: "talk",
+            cutaway: phase === "snapped",
+            playerGesture: phase === "snapped" ? undefined : "talk",
             actors:
-              phase === "camp" || phase === "counsel" || phase === "return"
+              phase === "snapped" || phase === "counsel" || phase === "return"
                 ? people.map((a, i) => ({
                     group: a.group,
-                    speaker: i === 0,
-                    gesture: "talk" as const,
+                    speaker: phase === "snapped" ? i === 1 : i === 0,
+                    gesture:
+                      phase === "snapped" && i === 0
+                        ? ("recoil" as const)
+                        : ("talk" as const),
                   }))
                 : [],
           },
         );
       };
       const objective = () =>
-        phase === "camp"
-          ? "Meet the hungry family at camp"
-          : phase === "wood"
-            ? "Find a flexible branch for a wooden bow"
-            : phase === "arrow"
-              ? "Find a straight stick for an arrow"
-              : phase === "craft"
-                ? `Shape and string the wooden bow • ${effort}/3`
+        phase === "practice"
+          ? `Climb the mountain for target practice • ${practiceShots}/3 shots`
+          : phase === "snapped"
+            ? "The steel bow has broken"
+            : phase === "wood"
+              ? "Find a flexible branch for a wooden bow"
+              : phase === "arrow"
+                ? "Find a straight stick for an arrow"
                 : phase === "counsel"
                   ? "Ask Lehi where to find food"
                   : phase === "guide"
@@ -361,11 +486,11 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
                         ? "Carry the food back to your family"
                         : "The family has food for the journey";
       return {
-        movementLocked: () => dialog || aiming,
+        movementLocked: () => dialog || aiming || phase === "snapped",
         camera: () => (aiming ? aimCamera : undefined),
         snapshot: () => ({
           phase,
-          effort,
+          practiceShots,
           food,
           aiming,
           charge,
@@ -384,19 +509,38 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
         update(dt, player, input) {
           time += dt;
           if (breakTime >= 0) breakTime += dt;
+          if (phase === "snapped" && breakTime > 0.8 && !dialog)
+            say(
+              "The family is hungry",
+              "After the steel bow breaks, Laman and Lemuel lament that their bows have lost their spring and the family has no food. Nephi resolves to make a wooden bow and a straight-stick arrow.",
+              "wood",
+            );
           steel.visible =
-            phase === "camp" || (breakTime < 1.8 && breakTime >= 0);
-          steel.position.set(player.x + 0.4, player.y + 1.1, player.z + 0.25);
+            phase === "practice" || (breakTime < 1.8 && breakTime >= 0);
+          if (!hooks.attachEquipment)
+            steel.position.set(player.x + 0.4, player.y + 1.1, player.z + 0.25);
+          const orientHeld = (group: T.Group) => {
+            const desired = new T.Quaternion().setFromEuler(
+              new T.Euler(-pitch, yaw, 0, "YXZ"),
+            );
+            if (hooks.attachEquipment && group.parent) {
+              group.parent.updateWorldMatrix(true, false);
+              const parentRotation = group.parent.getWorldQuaternion(
+                new T.Quaternion(),
+              );
+              group.quaternion.copy(parentRotation.invert().multiply(desired));
+            } else group.quaternion.copy(desired);
+          };
+          orientHeld(steel);
+          steelNocked.visible = phase === "practice" && aiming;
+          steelNocked.position.z = 0.69 - charge * 0.53;
           steelHalves.forEach((piece, i) => {
             const sign = i ? 1 : -1;
             const fall = Math.max(0, breakTime);
-            piece.position.set(
-              sign * fall * 0.55,
-              sign * 0.35 - fall * fall * 0.8,
-              0,
-            );
-            piece.rotation.z = sign * (0.22 + fall * 1.7);
+            piece.position.set(sign * fall * 0.55, -fall * fall * 0.8, 0);
+            piece.rotation.z = sign * fall * 1.7;
           });
+          steelString.visible = breakTime < 0;
           animals.forEach((a, i) => {
             a.previous.copy(a.position);
             if (!a.taken) {
@@ -434,9 +578,9 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
               arrow,
               dt,
               blockers,
-              animals.filter((a) => !a.taken),
+              phase === "hunt" ? animals.filter((a) => !a.taken) : [],
             );
-            if (hit?.kind === "animal") {
+            if (phase === "hunt" && hit?.kind === "animal") {
               const a = animals.find((a) => a.id === hit.targetId);
               if (a && !a.taken) {
                 a.taken = true;
@@ -461,23 +605,56 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
               Math.abs(player.y - t.y) < 2.5;
           marker.visible = !aiming && phase !== "done";
           marker.position.set(t.x, t.y + 2.8 + Math.sin(time * 2) * 0.12, t.z);
-          bow.group.visible = phase === "hunt";
-          bow.group.position.set(
-            player.x + Math.cos(yaw) * 0.35,
-            player.y + 1.15,
-            player.z - Math.sin(yaw) * 0.35,
-          );
-          nocked.visible = aiming;
+          bow.group.visible =
+            phase === "hunt" ||
+            phase === "return" ||
+            phase === "counsel" ||
+            phase === "guide" ||
+            phase === "arrow";
+          if (!hooks.attachEquipment)
+            bow.group.position.set(
+              player.x + Math.cos(yaw) * 0.35,
+              player.y + 1.15,
+              player.z - Math.sin(yaw) * 0.35,
+            );
+          nocked.visible = phase === "hunt" && aiming;
           nocked.position.set(0, 0, 0.69 - charge * 0.53);
-          bow.group.rotation.set(-pitch, yaw, 0, "YXZ");
+          orientHeld(bow.group);
           bow.setDraw(charge);
-          const shotOrigin = () =>
-            new T.Vector3(
+          const syncNock = () => {
+            const offset = 0.69 - charge * 0.53;
+            nocked.position.z = offset;
+            steelNocked.position.z = offset;
+            nocked.visible = phase === "hunt" && aiming;
+            steelNocked.visible = phase === "practice" && aiming;
+            bow.setDraw(charge);
+            const steelLine = steelString.geometry.getAttribute(
+              "position",
+            ) as T.BufferAttribute;
+            steelLine.setZ(1, 0.15 - charge * 0.53);
+            steelLine.needsUpdate = true;
+            steelString.geometry.computeBoundingSphere();
+            if (hooks.attachEquipment)
+              heldNock().updateWorldMatrix(true, false);
+          };
+          const heldNock = () => (phase === "practice" ? steelNocked : nocked);
+          const shotOrigin = () => {
+            if (hooks.attachEquipment) {
+              const nock = heldNock();
+              nock.updateWorldMatrix(true, false);
+              return nock.getWorldPosition(new T.Vector3());
+            }
+            return new T.Vector3(
               player.x + Math.cos(yaw) * 0.35,
               player.y + 1.15,
               player.z - Math.sin(yaw) * 0.35,
             ).addScaledVector(aimDirection(yaw, pitch), 0.69 - charge * 0.53);
-          const direction = aimDirection(yaw, pitch),
+          };
+          const direction = hooks.attachEquipment
+              ? new T.Vector3(0, 0, 1).applyQuaternion(
+                  heldNock().getWorldQuaternion(new T.Quaternion()),
+                )
+              : aimDirection(yaw, pitch),
             eye = new T.Vector3(player.x, player.y + 1.55, player.z);
           const cameraPosition = eye
             .clone()
@@ -497,7 +674,12 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
             cameraPosition.y += 0.3;
           aimDots.visible = aiming;
           if (aiming) {
-            const preview = createArrowState(shotOrigin(), yaw, pitch, charge);
+            const preview = createArrowState(
+              shotOrigin(),
+              Math.atan2(direction.x, direction.z),
+              Math.asin(direction.y),
+              charge,
+            );
             for (let i = 0; i < 12; i++) {
               const t = (i + 1) * 0.025;
               const point = preview.position
@@ -513,12 +695,20 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
             position: cameraPosition,
             focus: shotOrigin().addScaledVector(direction, 30),
           };
-          bundles.visible = phase === "return" || phase === "done";
-          if (phase === "return")
-            bundles.position.set(player.x, player.y + 1.1, player.z - 0.3);
-          else bundles.position.set(camp.x, 0, camp.z);
+          bundles.visible = food > 0 && phase !== "done";
+          bundles.children.forEach(
+            (animal, i) => (animal.visible = i < 3 ? i < food : true),
+          );
+          if (!hooks.attachEquipment)
+            bundles.position.set(player.x, player.y + 1.15, player.z - 0.42);
           let prompt = near ? "Interact" : "";
-          if (phase === "hunt") {
+          const optionalNear =
+            !optionalTalked &&
+            (phase === "practice" || phase === "wood" || phase === "arrow") &&
+            Math.hypot(player.x - (lehi.x + 4), player.z - lehi.z) < 2.4 &&
+            Math.abs(player.y) < 1;
+          if (optionalNear) prompt = "Speak with Lemuel";
+          if (phase === "hunt" || phase === "practice") {
             prompt = aiming
               ? `Hold {action} to draw; release to fire • {move} aims • ${Math.round(charge * 100)}%`
               : "Hold {action} to aim and draw; release to fire";
@@ -538,30 +728,64 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
                 0.65,
               );
               charge = Math.min(1, charge + dt / 1.1);
+              orientHeld(phase === "practice" ? steel : bow.group);
+              syncNock();
               player.yaw = yaw;
             }
             if (aiming && !input.interactHeld) {
               if (charge > 0.12) {
-                arrow = createArrowState(shotOrigin(), yaw, pitch, charge);
+                syncNock();
+                arrow = createArrowState(
+                  shotOrigin(),
+                  Math.atan2(direction.x, direction.z),
+                  Math.asin(direction.y),
+                  charge,
+                );
                 arrowModel.visible = true;
                 arrowModel.position.copy(arrow.position);
                 arrowModel.quaternion.setFromUnitVectors(
                   new T.Vector3(0, 0, 1),
                   arrow.velocity.clone().normalize(),
                 );
+                if (
+                  phase === "practice" &&
+                  Math.hypot(player.x - summit.x, player.z - summit.z) < 9 &&
+                  Math.abs(player.y - summit.y) < 1.5
+                ) {
+                  practiceShots++;
+                  if (practiceShots === 3) {
+                    breakTime = 0;
+                    phase = "snapped";
+                    arrow.active = false;
+                    arrow = undefined;
+                    arrowModel.visible = false;
+                    hooks.toast("The steel bow snaps in Nephi's hand.");
+                  }
+                }
               }
               aiming = false;
               charge = 0;
+              syncNock();
             }
+          } else if (!dialog && optionalNear && input.interact) {
+            optionalTalked = true;
+            dialog = true;
+            hooks.dialog(
+              "Camp conversation",
+              "A long journey",
+              "Lemuel: The journey has worn us down. I hope we find food soon.",
+              () => {
+                dialog = false;
+              },
+              {
+                focus: people[2].group,
+                actors: [
+                  { group: people[2].group, speaker: true, gesture: "talk" },
+                ],
+              },
+            );
           } else if (!dialog && near && input.interact) {
-            if (phase === "camp") {
-              breakTime = 0;
-              say(
-                "The steel bow breaks",
-                "Nephi’s steel bow breaks, and his brothers’ bows have lost their spring. The family is hungry. Nephi chooses to act: make a wooden bow and a straight-stick arrow.",
-                "wood",
-              );
-            } else if (phase === "wood") {
+            if (phase === "wood") {
               branchMesh.visible = false;
               phase = "arrow";
               hooks.toast(
@@ -569,20 +793,11 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
               );
             } else if (phase === "arrow") {
               stickMesh.visible = false;
-              phase = "craft";
+              phase = "counsel";
+              hooks.attachEquipment?.("leftHand", bow.group);
               hooks.toast(
-                "A straight arrow shaft. Shape your bow at the bench.",
+                "Nephi shapes the wooden bow and straight-stick arrow. Ask Lehi for counsel.",
               );
-            } else if (phase === "craft") {
-              effort++;
-              hooks.toast(
-                [
-                  "Shape the wood along its grain.",
-                  "Fit the string and prepare the arrow.",
-                  "A wooden bow and straight-stick arrow are ready.",
-                ][effort - 1],
-              );
-              if (effort === 3) phase = "counsel";
             } else if (phase === "counsel")
               say(
                 "Where shall I go?",
@@ -595,13 +810,19 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
                 "The writing on the Liahona gives direction. Follow the trail into the mountain. Aim carefully and bring back enough food for the family. Wildlife and hunting details here are imagined; the scripture does not identify the species.",
                 "hunt",
               );
-            else if (phase === "return")
-              say(
-                "Food for the family",
-                "Nephi returns with food. The family rejoices, humbles themselves, and gives thanks to the Lord.",
-                "done",
-              );
           }
+          if (
+            phase === "return" &&
+            !dialog &&
+            player.grounded &&
+            Math.abs(player.y - camp.y) < 0.6 &&
+            Math.hypot(player.x - camp.x, player.z - camp.z) < 3
+          )
+            say(
+              "Food for the family",
+              "Nephi returns with food. The family rejoices, humbles themselves, and gives thanks to the Lord.",
+              "done",
+            );
           if (phase === "done" && !finished) {
             finished = true;
             hooks.complete();
@@ -609,15 +830,24 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
           return {
             objective: objective(),
             prompt,
-            carrying: phase === "return",
+            carrying: false,
             aiming,
             draw: charge,
+            holdingBow:
+              phase === "practice" ||
+              phase === "hunt" ||
+              phase === "return" ||
+              phase === "counsel" ||
+              phase === "guide",
           };
         },
         dispose() {
           aiming = false;
           bow.group.visible = false;
           arrowModel.visible = false;
+          // Runtime sockets belong to the avatar, which the host disposes before
+          // the world. Return equipment to the world for its resource pass.
+          root.add(steel, bow.group, bundles);
         },
       };
     },
@@ -632,7 +862,7 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
         ms = new Set<T.Material>();
       root.traverse((o) => {
         if (o instanceof T.InstancedMesh) o.dispose();
-        if (o instanceof T.Mesh) {
+        if (o instanceof T.Mesh || o instanceof T.Line) {
           gs.add(o.geometry);
           (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) =>
             ms.add(m),

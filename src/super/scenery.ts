@@ -102,6 +102,248 @@ export function sceneryColumn(
   parent.add(mesh);
   return mesh;
 }
+
+export type CanvasTentShape = {
+  x: number;
+  y: number;
+  z: number;
+  width: number;
+  depth: number;
+  eaveHeight: number;
+  ridgeHeight: number;
+  doorWidth?: number;
+};
+
+/** Open A-frame shelter. The sewn roof and its thin physical bands share one profile. */
+export function sceneryCanvasTent(
+  parent: T.Group,
+  solids: Solid[],
+  materials: { canvas: T.Material; wood: T.Material; rope?: T.Material },
+  shape: CanvasTentShape,
+  name: string,
+): T.Group {
+  const tent = new T.Group();
+  tent.name = name;
+  parent.add(tent);
+  const halfW = shape.width / 2,
+    halfD = shape.depth / 2,
+    door = Math.min(shape.doorWidth ?? 2.6, shape.width - 0.6),
+    sag = Math.min(0.12, (shape.ridgeHeight - shape.eaveHeight) * 0.09);
+  const roofY = (localX: number, localZ: number) => {
+    const across = Math.abs(localX) / halfW,
+      along = (localZ + halfD) / shape.depth;
+    return (
+      shape.y +
+      shape.eaveHeight +
+      (shape.ridgeHeight - shape.eaveHeight) * (1 - across) -
+      sag * Math.sin(Math.PI * across) * Math.sin(Math.PI * along)
+    );
+  };
+  const box = (
+    x: number,
+    y: number,
+    z: number,
+    w: number,
+    h: number,
+    d: number,
+    label: string,
+    material = materials.canvas,
+  ) =>
+    sceneryBox(
+      tent,
+      solids,
+      material,
+      { x, y, z, w, h, d },
+      `${name} · ${label}`,
+    );
+  for (const side of [-1, 1]) {
+    box(
+      shape.x + side * halfW,
+      shape.y,
+      shape.z,
+      0.14,
+      shape.eaveHeight,
+      shape.depth,
+      `${side < 0 ? "left" : "right"} canvas wall`,
+    );
+    box(
+      shape.x + (side * (door + (shape.width - door) / 2)) / 2,
+      shape.y,
+      shape.z - halfD,
+      (shape.width - door) / 2,
+      shape.eaveHeight,
+      0.14,
+      "doorway canvas",
+    );
+    sceneryColumn(
+      tent,
+      solids,
+      materials.wood,
+      {
+        x: shape.x + side * (halfW - 0.18),
+        y: shape.y,
+        z: shape.z - halfD + 0.18,
+        diameter: 0.14,
+        height: shape.eaveHeight + 0.1,
+      },
+      `${name} · front tent pole`,
+    );
+    sceneryColumn(
+      tent,
+      solids,
+      materials.wood,
+      {
+        x: shape.x + side * (halfW - 0.18),
+        y: shape.y,
+        z: shape.z + halfD - 0.18,
+        diameter: 0.14,
+        height: shape.eaveHeight + 0.1,
+      },
+      `${name} · rear tent pole`,
+    );
+  }
+  box(
+    shape.x,
+    shape.y,
+    shape.z + halfD,
+    shape.width,
+    shape.eaveHeight,
+    0.14,
+    "back canvas wall",
+  );
+  box(
+    shape.x,
+    shape.y + shape.eaveHeight - 0.38,
+    shape.z - halfD,
+    door,
+    0.38,
+    0.14,
+    "door lintel",
+  );
+
+  const roofSupports: Solid[] = [];
+  const xSegments = 8,
+    zSegments = 3;
+  for (const side of [-1, 1]) {
+    const positions: number[] = [];
+    for (let zi = 0; zi < zSegments; zi++)
+      for (let xi = 0; xi < xSegments; xi++) {
+        const x0 = side * ((halfW * xi) / xSegments),
+          x1 = side * ((halfW * (xi + 1)) / xSegments),
+          z0 = -halfD + (shape.depth * zi) / zSegments,
+          z1 = -halfD + (shape.depth * (zi + 1)) / zSegments;
+        const p = (x: number, z: number) => [
+          shape.x + x,
+          roofY(x, z),
+          shape.z + z,
+        ];
+        if (side < 0)
+          positions.push(
+            ...p(x0, z0),
+            ...p(x1, z0),
+            ...p(x1, z1),
+            ...p(x0, z0),
+            ...p(x1, z1),
+            ...p(x0, z1),
+          );
+        else
+          positions.push(
+            ...p(x0, z0),
+            ...p(x1, z1),
+            ...p(x1, z0),
+            ...p(x0, z0),
+            ...p(x0, z1),
+            ...p(x1, z1),
+          );
+        const top = roofY((x0 + x1) / 2, (z0 + z1) / 2);
+        roofSupports.push({
+          x: shape.x + (x0 + x1) / 2,
+          y: top - 0.1,
+          z: shape.z + (z0 + z1) / 2,
+          w: Math.abs(x1 - x0),
+          h: 0.1,
+          d: z1 - z0,
+        });
+      }
+    const geometry = new T.BufferGeometry();
+    geometry.setAttribute(
+      "position",
+      new T.Float32BufferAttribute(positions, 3),
+    );
+    geometry.computeVertexNormals();
+    const roof = new T.Mesh(geometry, materials.canvas);
+    roof.name = `${name} · ${side < 0 ? "left" : "right"} sewn roof`;
+    roof.castShadow = true;
+    roof.receiveShadow = true;
+    markScenery(roof, {
+      kind: "solid",
+      solids: roofSupports.filter((s) => side * (s.x - shape.x) > 0),
+    });
+    tent.add(roof);
+  }
+  solids.push(...roofSupports);
+
+  // Two folded front flaps leave a clear central opening; ropes are visual guy lines.
+  for (const side of [-1, 1]) {
+    const flap = new T.BufferGeometry();
+    const x = shape.x + (side * door) / 2,
+      front = shape.z - halfD - 0.025;
+    flap.setAttribute(
+      "position",
+      new T.Float32BufferAttribute(
+        [
+          x,
+          shape.y + shape.eaveHeight - 0.38,
+          front,
+          x + side * 0.46,
+          shape.y + 0.65,
+          front - 0.1,
+          x + side * 0.06,
+          shape.y + 0.85,
+          front - 0.18,
+        ],
+        3,
+      ),
+    );
+    flap.computeVertexNormals();
+    const mesh = new T.Mesh(flap, materials.canvas);
+    mesh.name = `${name} · tied entrance flap`;
+    markScenery(mesh, {
+      kind: "decoration",
+      reason: "Folded cloth hangs beside the open doorway",
+    });
+    tent.add(mesh);
+  }
+  const ropePoints: T.Vector3[] = [];
+  for (const side of [-1, 1])
+    for (const end of [-1, 1]) {
+      ropePoints.push(
+        new T.Vector3(
+          shape.x + side * halfW,
+          shape.y + shape.eaveHeight,
+          shape.z + end * halfD,
+        ),
+        new T.Vector3(
+          shape.x + side * (halfW + 0.75),
+          shape.y + 0.3,
+          shape.z + end * (halfD + 0.7),
+        ),
+      );
+    }
+  const cord = new T.LineSegments(
+    new T.BufferGeometry().setFromPoints(ropePoints),
+    materials.rope instanceof T.LineBasicMaterial
+      ? materials.rope
+      : new T.LineBasicMaterial({ color: 0x725838 }),
+  );
+  cord.name = `${name} · side guy ropes`;
+  markScenery(cord, {
+    kind: "decoration",
+    reason: "Thin tie ropes do not obstruct walking",
+  });
+  tent.add(cord);
+  return tent;
+}
 /** Smooth faceted rock shell over fitted shallow physical layers. The shell stays within one step of support. */
 export function terracedRock(
   parent: T.Group,

@@ -5,7 +5,7 @@ import { buildBrokenBow } from "../src/super/broken-bow";
 import { createPlayer, stepPlayer } from "../src/super/physics";
 import { sceneryCollisionErrors } from "../src/super/scenery";
 const idle = { interact: false, interactHeld: false, x: 0, y: 0 };
-test("broken bow: family, meaningful craft work, counsel and a traversable mountain hunt", () => {
+test("broken bow: summit practice, automatic crafting, ordered counsel and return", () => {
   const world = buildBrokenBow(new T.Scene()),
     player = createPlayer(0, 0, -22);
   let completed = 0;
@@ -23,6 +23,7 @@ test("broken bow: family, meaningful craft work, counsel and a traversable mount
     runtime.snapshot() as {
       phase: string;
       effort: number;
+      practiceShots: number;
       food: number;
       aiming: boolean;
       target: { x: number; y: number; z: number };
@@ -50,25 +51,132 @@ test("broken bow: family, meaningful craft work, counsel and a traversable mount
     }
     assert.fail(`Blocked at ${player.x},${player.y},${player.z} to ${x},${z}`);
   }
+  function climb() {
+    walk(0, 10.5);
+    for (const [x, z, top] of [
+      [0, 14, 0.85],
+      [-1, 18, 1.7],
+      [0.8, 22, 2.6],
+      [1.3, 26, 3.5],
+      [-0.7, 30, 4.45],
+      [-1.2, 34, 5.4],
+      [0.6, 38, 6.35],
+      [0.2, 42, 7.3],
+      [0, 46, 8],
+    ]) {
+      let arrived = false;
+      for (let i = 0; i < 400; i++) {
+        const dx = x - player.x,
+          dz = z - player.z,
+          d = Math.hypot(dx, dz);
+        if (d < 0.4 && Math.abs(player.y - top) < 0.15 && player.grounded) {
+          arrived = true;
+          break;
+        }
+        const jump = player.grounded && player.y < top - 0.3 && d < 3.1;
+        stepPlayer(
+          player,
+          {
+            x: -dx / Math.max(d, 0.001),
+            y: dz / Math.max(d, 0.001),
+            jump,
+            jumpHeld: jump || !player.grounded,
+          },
+          1 / 60,
+          0,
+          world.solids,
+        );
+        runtime.update(1 / 60, player, idle);
+      }
+      assert.ok(
+        arrived,
+        `Could not land on ${x},${top},${z}; at ${player.x},${player.y},${player.z}`,
+      );
+    }
+  }
   assert.deepEqual(
     sceneryCollisionErrors(world.actorParent!, world.solids),
     [],
   );
-  for (const phase of ["camp", "wood", "arrow", "craft", "counsel", "guide"]) {
+  world.actorParent!.updateWorldMatrix(true, true);
+  for (const x of [-8, 0, 8]) {
+    const ray = new T.Raycaster(
+      new T.Vector3(x, 15, 48),
+      new T.Vector3(0, -1, 0),
+    );
+    const topOwners = new Set(
+      ray
+        .intersectObject(world.actorParent!, true)
+        .filter((hit) => Math.abs(hit.point.y - 8) < 0.02)
+        .map((hit) => hit.object),
+    );
+    assert.equal(
+      topOwners.size,
+      1,
+      `summit top at x=${x} has one visible owner`,
+    );
+    const drop = createPlayer(x, 13, 48);
+    for (let i = 0; i < 120; i++)
+      stepPlayer(
+        drop,
+        { x: 0, y: 0, jump: false, jumpHeld: false },
+        1 / 60,
+        0,
+        world.solids,
+      );
+    assert.ok(drop.grounded && Math.abs(drop.y - 8) < 0.05);
+  }
+  const blocked = createPlayer(0, 0, 10);
+  for (let i = 0; i < 120; i++)
+    stepPlayer(
+      blocked,
+      { x: 0, y: 1, jump: false, jumpHeld: false },
+      1 / 60,
+      0,
+      world.solids,
+    );
+  assert.ok(
+    blocked.z < 12.1,
+    "walking straight into the first boulder is blocked",
+  );
+  for (let i = 0; i < 90; i++)
+    stepPlayer(
+      blocked,
+      { x: -1, y: 0, jump: false, jumpHeld: false },
+      1 / 60,
+      0,
+      world.solids,
+    );
+  for (let i = 0; i < 90; i++)
+    stepPlayer(
+      blocked,
+      { x: 0, y: 1, jump: false, jumpHeld: false },
+      1 / 60,
+      0,
+      world.solids,
+    );
+  assert.ok(blocked.z > 15, "the boulder has a walkable way around it");
+  assert.equal(state().phase, "practice");
+  climb();
+  assert.ok(Math.abs(player.y - 8) < 0.05);
+  for (let shot = 1; shot <= 3; shot++) {
+    runtime.update(1, player, { ...idle, interactHeld: true });
+    runtime.update(1 / 60, player, idle);
+    assert.equal(state().practiceShots, shot);
+    assert.equal(state().phase, shot < 3 ? "practice" : "snapped");
+  }
+  runtime.update(0.85, player, idle);
+  assert.equal(state().phase, "wood");
+  walk(0, 8);
+  walk(0, -13);
+  for (const phase of ["wood", "arrow", "counsel", "guide"]) {
     assert.equal(state().phase, phase);
     const t = state().target;
     walk(t.x, t.z);
     runtime.update(1 / 60, player, { ...idle, interact: true });
-    if (phase === "craft") {
-      assert.equal(state().phase, "craft");
-      runtime.update(1 / 60, player, { ...idle, interact: true });
-      assert.equal(state().phase, "craft");
-      runtime.update(1 / 60, player, { ...idle, interact: true });
-    }
   }
   assert.equal(state().phase, "hunt");
-  walk(0, 8);
-  walk(0, 41);
+  climb();
   assert.ok(Math.abs(player.y - 8) < 0.05);
   // Walk around a solid trunk rather than through it on the camp route.
   assert.ok(texts.some((t) => t.includes("steel bow")));
@@ -127,12 +235,29 @@ test("broken bow: family, meaningful craft work, counsel and a traversable mount
   }
   assert.equal(state().food, 3);
   assert.equal(state().phase, "return");
-  walk(0, 41);
+  const returnPose = runtime.update(1 / 60, player, idle);
+  assert.equal(returnPose.holdingBow, true);
+  assert.equal(returnPose.carrying, false);
+  assert.equal(
+    world.actorParent!.getObjectByName("Curved hunting bow")!.visible,
+    true,
+  );
+  const summitPosition = { x: player.x, y: player.y, z: player.z };
+  Object.assign(player, { x: 0, y: 8, z: -13, grounded: false });
+  runtime.update(1 / 60, player, idle);
+  assert.equal(
+    completed,
+    0,
+    "crossing over camp in the air cannot complete the story",
+  );
+  Object.assign(player, summitPosition);
   walk(0, 8);
   walk(0, -13);
-  runtime.update(1 / 60, player, { ...idle, interact: true });
+  runtime.update(1 / 60, player, idle);
   assert.equal(completed, 1);
   assert.equal(state().phase, "done");
+  runtime.update(1 / 60, player, idle);
+  assert.equal(completed, 1);
   runtime.dispose();
   world.dispose?.();
 });

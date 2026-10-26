@@ -815,7 +815,7 @@ export function buildBountiful(scene: T.Scene): WorldData {
         mats = new Set<T.Material>();
       root.traverse((o) => {
         if (o instanceof T.InstancedMesh) o.dispose();
-        if (o instanceof T.Mesh) {
+        if (o instanceof T.Mesh || o instanceof T.LineSegments) {
           geometries.add(o.geometry);
           for (const m of Array.isArray(o.material) ? o.material : [o.material])
             mats.add(m);

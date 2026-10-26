@@ -1,3 +1,9 @@
+import {
+  GameplayAnalytics,
+  activeFrameSeconds,
+  browserAnalytics,
+  movementActions,
+} from "./super/analytics";
 import { StoryCinematic, type StoryShot } from "./super/cinematic";
 import type { AdventureRuntime } from "./super/adventure";
 import * as T from "three";
@@ -90,6 +96,12 @@ el("viewport").append(renderer.domElement);
 const camera = new T.PerspectiveCamera(58, 1, 0.08, 320),
   follow = new FollowCamera(camera),
   input = new Input(document);
+const analytics = new GameplayAnalytics(
+  browserAnalytics(
+    import.meta.env.PROD,
+    import.meta.env.VITE_GA_MEASUREMENT_ID,
+  ),
+);
 const diagnostics = createPerformanceDiagnostics(renderer, {
   enabled:
     import.meta.env.DEV &&
@@ -251,6 +263,7 @@ function modal(
   buttons: { label: string; run: () => void; secondary?: boolean }[],
 ) {
   el("modal").classList.remove("story-subtitles");
+  analytics.flush();
   paused = true;
   pauseMenuOpen = false;
   modalSince = performance.now();
@@ -310,18 +323,20 @@ function storyDialog(
     camera,
     {
       ...shot,
-      actors: [
-        {
-          group: avatar.group,
-          gesture:
-            shot?.playerGesture ??
-            actors.find((a) => a.group === avatar.group)?.gesture ??
-            "talk",
-          speaker:
-            actors.find((a) => a.group === avatar.group)?.speaker ?? false,
-        },
-        ...actors.filter((a) => a.group !== avatar.group),
-      ],
+      actors: shot?.cutaway
+        ? actors
+        : [
+            {
+              group: avatar.group,
+              gesture:
+                shot?.playerGesture ??
+                actors.find((a) => a.group === avatar.group)?.gesture ??
+                "talk",
+              speaker:
+                actors.find((a) => a.group === avatar.group)?.speaker ?? false,
+            },
+            ...actors.filter((a) => a.group !== avatar.group),
+          ],
     },
     world.solids,
     scene,
@@ -376,18 +391,36 @@ function pause() {
         secondary: true,
       },
       {
+        label: "Privacy & analytics",
+        run: () => {
+          window.open(
+            `${import.meta.env.BASE_URL}privacy.html`,
+            "_blank",
+            "noopener,noreferrer",
+          );
+        },
+        secondary: true,
+      },
+      {
         label: "Set up N64 controller",
         run: () => openControllerSetup(),
         secondary: true,
       },
       {
         label: "Restart this scene",
-        run: () => load(worldId),
+        run: () => {
+          analytics.retry("manual_restart");
+          analytics.exit("restart");
+          return load(worldId);
+        },
         secondary: true,
       },
       {
         label: "Return to the gallery",
-        run: () => load("hub"),
+        run: () => {
+          analytics.exit("gallery");
+          return load("hub");
+        },
         secondary: true,
       },
       {
@@ -411,6 +444,7 @@ function pause() {
 }
 function openControllerSetup() {
   if (transition || controllerSetup) return;
+  analytics.flush();
   paused = true;
   el("modal").hidden = true;
   input.reset();
@@ -881,6 +915,10 @@ async function load(id: WorldId) {
         el("caught-detail").textContent =
           "A spy saw you. Back to the beginning.";
       },
+      attachEquipment: (slot, object) => {
+        avatar.sockets[slot].add(object);
+        avatar.group.updateMatrixWorld(true);
+      },
       setAvatar: (role) => {
         avatar.dispose();
         avatar = createCharacter(role, { quality: "hero" });
@@ -888,6 +926,12 @@ async function load(id: WorldId) {
         avatar.update(0, player);
       },
     }) ?? null;
+  if (started)
+    analytics.start(
+      id,
+      id === "hub" ? "gallery" : completed.has(id) ? "replay" : "painting",
+      input.device,
+    );
   diagnostics.recordScene(id);
   transition = false;
   el("curtain").classList.remove("closed");
@@ -1025,6 +1069,7 @@ function complete() {
     );
     return;
   }
+  analytics.finish();
   completed.add(worldId);
   saveProgress();
   el("seal-count").textContent =
@@ -1077,6 +1122,7 @@ function beginCaughtTransition() {
   setCaughtPhase("caught");
 }
 function resetCaughtCheckpoint() {
+  analytics.retry("checkpoint");
   const checkpoint = storyCheckpoint ?? world.spawn;
   player = createPlayer(checkpoint.x, checkpoint.y, checkpoint.z);
   player.yaw = checkpoint.yaw ?? Math.PI;
@@ -1177,7 +1223,7 @@ function navigate(
   }
   return path.reverse().slice(1);
 }
-function update(dt: number) {
+function update(dt: number, activeElapsed = dt) {
   refreshControlHints();
   if (controllerSetup) {
     controllerSetup.update();
@@ -1262,6 +1308,8 @@ function update(dt: number) {
   }
   time += dt;
   levelTime += dt;
+  analytics.setDevice(input.device);
+  analytics.tick(activeFrameSeconds(activeElapsed));
   app.classList.toggle("chapter-faded", levelTime >= 10);
   caughtGrace = Math.max(0, caughtGrace - dt);
   if (
@@ -1277,6 +1325,7 @@ function update(dt: number) {
   }
   const movementLocked = organSeated || !!adventure?.movementLocked?.();
   if (movementLocked) player.vx = player.vz = 0;
+  const previousMove = { move: player.move, climbId: player.climbId };
   const events = stepPlayer(
     player,
     movementLocked
@@ -1288,6 +1337,9 @@ function update(dt: number) {
     world.climbables,
     world.swimRegions,
   );
+  if (!movementLocked)
+    for (const action of movementActions(previousMove, player, events))
+      analytics.move(action);
   if (organSeated && world.organ) {
     Object.assign(player, world.organ.seat, {
       vx: 0,
@@ -1310,6 +1362,7 @@ function update(dt: number) {
   }
   let adventureCarrying = false;
   let adventureAiming = false;
+  let holdingBow = false;
   let adventureDraw = 0;
   let treePrompt = "";
   if (adventure) {
@@ -1320,8 +1373,11 @@ function update(dt: number) {
         : result.prompt;
     adventureCarrying = !!result.carrying;
     adventureAiming = !!result.aiming;
+    holdingBow = !!result.holdingBow;
     adventureDraw = result.draw ?? 0;
     if (storyObjective !== result.objective) {
+      const phase = (adventure.snapshot() as { phase?: unknown }).phase;
+      if (typeof phase === "string") analytics.storyStep(phase);
       storyObjective = result.objective;
       updateObjective();
     }
@@ -1335,6 +1391,8 @@ function update(dt: number) {
     });
     treePrompt = result.prompt;
     if (storyObjective !== result.objective) {
+      const phase = (treeScene.snapshot() as { phase?: unknown }).phase;
+      if (typeof phase === "string") analytics.storyStep(phase);
       storyObjective = result.objective;
       updateObjective();
     }
@@ -1353,6 +1411,7 @@ function update(dt: number) {
   avatar.update(dt, {
     ...player,
     crouching: organSeated || player.crouching,
+    holdingBow,
     aiming: adventureAiming,
     draw: adventureDraw,
     carrying:
@@ -1365,6 +1424,12 @@ function update(dt: number) {
   });
   const adventureCamera = adventure?.camera?.();
   if (!adventureCamera && !organSeated) {
+    analytics.camera(
+      Math.abs(state.cameraX) + Math.abs(state.cameraY) > 0.02 ||
+        Math.abs(state.cameraZoom) > 0.02,
+      state.recenter,
+      dt,
+    );
     follow.update(
       dt,
       player,
@@ -1429,6 +1494,7 @@ function update(dt: number) {
       )
     ) {
       bonusCollected.add(token.id);
+      analytics.discover(token.id);
       mesh.visible = false;
       sound("collect");
       updateCollectionHud();
@@ -1446,6 +1512,8 @@ function update(dt: number) {
     carryObjects.some((object) => objectInTarget(object, world.delivery!))
   ) {
     deliveryDone = true;
+    analytics.discover("bundle_delivery");
+    analytics.activity("bundle_delivery");
     updateCollectionHud();
     sound("win");
     message("Bundle delivered! Pick it up again to keep practicing.", 3);
@@ -1454,6 +1522,9 @@ function update(dt: number) {
     const location = conferenceLocation(player);
     if (location.name !== hubLocation) {
       hubLocation = location.name;
+      analytics.discover(
+        `area_${location.name.toLowerCase().replace(/[^a-z0-9]+/g, "_")}`,
+      );
       el("world-name").textContent = location.name;
       updateObjective();
     }
@@ -1465,6 +1536,8 @@ function update(dt: number) {
         try {
           audio ??= new AudioContext();
           world.organ.start(audio);
+          analytics.discover("organ");
+          analytics.activity("organ");
           organSeated = true;
           input.reset();
           message(
@@ -1574,6 +1647,8 @@ function update(dt: number) {
   if (storyScene) {
     const result = storyScene.update(dt, player, { interact: state.interact });
     if (storyObjective !== result.objective) {
+      const phase = (storyScene.snapshot() as { phase?: unknown }).phase;
+      if (typeof phase === "string") analytics.storyStep(phase);
       storyObjective = result.objective;
       updateObjective();
     }
@@ -1659,6 +1734,7 @@ void load(testScene ?? "hub");
 function startGame() {
   if (started || !world) return;
   started = true;
+  analytics.start(worldId, "initial", input.device);
   el("title-screen").hidden = true;
   input.reset();
   const mobileScreen = matchMedia(
@@ -1698,8 +1774,16 @@ document.addEventListener("keydown", (e) => {
 });
 el("pause").onclick = pause;
 el("home").onclick = () => {
-  if (started && !transition) warp("hub");
+  if (started && !transition) {
+    analytics.exit("gallery");
+    warp("hub");
+  }
 };
+window.addEventListener("pagehide", () => analytics.exit("page_close"));
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted && world)
+    analytics.start(worldId, "page_resume", input.device);
+});
 let frameRequest: number | null = null;
 function queueFrame() {
   if (!document.hidden && frameRequest === null)
@@ -1707,6 +1791,7 @@ function queueFrame() {
 }
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
+    analytics.flush();
     world?.organ?.stop();
     if (frameRequest !== null) cancelAnimationFrame(frameRequest);
     frameRequest = null;
@@ -1719,9 +1804,10 @@ document.addEventListener("visibilitychange", () => {
 function frame(now: number) {
   frameRequest = null;
   if (document.hidden) return;
-  const dt = Math.min((now - previous) / 1000, 0.04);
+  const activeElapsed = Math.max(0, (now - previous) / 1000);
+  const dt = Math.min(activeElapsed, 0.04);
   previous = now;
-  update(dt);
+  update(dt, activeElapsed);
   if (!started && world)
     follow.update(
       dt,

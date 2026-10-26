@@ -1,3 +1,7 @@
+# Repository workflow
+
+- The brainstorming skill is optional in this repository. For concrete playtest feedback and clear feature or bugfix requests, proceed directly with investigation, implementation and verification; do not require a brainstorming session, a new specification or a separate design approval. Ask only for information that materially blocks the work.
+
 # Scenery acceptance rules
 
 - Build foreground solid scenery with shared geometry-and-collision helpers in `src/super/scenery.ts`. Use one dimension source for its visible surface and physical support. Register deliberate decoration/backdrops explicitly with a reason; do not turn all render meshes into enclosing AABBs.

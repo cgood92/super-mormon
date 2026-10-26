@@ -38,3 +38,29 @@ for (const id of ["hub", "house", "streets", "tree"] satisfies WorldId[]) {
     assert.equal(scene.children.length, 0);
   });
 }
+
+for (const id of ["bountiful", "broken-bow"] satisfies WorldId[]) {
+  test(`${id} releases tent rope geometry and material exactly once`, () => {
+    const scene = new T.Scene();
+    const world = buildWorld(id, scene);
+    let count = 0,
+      released = 0;
+    const geometries = new Set<T.BufferGeometry>(),
+      materials = new Set<T.Material>();
+    scene.traverse((o) => {
+      if (o instanceof T.LineSegments) {
+        count++;
+        geometries.add(o.geometry);
+        for (const m of Array.isArray(o.material) ? o.material : [o.material])
+          materials.add(m);
+      }
+    });
+    for (const g of geometries) g.addEventListener("dispose", () => released++);
+    for (const m of materials) m.addEventListener("dispose", () => released++);
+    assert.ok(count > 0);
+    world.dispose?.();
+    assert.equal(released, geometries.size + materials.size);
+    world.dispose?.();
+    assert.equal(released, geometries.size + materials.size);
+  });
+}

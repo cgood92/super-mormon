@@ -1,6 +1,7 @@
 import type { CharacterRole } from "./character-types";
 import type { StoryShot } from "./cinematic";
 import type { PlayerState } from "./physics";
+import type * as T from "three";
 
 export type AdventureInput = {
   interact: boolean;
@@ -21,6 +22,10 @@ export type AdventureHooks = {
   toast: (text: string) => void;
   complete: () => void;
   setAvatar: (role: CharacterRole) => void;
+  attachEquipment?: (
+    slot: "leftHand" | "rightHand" | "back",
+    object: T.Object3D,
+  ) => void;
   caught?: (reset: () => void) => void;
 };
 export type AdventureRuntime = {
@@ -34,6 +39,7 @@ export type AdventureRuntime = {
     carrying?: boolean;
     aiming?: boolean;
     draw?: number;
+    holdingBow?: boolean;
   };
   movementLocked?: () => boolean;
   camera?: () =>

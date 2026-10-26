@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import * as T from "three";
 import { StoryCinematic } from "../src/super/cinematic";
+import { buildBrokenBow } from "../src/super/broken-bow";
+import { cameraSegmentClear } from "../src/super/camera";
 
 test("story shot eases the camera, animates actors, then restores exact transforms", () => {
   const camera = new T.PerspectiveCamera();
@@ -77,4 +79,64 @@ test("a staged turn compensates for the character body's existing heading", () =
   movie.finish();
   assert.equal(first.rotation.y, 0);
   assert.equal(body.rotation.y, Math.PI / 2);
+});
+
+test("broken bow family cutaway safely frames camp and returns to the mountain", () => {
+  const scene = new T.Scene(),
+    world = buildBrokenBow(scene);
+  const actors = world
+    .actorParent!.children.filter((group) =>
+      /^(lehi|laman|lemuel)-character$/.test(group.name),
+    )
+    .map((group, i) => ({ group, speaker: i === 1, gesture: "talk" as const }));
+  assert.equal(actors.length, 3);
+  for (const aspect of [16 / 9, 9 / 16])
+    for (const x of [-5, 0, 5]) {
+      const camera = new T.PerspectiveCamera(52, aspect, 0.1, 180);
+      camera.position.set(x, 11, 40);
+      camera.lookAt(0, 9, 46);
+      const original = camera.position.clone(),
+        rotation = camera.quaternion.clone();
+      const movie = new StoryCinematic(
+        camera,
+        { cutaway: true, actors },
+        world.solids,
+        scene,
+      );
+      assert.equal(movie.snapshot().cutaway, true);
+      for (let i = 0; i < 100; i++) {
+        movie.update(1 / 60);
+        const state = movie.snapshot();
+        assert.equal(state.clear, true);
+        assert.equal(state.actorVisible, true);
+        assert.ok(Math.abs(state.actorFrame![0]) < 0.8);
+      }
+      assert.equal(movie.finish(), true);
+      assert.equal(movie.update(1 / 60), true);
+      assert.ok(camera.position.distanceTo(original) < 1e-8);
+      assert.ok(camera.quaternion.angleTo(rotation) < 1e-7);
+      movie.dispose();
+    }
+  const embedded = new T.PerspectiveCamera(52, 9 / 16, 0.1, 180);
+  embedded.position.set(0, 4, 46);
+  const rescue = new StoryCinematic(
+    embedded,
+    { cutaway: true, actors },
+    world.solids,
+    scene,
+  );
+  assert.equal(rescue.snapshot().clear, true);
+  for (let i = 0; i < 100; i++) rescue.update(1 / 60);
+  rescue.finish();
+  assert.equal(rescue.update(1 / 60), true);
+  assert.ok(
+    cameraSegmentClear(
+      embedded.position,
+      embedded.position,
+      world.solids,
+      0.28,
+    ),
+  );
+  rescue.dispose();
+  world.dispose?.();
 });

@@ -242,6 +242,107 @@ test("mantle keeps its authored hem while walking and restores it after a crawl"
   actor.dispose();
 });
 
+test("crawl retains a curved rear hem instead of collapsing it into a flat band", () => {
+  const actor = createPlayableLehi();
+  const mantle = actor.group.getObjectByName("flowing-mantle") as T.Mesh;
+  const positions = mantle.geometry.getAttribute(
+    "position",
+  ) as T.BufferAttribute;
+  const rearHem: number[] = [];
+  const hemEdge: number[] = [];
+  const centerEdge: number[] = [];
+  const sideEdge: number[] = [];
+  for (let i = 0; i < positions.count; i++)
+    if (positions.getY(i) < 0.45 && positions.getZ(i) < -0.08) {
+      rearHem.push(i);
+      if (positions.getY(i) < 0.18) {
+        hemEdge.push(i);
+        if (Math.abs(positions.getX(i)) < 0.05) centerEdge.push(i);
+        if (Math.abs(positions.getX(i)) > 0.25) sideEdge.push(i);
+      }
+    }
+  assert.ok(rearHem.length > 100);
+  assert.ok(hemEdge.length > 100);
+  assert.ok(centerEdge.length > 10 && sideEdge.length > 10);
+  actor.update(1 / 60, {
+    ...standing,
+    crouching: true,
+    runSpeed: 1.5,
+    vz: 1.5,
+    move: "crawl",
+  });
+  const ys = rearHem.map((i) => positions.getY(i));
+  const zs = hemEdge.map((i) => positions.getZ(i));
+  assert.ok(
+    Math.max(...ys) - Math.min(...ys) > 0.15,
+    "rear hem must retain depth and curvature around the hips",
+  );
+  assert.ok(
+    Math.max(...zs) - Math.min(...zs) > 0.08,
+    "rear coat shell must keep volume instead of collapsing into a plane",
+  );
+  const centerHeight =
+    centerEdge.reduce((sum, i) => sum + positions.getZ(i), 0) /
+    centerEdge.length;
+  const sideHeight =
+    sideEdge.reduce((sum, i) => sum + positions.getZ(i), 0) / sideEdge.length;
+  assert.ok(
+    sideHeight - centerHeight > 0.08,
+    "rear hem must arch over the spine instead of ending in a straight cutoff",
+  );
+  actor.dispose();
+});
+
+test("equipment sockets follow palms and keep a back load below the head", async () => {
+  const { createSculptedCharacterRig } =
+    await import("../src/super/playable-lehi.ts");
+  const actor = createSculptedCharacterRig("nephi", { quality: "hero" });
+  const { leftHand, rightHand, back } = actor.sockets;
+  for (const state of [
+    standing,
+    {
+      ...standing,
+      x: 1,
+      z: 2,
+      yaw: Math.PI / 2,
+      holdingBow: true,
+      runSpeed: 4,
+      vz: 4,
+      move: "run" as const,
+    },
+    {
+      ...standing,
+      x: 2,
+      z: 3,
+      yaw: Math.PI,
+      holdingBow: true,
+      aiming: true,
+      draw: 1,
+    },
+  ]) {
+    actor.update(1 / 60, state);
+    actor.group.updateMatrixWorld(true);
+    for (const [socket, meshName] of [
+      [leftHand, "left-hand"],
+      [rightHand, "right-hand"],
+    ] as const) {
+      const palm = new T.Box3()
+        .setFromObject(actor.group.getObjectByName(meshName)!)
+        .getCenter(new T.Vector3());
+      assert.ok(
+        socket.getWorldPosition(new T.Vector3()).distanceTo(palm) < 0.09,
+        `${meshName} socket must stay at the grip`,
+      );
+    }
+    const backPosition = back.getWorldPosition(new T.Vector3());
+    const head = actor.group
+      .getObjectByName("head")!
+      .getWorldPosition(new T.Vector3());
+    assert.ok(backPosition.y < head.y - 0.15, "back load stays below the head");
+  }
+  actor.dispose();
+});
+
 test("coat sleeves share the tunic skeleton instead of floating over swinging arms", () => {
   const actor = createPlayableLehi();
   const shirt = actor.group.getObjectByName(
