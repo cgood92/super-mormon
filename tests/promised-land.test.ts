@@ -113,10 +113,7 @@ test("Lehi walks inland, rests, and one burial interaction begins the journey wi
   assert.equal(h.scene.getObjectByName("lehi-character")!.visible, false);
   assert.ok(h.scene.getObjectByName("Quiet memorial stone")!.visible);
   assert.equal(h.scene.getObjectByName("Temple foundation"), undefined);
-  assert.equal(
-    h.scene.getObjectByName("Blue next task beacon")!.visible,
-    false,
-  );
+  assert.equal(h.scene.getObjectByName("Blue next task beacon")!.visible, true);
   h.world.dispose!();
 });
 
@@ -140,9 +137,17 @@ test("branching mountain valleys support two ordinary routes and complete only a
       "willing families physically follow the chosen branch",
     );
     walk(h, 25, -105);
+    assert.equal(h.completed(), 0, "arrival alone keeps exploration open");
+    const arrival = h.runtime.update(1 / 60, h.player, idle);
+    assert.match(arrival.prompt, /Settle here/);
+    h.runtime.update(1 / 60, h.player, { ...idle, interact: true });
     assert.equal(h.completed(), 1);
     for (let i = 0; i < 10; i++) h.tick();
     assert.equal(h.completed(), 1);
+    assert.equal(
+      h.scene.getObjectByName("Blue next task beacon")!.visible,
+      false,
+    );
     assert.equal(h.dialogs(), 0);
     h.runtime.dispose();
     h.world.dispose!();
@@ -189,4 +194,29 @@ test("promised-land resources release once and mountain surfaces have fitted col
   h.world.dispose!();
   assert.equal(released, instances.length);
   assert.equal(h.scene.children.length, 0);
+});
+
+test("families follow onto a mountain and stay separate when the leader stops", () => {
+  const h = setup();
+  burial(h);
+  walk(h, -15, 12);
+  // Go around Lemuel, who remains beside the memorial rather than departing.
+  walk(h, -13, 16);
+  walk(h, 0, 16);
+  walk(h, 0, 0);
+  for (let i = 0; i < 600; i++) h.tick();
+  const followers = h.state().followers;
+  assert.ok(
+    followers.every((p) => p.y > 1),
+    "the group follows the physical ascent",
+  );
+  followers.forEach((p, i) =>
+    followers.slice(i + 1).forEach((q) => {
+      assert.ok(
+        Math.hypot(p.x - q.x, p.z - q.z) > 0.7,
+        "stopped followers do not overlap",
+      );
+    }),
+  );
+  h.world.dispose!();
 });
