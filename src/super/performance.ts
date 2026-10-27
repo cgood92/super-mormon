@@ -114,6 +114,11 @@ export function createPerformanceDiagnostics(
         scenes: Object.freeze([...scenes]),
       });
     },
+    suspend() {
+      start = null;
+      frames = 0;
+      fps = 0;
+    },
     dispose() {
       scenes.length = 0;
       pendingScene = null;

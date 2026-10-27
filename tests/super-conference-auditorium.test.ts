@@ -95,43 +95,50 @@ test("seating is instanced and landmarks are useful open viewing places", () => 
       object.name === "auditorium seating"
     ) {
       batches++;
-      seats = object.count;
+      seats += object.count;
     }
   });
-  assert.equal(batches, 3);
-  assert.ok(seats > 10000);
+  assert.ok(batches > 3);
+  assert.ok(seats / 3 > 10000);
   assert.equal(result.landmarks.length, 3);
 });
 
 test("rendered choir backrests face the organ while audience backrests face away", () => {
   const parent = new THREE.Group();
   buildAuditorium(parent);
-  const parts: THREE.InstancedMesh[] = [];
+  parent.updateMatrixWorld(true);
+  const backs: THREE.InstancedMesh[] = [];
   parent.traverse((object) => {
     if (
       object instanceof THREE.InstancedMesh &&
-      object.name === "auditorium seating"
+      object.name === "auditorium seating" &&
+      object.geometry.attributes.position.count === 60
     )
-      parts.push(object);
+      backs.push(object);
   });
   const back = new THREE.Matrix4(),
     cushion = new THREE.Matrix4();
   let choir = 0,
     audience = 0;
-  for (let i = 0; i < parts[0].count; i++) {
-    parts[0].getMatrixAt(i, back);
-    parts[1].getMatrixAt(i, cushion);
-    const backZ = back.elements[14],
-      seatZ = cushion.elements[14];
-    if (seatZ < -85) {
-      choir++;
-      assert.ok(
-        backZ < seatZ - 0.2,
-        "choir backrest must be on the organ side",
-      );
-    } else if (seatZ > -60) {
-      audience++;
-      assert.ok(backZ > seatZ, "audience backrest must be away from stage");
+  for (const part of backs) {
+    const cushionPart = part.parent!.children[1] as THREE.InstancedMesh;
+    for (let i = 0; i < part.count; i++) {
+      part.getMatrixAt(i, back);
+      cushionPart.getMatrixAt(i, cushion);
+      back.premultiply(part.matrixWorld);
+      cushion.premultiply(cushionPart.matrixWorld);
+      const backZ = back.elements[14],
+        seatZ = cushion.elements[14];
+      if (seatZ < -85) {
+        choir++;
+        assert.ok(
+          backZ < seatZ - 0.2,
+          "choir backrest must be on the organ side",
+        );
+      } else if (seatZ > -60) {
+        audience++;
+        assert.ok(backZ > seatZ, "audience backrest must be away from stage");
+      }
     }
   }
   assert.ok(choir > 300 && audience > 1000);

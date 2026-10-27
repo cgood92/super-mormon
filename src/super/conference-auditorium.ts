@@ -241,32 +241,92 @@ export function buildAuditorium(parent: THREE.Group) {
       group.add(pipe);
     }
   }
-  // Upholstered seats are only three instanced draws, regardless of capacity.
+  // Small banks have useful frustum bounds instead of one auditorium-wide
+  // instance sphere. Three's renderer updates each LOD for the actual camera,
+  // including balcony, roof and cinematic views; no player-zone hiding is used.
+  const banks = new Map<string, Seat[]>();
+  for (const seat of seats) {
+    const key = `${Math.floor(seat.x / 24)},${Math.floor(seat.y / 12)},${Math.floor(seat.z / 24)}`;
+    const bank = banks.get(key) ?? [];
+    bank.push(seat);
+    banks.set(key, bank);
+  }
+  // At distance, the chair thickness and support are subpixel details. Keep
+  // the same shaped back and horizontal cushion, visible from both sides.
+  // Their front/top surfaces coincide with the detailed chair surfaces.
+  const distantGeometry = new THREE.BufferGeometry();
+  distantGeometry.setAttribute(
+    "position",
+    new THREE.Float32BufferAttribute(
+      [
+        -0.275, 0.52, 0.32, 0.275, 0.52, 0.32, 0.275, 0.952, 0.32, -0.275, 0.52,
+        0.32, 0.275, 0.952, 0.32, -0.275, 0.952, 0.32, -0.275, 0.952, 0.32,
+        0.275, 0.952, 0.32, 0.187, 1.06, 0.32, -0.275, 0.952, 0.32, 0.187, 1.06,
+        0.32, -0.187, 1.06, 0.32, -0.275, 0.52, -0.265, 0.275, 0.52, 0.265,
+        0.275, 0.52, -0.265, -0.275, 0.52, -0.265, -0.275, 0.52, 0.265, 0.275,
+        0.52, 0.265,
+      ],
+      3,
+    ),
+  );
+  distantGeometry.computeVertexNormals();
+  const distantMaterial = burgundy.clone();
+  distantMaterial.side = THREE.DoubleSide;
   const transforms = new THREE.Object3D();
-  for (const part of [
-    { mat: burgundy, w: 0.55, h: 0.54, d: 0.16, dy: 0.79, dz: 0.24 },
-    { mat: burgundy, w: 0.55, h: 0.16, d: 0.53, dy: 0.44, dz: 0 },
-    { mat: dark, w: 0.08, h: 0.43, d: 0.4, dy: 0.215, dz: 0 },
-  ]) {
-    const batch = new THREE.InstancedMesh(
-      part.h > 0.5 ? softSeatBackGeometry() : boxGeometry,
-      part.mat,
-      seats.length,
+  for (const bank of banks.values()) {
+    const bounds = new THREE.Box3().setFromPoints(
+      bank.map((seat) => new THREE.Vector3(seat.x, seat.y, seat.z)),
     );
-    batch.name = "auditorium seating";
-    seats.forEach((seat, i) => {
-      transforms.position.set(
-        seat.x + Math.sin(seat.angle) * part.dz,
-        seat.y + part.dy,
-        seat.z + Math.cos(seat.angle) * part.dz,
+    const lod = new THREE.LOD();
+    lod.name = "auditorium seating chunk";
+    bounds.getCenter(lod.position);
+    const detailed = new THREE.Group();
+    for (const part of [
+      { mat: burgundy, w: 0.55, h: 0.54, d: 0.16, dy: 0.79, dz: 0.24 },
+      { mat: burgundy, w: 0.55, h: 0.16, d: 0.53, dy: 0.44, dz: 0 },
+      { mat: dark, w: 0.08, h: 0.43, d: 0.4, dy: 0.215, dz: 0 },
+    ]) {
+      const batch = new THREE.InstancedMesh(
+        part.h > 0.5 ? softSeatBackGeometry() : boxGeometry,
+        part.mat,
+        bank.length,
       );
+      batch.name = "auditorium seating";
+      bank.forEach((seat, i) => {
+        transforms.position.set(
+          seat.x + Math.sin(seat.angle) * part.dz - lod.position.x,
+          seat.y + part.dy - lod.position.y,
+          seat.z + Math.cos(seat.angle) * part.dz - lod.position.z,
+        );
+        transforms.rotation.set(0, seat.angle, 0);
+        transforms.scale.set(part.w, part.h, part.d);
+        transforms.updateMatrix();
+        batch.setMatrixAt(i, transforms.matrix);
+      });
+      batch.computeBoundingSphere();
+      detailed.add(batch);
+    }
+    const distant = new THREE.Group();
+    const batch = new THREE.InstancedMesh(
+      distantGeometry,
+      distantMaterial,
+      bank.length,
+    );
+    batch.name = "auditorium distant seating";
+    bank.forEach((seat, i) => {
+      transforms.position.set(seat.x, seat.y, seat.z).sub(lod.position);
       transforms.rotation.set(0, seat.angle, 0);
-      transforms.scale.set(part.w, part.h, part.d);
+      transforms.scale.setScalar(1);
       transforms.updateMatrix();
       batch.setMatrixAt(i, transforms.matrix);
     });
-    batch.instanceMatrix.needsUpdate = true;
-    group.add(batch);
+    batch.computeBoundingSphere();
+    distant.add(batch);
+    lod.addLevel(detailed, 0);
+    // Keep full detail until the entire bank is comfortably distant.
+    // Hysteresis avoids flickering when standing close to a transition.
+    lod.addLevel(distant, 48, 0.1);
+    group.add(lod);
   }
   // Recessed coffer ceiling and luminous slots leave full camera clearance.
   box(0, 33.8, -49, 128, 1, 100, cream);

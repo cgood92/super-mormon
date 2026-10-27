@@ -250,3 +250,41 @@ test("prop movement is applied before validating the current story camera", () =
     assert.equal(movie.snapshot().actorVisible, true);
   }
 });
+
+test("camera obstacles include detailed LOD surfaces before a distant level switches", () => {
+  const root = new T.Group();
+  const lod = new T.LOD();
+  const detail = new T.Group();
+  const thickBack = new T.Mesh(
+    new T.BoxGeometry(2, 2, 0.4),
+    new T.MeshStandardMaterial(),
+  );
+  detail.add(thickBack);
+  const distant = new T.Group();
+  lod.addLevel(detail, 0);
+  lod.addLevel(distant, 48);
+  root.add(lod);
+  const camera = new T.PerspectiveCamera();
+  camera.position.set(0, 0, 100);
+  camera.updateMatrixWorld();
+  root.updateMatrixWorld(true);
+  lod.update(camera);
+  assert.equal(detail.visible, false);
+  const obstacles = new StoryMeshObstacles(root, []);
+  camera.position.z = 5;
+  camera.updateMatrixWorld();
+  lod.update(camera);
+  assert.equal(detail.visible, true);
+  assert.equal(
+    obstacles.clear(new T.Vector3(0, 0, -0.5), new T.Vector3(0, 0, 0.5)),
+    false,
+  );
+  root.visible = false;
+  assert.equal(
+    new StoryMeshObstacles(root, []).clear(
+      new T.Vector3(0, 0, -0.5),
+      new T.Vector3(0, 0, 0.5),
+    ),
+    true,
+  );
+});
