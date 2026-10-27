@@ -1,6 +1,7 @@
 import { softBoxGeometry } from "./soft-geometry";
 import * as THREE from "three";
 import type { Solid } from "./physics";
+import { sceneryBox } from "./scenery";
 
 export type RostrumSeat = { x: number; y: number; z: number; angle: number };
 
@@ -101,16 +102,25 @@ export function buildRostrum(parent: THREE.Group): {
     const chair = new THREE.Group();
     chair.name = "apostle armchair";
     chair.position.set(x, 2.4, -81);
-    for (const [cx, cy, cz, w, h, d] of [
+    for (const [part, [cx, cy, cz, w, h, d]] of [
       [0, 0.56, 0, 1.45, 0.38, 1.2],
       [0, 1.14, -0.48, 1.5, 1.25, 0.42],
       [-0.72, 0.86, 0, 0.3, 0.6, 1.2],
       [0.72, 0.86, 0, 0.3, 0.6, 1.2],
-    ]) {
-      const cushion = new THREE.Mesh(softBoxGeometry(w, h, d), velvet);
-      cushion.scale.set(w, h, d);
-      cushion.position.set(cx, cy, cz);
-      chair.add(cushion);
+    ].entries()) {
+      const shape = { x: cx, y: cy - h / 2, z: cz, w, h, d };
+      sceneryBox(
+        chair,
+        solids,
+        velvet,
+        shape,
+        `Stage armchair ${["seat", "back", "left arm", "right arm"][part]}`,
+      );
+      // Render in chair-local coordinates; physics uses the same surface in
+      // rostrum coordinates, including the stage's elevation.
+      shape.x += chair.position.x;
+      shape.y += chair.position.y;
+      shape.z += chair.position.z;
     }
     group.add(chair);
   }

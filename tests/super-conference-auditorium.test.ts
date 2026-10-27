@@ -14,7 +14,7 @@ function walk(p: PlayerState, z: number, solids: Solid[]) {
       p,
       {
         x: 0,
-        y: Math.sign(z - p.z),
+        y: Math.sign(z - p.z) * Math.min(1, Math.abs(z - p.z) * 0.75),
         jump: false,
         jumpHeld: false,
         traversal: false,
@@ -53,7 +53,7 @@ function walkAcross(p: PlayerState, x: number, solids: Solid[]) {
     stepPlayer(
       p,
       {
-        x: -Math.sign(x - p.x),
+        x: -Math.sign(x - p.x) * Math.min(1, Math.abs(x - p.x) * 0.75),
         y: 0,
         jump: false,
         jumpHeld: false,
@@ -72,8 +72,8 @@ test("the center aisle reaches paired side stairs to the pulpit and returns", ()
     const p = createPlayer(0, 0, -0.5);
     walk(p, -70, solids);
     walkAcross(p, side, solids);
-    walk(p, -80.5, solids);
-    walkAcross(p, Math.sign(side) * 4, solids);
+    walk(p, -79.8, solids);
+    walkAcross(p, Math.sign(side) * 3.6, solids);
     walk(p, -83, solids);
     walkAcross(p, 0, solids);
     assert.ok(Math.abs(p.y - 3) < 0.01);

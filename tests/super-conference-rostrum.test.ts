@@ -58,11 +58,11 @@ test("both offset stairways provide a walking route from the aisle to the pulpit
     walkTo(side * 25, -70);
     walkTo(side * 25, -80);
     assert.ok(Math.abs(player.y - 2.4) < 0.001);
-    walkTo(side * 4, -80);
-    walkTo(side * 4, -83);
+    walkTo(side * 3.6, -79.8);
+    walkTo(side * 3.6, -83);
     walkTo(0, -83);
-    walkTo(side * 4, -83);
-    walkTo(side * 4, -80);
+    walkTo(side * 3.6, -83);
+    walkTo(side * 3.6, -79.8);
     walkTo(side * 25, -80);
     walkTo(side * 25, -70);
     walkTo(0, -70);
