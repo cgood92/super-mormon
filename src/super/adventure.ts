@@ -44,6 +44,7 @@ export type AdventureRuntime = {
   movementLocked?: () => boolean;
   camera?: () =>
     | {
+        cut?: boolean;
         position: { x: number; y: number; z: number };
         focus: { x: number; y: number; z: number };
       }

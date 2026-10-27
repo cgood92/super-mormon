@@ -23,7 +23,11 @@ test("the shared vessel translates geometry, collision and destinations together
     assert.deepEqual(b.solids[i], { ...solid, z: solid.z - 40 }),
   );
   assert.equal(b.points.helm.z, a.points.helm.z - 40);
-  assert.ok(a.solids.every((s) => s.y >= 0));
+  assert.ok(a.solids.every((s) => s.y >= -0.035));
+  assert.ok(
+    a.solids.some((s) => s.y === -0.035 && Math.abs(s.y + s.h) < 1e-8),
+    "lower deck has physical board thickness below its dry walking surface",
+  );
   assert.equal(a.climbables[0].height, 14);
 });
 

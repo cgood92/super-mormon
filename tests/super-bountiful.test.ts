@@ -80,12 +80,18 @@ test("Bountiful requires prayer, tools, reconciliation and four individually ali
     act(); // shoulder timber and leave axe
     assert.equal(state().carrying, true);
     assert.equal(state().hasAxe, false);
+
     runtime.update(0.016, player, {
       interact: false,
       interactHeld: false,
       x: 0,
       y: 0,
     });
+    assert.equal(
+      scene.getObjectByName("Ground axe")!.visible,
+      true,
+      "axe remains where timber was picked up",
+    );
     const beam = scene.getObjectByName("Carried timber")!;
     assert.ok(
       Math.hypot(beam.position.x - player.x, beam.position.z - player.z) > 0.6,
@@ -106,6 +112,10 @@ test("Bountiful requires prayer, tools, reconciliation and four individually ali
       );
       assert.ok(timber, "Placed timber has ground collision");
       assert.equal(timber.y, 0);
+      assert.ok(
+        player.y >= timber.y + timber.h,
+        "deposit lifts player clear of the new timber",
+      );
     }
   }
   assert.equal(state().phase, "timber");
@@ -227,6 +237,104 @@ test("forge table and bellows block walking and permit a route around", () => {
         world.solids,
       );
     assert.ok(around.z > z + 1, "Can walk around the work surface");
+  }
+  world.dispose!();
+});
+
+test("Bountiful held tools use the avatar hand sockets", () => {
+  const scene = new T.Scene(),
+    world = buildBountiful(scene);
+  const hand = new T.Group();
+  scene.add(hand);
+  const runtime = world.adventure!({
+    setAvatar() {},
+    toast() {},
+    complete() {},
+    dialog: (_a, _b, _c, next) => next(),
+    attachEquipment: (_slot, object) => hand.add(object),
+  });
+  const p = createPlayer();
+  const input = { x: 0, y: 0, interact: true, interactHeld: true };
+  for (let i = 0; i < 3; i++) {
+    Object.assign(p, (runtime.snapshot() as { target: object }).target);
+    runtime.update(0.016, p, input);
+  }
+  runtime.update(0.016, p, { ...input, interact: false });
+  assert.ok(
+    scene.getObjectByName("Animated work tool")!.parent === hand,
+    "hammer must attach to right hand",
+  );
+  world.dispose!();
+});
+
+test("ore has continuous support and a clear route around its rear corners", () => {
+  const scene = new T.Scene();
+  const world = buildBountiful(scene);
+  scene.updateMatrixWorld(true);
+  const oreSurfaces: T.Mesh[] = [];
+  scene.traverse((object) => {
+    if (
+      object instanceof T.Mesh &&
+      object.name === "Ore outcrop natural surface"
+    )
+      oreSurfaces.push(object);
+  });
+  const ray = new T.Raycaster(
+    new T.Vector3(-22.5, 5, 18.5),
+    new T.Vector3(0, -1, 0),
+  );
+  const owners = new Set(
+    ray.intersectObjects(oreSurfaces).map((hit) => hit.object),
+  );
+  assert.equal(
+    owners.size,
+    1,
+    "ore must have one visible support owner at its former overlapping seam",
+  );
+  for (const x of [-24.3, -23.6, -22, -20.4, -19.7]) {
+    const p = createPlayer(x, 4, 20.5);
+    for (let i = 0; i < 180; i++)
+      stepPlayer(
+        p,
+        { x: 0, y: 0, jump: false, jumpHeld: false },
+        1 / 60,
+        0,
+        world.solids,
+      );
+    assert.ok(p.y >= 0 && p.grounded, `ore corner lost support ${x}: ${p.y}`);
+  }
+  const p = createPlayer(-18.8, 0, 16);
+  for (let i = 0; i < 120; i++)
+    stepPlayer(
+      p,
+      { x: 0, y: 1, jump: false, jumpHeld: false },
+      1 / 60,
+      0,
+      world.solids,
+    );
+  assert.ok(
+    p.z > 22 && p.y >= 0,
+    `rear corner route blocked ${p.x},${p.y},${p.z}`,
+  );
+  world.dispose!();
+});
+
+test("Bountiful people block a direct walk while leaving room around", () => {
+  const world = buildBountiful(new T.Scene());
+  for (const [x, z] of [
+    [9, 4],
+    [-12, 27],
+  ]) {
+    const p = createPlayer(x, 0, z - 2);
+    for (let i = 0; i < 65; i++)
+      stepPlayer(
+        p,
+        { x: 0, y: 1, jump: false, jumpHeld: false },
+        1 / 60,
+        0,
+        world.solids,
+      );
+    assert.ok(p.z < z - 0.6, `walked through person at ${x},${z}: ${p.z}`);
   }
   world.dispose!();
 });

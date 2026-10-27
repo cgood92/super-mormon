@@ -81,6 +81,7 @@ export class Input {
     this.target.addEventListener("keydown", this.onKeyDown);
     this.target.addEventListener("keyup", this.onKeyUp);
     this.target.addEventListener("pointerdown", this.onPointerDown);
+    this.target.addEventListener("contextmenu", this.onContextMenu);
     this.target.addEventListener("pointermove", this.onPointerMove);
     this.target.addEventListener("pointerup", this.onPointerUp);
     this.target.addEventListener("pointercancel", this.onPointerUp);
@@ -148,6 +149,7 @@ export class Input {
               ? "pause"
               : null;
     if (action) {
+      pointer.preventDefault();
       if (action === "crouch") {
         if (!this.buttonPointers.has(pointer.pointerId)) {
           this.crouchButton = actionButton ?? null;
@@ -176,6 +178,16 @@ export class Input {
     }
     region.setPointerCapture?.(pointer.pointerId);
     pointer.preventDefault();
+  };
+  private onContextMenu = (event: Event) => {
+    if (
+      typeof Element !== "undefined" &&
+      event.target instanceof Element &&
+      event.target.closest(
+        "[data-jump], [data-crouch], [data-action], [data-recenter], [data-pause], [data-stick], [data-look]",
+      )
+    )
+      event.preventDefault();
   };
   private updateStick(pointer: PointerEvent, region: Element) {
     const rect = region.getBoundingClientRect();
@@ -402,6 +414,7 @@ export class Input {
     this.target.removeEventListener("keydown", this.onKeyDown);
     this.target.removeEventListener("keyup", this.onKeyUp);
     this.target.removeEventListener("pointerdown", this.onPointerDown);
+    this.target.removeEventListener("contextmenu", this.onContextMenu);
     this.target.removeEventListener("pointermove", this.onPointerMove);
     this.target.removeEventListener("pointerup", this.onPointerUp);
     this.target.removeEventListener("pointercancel", this.onPointerUp);

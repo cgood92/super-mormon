@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as T from "three";
-import { buildVoyage } from "../src/super/voyage";
+import { buildVoyage, shipClearsIsland } from "../src/super/voyage";
 import { createPlayer } from "../src/super/physics";
 
 test("voyage follows fourth-day release, prayer, Liahona and sustained steering", () => {
@@ -49,8 +49,17 @@ test("voyage follows fourth-day release, prayer, Liahona and sustained steering"
   assert.equal(state().phase, "release");
   assert.equal(runtime.movementLocked!(), true);
   const childBelow = { x: p.x, z: p.z };
-  for (let i = 0; i < 260; i++)
+  for (let i = 0; i < 260; i++) {
     runtime.update(0.1, p, { ...click, interact: false });
+    for (const role of ["laman", "lemuel"]) {
+      const npc = scene.getObjectByName(`${role}-character`)!;
+      if (npc.position.y > 0.5 && npc.position.y < 4.1)
+        assert.ok(
+          npc.position.x > 4.6 && npc.position.x < 7.4,
+          "brothers climb inside the stair opening, never float through the ceiling",
+        );
+    }
+  }
   assert.ok(
     p.y > 4.1,
     "the child follows the stairs to the deck without teleporting",
@@ -58,7 +67,8 @@ test("voyage follows fourth-day release, prayer, Liahona and sustained steering"
   assert.ok(Math.hypot(p.x - childBelow.x, p.z - childBelow.z) > 12);
   assert.equal(state().releaseReady, true);
   assert.equal(runtime.movementLocked!(), false);
-  visit("nephi");
+  assert.equal(state().phase, "pray", "release flows directly into prayer");
+  assert.equal(scene.getObjectByName("Voyage child companion")?.visible, true);
   assert.equal(avatar, "nephi");
   runtime.update(0.016, p, click);
   assert.equal(state().phase, "liahona");
@@ -88,6 +98,21 @@ test("voyage follows fourth-day release, prayer, Liahona and sustained steering"
       interact: false,
       x: Math.max(-1, Math.min(1, error * 5)),
     });
+    const boat = state().boat;
+    for (const channel of (
+      runtime.snapshot() as { channels: { x: number; z: number }[] }
+    ).channels)
+      for (const side of [-1, 1])
+        assert.ok(
+          shipClearsIsland(
+            boat.x,
+            boat.z,
+            state().heading,
+            channel.x + side * 45,
+            channel.z,
+          ),
+          "every accepted sailing frame clears the complete hull",
+        );
   }
   assert.equal(state().phase, "arrived");
   assert.ok(
@@ -244,4 +269,146 @@ test("hidden construction ships defer collision validation until revealed", asyn
   ship.group.visible = true;
   assert.ok(sceneryCollisionErrors(root, []).length > 0);
   assert.deepEqual(sceneryCollisionErrors(root, ship.solids), []);
+});
+
+test("bound Nephi and both mast trunks block walking", async () => {
+  const { stepPlayer } = await import("../src/super/physics");
+  const world = buildVoyage(new T.Scene());
+  for (const z of [-7, -6.25, 6]) {
+    const p = createPlayer(-2, 4.2, z);
+    for (let i = 0; i < 90; i++)
+      stepPlayer(
+        p,
+        { x: -1, y: 0, jump: false, jumpHeld: false },
+        1 / 60,
+        0,
+        world.solids,
+      );
+    assert.ok(p.x < -0.5, `walked through occupant at ${z}: ${p.x}`);
+  }
+  world.dispose!();
+});
+
+test("sailing clearance includes bow, stern, beam and rotated hull", async () => {
+  const { shipClearsIsland } = await import("../src/super/voyage");
+  assert.equal(
+    shipClearsIsland(0, 0, 0, 0, -45),
+    false,
+    "bow reaches rock before ship center",
+  );
+  assert.equal(shipClearsIsland(0, 0, 0, 32, 0), true);
+  assert.equal(shipClearsIsland(0, 0, Math.PI / 2, 30, 0), false);
+});
+
+test("running naturally off the stair bottom never grabs the overhead upper deck", async () => {
+  const { stepPlayer } = await import("../src/super/physics");
+  const world = buildVoyage(new T.Scene()),
+    p = createPlayer(6, 4.2, -2);
+  assert.equal(
+    world.solids.some(
+      (s) =>
+        s.y > 3 && Math.abs(s.x - 6) < s.w / 2 && Math.abs(s.z - 12) < s.d / 2,
+    ),
+    false,
+    "stair run-out has open headroom through z12",
+  );
+  let grabbed = false;
+  for (let i = 0; i < 160; i++) {
+    stepPlayer(
+      p,
+      { x: 0, y: 1, jump: false, jumpHeld: false },
+      1 / 60,
+      0,
+      world.solids,
+      world.climbables,
+    );
+    grabbed ||= !!p.ledge;
+  }
+  assert.equal(
+    grabbed,
+    false,
+    "normal stair descent should not catch the overhead deck",
+  );
+  assert.ok(p.y < 0.5, `did not arrive below deck: ${p.x},${p.y},${p.z}`);
+  world.dispose!();
+});
+
+test("sailing view frames the hull and keeps the next passage clear of opaque sails on phone and desktop", async () => {
+  const scene = new T.Scene(),
+    world = buildVoyage(scene),
+    p = createPlayer();
+  const runtime = world.adventure!({
+    setAvatar: () => {},
+    toast: () => {},
+    dialog: (_r, _t, _b, next) => next(),
+    complete: () => {},
+  });
+  const idle = { interact: false, interactHeld: false, x: 0, y: 0 };
+  const state = () =>
+    runtime.snapshot() as {
+      phase: string;
+      targets: Record<string, { x: number; y: number; z: number }>;
+    };
+  for (let i = 0; i < 42; i++) runtime.update(0.1, p, idle);
+  Object.assign(p, state().targets.brothers);
+  runtime.update(0.016, p, { ...idle, interact: true });
+  for (let i = 0; i < 300 && state().phase === "release"; i++)
+    runtime.update(0.1, p, idle);
+  runtime.update(0.016, p, { ...idle, interact: true });
+  for (const name of ["liahona", "helm"]) {
+    Object.assign(p, state().targets[name]);
+    runtime.update(0.016, p, { ...idle, interact: true });
+  }
+  assert.equal(state().phase, "steer");
+  world.update!(0.1, p);
+  scene.updateMatrixWorld(true);
+  const shot = runtime.camera!()!,
+    origin = new T.Vector3(shot.position.x, shot.position.y, shot.position.z);
+  const ship = scene.getObjectByName("Ancient timber sailing vessel")!;
+  const opaque: T.Mesh[] = [];
+  ship.traverse((o) => {
+    if (o instanceof T.Mesh) opaque.push(o);
+  });
+  for (const point of [
+    new T.Vector3(18, 20, -140),
+    new T.Vector3(18, 2.5, -140),
+    new T.Vector3(0, 4.2, -21),
+    new T.Vector3(-6, 4.2, -16),
+    new T.Vector3(6, 4.2, -16),
+  ]) {
+    const delta = point.clone().sub(origin),
+      ray = new T.Raycaster(
+        origin,
+        delta.clone().normalize(),
+        0,
+        delta.length() - 0.5,
+      );
+    const hits = ray.intersectObjects(opaque, false);
+    assert.equal(
+      hits.length,
+      0,
+      `opaque ship geometry blocks the playable course or bow at ${point.toArray()}: ${hits.map((hit) => hit.object.name).join(", ")}`,
+    );
+  }
+  for (const aspect of [16 / 9, 390 / 844]) {
+    const camera = new T.PerspectiveCamera(58, aspect, 0.08, 1400);
+    camera.position.copy(origin);
+    camera.lookAt(shot.focus.x, shot.focus.y, shot.focus.z);
+    camera.updateMatrixWorld();
+    for (const point of [
+      new T.Vector3(0, 4, -22),
+      new T.Vector3(0, 4, 22),
+      new T.Vector3(-9, 4, 0),
+      new T.Vector3(9, 4, 0),
+      new T.Vector3(18, 2.5, -140),
+    ]) {
+      const screen = point.project(camera);
+      assert.ok(
+        Math.abs(screen.x) < 0.95 && Math.abs(screen.y) < 0.95,
+        `hull/passage clipped on ${aspect}: ${screen.toArray()}`,
+      );
+    }
+  }
+  runtime.dispose();
+  world.dispose!();
 });

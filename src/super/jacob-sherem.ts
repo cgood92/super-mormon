@@ -1,7 +1,8 @@
 import * as T from "three";
 import { adventureLandscape, withinTask } from "./adventure-landscape";
 import { buildNephiteTemple } from "./nephite-temple";
-import type { Point, WorldData } from "./worlds";
+import type { WorldData } from "./worlds";
+import { createCharacter, type CharacterRole } from "./character";
 
 /** Jacob 7:1–23. Architecture and exploration staging are interpretive. */
 export function buildJacobSherem(scene: T.Scene): WorldData {
@@ -9,11 +10,15 @@ export function buildJacobSherem(scene: T.Scene): WorldData {
     scene,
     "Jacob's settlement",
     0xb3b081,
-    140,
-    190,
+    170,
+    180,
   );
   const { root, solids, solid } = land;
   const temple = buildNephiteTemple(root, solids);
+  // The expanded north approach must remain in front of the distant backdrop.
+  root.traverse((object) => {
+    if (object.name === "Distant rolling hills") object.position.z -= 40;
+  });
   // Open doorways face the streets. Walls and roofs share their physical dimensions.
   function home(x: number, z: number, tint: number) {
     solid({ x: x - 4, y: 0, z, w: 0.6, h: 4.2, d: 8 }, tint, "Home west wall");
@@ -35,6 +40,10 @@ export function buildJacobSherem(scene: T.Scene): WorldData {
   home(17, 20, 0xd1b990);
   home(-19, -19, 0xbfa981);
   home(20, -19, 0xd6c29b);
+  home(-58, 20, 0xbfae87);
+  home(58, 20, 0xd1bc96);
+  home(-58, -18, 0xc8b58b);
+  home(58, -18, 0xbfa981);
   solid(
     { x: -15, y: 0, z: 23, w: 2, h: 0.8, d: 1.5 },
     0x816046,
@@ -57,202 +66,203 @@ export function buildJacobSherem(scene: T.Scene): WorldData {
     [31, -31],
   ])
     land.tree(x, z);
-  const sherem = land.actor("sherem", {
-    x: 2.8,
-    y: 0,
-    z: 0,
-    yaw: -Math.PI / 2,
+  // Straight, open street patrols avoid buildings and temple surfaces. Their
+  // visible actor and collision body always share the same position.
+  const roles: CharacterRole[] = [
+    "convert",
+    "wife",
+    "sam",
+    "sariah",
+    "zoram",
+    "child",
+    "lemuel",
+    "lamans-wife",
+  ];
+  const residents = Array.from({ length: 24 }, (_, i) => {
+    const actor = createCharacter(roles[i % roles.length], {
+      quality: "crowd",
+    });
+    actor.group.name = `Settlement resident ${i + 1} · imagined inhabitant`;
+    root.add(actor.group);
+    const row = Math.floor(i / 4);
+    const z = [-27, -8, 34, 52, 65, 76][row] + (i % 4) * 1.1;
+    const extent = row < 3 ? 34 : 65;
+    const body = { x: 0, y: 0, z, w: 0.6, h: i % 8 === 5 ? 1.15 : 1.7, d: 0.6 };
+    solids.push(body);
+    return {
+      actor,
+      body,
+      extent,
+      z,
+      offset: i * 13.7,
+      speed: 1.65 + (i % 3) * 0.12,
+    };
   });
+  const sherem = land.actor("sherem", { x: 2.8, y: 0, z: 40 });
   sherem.group.name = "Sherem · articulate visitor";
-  const listeners = [
-    land.actor("sam", { x: -5, y: 0, z: -6 }),
-    land.actor("sariah", { x: 6, y: 0, z: -7 }),
-    land.actor("child", { x: 0, y: 0, z: -9 }),
-  ];
-  const study = { x: -17, y: 0, z: 29 };
-  const square = { x: 0, y: 0, z: 3 };
-  const care = { x: 17, y: 0, z: 27 };
-  const peace = { x: 0, y: 0, z: -17 };
-  const discovery = { x: -23, y: 0, z: -3 };
-  const stages = [
-    {
-      id: "settlement",
-      at: study,
-      action: "Leave home and consider Jacob's witness",
-      ref: "Jacob 7:1–5",
-      title: "Steady faith",
-      text: "Sherem wins many hearts by denying Christ. Jacob's faith rests on revelation and his own experience with God.",
-    },
-    {
-      id: "testimony",
-      at: square,
-      action: "Meet Sherem in the square",
-      ref: "Jacob 7:6–12",
-      title: "The scriptures testify of Christ",
-      text: "Sherem challenges Jacob's teaching. Strengthened by the Spirit, Jacob testifies that the prophets speak of Christ, and that all need His Atonement.",
-    },
-    {
-      id: "sign",
-      at: square,
-      action: "Hear Sherem's demand",
-      ref: "Jacob 7:13–15",
-      title: "God's will",
-      text: "Sherem demands a sign. Jacob leaves the matter to God's will. The Lord's power comes upon Sherem, and he falls.",
-    },
-    {
-      id: "days",
-      at: care,
-      action: "Walk to the house of care",
-      ref: "Jacob 7:15–16",
-      title: "Many days pass",
-      text: "Sherem is nourished for many days. Then he asks the people to gather the next day, so he can speak before he dies.",
-    },
-    {
-      id: "confession",
-      at: square,
-      action: "Return for the next day's gathering",
-      ref: "Jacob 7:17–22",
-      title: "Sherem's confession",
-      text: "Sherem rejects his former teachings, confesses Christ, and speaks of his deception and fear. After speaking, he dies. The witnesses are overcome by God's power.",
-    },
-    {
-      id: "peace",
-      at: peace,
-      action: "Walk with the community toward peace",
-      ref: "Jacob 7:23",
-      title: "Peace restored",
-      text: "Peace and God's love return among the people. They search the scriptures and no longer follow Sherem's teachings.",
-    },
-  ];
-  let fallTime = 0;
-  let index = 0,
-    pending = false,
-    ended = false,
-    discovered = false;
-  land.update(0, study);
+  const sheremBody = { x: 2.8, y: 0, z: 40, w: 0.7, h: 1.7, d: 0.7 };
+  solids.push(sheremBody);
+  let time = 0,
+    fallTime = 0,
+    epilogueTime = 0,
+    disposed = false;
+  let phase: "search" | "encounter" | "fall" | "epilogue" | "done" = "search";
+  const patrol = (
+    actor: ReturnType<typeof createCharacter>,
+    body: typeof sheremBody,
+    extent: number,
+    z: number,
+    distance: number,
+    speed: number,
+    dt: number,
+  ) => {
+    const t = ((distance % (extent * 4)) + extent * 4) % (extent * 4);
+    const direction = t < extent * 2 ? 1 : -1;
+    const x = t < extent * 2 ? -extent + t : extent * 3 - t;
+    actor.update(dt, {
+      x,
+      y: 0,
+      z,
+      vx: direction * speed,
+      vy: 0,
+      vz: 0,
+      yaw: (direction * Math.PI) / 2,
+      grounded: true,
+      runSpeed: speed,
+    });
+    body.x = x;
+  };
+  const animate = (dt: number) => {
+    if (disposed) return;
+    const delta = Math.min(Math.max(dt, 0), 0.1);
+    time += delta;
+    for (const r of residents)
+      patrol(
+        r.actor,
+        r.body,
+        r.extent,
+        r.z,
+        time * r.speed + r.offset,
+        r.speed,
+        delta,
+      );
+    if (phase === "search")
+      patrol(sherem, sheremBody, 30, 40, time * 1.8 + 32.8, 1.8, delta);
+    land.update(delta); // This search deliberately has no objective beacon.
+  };
+  const closingCaption =
+    "Later, after many days of care, Sherem called a gathering for the next day. He confessed Christ, then died after speaking. Peace returned (Jacob 7:15–23).";
+  animate(0);
   return {
     name: "Jacob and Sherem",
-    subtitle: "A witness of Christ • Jacob 7",
-    initialObjective: stages[0].action,
-    spawn: { x: 0, y: 0, z: 38 },
+    subtitle: "Find a voice in the city • Jacob 7 • Imagined settlement",
+    initialObjective:
+      "Find Sherem among the people in the city and its outskirts.",
+    spawn: { x: 14, y: 0, z: -84 },
     solids,
     actorParent: root,
-    bounds: { minX: -55, maxX: 55, minZ: -86, maxZ: 55 },
-    goal: { ...peace, radius: 3 },
+    bounds: { minX: -80, maxX: 80, minZ: -88, maxZ: 85 },
+    goal: { x: 0, y: 0, z: 40, radius: 3 },
     landmarks: [
-      { name: "Jacob's home", ...study },
-      { name: "Meeting square", ...square },
-      { name: "House of care", ...care },
-      { name: "Quiet garden", ...discovery },
       { name: "Nephi's temple · interpretive", ...temple.entrance },
+      { name: "City square", x: 0, y: 0, z: 0 },
+      { name: "Outer gardens", x: 0, y: 0, z: 65 },
     ],
     update(dt) {
-      if (index === 3 && !ended) {
-        fallTime = Math.min(1, fallTime + Math.min(Math.max(dt, 0), 0.1) / 0.9);
-        sherem.group.rotation.z =
-          (-Math.PI / 2) * (fallTime * fallTime * (3 - 2 * fallTime));
-        sherem.group.position.y = fallTime * 0.35;
-      }
-      land.update(dt, ended ? undefined : stages[index].at);
+      animate(dt);
     },
     adventure(hooks) {
       hooks.setAvatar("jacob");
       hooks.toast(
-        "Explore the settlement as Jacob. Homes and streets are an imagined setting for Jacob 7; follow the blue beacon.",
+        "Pass the temple and explore the city. Find Sherem: a traveling speaker in a plum-colored mantle. Speak beside him when you recognize him.",
       );
       return {
         snapshot: () => ({
-          phase: ended ? "done" : stages[index].id,
-          index,
-          pending,
-          discovered,
-          target: stages[index].at,
-          targets: stages.map((s) => ({ id: s.id, ...s.at })),
+          phase,
+          target: { ...sherem.group.position },
+          pending: phase !== "search" && phase !== "done",
         }),
-        update(_dt, player, input) {
-          if (ended)
-            return { objective: "Peace restored", prompt: "Journey complete" };
-          const stage = stages[index];
-          const close = withinTask(player, stage.at);
-          const optional = !discovered && withinTask(player, discovery);
-          const atTemple =
-            withinTask(player, temple.entrance, 3.2) ||
-            withinTask(player, temple.hall, 3.2) ||
-            withinTask(player, temple.inner, 3.2);
-          if (!pending && input.interact && optional) {
-            discovered = true;
-            hooks.toast(
-              "Quiet garden · Jacob's confidence came from revelation, not a contest of eloquence (Jacob 7:4–5). This resting place is imagined.",
+        movementLocked: () => phase !== "search" && phase !== "done",
+        update(dt, player, input) {
+          if (disposed) return { objective: "", prompt: "" };
+          if (phase === "fall") {
+            fallTime = Math.min(
+              1,
+              fallTime + Math.min(Math.max(dt, 0), 0.1) / 0.9,
             );
-          } else if (!pending && atTemple && input.interact && !close) {
-            hooks.toast(
-              "Nephi built a temple after the manner of Solomon's, with fewer precious things (2 Nephi 5:16). This layout and its furnishings are interpretive; explore the porch, hall, and inner room.",
-            );
-          } else if (!pending && close && input.interact) {
-            pending = true;
+            sherem.group.rotation.z =
+              (-Math.PI / 2) * fallTime * fallTime * (3 - 2 * fallTime);
+            sherem.group.position.y = fallTime * 0.35;
+            sheremBody.h = 0.5;
+            if (fallTime === 1) {
+              phase = "epilogue";
+              hooks.toast(closingCaption);
+            }
+          }
+          if (phase === "epilogue") {
+            epilogueTime += Math.min(Math.max(dt, 0), 0.1);
+            if (epilogueTime >= 8) {
+              phase = "done";
+              hooks.complete();
+            }
+          }
+          const close = withinTask(player, sherem.group.position, 2.6);
+          if (phase === "search" && close && input.interact) {
+            phase = "encounter";
+            // Control is locked through completion; the actor capsule must not
+            // occlude its own face from the story camera.
+            solids.splice(solids.indexOf(sheremBody), 1);
+            sherem.update(0, {
+              ...sherem.group.position,
+              vx: 0,
+              vy: 0,
+              vz: 0,
+              yaw: Math.atan2(
+                player.x - sherem.group.position.x,
+                player.z - sherem.group.position.z,
+              ),
+              grounded: true,
+              runSpeed: 0,
+            });
             hooks.dialog(
-              stage.ref,
-              stage.title,
-              stage.text,
+              "Jacob 7:6–15",
+              "Jacob's witness of Christ",
+              "Sherem challenges Jacob's teaching about Christ. Jacob testifies that the scriptures and prophets bear witness of Him. Sherem asks for a sign; Jacob leaves the matter to God's will. The Lord's power comes upon Sherem, and he falls to the earth.",
               () => {
-                pending = false;
-                if (stage.id === "sign") {
-                  // No attack, flash, or reward: the narrated event leads into care.
-                  fallTime = 0;
-                }
-                if (stage.id === "days") {
-                  sherem.group.rotation.z = 0;
-                  sherem.group.position.set(2.8, 0, 0);
-                  sherem.group.visible = true;
-                  listeners.forEach((a) => {
-                    a.group.visible = true;
-                  });
-                }
-                if (stage.id === "confession") sherem.group.visible = false;
-                if (index === stages.length - 1) {
-                  ended = true;
-                  land.marker.visible = false;
-                  hooks.complete();
-                } else {
-                  index++;
-                  land.update(0, stages[index].at);
-                }
+                if (!disposed && phase === "encounter") phase = "fall";
               },
               {
-                focus: { x: stage.at.x, y: 1.1, z: stage.at.z },
-                wide: 5,
+                actors: [
+                  { group: sherem.group, gesture: "talk", speaker: true },
+                ],
                 playerGesture: "talk",
-                actors:
-                  stage.at === square && sherem.group.visible
-                    ? [
-                        { group: sherem.group, gesture: "talk", speaker: true },
-                        ...listeners.map((a) => ({ group: a.group })),
-                      ]
-                    : [],
+                focus: sherem.group,
+                wide: 6,
               },
             );
           }
           return {
-            objective: stages[index].action,
-            prompt: pending
-              ? ""
-              : optional
-                ? "{action} · Reflect in the quiet garden"
-                : atTemple
-                  ? "{action} · Explore Nephi's temple"
-                  : close
-                    ? `{action} · ${stage.action}`
-                    : "",
+            objective:
+              phase === "epilogue"
+                ? closingCaption
+                : phase === "done"
+                  ? "Peace restored"
+                  : phase === "search"
+                    ? "Find Sherem among the people in the city and its outskirts."
+                    : "Witness Jacob's encounter with Sherem",
+            prompt:
+              phase === "search" && close ? "{action} · Speak with Sherem" : "",
           };
         },
         dispose() {
-          ended = true;
-          land.marker.visible = false;
+          phase = "done";
         },
       };
     },
     dispose() {
-      ended = true;
+      if (disposed) return;
+      disposed = true;
+      residents.forEach((r) => r.actor.dispose());
       land.dispose();
     },
   };
