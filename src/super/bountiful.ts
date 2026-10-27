@@ -183,17 +183,9 @@ export function buildBountiful(scene: T.Scene): WorldData {
     ore = point(-22, 18),
     forge = point(-8, 10),
     brothers = point(9, 4);
-  for (let i = 0; i < 7; i++)
-    rock(
-      -23 + (i % 3),
-      0,
-      18 + Math.floor(i / 3),
-      1.4,
-      1.3 + (i % 2) * 0.4,
-      1.3,
-      i % 2 ? 0x566572 : 0x9e6a3f,
-      "Ore outcrop",
-    );
+  // One fitted outcrop owns the whole ore surface. Intersecting little mounds
+  // previously created inward seams and competing collision corrections.
+  rock(-22, 0, 18.8, 4.2, 1.6, 3.8, 0x76645a, "Ore outcrop");
   block(-8, 0, 10, 3, 0.65, 2, 0x5f5c51, true, "Solid forge table");
   block(-11, 0, 10, 1.2, 0.8, 1.6, 0x795b3d, true, "Solid forge bellows");
   block(-8, 0.65, 10, 1, 0.18, 1, 0x343c3c, true, "Forge anvil");
@@ -266,8 +258,21 @@ export function buildBountiful(scene: T.Scene): WorldData {
   }
   const familyCamp = buildFamilyCamp(root, solids);
   const people = [createCharacter("laman"), createCharacter("lemuel")];
+  const peopleSolids = people.map(() => ({
+    x: 0,
+    y: 0,
+    z: 0,
+    w: 0.7,
+    h: 1.7,
+    d: 0.7,
+  }));
+  solids.push(...peopleSolids);
   people.forEach((actor, i) => {
     actor.group.position.set(brothers.x + i * 2, 0, brothers.z);
+    Object.assign(peopleSolids[i], {
+      x: actor.group.position.x,
+      z: actor.group.position.z,
+    });
     root.add(actor.group);
   });
   const ship = buildShip(root, point(0, -40));
@@ -409,6 +414,19 @@ export function buildBountiful(scene: T.Scene): WorldData {
         power = 0,
         reconciliationTime = 0,
         hitTree = -1;
+      const held = new Set<T.Object3D>();
+      const equip = (object: T.Object3D, carrying: boolean) => {
+        if (!hooks.attachEquipment) return;
+        if (carrying && !held.has(object)) {
+          hooks.attachEquipment("rightHand", object);
+          object.position.set(0, 0, 0);
+          object.rotation.set(0, 0, 0);
+          held.add(object);
+        } else if (!carrying && held.has(object)) {
+          root.add(object);
+          held.delete(object);
+        }
+      };
       const target = () =>
         count >= sockets.length
           ? ship.points.helm
@@ -445,6 +463,7 @@ export function buildBountiful(scene: T.Scene): WorldData {
             strikes = 0;
           },
           {
+            ...(next === "explore" ? { wide: 10, cutaway: true } : {}),
             playerGesture:
               phase === "pray"
                 ? "pray"
@@ -453,9 +472,12 @@ export function buildBountiful(scene: T.Scene): WorldData {
                   : phase === "power" || phase === "oppose"
                     ? "point"
                     : "talk",
-            actors: (phase === "pray" || phase === "forge" || phase === "ore"
+            actors: (phase === "pray" ||
+            phase === "forge" ||
+            phase === "ore" ||
+            next === "explore"
               ? []
-              : phase === "oppose" || phase === "power" || next === "explore"
+              : phase === "oppose" || phase === "power"
                 ? people
                 : [people[0]]
             ).map((actor, i) => ({
@@ -478,7 +500,7 @@ export function buildBountiful(scene: T.Scene): WorldData {
                   : phase === "ore"
                     ? ore
                     : next === "explore"
-                      ? ship.points.helm
+                      ? { x: 3, y: 6, z: -27 }
                       : brothers,
           },
         );
@@ -521,23 +543,28 @@ export function buildBountiful(scene: T.Scene): WorldData {
           spark = Math.max(0, spark - dt);
           power = Math.max(0, power - dt);
           tool.visible = phase === "hammer" || hasHammer;
-          if (hasHammer)
+          equip(tool, hasHammer);
+          equip(axe, hasAxe);
+          equip(carried, carrying);
+          if (hasHammer && !hooks.attachEquipment)
             tool.position.set(
               player.x + Math.cos(player.yaw) * 0.65,
               player.y + 0.55,
               player.z - Math.sin(player.yaw) * 0.65,
             );
-          else tool.position.set(hammerPoint.x, 0.16, hammerPoint.z);
-          axe.visible = phase === "timber" && !carrying;
+          else if (!hasHammer)
+            tool.position.set(hammerPoint.x, 0.16, hammerPoint.z);
+          axe.visible = phase === "timber";
           if (hasAxe) {
-            axe.position.set(
-              player.x + Math.cos(player.yaw) * 0.65,
-              player.y + 0.65,
-              player.z - Math.sin(player.yaw) * 0.65,
-            );
+            if (!hooks.attachEquipment)
+              axe.position.set(
+                player.x + Math.cos(player.yaw) * 0.65,
+                player.y + 0.65,
+                player.z - Math.sin(player.yaw) * 0.65,
+              );
             axe.rotation.set(
               0,
-              player.yaw,
+              hooks.attachEquipment ? 0 : player.yaw,
               swing > 0 ? Math.sin((swing / 0.4) * Math.PI) * -1.5 : 0.2,
             );
           } else {
@@ -546,7 +573,7 @@ export function buildBountiful(scene: T.Scene): WorldData {
           }
           tool.rotation.set(
             0,
-            player.yaw,
+            hooks.attachEquipment && hasHammer ? 0 : player.yaw,
             hasHammer
               ? swing > 0
                 ? Math.sin((1 - swing / 0.4) * Math.PI) * -1.5
@@ -612,6 +639,14 @@ export function buildBountiful(scene: T.Scene): WorldData {
                 ? Math.sin(animationTime * 2 + i) * 0.04
                 : 0;
             });
+          people.forEach((actor, i) => {
+            const position = actor.group.position;
+            Object.assign(peopleSolids[i], {
+              x: position.x,
+              y: position.y,
+              z: position.z,
+            });
+          });
           const p = target(),
             near =
               Math.hypot(player.x - p.x, player.z - p.z) <
@@ -626,12 +661,17 @@ export function buildBountiful(scene: T.Scene): WorldData {
           );
           fire.scale.y = 1.1 + Math.sin(Date.now() * 0.012) * 0.1;
           carried.visible = carrying;
-          carried.position.set(
-            player.x + Math.cos(player.yaw) * 0.62,
-            player.y + 1.65,
-            player.z - Math.sin(player.yaw) * 0.62,
-          );
-          carried.rotation.y = player.yaw;
+          if (!hooks.attachEquipment)
+            carried.position.set(
+              player.x + Math.cos(player.yaw) * 0.62,
+              player.y + 1.65,
+              player.z - Math.sin(player.yaw) * 0.62,
+            );
+          if (hooks.attachEquipment) {
+            // The length runs beside the shoulder; its center grip sits in the palm.
+            carried.position.set(0, 0, 0);
+            carried.rotation.set(0, 0, Math.PI / 2);
+          } else carried.rotation.y = player.yaw;
           const aligned =
             !carrying ||
             Math.abs(Math.sin(player.yaw - sockets[count].yaw)) < 0.38;
@@ -742,6 +782,17 @@ export function buildBountiful(scene: T.Scene): WorldData {
               }
               placedSolids.push(beamSolid);
               placed.push(beam);
+              // Depositing at the socket can create support around the feet.
+              // Settle on the beam instead of trapping the player inside it.
+              if (
+                Math.abs(player.x - beamSolid.x) < beamSolid.w / 2 + 0.35 &&
+                Math.abs(player.z - beamSolid.z) < beamSolid.d / 2 + 0.35 &&
+                player.y < beamSolid.y + beamSolid.h
+              ) {
+                player.y = beamSolid.y + beamSolid.h;
+                player.vy = 0;
+                player.grounded = true;
+              }
               count++;
               carrying = false;
               hooks.toast(`Timber secured • ${count}/4`);
@@ -795,9 +846,15 @@ export function buildBountiful(scene: T.Scene): WorldData {
               hooks.complete();
             }
           }
-          return { objective: objective(), prompt, carrying };
+          return {
+            objective: objective(),
+            prompt,
+            carrying: carrying || hasAxe || hasHammer,
+          };
         },
         dispose() {
+          for (const object of held) root.add(object);
+          held.clear();
           carried.visible = false;
           marker.visible = false;
           tool.visible = false;

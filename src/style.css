@@ -32,6 +32,12 @@ button:focus-visible {
 [hidden] {
   display: none !important;
 }
+#app,
+#app * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
 #app {
   position: fixed;
   inset: 0;

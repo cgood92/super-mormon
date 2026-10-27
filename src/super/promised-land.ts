@@ -1,17 +1,19 @@
 import * as T from "three";
 import { adventureLandscape, withinTask } from "./adventure-landscape";
 import { material } from "./art";
-import { markScenery } from "./scenery";
+import { markScenery, terracedRock } from "./scenery";
 import { createPlayer, stepPlayer } from "./physics";
 import type { Point, WorldData } from "./worlds";
 
 // Scripture chronology: 1 Nephi 18:23–25; 2 Nephi 1; 4:12; 5:5–17, 27.
-// Geography, tasks, compressed time and buildings are an imagined reconstruction.
+// Final walk/death staging, terrain, costumes and condensed years are imagined.
 export function buildPromisedLand(scene: T.Scene): WorldData {
   const land = adventureLandscape(
     scene,
-    "The Promised Land and City of Nephi",
+    "The Promised Land — mountain valleys",
     0x8b9b68,
+    190,
+    260,
   );
   const { root, solids, solid } = land;
   const ocean = new T.Mesh(
@@ -88,393 +90,283 @@ export function buildPromisedLand(scene: T.Scene): WorldData {
     reason:
       "Small surf lines beyond the dry-land route; nonphysical water effect.",
   });
-  const tents: T.Mesh[] = [];
   const shelter = (x: number, z: number, name: string) => {
-    const pieces = [
-      solid(
-        { x: x - 2, y: 0, z, w: 0.22, h: 2.6, d: 4 },
-        0xba9d70,
-        `${name} left canvas`,
-      ),
-      solid(
-        { x: x + 2, y: 0, z, w: 0.22, h: 2.6, d: 4 },
-        0xba9d70,
-        `${name} right canvas`,
-      ),
-      solid(
-        { x, y: 0, z: z - 2, w: 4, h: 2.6, d: 0.22 },
-        0xba9d70,
-        `${name} rear canvas`,
-      ),
-      solid(
-        { x, y: 2.6, z, w: 4.25, h: 0.22, d: 4.25 },
-        0xe0c99c,
-        `${name} canopy`,
-      ),
-    ];
-    return pieces;
+    solid(
+      { x: x - 2, y: 0, z, w: 0.22, h: 2.6, d: 4 },
+      0xba9d70,
+      `${name} left canvas`,
+    );
+    solid(
+      { x: x + 2, y: 0, z, w: 0.22, h: 2.6, d: 4 },
+      0xba9d70,
+      `${name} right canvas`,
+    );
+    solid(
+      { x, y: 0, z: z - 2, w: 4, h: 2.6, d: 0.22 },
+      0xba9d70,
+      `${name} rear canvas`,
+    );
+    solid(
+      { x, y: 2.6, z, w: 4.25, h: 0.22, d: 4.25 },
+      0xe0c99c,
+      `${name} canopy`,
+    );
   };
   shelter(-12, 40, "Family tent");
   shelter(13, 43, "Shore tent");
-  const lehi = land.actor("lehi", { x: -9, y: 0, z: 27 });
-  land.actor("sariah", { x: -12, y: 0, z: 29 });
-  const family = [
-    { role: "sam" as const, x: -4, z: 13 },
-    { role: "zoram" as const, x: 1, z: 12 },
-    { role: "child" as const, x: 4, z: 14 },
-  ].map(({ role, x, z }) => ({
-    rig: land.actor(role, { x, y: 0, z }),
-    player: createPlayer(x, 0, z),
-  }));
-  for (const [x, z, scale] of [
-    [-23, 4, 1.1],
-    [24, 6, 1],
-    [-18, -18, 1],
-    [19, -25, 1.2],
-    [-29, -43, 1.1],
-    [28, -50, 1],
-  ])
-    land.tree(x, z, scale);
-  // A broad, gently winding corridor stays open between the forest and city.
-  solid(
-    { x: -12, y: 0, z: -4, w: 4, h: 1.5, d: 7 },
-    0xa69c7b,
-    "Trail-side stone terrace",
-  );
-  solid(
-    { x: 13, y: 0, z: -31, w: 5, h: 1.2, d: 6 },
-    0xa69c7b,
-    "Trail-side resting terrace",
-  );
-  solid(
-    { x: 10, y: 0, z: -52, w: 3, h: 1.05, d: 1.5 },
-    0x795b3e,
-    "Building workbench",
-  );
-  solid(
-    { x: 8.9, y: 1.05, z: -52, w: 0.65, h: 0.12, d: 0.45 },
-    0xc3a45f,
-    "Preserved brass records",
-  );
-  const cityBuildings: T.Mesh[] = [];
-  const cityWall = (x: number, z: number, name: string) => {
-    cityBuildings.push(
-      solid({ x, y: 0, z, w: 5, h: 2.8, d: 0.4 }, 0xc6ac7d, name),
-    );
-    cityBuildings.push(
-      solid(
-        { x: x - 2.3, y: 0, z: z + 2, w: 0.4, h: 2.8, d: 4 },
-        0xc6ac7d,
-        `${name} side`,
-      ),
-    );
-    cityBuildings.push(
-      solid(
-        { x, y: 2.8, z: z + 2, w: 5, h: 0.3, d: 4.4 },
-        0x846247,
-        `${name} roof`,
-      ),
-    );
-  };
-  // Completed buildings are outside every work interaction and the main north/south path.
-  cityWall(-17, -58, "City dwelling");
-  cityWall(21, -58, "City workshop");
-  const temple: T.Mesh[] = [];
-  const buildTemple = () => {
-    temple.push(
-      solid(
-        { x: 0, y: 0, z: -65, w: 11, h: 0.3, d: 8 },
-        0xddcda9,
-        "Temple foundation",
-      ),
-    );
-    temple.push(
-      solid(
-        { x: 0, y: 0.3, z: -68.5, w: 11, h: 5, d: 0.5 },
-        0xd9c49c,
-        "Temple rear wall",
-      ),
-    );
-    for (const x of [-5.25, 5.25])
-      temple.push(
-        solid(
-          { x, y: 0.3, z: -65, w: 0.5, h: 5, d: 7 },
-          0xd9c49c,
-          "Temple side wall",
-        ),
+  // The hills are now reachable terrain, with broad interconnecting valleys.
+  // Every mountain has a fitted supporting profile; the passages are real gaps.
+  for (const [row, z] of [0, -36, -72].entries()) {
+    const xs = row === 1 ? [-53, -18, 18, 53] : [-35, 0, 35];
+    for (const [i, x] of xs.entries())
+      terracedRock(
+        root,
+        solids,
+        material(i % 2 ? 0x7b8c68 : 0x8e9571),
+        { x, y: 0, z, w: 24, h: 7 + (i % 3) * 1.1, d: 24 },
+        "Valley mountain",
       );
-    temple.push(
-      solid(
-        { x: 0, y: 5.3, z: -65, w: 11.5, h: 0.4, d: 8.5 },
-        0xe9d8b3,
-        "Temple roof",
-      ),
-    );
-  };
-  const crop = new T.InstancedMesh(
-    new T.ConeGeometry(0.18, 0.9, 5),
-    material(0xaac264),
-    30,
-  );
-  for (let i = 0; i < 30; i++)
-    crop.setMatrixAt(
-      i,
-      new T.Matrix4().makeTranslation(
-        8 + (i % 6) * 0.65,
-        0.45,
-        30 + Math.floor(i / 6) * 0.75,
-      ),
-    );
-  crop.visible = false;
-  root.add(crop);
-  markScenery(crop, {
-    kind: "decoration",
-    reason:
-      "Small flexible seedlings in the cultivated plot; no solid barrier.",
+  }
+  for (const [x, z] of [
+    [-67, 10],
+    [66, 9],
+    [-65, -48],
+    [66, -58],
+    [-50, -103],
+    [55, -102],
+  ])
+    land.tree(x, z, 1.2);
+  // Paint the single existing ground surface along the valley network. No
+  // overlay floors or invisible maze walls are introduced.
+  const segments = [
+    [-15, 21, -20, 14],
+    [-15, 21, 20, 14],
+    [-20, 14, -20, -18],
+    [20, 14, 20, -18],
+    [-20, -18, 20, -18],
+    [0, -18, 0, -54],
+    [-38, -18, -38, -54],
+    [38, -18, 38, -54],
+    [-38, -54, 38, -54],
+    [-20, -54, -20, -92],
+    [20, -54, 20, -92],
+    [-60, 14, -60, -92],
+    [60, 14, 60, -92],
+    [-60, -92, 60, -92],
+    [25, -92, 25, -105],
+  ];
+  const positions = land.ground.geometry.getAttribute("position"),
+    colors = land.ground.geometry.getAttribute("color");
+  const trailColor = new T.Color(0xb7a078);
+  for (let i = 0; i < positions.count; i++) {
+    const x = positions.getX(i) * 190,
+      z = positions.getZ(i) * 260;
+    let nearest = Infinity;
+    for (const [ax, az, bx, bz] of segments) {
+      const t = T.MathUtils.clamp(
+        ((x - ax) * (bx - ax) + (z - az) * (bz - az)) /
+          ((bx - ax) ** 2 + (bz - az) ** 2),
+        0,
+        1,
+      );
+      nearest = Math.min(
+        nearest,
+        Math.hypot(x - ax - t * (bx - ax), z - az - t * (bz - az)),
+      );
+    }
+    if (z < 24) {
+      const base = new T.Color(0x8b9b68).lerp(
+        trailColor,
+        1 - T.MathUtils.smoothstep(nearest, 2, 4),
+      );
+      colors.setXYZ(i, base.r, base.g, base.b);
+    }
+  }
+  colors.needsUpdate = true;
+  const grave = { x: -15, y: 0, z: 21 },
+    settlement = { x: 25, y: 0, z: -105 };
+  const lehi = land.actor("lehi", { x: 18, y: 0, z: 61 });
+  const lehiPlayer = createPlayer(18, 0, 61);
+  const relatives = [
+    "sam",
+    "zoram",
+    "jacob",
+    "child",
+    "wife",
+    "child",
+    "laman",
+    "lemuel",
+  ] as const;
+  const family = relatives.map((role, i) => {
+    const angle = (i / relatives.length) * Math.PI * 2;
+    const x = grave.x + Math.cos(angle) * (8 + i * 0.4);
+    const z = grave.z + Math.sin(angle) * (8 + i * 0.4);
+    return {
+      rig: land.actor(role, { x, y: 0, z }),
+      player: createPlayer(x, 0, z),
+      willing: i < 6,
+    };
   });
+  family[3].rig.group.name = "joseph-character";
+  // The memorial only becomes physical when the burial is complete.
   const memorial = solid(
-    { x: -15, y: 0, z: 21, w: 1.7, h: 0.35, d: 1.2 },
+    { x: grave.x, y: 0, z: grave.z, w: 1.7, h: 0.35, d: 1.2 },
     0xd5c4a1,
     "Quiet memorial stone",
   );
   memorial.visible = false;
-  // Do not leave an invisible obstacle before the memorial is established.
   const memorialSolid = solids.pop()!;
-  type Task = {
-    id: string;
-    at: Point;
-    action: string;
-    title: string;
-    text: string;
-    ref: string;
-    work?: boolean;
-    run?: () => void;
+  const circle = new T.Mesh(
+    new T.RingGeometry(5, 5.35, 64),
+    new T.MeshBasicMaterial({ color: 0xd8d49a, side: T.DoubleSide }),
+  );
+  circle.name = "New settlement arrival circle";
+  circle.rotation.x = -Math.PI / 2;
+  circle.position.set(settlement.x, 0.025, settlement.z);
+  root.add(circle);
+  markScenery(circle, {
+    kind: "decoration",
+    reason:
+      "Thin arrival indicator above the sole ground support, without a duplicate floor.",
+  });
+  const trail: Point[] = [];
+  let phase = "shore",
+    deathTime = 0,
+    gatherTime = 0,
+    following = false,
+    ended = false,
+    disposed = false,
+    trailTimer = 0;
+  const moveToward = (
+    p: ReturnType<typeof createPlayer>,
+    target: Point,
+    dt: number,
+    speed: number,
+  ) => {
+    const dx = target.x - p.x,
+      dz = target.z - p.z,
+      d = Math.hypot(dx, dz);
+    stepPlayer(
+      p,
+      {
+        x: d ? (-dx / d) * Math.min(speed, d) : 0,
+        y: d ? (dz / d) * Math.min(speed, d) : 0,
+        jump: false,
+        jumpHeld: false,
+      },
+      dt,
+      0,
+      solids,
+    );
   };
-  let following = false;
-  const tasks: Task[] = [
-    {
-      id: "camp",
-      at: { x: 0, y: 0, z: 43 },
-      action: "Set up the shore camp",
-      title: "On the promised shore",
-      text: "The family pitches tents after arriving. This imagined journey compresses years into a few visits.",
-      ref: "1 Nephi 18:23",
-      run: () => {
-        tents.push(...shelter(-23, 35, "Newly pitched tent"));
-      },
-    },
-    {
-      id: "seeds",
-      at: { x: 7, y: 0, z: 32 },
-      action: "Hold {action} · Plant the seeds",
-      title: "Seeds from Jerusalem",
-      text: "The seeds brought from Jerusalem grow abundantly in their new home.",
-      ref: "1 Nephi 18:24",
-      work: true,
-      run: () => {
-        crop.visible = true;
-      },
-    },
-    {
-      id: "counsel",
-      at: { x: -7, y: 0, z: 29 },
-      action: "Listen to Lehi",
-      title: "A father's counsel",
-      text: "Later, Lehi teaches his family to remember the Lord's mercy and live in unity.",
-      ref: "2 Nephi 1",
-    },
-    {
-      id: "farewell",
-      at: { x: -12, y: 0, z: 22 },
-      action: "Remember Lehi together",
-      title: "Remembering Lehi",
-      text: "After speaking to his household, Lehi grows old, dies, and is buried. We pause quietly with his family. This scene does not portray the manner of his death.",
-      ref: "2 Nephi 4:12",
-      run: () => {
-        lehi.group.visible = false;
-        memorial.visible = true;
-        solids.push(memorialSolid);
-      },
-    },
-    {
-      id: "gather",
-      at: { x: 0, y: 0, z: 13 },
-      action: "Gather the willing families",
-      title: "A warning and a departure",
-      text: "The Lord warns Nephi to leave. His family, Sam's and Zoram's families, Jacob, Joseph, his sisters, and others who choose to go journey with him.",
-      ref: "2 Nephi 5:5–7",
-      run: () => {
-        following = true;
-      },
-    },
-    {
-      id: "trail1",
-      at: { x: 3, y: 0, z: 0 },
-      action: "Lead the group onward",
-      title: "Into the wilderness",
-      text: "Stay on the open trail. The family is following your route.",
-      ref: "An imagined route · 2 Nephi 5:7",
-    },
-    {
-      id: "trail2",
-      at: { x: -3, y: 0, z: -18 },
-      action: "Rest and continue",
-      title: "Many days pass",
-      text: "The journey takes many days. Help the families reach a new place to settle.",
-      ref: "2 Nephi 5:7",
-    },
-    {
-      id: "settle",
-      at: { x: 0, y: 0, z: -40 },
-      action: "Pitch tents at the new settlement",
-      title: "The land of Nephi",
-      text: "The people name their new home Nephi.",
-      ref: "2 Nephi 5:8",
-      run: () => {
-        tents.push(...shelter(-12, -43, "New settlement tent"));
-      },
-    },
-    {
-      id: "records",
-      at: { x: 10, y: 0, z: -49 },
-      action: "Safeguard the records",
-      title: "Remembering their journey",
-      text: "Nephi brings the brass plates and the compass. The people sow, harvest, and learn to build.",
-      ref: "2 Nephi 5:11–15",
-    },
-    {
-      id: "build",
-      at: { x: 3, y: 0, z: -55 },
-      action: "Hold {action} · Help build the temple",
-      title: "Building with care",
-      text: "Nephi builds a temple after the manner of Solomon's, with fewer precious materials. This building is an imagined representation.",
-      ref: "2 Nephi 5:16",
-      work: true,
-      run: buildTemple,
-    },
-    {
-      id: "joy",
-      at: { x: 0, y: 0, z: -57 },
-      action: "Gather in gratitude",
-      title: "A community takes root",
-      text: "Nephi teaches his people to work diligently. They seek a life of happiness together.",
-      ref: "2 Nephi 5:17, 27",
-    },
-  ];
-  let index = 0,
-    effort = 0,
-    pending = false,
-    ended = false;
-  const trail: Point[] = [{ x: 0, y: 0, z: 13 }];
-  let trailTimer = 0;
-  land.update(0, tasks[0].at);
   const world: WorldData = {
     name: "The Promised Land",
-    subtitle: "Settle, remember, and build • 1 Nephi 18; 2 Nephi 1–5",
-    initialObjective: "Set up the shore camp",
+    subtitle:
+      "Remember Lehi; lead the willing families • 2 Nephi 4–5 • Imagined route and condensed years",
+    initialObjective: "Explore the shore and find Lehi",
     spawn: { x: 0, y: 0, z: 51 },
     solids,
-    bounds: { minX: -65, maxX: 65, minZ: -74, maxZ: 70 },
-    goal: { x: 0, y: 0, z: -57, radius: 3 },
-    landmarks: tasks.map((task) => ({ name: task.title, ...task.at })),
+    actorParent: root,
+    bounds: { minX: -83, maxX: 83, minZ: -123, maxZ: 76 },
+    goal: { ...settlement, radius: 5 },
+    landmarks: [
+      { name: "Shore camp", x: 0, y: 0, z: 43 },
+      { name: "Memorial grove", ...grave },
+      { name: "Mountain valleys", x: 0, y: 0, z: -36 },
+      { name: "New settlement", ...settlement },
+    ],
     update(dt, player) {
-      if (ended) return;
-      land.update(dt, ended ? undefined : tasks[index]?.at);
-      if (!following || pending || ended) return;
-      trailTimer += Math.min(dt, 0.1);
+      if (disposed || ended) return;
+      dt = Math.min(Math.max(dt, 0), 0.1);
+      land.update(dt);
+      if (phase === "shore") {
+        moveToward(lehiPlayer, grave, dt, 0.16);
+        lehi.update(dt, lehiPlayer);
+        if (Math.hypot(lehiPlayer.x - grave.x, lehiPlayer.z - grave.z) < 0.35) {
+          phase = "farewell";
+          deathTime = 0;
+        }
+      } else if (phase === "farewell") {
+        deathTime += dt;
+        const ease = T.MathUtils.smoothstep(deathTime, 0, 2.8);
+        lehi.group.rotation.z = (ease * Math.PI) / 2;
+        lehi.group.position.y = ease * 0.35;
+        if (deathTime >= 3) {
+          phase = "burial";
+        }
+      }
+      if (!following) return;
+      gatherTime += dt;
+      trailTimer += dt;
       if (trailTimer > 0.18) {
         trailTimer = 0;
-        if (
-          Math.hypot(
-            player.x - trail[trail.length - 1].x,
-            player.z - trail[trail.length - 1].z,
-          ) > 0.6
-        )
+        const prior = trail[trail.length - 1];
+        if (!prior || Math.hypot(player.x - prior.x, player.z - prior.z) > 0.65)
           trail.push({ x: player.x, y: player.y, z: player.z });
-        if (trail.length > 160) trail.shift();
+        if (trail.length > 600) trail.shift();
       }
-      family.forEach(({ player: follower, rig }, i) => {
-        const target = trail[Math.max(0, trail.length - 5 - i * 4)];
-        const dx = target.x - follower.x,
-          dz = target.z - follower.z,
-          d = Math.hypot(dx, dz),
-          speed = d > 0.8 ? Math.min(0.8, d * 0.35) : 0;
-        stepPlayer(
-          follower,
-          {
-            x: d ? (-dx / d) * speed : 0,
-            y: d ? (dz / d) * speed : 0,
-            jump: false,
-            jumpHeld: false,
-          },
-          dt,
-          0,
-          solids,
-        );
-        rig.update(dt, follower);
+      family.forEach(({ rig, player: p, willing }, i) => {
+        const angle = (i / 8) * Math.PI * 2;
+        const ring = {
+          x: grave.x + Math.cos(angle) * 4.1,
+          y: 0,
+          z: grave.z + Math.sin(angle) * 4.1,
+        };
+        const target =
+          !willing || gatherTime < 5
+            ? ring
+            : (trail[Math.max(0, trail.length - 5 - i * 4)] ?? ring);
+        moveToward(p, target, dt, 0.72);
+        rig.update(dt, p);
       });
     },
     adventure(hooks) {
       hooks.setAvatar("nephi");
       hooks.toast(
-        "Explore the shore. Follow the blue beacon to help your family settle.",
+        "Lehi is walking inland. Explore the shore and look for him. This scene condenses years; his final walk is imagined.",
       );
       return {
         snapshot: () => ({
-          phase: ended ? "done" : tasks[index].id,
-          index,
-          effort,
+          phase,
           following,
-          targets: tasks.map((task) => ({ id: task.id, ...task.at })),
+          lehi: { x: lehiPlayer.x, y: lehiPlayer.y, z: lehiPlayer.z },
+          grave,
+          settlement,
+          followers: family
+            .filter((f) => f.willing)
+            .map((f) => ({ x: f.player.x, y: f.player.y, z: f.player.z })),
+          paths: segments,
         }),
-        update(dt, player, input) {
-          if (ended)
-            return {
-              objective: "A community takes root",
-              prompt: "Journey complete",
-            };
-          const task = tasks[index];
-          const close = withinTask(player, task.at);
-          if (!close || !input.interactHeld) effort = 0;
-          if (close && task.work && input.interactHeld && !pending)
-            effort += Math.min(Math.max(dt, 0), 0.1);
-          if (
-            close &&
-            !pending &&
-            (task.work ? effort >= 1.2 : input.interact)
-          ) {
-            effort = 0;
-            pending = true;
-            task.run?.();
-            hooks.dialog(
-              task.ref,
-              task.title,
-              task.text,
-              () => {
-                pending = false;
-                if (index === tasks.length - 1) {
-                  ended = true;
-                  land.marker.visible = false;
-                  hooks.complete();
-                } else index++;
-              },
-              {
-                focus: { ...task.at, y: 1.1 },
-                wide: 7,
-                playerGesture: task.work ? "work" : "talk",
-                actors:
-                  task.id === "counsel"
-                    ? [{ group: lehi.group, gesture: "talk", speaker: true }]
-                    : [],
-              },
+        update(_dt, player, input) {
+          const near = withinTask(player, grave, 3.1);
+          if (phase === "burial" && near && input.interact) {
+            lehi.group.visible = false;
+            memorial.visible = true;
+            solids.push(memorialSolid);
+            phase = "journey";
+            following = true;
+            trail.push({ ...grave });
+            hooks.toast(
+              "Lehi is buried. His relatives gather. The Lord warns Nephi to depart; lead those who choose to follow through the valleys. Find a place to settle. (2 Nephi 4:12; 5:5–8)",
             );
           }
+          if (phase === "journey" && withinTask(player, settlement, 5)) {
+            phase = "done";
+            ended = true;
+            hooks.complete();
+          }
           return {
-            objective: `${index + 1}/${tasks.length} · ${task.action.replace("Hold {action} · ", "")}`,
-            prompt:
-              close && !pending
-                ? `${task.work ? task.action : `{action} · ${task.action}`}${task.work ? ` · ${Math.round((effort / 1.2) * 100)}%` : ""}`
-                : "",
+            objective:
+              phase === "shore"
+                ? "Explore the shore and find Lehi"
+                : phase === "farewell"
+                  ? "Stay near Lehi"
+                  : phase === "burial"
+                    ? "Find Lehi and bury him"
+                    : phase === "journey"
+                      ? "Lead the willing families through the valleys; find a place to settle"
+                      : "The families reach their new home",
+            prompt: phase === "burial" && near ? "{action} · Bury Lehi" : "",
           };
         },
         dispose() {
@@ -484,9 +376,12 @@ export function buildPromisedLand(scene: T.Scene): WorldData {
       };
     },
     dispose() {
+      if (disposed) return;
+      disposed = true;
       ended = true;
       land.dispose();
     },
   };
+  land.update(0);
   return world;
 }

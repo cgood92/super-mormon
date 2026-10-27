@@ -6,6 +6,8 @@ import type { Solid } from "./physics";
 export function applyAdventureCamera(
   camera: T.PerspectiveCamera,
   shot: {
+    /** Static edited cutaway: never sweep the view through intervening scenery. */
+    cut?: boolean;
     position: { x: number; y: number; z: number };
     focus: { x: number; y: number; z: number };
   },
@@ -30,7 +32,7 @@ export function applyAdventureCamera(
     .lerp(destination, 1 - Math.exp(-8 * Math.min(dt, 0.1)));
   // Cutting safely across an obstruction is preferable to showing the inside of it.
   camera.position.copy(
-    cameraSegmentClear(camera.position, candidate, solids, 0.2)
+    !shot.cut && cameraSegmentClear(camera.position, candidate, solids, 0.2)
       ? candidate
       : destination,
   );

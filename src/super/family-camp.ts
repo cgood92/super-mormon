@@ -80,6 +80,15 @@ export function buildFamilyCamp(parent: T.Group, solids: Solid[]) {
     createCharacter("child", { quality: "crowd" }),
     createCharacter("child", { quality: "crowd" }),
   ];
+  const actorSolids = actors.map((_, i) => ({
+    x: 0,
+    y: 0,
+    z: 0,
+    w: i > 1 ? 0.5 : 0.7,
+    h: i > 1 ? 1.15 : 1.7,
+    d: i > 1 ? 0.5 : 0.7,
+  }));
+  solids.push(...actorSolids);
   actors.forEach((actor, i) => {
     group.add(actor.group);
     actor.group.name =
@@ -94,6 +103,7 @@ export function buildFamilyCamp(parent: T.Group, solids: Solid[]) {
         angle = time * (child ? 0.65 : 0) + i * Math.PI;
       const x = child ? -4 + Math.cos(angle) * 3 : -12 + i * 14,
         z = child ? 24 + Math.sin(angle) * 2 : 27;
+      Object.assign(actorSolids[i], { x, z });
       actor.update(dt, {
         x,
         y: 0,

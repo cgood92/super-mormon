@@ -1,4 +1,4 @@
-import { sceneryBox, markScenery } from "./scenery";
+import { sceneryBox, sceneryColumn, markScenery } from "./scenery";
 import { softBoxGeometry } from "./soft-geometry";
 import * as T from "three";
 import type { Solid, Climbable } from "./physics";
@@ -182,15 +182,18 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
     shape.y += origin.y;
     shape.z += origin.z;
   }
-  // The living floor is the world baseline; visible boards have no underground geometry.
-  for (let z = -18; z <= 18; z += 1) {
+  // Each visible living-floor board owns its fitted dry support. Its top is
+  // the world baseline, so cabin spawns never start inside the floor.
+  for (let z = -21; z <= 21; z += 1) {
     const w = halfWidth(z) - 0.45;
-    addBox(0, 0, z, w * 2, 0.035, 0.94, paleWood);
+    addBox(0, -0.035, z, w * 2, 0.035, 0.94, paleWood, true);
   }
-  // Upper deck is divided around a full-height stair opening.
+  // Upper deck leaves a full-height stair opening and a clear lower run-out.
+  // The opening continues past the final tread so a running descent cannot grab
+  // the overhead deck before the player has settled on the cabin floor.
   for (let z = -21; z <= 21; z++) {
     const w = halfWidth(z) - 0.18;
-    if (z >= -1 && z <= 10) {
+    if (z >= -1 && z <= 12) {
       addBox((-w + 4.5) / 2, 3.95, z, w + 4.5, 0.25, 1, paleWood, true);
       if (w > 7.5)
         addBox((w + 7.5) / 2, 3.95, z, w - 7.5, 0.25, 1, paleWood, true);
@@ -269,7 +272,17 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
     addBox(3.4, 0, z, 1.3, 0.7, 1.1, timber, true);
   }
   for (const z of [-7, 6]) {
-    beam({ x: 0, y: 4.2, z }, { x: 0, y: 18.2, z }, 0.25, darkWood);
+    sceneryColumn(
+      group,
+      solids,
+      darkWood,
+      { x: 0, y: 4.2, z, diameter: 0.5, height: 14 },
+      "Solid climbable mast",
+    );
+    const mastBody = solids[solids.length - 1];
+    mastBody.x += origin.x;
+    mastBody.y += origin.y;
+    mastBody.z += origin.z;
     beam({ x: -6.5, y: 15.5, z }, { x: 6.5, y: 15.5, z }, 0.13, darkWood);
     const sail = new T.Mesh(new T.PlaneGeometry(12, 7, 6, 4), sailMaterial);
     sail.position.set(0, 11.7, z);

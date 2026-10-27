@@ -1,6 +1,6 @@
 import { mountainGeometry } from "./soft-geometry";
 import * as T from "three";
-import { stepPlayer } from "./physics";
+import { createPlayer, stepPlayer } from "./physics";
 import { buildShip } from "./ship";
 import { createCharacter } from "./character";
 import { box, material } from "./art";
@@ -9,6 +9,26 @@ import type { WorldData, Point } from "./worlds";
 const near = (a: Point, b: Point, r = 2.8) =>
   Math.hypot(a.x - b.x, a.z - b.z) < r && Math.abs(a.y - b.y) < 2;
 const wrap = (n: number) => Math.atan2(Math.sin(n), Math.cos(n));
+
+/** Conservative SAT clearance: the complete 18 × 44 hull against each island's rendered bounds. */
+export function shipClearsIsland(
+  x: number,
+  z: number,
+  heading: number,
+  ix: number,
+  iz: number,
+) {
+  const dx = ix - x,
+    dz = iz - z,
+    c = Math.cos(heading),
+    s = Math.sin(heading);
+  return (
+    Math.abs(dx) > 20 + 9 * Math.abs(c) + 22 * Math.abs(s) + 1 ||
+    Math.abs(dz) > 26 + 9 * Math.abs(s) + 22 * Math.abs(c) + 1 ||
+    Math.abs(dx * c + dz * s) > 9 + 20 * Math.abs(c) + 26 * Math.abs(s) + 1 ||
+    Math.abs(-dx * s + dz * c) > 22 + 20 * Math.abs(s) + 26 * Math.abs(c) + 1
+  );
+}
 
 /** A child's imagined visit; ship architecture and sailing course are playful reconstructions. */
 export function buildVoyage(scene: T.Scene): WorldData {
@@ -66,9 +86,10 @@ export function buildVoyage(scene: T.Scene): WorldData {
       material(i % 2 ? 0x728b61 : 0x9caa75),
     );
     hill.scale.set(18 + (i % 4) * 6, 18 + (i % 5) * 9, 22 + (i % 4) * 5);
-    hill.position.set((i - 6) * 22, -2, -290 - (i % 3) * 12);
+    hill.position.set((i - 6) * 22, -2, -(i % 3) * 12);
     land.add(hill);
   }
+  land.position.z = -920;
   const brothers = { x: -1, y: 0, z: 16 };
   const releaseRoute = [
     { x: -1, y: 0, z: 11 },
@@ -90,6 +111,13 @@ export function buildVoyage(scene: T.Scene): WorldData {
     { x: 1, y: 0, z: 16 },
     ship.points.boundNephi,
   ];
+  const walkers = positions.slice(0, 2).map((p) => createPlayer(p.x, p.y, p.z));
+  const boundSolid = { x: 0, y: 4.2, z: -6.25, w: 0.65, h: 1.8, d: 0.65 };
+  ship.solids.push(boundSolid);
+  const companion = createCharacter("child", { quality: "npc" });
+  companion.group.name = "Voyage child companion";
+  companion.group.visible = false;
+  ship.group.add(companion.group);
   npcs.forEach((npc, i) => {
     ship.group.add(npc.group);
     npc.update(0, {
@@ -157,13 +185,22 @@ export function buildVoyage(scene: T.Scene): WorldData {
   root.add(gate);
   gate.visible = false;
   const channels = [
-    { x: 18, z: -90 },
-    { x: -12, z: -180 },
-    { x: 26, z: -270 },
-    { x: -10, z: -360 },
-    { x: 0, z: -450 },
+    { x: 18, z: -140 },
+    { x: -12, z: -280 },
+    { x: 26, z: -420 },
+    { x: -10, z: -560 },
+    { x: 0, z: -700 },
   ];
   const islands: { object: T.Mesh; x: number; z: number }[] = [];
+  const courseMarks = channels.map((channel) => {
+    const mark = new T.Mesh(
+      new T.OctahedronGeometry(1.2),
+      new T.MeshBasicMaterial({ color: 0x9ceeff }),
+    );
+    mark.name = "Imagined navigation marker";
+    gate.add(mark);
+    return { object: mark, ...channel };
+  });
   channels.forEach((channel, index) => {
     for (const side of [-1, 1]) {
       const rock = new T.Mesh(
@@ -173,7 +210,7 @@ export function buildVoyage(scene: T.Scene): WorldData {
       rock.scale.set(20, 18, 24);
       rock.name = "Rocky island passage";
       gate.add(rock);
-      islands.push({ object: rock, x: channel.x + side * 25, z: channel.z });
+      islands.push({ object: rock, x: channel.x + side * 45, z: channel.z });
     }
   });
   let time = 0,
@@ -191,13 +228,14 @@ export function buildVoyage(scene: T.Scene): WorldData {
   let releaseCamera: { position: Point; focus: Point } | undefined;
   const desiredHeading = () => {
     const target = channels[Math.min(gateIndex, channels.length - 1)];
-    return Math.atan2(target.x - boatX, boatZ - target.z);
+    return Math.atan2(target.x - boatX, Math.max(55, boatZ - target.z));
   };
   const resetCourse = () => {
     contacts++;
     boatX = checkpoint.x;
     boatZ = checkpoint.z;
     heading = desiredHeading();
+    rudder = 0;
   };
   const updateVisuals = (dt: number) => {
     time += dt;
@@ -266,21 +304,30 @@ export function buildVoyage(scene: T.Scene): WorldData {
     (scene.background as T.Color)
       .set(0x34475f)
       .lerp(new T.Color(0x9ed3d5), 1 - storm);
-    if (scene.fog) scene.fog.color.copy(scene.background as T.Color);
+    if (scene.fog) {
+      scene.fog.color.copy(scene.background as T.Color);
+      if (scene.fog instanceof T.Fog) scene.fog.far = 420 + (1 - storm) * 850;
+    }
     clouds.position.x = Math.sin(time * 0.02) * 30;
     clouds.position.y = (1 - storm) * 23;
-    needle.rotation.z = -heading;
+    needle.rotation.z = desiredHeading() - heading;
     if (phase === "steer") {
-      for (const island of islands) {
+      for (const island of [...islands, ...courseMarks]) {
         const dx = island.x - boatX,
           dz = island.z - boatZ;
         island.object.position.set(
           dx * Math.cos(heading) + dz * Math.sin(heading),
-          -2,
+          island.object.name === "Imagined navigation marker" ? 2.5 : -2,
           -dx * Math.sin(heading) + dz * Math.cos(heading),
         );
       }
       land.rotation.y = -heading;
+      const shoreZ = -920 - boatZ;
+      land.position.set(
+        -boatX * Math.cos(heading) + shoreZ * Math.sin(heading),
+        0,
+        boatX * Math.sin(heading) + shoreZ * Math.cos(heading),
+      );
     }
   };
   const world: WorldData = {
@@ -341,8 +388,9 @@ export function buildVoyage(scene: T.Scene): WorldData {
         camera: () =>
           phase === "steer"
             ? {
-                position: { x: 0, y: 7.4, z: 20 },
-                focus: { x: 0, y: 6, z: -70 },
+                cut: true,
+                position: { x: 16, y: 58, z: 65 },
+                focus: { x: 0, y: 2, z: -45 },
               }
             : openingTime < 4
               ? {
@@ -420,24 +468,27 @@ export function buildVoyage(scene: T.Scene): WorldData {
             const target = releaseRoute[releaseStep];
             let arrived = true;
             npcs.slice(0, 2).forEach((npc, i) => {
-              const pos = npc.group.position,
-                tx = target.x + (i ? 0.45 : -0.45),
+              const pos = walkers[i],
+                tx = target.x + (i ? 0.4 : -0.4),
                 dx = tx - pos.x,
                 dz = target.z - pos.z,
                 distance = Math.hypot(dx, dz),
-                advance = Math.min(distance, dt * 3);
-              if (distance > 0.15) arrived = false;
-              npc.update(dt, {
-                x: pos.x + (distance ? (dx / distance) * advance : 0),
-                y: T.MathUtils.damp(pos.y, target.y, 5, dt),
-                z: pos.z + (distance ? (dz / distance) * advance : 0),
-                vx: 0,
-                vy: 0,
-                vz: 0,
-                yaw: Math.atan2(dx, dz),
-                grounded: true,
-                runSpeed: distance > 0.15 ? 3 : 0,
-              });
+                strength = Math.min(0.48, distance);
+              if (distance > 0.18 || Math.abs(pos.y - target.y) > 0.45)
+                arrived = false;
+              stepPlayer(
+                pos,
+                {
+                  x: distance ? (-dx / distance) * strength : 0,
+                  y: distance ? (dz / distance) * strength : 0,
+                  jump: false,
+                  jumpHeld: false,
+                },
+                dt,
+                0,
+                ship.solids,
+              );
+              npc.update(dt, pos);
             });
             // The child follows the same physical stair route while the brothers lead.
             const dx = target.x - player.x,
@@ -474,10 +525,23 @@ export function buildVoyage(scene: T.Scene): WorldData {
               rope.visible = false;
               secondRope.visible = false;
               releaseCamera = undefined;
+              phase = "pray";
+              ship.solids.splice(ship.solids.indexOf(boundSolid), 1);
+              npcs[2].group.visible = false;
+              companion.group.visible = true;
+              companion.update(0, {
+                ...player,
+                x: -1.5,
+                z: -4.5,
+                vx: 0,
+                vz: 0,
+                runSpeed: 0,
+              });
+              hooks.setAvatar("nephi");
               hooks.dialog(
                 "1 Nephi 18:20",
                 "Nephi is released",
-                "At the mast, Laman and Lemuel loosen the ropes. The child stands beside them as Nephi is finally freed.",
+                "Laman and Lemuel loosen the ropes. Now play as Nephi; your young companion stays beside you. Though his wrists are sore, Nephi turns toward God in praise and prayer.",
                 () => {},
                 {
                   actors: npcs.map((npc, i) => ({
@@ -517,29 +581,7 @@ export function buildVoyage(scene: T.Scene): WorldData {
               }
             }
           } else if (phase === "release") {
-            objective =
-              "Return up the stairs. Find Nephi beside the forward mast.";
-            if (releaseReady && near(player, ship.points.boundNephi)) {
-              prompt = "{action} · Stand with Nephi";
-              if (input.interact) {
-                phase = "pray";
-                rope.visible = false;
-                secondRope.visible = false;
-                npcs[2].group.visible = false;
-                hooks.setAvatar("nephi");
-                hooks.dialog(
-                  "Now play as Nephi",
-                  "Turn toward God",
-                  "Though his wrists are sore, Nephi praises God. Use {action} to pray.",
-                  () => {},
-                  {
-                    actors: [],
-                    playerGesture: "pray",
-                    focus: ship.points.boundNephi,
-                  },
-                );
-              }
-            }
+            objective = "Follow the brothers up the stairs to Nephi.";
           } else if (phase === "pray") {
             objective = "As Nephi, pray for the people aboard.";
             prompt = "{action} · Pray";
@@ -558,7 +600,7 @@ export function buildVoyage(scene: T.Scene): WorldData {
               );
             }
           } else if (phase === "liahona") {
-            objective = "Find the golden Liahona on the rear deck.";
+            objective = "Find the Liahona on the rear deck.";
             if (near(player, ship.points.liahona)) {
               prompt = "{action} · Follow its direction";
               if (input.interact) {
@@ -574,9 +616,17 @@ export function buildVoyage(scene: T.Scene): WorldData {
               prompt = "{action} · Take the ship wheel";
               if (input.interact) {
                 phase = "steer";
+                // Reef the imagined square sails for the sheltered final approach.
+                // Retain visible cloth high on the yards while opening the view of the hull.
+                ship.group.traverse((object) => {
+                  if (object.name === "Cream woven square sail") {
+                    object.scale.y = 0.16;
+                    object.position.y = 15.2;
+                  }
+                });
                 gate.visible = true;
                 hooks.toast(
-                  "Steer left and right. Guide the bow through the open water between the rocky islands.",
+                  "Steer left and right. Follow the pale blue markers toward the distant shore. Leave room for the whole ship between the islands.",
                 );
               }
             }
@@ -591,11 +641,13 @@ export function buildVoyage(scene: T.Scene): WorldData {
             boatZ -= Math.cos(heading) * dt * 9;
             const channel = channels[gateIndex];
             const hit = islands.some(
-              (island) => Math.hypot(boatX - island.x, boatZ - island.z) < 15,
+              (island) =>
+                !shipClearsIsland(boatX, boatZ, heading, island.x, island.z),
             );
-            const crossing = previousZ > channel.z && boatZ <= channel.z;
+            const crossing =
+              previousZ > channel.z - 52 && boatZ <= channel.z - 52;
             const failed =
-              hit || (crossing && Math.abs(boatX - channel.x) > 10);
+              hit || (crossing && Math.abs(boatX - channel.x) > 18);
             if (failed) {
               resetCourse();
               hooks.toast(
@@ -606,15 +658,14 @@ export function buildVoyage(scene: T.Scene): WorldData {
               0,
               (checkpoint.z - boatZ) / (checkpoint.z - channel.z),
             );
-            objective = `Sail through rocky passage ${gateIndex + 1} of ${channels.length}`;
+            objective = `Sail toward the distant shore · ${Math.min(99, Math.floor((-boatZ / 752) * 100))}%`;
             prompt = "Steer left / right · guide the bow through open water";
-            if (!failed && crossing && Math.abs(boatX - channel.x) <= 10) {
-              checkpoint = { x: boatX, z: boatZ - 16 };
+            if (!failed && crossing && Math.abs(boatX - channel.x) <= 18) {
+              checkpoint = { x: boatX, z: boatZ };
               gateIndex++;
               if (gateIndex === channels.length) {
                 phase = "arrived";
-                gate.visible = false;
-                land.position.z = 190;
+
                 hooks.dialog(
                   "1 Nephi 18:23",
                   "A new shore",
@@ -628,10 +679,7 @@ export function buildVoyage(scene: T.Scene): WorldData {
                     wide: 10,
                   },
                 );
-              } else
-                hooks.toast(
-                  "Passage reached! Find the next gap between the islands.",
-                );
+              }
             }
           } else {
             objective = "The promised shore lies ahead.";
@@ -649,6 +697,7 @@ export function buildVoyage(scene: T.Scene): WorldData {
       disposed = true;
       npcs.forEach((n) => n.dispose());
       wives.forEach((wife) => wife.dispose());
+      companion.dispose();
       const geometries = new Set<T.BufferGeometry>(),
         materials = new Set<T.Material>();
       root.traverse((o) => {

@@ -708,13 +708,12 @@ async function load(id: WorldId) {
     if (generation !== loadGeneration) return;
     transition = !world;
     el("curtain").classList.remove("closed");
-    el("load-error").hidden = !!world;
-    if (!world) {
-      el("load-retry").onclick = () => void load(id);
-      el("load-retry").focus();
-    } else {
-      message("This scene could not load. Please try again.", 6);
-    }
+    paused = true;
+    el("load-error").hidden = false;
+    el("load-error-title").textContent =
+      `The ${id === "hub" ? "gallery" : "scene"} could not load.`;
+    el("load-retry").onclick = () => void load(id);
+    el("load-retry").focus();
     console.error(error);
     return;
   }
@@ -728,6 +727,8 @@ async function load(id: WorldId) {
   el("modal").hidden = true;
   if (world) disposeScene();
   worldId = id;
+  camera.far = id === "voyage" ? 1400 : 320;
+  camera.updateProjectionMatrix();
   completionSceneSeen = false;
   pendingAdventureReset = null;
   organSeated = false;

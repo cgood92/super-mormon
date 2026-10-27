@@ -38,8 +38,8 @@ test("initial load failures expose a retry action without resuming an absent wor
     "retry must start a fresh load",
   );
   assert.ok(
-    main.includes('el("load-error").hidden = !!world'),
-    "existing scenes should resume without a blocking error screen",
+    main.includes('el("load-error").hidden = false'),
+    "a failed transition must expose a retry even with an existing scene",
   );
 });
 
@@ -48,9 +48,9 @@ test("later chapters prepare their own interactive worlds and leave no scene res
   const { Scene } = await import("three");
   for (const [id, phase] of [
     ["broken-bow", "practice"],
-    ["promised", "camp"],
+    ["promised", "shore"],
     ["vineyard", "learn"],
-    ["jacob", "settlement"],
+    ["jacob", "search"],
     ["waters", "city"],
     ["ammon", "meet"],
   ] as const) {

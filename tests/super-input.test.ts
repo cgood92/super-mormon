@@ -463,3 +463,40 @@ test("cancel, lost capture during a touch, and blur clear touch crouch", () => {
     else Reflect.deleteProperty(globalThis, "Element");
   }
 });
+
+test("touch action buttons suppress native long-press selection and context menus", () => {
+  class Button extends EventTarget {
+    hasAttribute(name: string) {
+      return name === "data-action";
+    }
+    closest() {
+      return this;
+    }
+    setPointerCapture() {}
+  }
+  const prior = Object.getOwnPropertyDescriptor(globalThis, "Element");
+  Object.defineProperty(globalThis, "Element", {
+    configurable: true,
+    value: Button,
+  });
+  try {
+    const target = new Button(),
+      input = new Input(target);
+    const down = new Event("pointerdown", { cancelable: true });
+    Object.defineProperty(down, "pointerId", { value: 9 });
+    target.dispatchEvent(down);
+    assert.equal(down.defaultPrevented, true);
+    assert.equal(input.latest().interact, true);
+    assert.equal(input.latest().interactHeld, true);
+    const menu = new Event("contextmenu", { cancelable: true });
+    target.dispatchEvent(menu);
+    assert.equal(menu.defaultPrevented, true);
+    input.dispose();
+    const after = new Event("contextmenu", { cancelable: true });
+    target.dispatchEvent(after);
+    assert.equal(after.defaultPrevented, false);
+  } finally {
+    if (prior) Object.defineProperty(globalThis, "Element", prior);
+    else Reflect.deleteProperty(globalThis, "Element");
+  }
+});

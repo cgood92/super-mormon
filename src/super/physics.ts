@@ -376,8 +376,22 @@ export function stepPlayer(
       water = r;
     }
   }
+  // A water region can extend beneath a ship or pier. Actual dry support
+  // takes precedence over buoyancy, including while landing on a low deck.
+  const drySupport =
+    water &&
+    solids.some((solid) => {
+      const top = solid.y + solid.h;
+      return (
+        top >= water.surfaceY + EPS &&
+        top <= player.y + STEP_HEIGHT + EPS &&
+        horizontalOverlap(player.x, player.z, solid) &&
+        clearAt(player.x, top, player.z, solids, height(player))
+      );
+    });
   if (
     water &&
+    !drySupport &&
     player.y < water.surfaceY + 0.8 &&
     !player.climbId &&
     !player.ledge
@@ -716,7 +730,12 @@ export function stepPlayer(
       player.grounded = false;
     } else {
       const floor = supportHeight(player, solids);
-      if (oldY >= floor - EPS && nextY <= floor + EPS) {
+      // The implicit world floor is also a recovery boundary. A small
+      // penetration or scripted placement below it must not fall forever.
+      if (
+        (oldY >= floor - EPS || (floor === 0 && oldY < 0)) &&
+        nextY <= floor + EPS
+      ) {
         nextY = floor;
         player.vy = 0;
         if (!player.grounded) {

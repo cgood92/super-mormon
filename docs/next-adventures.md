@@ -23,9 +23,9 @@ The intended feel is free exploration, optional discoveries, jumping, climbing, 
 
 Game variations:
 
-- Explore the settlement and take either the main path or an optional climbing route to reach Jacob's gathering.
-- Place optional scripture discovery spots around the environment, with brief passages available for inspection rather than quiz gates.
-- Close with a quiet record-handoff scene that opens the path toward Enos's forest.
+- Pass the temple, then search the city and outskirts among varied walking inhabitants.
+- Find and speak beside the moving Sherem without a beacon or intermediate chores.
+- Show the short encounter and fall, then narrate the later care, confession, and death with an explicit time jump. See [staging and sources](jacob-sherem-staging.md).
 
 Keep the confrontation and confession as witnessed story scenes. Sherem is not a boss to defeat, and the player does not cause divine judgment.
 
