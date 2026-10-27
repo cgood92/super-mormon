@@ -4,7 +4,7 @@ import * as T from "three";
 import { buildVoyage, shipClearsIsland } from "../src/super/voyage";
 import { createPlayer } from "../src/super/physics";
 
-test("voyage follows fourth-day release, prayer, Liahona and sustained steering", () => {
+test("voyage follows fourth-day release, automatic calm, Liahona and sustained steering", () => {
   const scene = new T.Scene(),
     world = buildVoyage(scene);
   assert.equal(world.initialObjective, "Find Laman and Lemuel below deck");
@@ -30,6 +30,7 @@ test("voyage follows fourth-day release, prayer, Liahona and sustained steering"
     runtime.snapshot() as {
       phase: string;
       day: number;
+      storm: number;
       gateIndex: number;
       heading: number;
       targetHeading: number;
@@ -67,14 +68,30 @@ test("voyage follows fourth-day release, prayer, Liahona and sustained steering"
   assert.ok(Math.hypot(p.x - childBelow.x, p.z - childBelow.z) > 12);
   assert.equal(state().releaseReady, true);
   assert.equal(runtime.movementLocked!(), false);
-  assert.equal(state().phase, "pray", "release flows directly into prayer");
   assert.equal(scene.getObjectByName("Voyage child companion")?.visible, true);
   assert.equal(avatar, "nephi");
-  runtime.update(0.016, p, click);
-  assert.equal(state().phase, "liahona");
+  assert.equal(
+    state().phase,
+    "liahona",
+    "release must not require a separate prayer input",
+  );
+  assert.equal(state().storm, 0, "the storm clears at release");
+  world.update!(0.016, p);
+  const beacon = scene.getObjectByName("Blue next task beacon")!;
+  assert.equal(beacon.position.x, state().targets.liahona.x);
+  assert.equal(beacon.position.z, state().targets.liahona.z);
+  const next = runtime.update(0.016, p, { ...click, interact: false });
+  assert.match(next.objective!, /Liahona/);
   visit("liahona");
   visit("helm");
   assert.equal(runtime.movementLocked!(), true);
+  const start = { ...state().boat };
+  for (let i = 0; i < 10; i++)
+    runtime.update(0.1, p, { ...click, interact: false });
+  assert.ok(
+    Math.hypot(state().boat.x - start.x, state().boat.z - start.z) > 15,
+    "one second of sailing covers over 15 units at the faster pace",
+  );
   for (let i = 0; i < 120; i++) runtime.update(0.1, p, click);
   assert.equal(state().gateIndex, 0, "pressing B cannot finish the course");
   assert.ok(

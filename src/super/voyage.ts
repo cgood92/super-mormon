@@ -8,6 +8,7 @@ import type { WorldData, Point } from "./worlds";
 
 const near = (a: Point, b: Point, r = 2.8) =>
   Math.hypot(a.x - b.x, a.z - b.z) < r && Math.abs(a.y - b.y) < 2;
+const SAILING_SPEED = 9 * 1.75;
 const wrap = (n: number) => Math.atan2(Math.sin(n), Math.cos(n));
 
 /** Conservative SAT clearance: the complete 18 × 44 hull against each island's rendered bounds. */
@@ -263,7 +264,7 @@ export function buildVoyage(scene: T.Scene): WorldData {
     const target =
       phase === "brothers"
         ? brothers
-        : phase === "release" || phase === "pray"
+        : phase === "release"
           ? ship.points.boundNephi
           : phase === "liahona"
             ? ship.points.liahona
@@ -277,7 +278,7 @@ export function buildVoyage(scene: T.Scene): WorldData {
     waypoint.rotation.y = time;
     storm = T.MathUtils.damp(
       storm,
-      ["brothers", "release", "pray"].includes(phase) ? 1 : 0,
+      ["brothers", "release"].includes(phase) ? 1 : 0,
       1.2,
       dt,
     );
@@ -525,7 +526,9 @@ export function buildVoyage(scene: T.Scene): WorldData {
               rope.visible = false;
               secondRope.visible = false;
               releaseCamera = undefined;
-              phase = "pray";
+              phase = "liahona";
+              storm = 0;
+              updateVisuals(0);
               ship.solids.splice(ship.solids.indexOf(boundSolid), 1);
               npcs[2].group.visible = false;
               companion.group.visible = true;
@@ -539,9 +542,9 @@ export function buildVoyage(scene: T.Scene): WorldData {
               });
               hooks.setAvatar("nephi");
               hooks.dialog(
-                "1 Nephi 18:20",
-                "Nephi is released",
-                "Laman and Lemuel loosen the ropes. Now play as Nephi; your young companion stays beside you. Though his wrists are sore, Nephi turns toward God in praise and prayer.",
+                "1 Nephi 18:20–21",
+                "Peace on the waters",
+                "Laman and Lemuel free Nephi. He prays to the Lord, and the winds and storm cease. Now play as Nephi, with your young companion beside you. Find the Liahona near the stern.",
                 () => {},
                 {
                   actors: npcs.map((npc, i) => ({
@@ -582,23 +585,6 @@ export function buildVoyage(scene: T.Scene): WorldData {
             }
           } else if (phase === "release") {
             objective = "Follow the brothers up the stairs to Nephi.";
-          } else if (phase === "pray") {
-            objective = "As Nephi, pray for the people aboard.";
-            prompt = "{action} · Pray";
-            if (input.interact) {
-              phase = "liahona";
-              hooks.dialog(
-                "1 Nephi 18:21",
-                "Peace on the waters",
-                "Nephi prays. The winds cease and the storm becomes calm. Find the Liahona near the stern.",
-                () => {},
-                {
-                  actors: [],
-                  playerGesture: "pray",
-                  focus: ship.points.boundNephi,
-                },
-              );
-            }
           } else if (phase === "liahona") {
             objective = "Find the Liahona on the rear deck.";
             if (near(player, ship.points.liahona)) {
@@ -637,8 +623,8 @@ export function buildVoyage(scene: T.Scene): WorldData {
               heading + input.x * dt * 0.55 + Math.sin(time * 0.8) * dt * 0.018,
             );
             const previousZ = boatZ;
-            boatX += Math.sin(heading) * dt * 9;
-            boatZ -= Math.cos(heading) * dt * 9;
+            boatX += Math.sin(heading) * dt * SAILING_SPEED;
+            boatZ -= Math.cos(heading) * dt * SAILING_SPEED;
             const channel = channels[gateIndex];
             const hit = islands.some(
               (island) =>
