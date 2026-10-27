@@ -36,7 +36,12 @@ test("Conference Center has reachable canvases on their assigned floors and nine
               { x: Math.sign(portal.x) * 85, z: -1 },
               { x: Math.sign(portal.x) * 85, z: portal.z + 2 },
             ];
-    for (const target of [...aisle, { x: portal.x, z: portal.z + 2 }]) {
+    const side = portal.facing === "east" || portal.facing === "west";
+    const approach = {
+      x: side ? portal.x + Math.sign(portal.x) * 2 : portal.x,
+      z: side ? portal.z : portal.z + 2,
+    };
+    for (const target of [...aisle, approach]) {
       for (let i = 0; i < 1800; i++) {
         const dx = target.x - player.x,
           dz = target.z - player.z,
@@ -65,7 +70,12 @@ test("Conference Center has reachable canvases on their assigned floors and nine
     for (let i = 0; i < 100; i++) {
       stepPlayer(
         player,
-        { x: 0, y: -1, jump: i === 30, jumpHeld: i >= 30 && i < 45 },
+        {
+          x: side ? Math.sign(portal.x) : 0,
+          y: side ? 0 : -1,
+          jump: i === 30,
+          jumpHeld: i >= 30 && i < 45,
+        },
         1 / 60,
         0,
         world.solids,
@@ -347,5 +357,63 @@ test("movement studio near spawn has a walk-in doorway and contains every practi
     [-81, 6],
   ])
     walk(x, z);
+  world.dispose?.();
+});
+
+test("later story canvases replace existing wall exhibits and leave a clear side-hall lane", () => {
+  const scene = new THREE.Scene();
+  const world = gallery(scene);
+  for (const portal of world.portals!.slice(6)) {
+    assert.equal(Math.abs(portal.x), 67.38);
+    assert.ok([-20, -43, -66, -89].includes(portal.z));
+    assert.equal(portal.facing, portal.x > 0 ? "west" : "east");
+    const player = createPlayer(
+      Math.sign(portal.x) * 77,
+      portal.y - 0.59,
+      portal.z + 8,
+    );
+    for (let i = 0; i < 240; i++)
+      stepPlayer(
+        player,
+        { x: 0, y: -1, jump: false, jumpHeld: false },
+        1 / 60,
+        0,
+        world.solids,
+      );
+    assert.ok(
+      player.z < portal.z - 5,
+      `${portal.id} has no freestanding hallway barrier`,
+    );
+    const image = scene.getObjectByName(`${portal.id} story painting`)!;
+    const position = image.getWorldPosition(new THREE.Vector3());
+    assert.ok(
+      position.distanceTo(
+        new THREE.Vector3(portal.x, portal.y + 2.18, portal.z),
+      ) < 1e-6,
+    );
+  }
+  world.dispose?.();
+});
+
+test("unassigned landscape exhibit frames also stop a jump through the artwork", () => {
+  const world = gallery(new THREE.Scene());
+  // The third floor has no story assignments yet and retains the original exhibits.
+  for (const side of [-1, 1]) {
+    const player = createPlayer(side * 70, 24, -20);
+    let touched = false;
+    for (let i = 0; i < 120; i++) {
+      stepPlayer(
+        player,
+        { x: side, y: 0, jump: i === 20, jumpHeld: i >= 20 && i < 35 },
+        1 / 60,
+        0,
+        world.solids,
+      );
+      if (player.y > 26) touched = true;
+      if (player.y > 25.2)
+        assert.ok(side * player.x >= 67.51, `landscape blocks side ${side}`);
+    }
+    assert.ok(touched, "jump actually reaches the landscape canvas height");
+  }
   world.dispose?.();
 });

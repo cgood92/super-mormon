@@ -8,7 +8,8 @@ test("Ammon shepherds a real moving flock from the royal yard using walking inpu
   const scene = new T.Scene(),
     world = buildAmmonFlocks(scene),
     player = createPlayer(world.spawn.x, 0, world.spawn.z);
-  let completed = 0;
+  let completed = 0,
+    dialogs = 0;
   const runtime = world.adventure!({
     setAvatar() {},
     toast() {},
@@ -16,6 +17,7 @@ test("Ammon shepherds a real moving flock from the royal yard using walking inpu
       completed++;
     },
     dialog(_k, _t, _b, next) {
+      dialogs++;
       next();
     },
   });
@@ -26,6 +28,8 @@ test("Ammon shepherds a real moving flock from the royal yard using walking inpu
       raiders: { id: string; position: T.Vector3; retreat: boolean }[];
       aiming: boolean;
       charge: number;
+      attackCount: number;
+      flockMarkers: number;
       stone?: { position: T.Vector3; active: boolean };
     };
   const tick = (x = 0, y = 0) => {
@@ -48,9 +52,7 @@ test("Ammon shepherds a real moving flock from the royal yard using walking inpu
       tick(dx / d, dz / d);
     }
   };
-  walk(0, -25);
-  runtime.update(1 / 60, player, { ...idle, interact: true });
-  assert.equal(snap().phase, "drive");
+  assert.equal(snap().phase, "drive", "herding begins without a conversation");
   const before = snap().flock.map((a) => a.position.clone());
   for (let n = 0; n < 60; n++) tick();
   assert.ok(
@@ -95,16 +97,54 @@ test("Ammon shepherds a real moving flock from the royal yard using walking inpu
       }
     }
   };
-  herd("drive", 0, 24);
+  herd("drive", 0, 34);
+  assert.equal(snap().phase, "scatter");
+  assert.ok(
+    snap().flock.every((a) => a.position.z >= 32),
+    "all animals reach the actual water before the cinematic",
+  );
+  assert.ok(runtime.movementLocked?.());
+  assert.ok(runtime.camera?.());
+  for (let f = 0; f < 540; f++) tick();
   assert.equal(snap().phase, "recover");
-  herd("recover", 0, 24);
+  assert.ok(snap().flockMarkers > 0, "strays have visible indicators");
+  herd("recover", 0, 34);
   assert.equal(snap().phase, "protect");
   assert.equal(snap().raiders.filter((r) => r.retreat).length, 0);
+  for (let f = 0; f < 60 * 35; f++) tick();
+  assert.equal(
+    snap().phase,
+    "protect",
+    "combat never scatters the gathered flock again",
+  );
+  assert.equal(snap().flockMarkers, 0);
+  assert.ok(snap().attackCount > 0, "raiders attack Ammon with stones");
   // Spin while aiming away: holding and proximity cannot auto-hit raiders.
   player.yaw = Math.PI;
   for (let f = 0; f < 90; f++)
     runtime.update(1 / 60, player, { ...idle, interactHeld: true });
   assert.ok(snap().charge > 0.95);
+  const shot = runtime.camera!()!;
+  const view = new T.Vector3()
+    .subVectors(shot.focus, shot.position)
+    .normalize();
+  const expectedPouch = new T.Vector3(
+    player.x - Math.cos(player.yaw) * 0.42,
+    player.y + 1.3,
+    player.z + Math.sin(player.yaw) * 0.42,
+  ).addScaledVector(
+    new T.Vector3(
+      Math.sin(player.yaw) * Math.cos(0.02),
+      Math.sin(0.02),
+      Math.cos(player.yaw) * Math.cos(0.02),
+    ),
+    0.55,
+  );
+  const cameraRay = new T.Ray(shot.position, view);
+  assert.ok(
+    cameraRay.distanceToPoint(expectedPouch) < 0.2,
+    "reticle aligns with the sling’s forward release line",
+  );
   runtime.update(1 / 60, player, { ...idle, jump: true });
   assert.equal(snap().aiming, false);
   assert.equal(snap().stone, undefined);
@@ -136,6 +176,11 @@ test("Ammon shepherds a real moving flock from the royal yard using walking inpu
   runtime.update(1 / 60, player, { ...idle, interact: true });
   assert.equal(snap().phase, "done");
   assert.equal(completed, 1);
+  assert.equal(
+    dialogs,
+    0,
+    "no required conversations interrupt the herding adventure",
+  );
 
   runtime.dispose();
   world.dispose!();
@@ -187,4 +232,41 @@ test("pasture scenery has deliberate collision, solid trunks, clear routes, and 
     .filter((h) => h.object.name === "Pasture ground");
   assert.equal(hits.length, 1, "one ground surface owns this walking point");
   world.dispose!();
+});
+
+test("raiders wear dark coats and head-attached masks with no facial hair", () => {
+  const world = buildAmmonFlocks(new T.Scene());
+  const raiders = world.actorParent!.children.filter((o) =>
+    o.name.startsWith("Masked flock raider"),
+  );
+  assert.equal(raiders.length, 3);
+  let maskBuffersDisposed = 0;
+  for (const actor of raiders) {
+    const mask = actor.getObjectByName("Imagined dark cloth face covering")!;
+    assert.equal(mask.parent!.name, "head");
+    (mask as T.Mesh).geometry.addEventListener(
+      "dispose",
+      () => maskBuffersDisposed++,
+    );
+    ((mask as T.Mesh).material as T.Material).addEventListener(
+      "dispose",
+      () => maskBuffersDisposed++,
+    );
+    const coat = actor.getObjectByName("flowing-mantle") as T.Mesh;
+    assert.equal(
+      (coat.material as T.MeshStandardMaterial).color.getHex(),
+      0x242933,
+    );
+    assert.equal(
+      actor.getObjectByName("one-piece-sculpted-beard")!.visible,
+      false,
+    );
+  }
+  world.dispose!();
+  world.dispose!();
+  assert.equal(
+    maskBuffersDisposed,
+    6,
+    "all mask buffers and materials are released exactly once",
+  );
 });

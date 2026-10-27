@@ -610,17 +610,19 @@ function decorateGalleryProgress() {
     const prior = prerequisite(portal.id, completed);
     if (!prior) continue;
     const badge = new T.Group();
+    const side = portal.facing === "east" || portal.facing === "west";
+    const normal = portal.facing === "east" ? -1 : 1;
     const plaque = label(
       badge,
       "LOCKED",
-      portal.facing === "east" ? portal.x - 0.17 : portal.x + 0.75,
+      side ? portal.x + normal * 0.17 : portal.x + 0.75,
       (portal.y ?? 0.59) + 3.96,
-      portal.facing === "east" ? portal.z : portal.z + 0.07,
+      side ? portal.z : portal.z + 0.07,
       1.55,
       0.5,
     );
     plaque.renderOrder = 2;
-    if (portal.facing === "east") plaque.rotation.y = -Math.PI / 2;
+    if (side) plaque.rotation.y = (normal * Math.PI) / 2;
     scene.add(badge);
   }
 }
@@ -970,6 +972,7 @@ async function load(id: WorldId) {
   }
   adventure =
     world.adventure?.({
+      viewAspect: () => camera.aspect,
       dialog: storyDialog,
       toast: (text) => message(text, 4),
       complete,

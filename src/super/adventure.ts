@@ -12,6 +12,8 @@ export type AdventureInput = {
   crouch?: boolean;
 };
 export type AdventureHooks = {
+  /** Current rendered camera aspect; authored shots can fit portrait screens. */
+  viewAspect?: () => number;
   dialog: (
     kicker: string,
     title: string,
