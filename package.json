@@ -8,8 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "test": "node --import tsx --test tests/*.test.ts",
     "preview": "vite preview --host 127.0.0.1",
-    "format": "prettier --write src tests index.html README.md vite.config.ts",
-    "format:check": "prettier --check src tests index.html README.md vite.config.ts"
+    "format": "prettier --write src tests scripts index.html README.md vite.config.ts",
+    "format:check": "prettier --check src tests scripts index.html README.md vite.config.ts"
   },
   "dependencies": {
     "three": "^0.180.0"
