@@ -1,6 +1,6 @@
 import * as T from "three";
 import { material } from "./art";
-import { markScenery, sceneryBox } from "./scenery";
+import { markScenery, sceneryBox, terracedRock } from "./scenery";
 import { createCharacter, type CharacterRole } from "./character";
 import type { Point, Solid } from "./worlds";
 
@@ -209,12 +209,25 @@ export function adventureLandscape(
       -54 + Math.floor(i / 2) * 24,
       1 + (i % 3) * 0.14,
     );
+  // Northern valley shoulders are reachable: their rendered profile and shallow
+  // supporting terraces share dimensions, with an open settlement corridor.
+  if (name.includes("mountain valleys")) {
+    for (const x of [-60, 65])
+      terracedRock(
+        root,
+        solids,
+        material(0x7c9672),
+        { x, y: 0, z: -117, w: 24, h: 8, d: 20 },
+        "Northern valley foothill",
+      );
+  }
   const backdropMaterial = material(orchard ? 0x7d8c69 : 0x7c9672);
   const hillGeometry = new T.IcosahedronGeometry(1, 1);
   for (let i = 0; i < 15; i++) {
     const hill = new T.Mesh(hillGeometry, backdropMaterial);
     hill.name = "Distant rolling hills";
-    hill.position.set((i - 7) * 23, 2, -101 - (i % 3) * 14);
+    // The full silhouette must clear the ground, even in deeper worlds.
+    hill.position.set((i - 7) * 23, 2, -depth / 2 - 35 - (i % 3) * 14);
     hill.scale.set(25 + (i % 4) * 5, 18 + (i % 3) * 10, 22);
     root.add(hill);
     markScenery(hill, {

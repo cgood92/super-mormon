@@ -3,7 +3,7 @@ import { adventureLandscape, withinTask } from "./adventure-landscape";
 import { material } from "./art";
 import { markScenery, terracedRock } from "./scenery";
 import { createPlayer, stepPlayer } from "./physics";
-import type { Point, WorldData } from "./worlds";
+import type { Point, Solid, WorldData } from "./worlds";
 
 // Scripture chronology: 1 Nephi 18:23–25; 2 Nephi 1; 4:12; 5:5–17, 27.
 // Final walk/death staging, terrain, costumes and condensed years are imagined.
@@ -187,6 +187,11 @@ export function buildPromisedLand(scene: T.Scene): WorldData {
     settlement = { x: 25, y: 0, z: -105 };
   const lehi = land.actor("lehi", { x: 18, y: 0, z: 61 });
   const lehiPlayer = createPlayer(18, 0, 61);
+  // Bodies move with their actors and participate in the same swept movement
+  // as scenery. Each actor excludes its own body when taking a physics step.
+  const body = (p: Point): Solid => ({ ...p, w: 0.8, h: 1.65, d: 0.8 });
+  const lehiBody = body(lehiPlayer);
+  solids.push(lehiBody);
   const relatives = [
     "sam",
     "zoram",
@@ -201,9 +206,14 @@ export function buildPromisedLand(scene: T.Scene): WorldData {
     const angle = (i / relatives.length) * Math.PI * 2;
     const x = grave.x + Math.cos(angle) * (8 + i * 0.4);
     const z = grave.z + Math.sin(angle) * (8 + i * 0.4);
+    const player = createPlayer(x, 0, z);
+    const collider = body(player);
+    solids.push(collider);
     return {
+      collider,
+      waiting: { x, y: 0, z },
       rig: land.actor(role, { x, y: 0, z }),
-      player: createPlayer(x, 0, z),
+      player,
       willing: i < 6,
     };
   });
@@ -232,16 +242,16 @@ export function buildPromisedLand(scene: T.Scene): WorldData {
   const trail: Point[] = [];
   let phase = "shore",
     deathTime = 0,
-    gatherTime = 0,
     following = false,
     ended = false,
-    disposed = false,
-    trailTimer = 0;
+    disposed = false;
   const moveToward = (
     p: ReturnType<typeof createPlayer>,
     target: Point,
     dt: number,
     speed: number,
+    collider: Solid,
+    leader: Point,
   ) => {
     const dx = target.x - p.x,
       dz = target.z - p.z,
@@ -256,8 +266,28 @@ export function buildPromisedLand(scene: T.Scene): WorldData {
       },
       dt,
       0,
-      solids,
+      [...solids.filter((s) => s !== collider), body(leader)],
     );
+    Object.assign(collider, { x: p.x, y: p.y, z: p.z });
+  };
+  // Arc distance, rather than sample count, keeps the group spaced when the
+  // player slows or stops. Until their slot exists, relatives keep their circle.
+  const trailingPoint = (distance: number): Point | undefined => {
+    for (let i = trail.length - 1; i > 0; i--) {
+      const a = trail[i],
+        b = trail[i - 1];
+      const length = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+      if (length >= distance) {
+        const t = distance / length;
+        return {
+          x: a.x + (b.x - a.x) * t,
+          y: a.y + (b.y - a.y) * t,
+          z: a.z + (b.z - a.z) * t,
+        };
+      }
+      distance -= length;
+    }
+    return undefined;
   };
   const world: WorldData = {
     name: "The Promised Land",
@@ -278,9 +308,9 @@ export function buildPromisedLand(scene: T.Scene): WorldData {
     update(dt, player) {
       if (disposed || ended) return;
       dt = Math.min(Math.max(dt, 0), 0.1);
-      land.update(dt);
+      land.update(dt, following ? settlement : undefined);
       if (phase === "shore") {
-        moveToward(lehiPlayer, grave, dt, 0.16);
+        moveToward(lehiPlayer, grave, dt, 0.16, lehiBody, player);
         lehi.update(dt, lehiPlayer);
         if (Math.hypot(lehiPlayer.x - grave.x, lehiPlayer.z - grave.z) < 0.35) {
           phase = "farewell";
@@ -296,27 +326,18 @@ export function buildPromisedLand(scene: T.Scene): WorldData {
         }
       }
       if (!following) return;
-      gatherTime += dt;
-      trailTimer += dt;
-      if (trailTimer > 0.18) {
-        trailTimer = 0;
-        const prior = trail[trail.length - 1];
-        if (!prior || Math.hypot(player.x - prior.x, player.z - prior.z) > 0.65)
-          trail.push({ x: player.x, y: player.y, z: player.z });
-        if (trail.length > 600) trail.shift();
+      const prior = trail[trail.length - 1];
+      if (
+        !prior ||
+        Math.hypot(player.x - prior.x, player.y - prior.y, player.z - prior.z) >
+          0.35
+      ) {
+        trail.push({ x: player.x, y: player.y, z: player.z });
+        if (trail.length > 1600) trail.shift();
       }
-      family.forEach(({ rig, player: p, willing }, i) => {
-        const angle = (i / 8) * Math.PI * 2;
-        const ring = {
-          x: grave.x + Math.cos(angle) * 4.1,
-          y: 0,
-          z: grave.z + Math.sin(angle) * 4.1,
-        };
-        const target =
-          !willing || gatherTime < 5
-            ? ring
-            : (trail[Math.max(0, trail.length - 5 - i * 4)] ?? ring);
-        moveToward(p, target, dt, 0.72);
+      family.forEach(({ rig, player: p, collider, waiting, willing }, i) => {
+        const target = willing ? trailingPoint(2.2 + i * 1.8) : undefined;
+        moveToward(p, target ?? waiting, dt, 0.9, collider, player);
         rig.update(dt, p);
       });
     },
@@ -341,18 +362,23 @@ export function buildPromisedLand(scene: T.Scene): WorldData {
           const near = withinTask(player, grave, 3.1);
           if (phase === "burial" && near && input.interact) {
             lehi.group.visible = false;
+            solids.splice(solids.indexOf(lehiBody), 1);
             memorial.visible = true;
             solids.push(memorialSolid);
             phase = "journey";
             following = true;
-            trail.push({ ...grave });
+            trail.push({ x: player.x, y: player.y, z: player.z });
+            land.update(0, settlement);
             hooks.toast(
-              "Lehi is buried. His relatives gather. The Lord warns Nephi to depart; lead those who choose to follow through the valleys. Find a place to settle. (2 Nephi 4:12; 5:5–8)",
+              "Lehi is buried. His relatives wait in their circle until you lead them away. The Lord warns Nephi to depart; lead those who choose to follow through the valleys. Follow the blue beacon to the settlement clearing, then choose to settle. (2 Nephi 4:12; 5:5–8)",
             );
           }
-          if (phase === "journey" && withinTask(player, settlement, 5)) {
+          const arrived =
+            phase === "journey" && withinTask(player, settlement, 5);
+          if (arrived && input.interact) {
             phase = "done";
             ended = true;
+            land.marker.visible = false;
             hooks.complete();
           }
           return {
@@ -364,9 +390,14 @@ export function buildPromisedLand(scene: T.Scene): WorldData {
                   : phase === "burial"
                     ? "Find Lehi and bury him"
                     : phase === "journey"
-                      ? "Lead the willing families through the valleys; find a place to settle"
+                      ? "Lead the families through the valleys to the blue beacon"
                       : "The families reach their new home",
-            prompt: phase === "burial" && near ? "{action} · Bury Lehi" : "",
+            prompt:
+              phase === "burial" && near
+                ? "{action} · Bury Lehi"
+                : arrived
+                  ? "{action} · Settle here"
+                  : "",
           };
         },
         dispose() {
