@@ -59,3 +59,18 @@ test("records scene resource trends after rendering and bounds immutable history
   }
   assert.equal(diagnostics.snapshot()!.scenes.length, 40);
 });
+
+test("suspended rendering reports zero FPS and does not count paused time on resume", () => {
+  const diagnostics = createPerformanceDiagnostics(renderer(), {
+    enabled: true,
+    readHeapBytes: () => null,
+  });
+  diagnostics.sampleFrame(0);
+  diagnostics.sampleFrame(1000);
+  diagnostics.suspend();
+  assert.equal(diagnostics.snapshot()!.fps, 0);
+  diagnostics.sampleFrame(100000);
+  diagnostics.sampleFrame(100500);
+  diagnostics.sampleFrame(101000);
+  assert.equal(diagnostics.snapshot()!.fps, 2);
+});

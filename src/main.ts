@@ -53,6 +53,14 @@ import {
 } from "./super/scene-entry";
 import { prepareWorld } from "./super/world-loading";
 import { createPerformanceDiagnostics } from "./super/performance";
+import {
+  FramePacer,
+  RenderQuality,
+  GRAPHICS_MODES,
+  readGraphicsMode,
+  renderScale,
+  type GraphicsMode,
+} from "./super/render-policy";
 import { conferenceLocation } from "./super/conference-location";
 import { label } from "./super/art";
 import {
@@ -84,9 +92,26 @@ const el = <E extends HTMLElement>(id: string) =>
   document.getElementById(id) as E;
 const renderer = new T.WebGLRenderer({
   antialias: true,
-  powerPreference: "high-performance",
 });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
+let graphicsMode: GraphicsMode = "balanced";
+try {
+  graphicsMode = readGraphicsMode(
+    localStorage.getItem("super-mormon-graphics"),
+  );
+} catch {
+  /* storage is optional */
+}
+const framePacer = new FramePacer();
+const renderQuality = new RenderQuality();
+let renderDirty = true;
+let renderedFrames = 0;
+// Painting textures can finish loading while a static menu is open.
+T.DefaultLoadingManager.onProgress = () => {
+  renderDirty = true;
+};
+T.DefaultLoadingManager.onLoad = () => {
+  renderDirty = true;
+};
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = T.PCFSoftShadowMap;
 renderer.toneMapping = T.ACESFilmicToneMapping;
@@ -269,6 +294,7 @@ function modal(
 ) {
   el("modal").classList.remove("story-subtitles");
   analytics.flush();
+  renderDirty = true;
   paused = true;
   pauseMenuOpen = false;
   modalSince = performance.now();
@@ -391,6 +417,11 @@ function pause() {
     [
       { label: "Keep exploring", run: () => {} },
       {
+        label: `Graphics · ${GRAPHICS_MODES[graphicsMode].label}`,
+        run: () => showGraphics(),
+        secondary: true,
+      },
+      {
         label: "Moves & practice",
         run: () => showMoves(),
         secondary: true,
@@ -447,9 +478,37 @@ function pause() {
   );
   pauseMenuOpen = true;
 }
+function showGraphics() {
+  modal(
+    "GRAPHICS & BATTERY",
+    "Choose how to play.",
+    "Balanced keeps movement smooth at 60 FPS. Battery saver uses 30 FPS and a softer picture. High refresh follows your display and uses more power. Picture detail adjusts when needed.",
+    [
+      ...(["balanced", "battery", "refresh"] as const).map((mode) => ({
+        label: `${GRAPHICS_MODES[mode].label}${mode === graphicsMode ? " · selected" : ""}`,
+        run: () => {
+          graphicsMode = mode;
+          try {
+            localStorage.setItem("super-mormon-graphics", mode);
+          } catch {
+            /* optional */
+          }
+          framePacer.reset();
+          renderQuality.reset();
+          previous = performance.now();
+          resize();
+          pause();
+        },
+        secondary: mode !== graphicsMode,
+      })),
+      { label: "Back", run: () => pause(), secondary: true },
+    ],
+  );
+}
 function openControllerSetup() {
   if (transition || controllerSetup) return;
   analytics.flush();
+  renderDirty = true;
   paused = true;
   el("modal").hidden = true;
   input.reset();
@@ -938,6 +997,8 @@ async function load(id: WorldId) {
       id === "hub" ? "gallery" : completed.has(id) ? "replay" : "painting",
       input.device,
     );
+  renderQuality.reset();
+  resize();
   diagnostics.recordScene(id);
   transition = false;
   el("curtain").classList.remove("closed");
@@ -1729,7 +1790,17 @@ function update(dt: number, activeElapsed = dt) {
   if (time > toastUntil) el("toast").classList.remove("visible");
 }
 function resize() {
+  const scale = renderScale(
+    innerWidth,
+    innerHeight,
+    devicePixelRatio,
+    graphicsMode,
+    renderQuality.factor,
+  );
+  if (Math.abs(renderer.getPixelRatio() - scale) > 0.001)
+    renderer.setPixelRatio(scale);
   renderer.setSize(innerWidth, innerHeight);
+  renderDirty = true;
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
 }
@@ -1804,12 +1875,21 @@ document.addEventListener("visibilitychange", () => {
     if (started && !paused) pause();
   } else {
     previous = performance.now();
+    framePacer.reset();
+    renderDirty = true;
     queueFrame();
   }
 });
 function frame(now: number) {
   frameRequest = null;
   if (document.hidden) return;
+  const fps = GRAPHICS_MODES[graphicsMode].fps;
+  // Menu input stays responsive without continuing the expensive world render.
+  if (!framePacer.due(now, paused && !cinematic ? 30 : fps)) {
+    queueFrame();
+    return;
+  }
+  const wasStatic = paused && !cinematic;
   const activeElapsed = Math.max(0, (now - previous) / 1000);
   const dt = Math.min(activeElapsed, 0.04);
   previous = now;
@@ -1822,15 +1902,38 @@ function frame(now: number) {
       { orbitX: 0, orbitY: 0, recenter: false },
       cameraModeForWorld(worldId),
     );
-  renderer.render(scene, camera);
-  diagnostics.sampleFrame(now);
+  const staticMenu = paused && !cinematic;
+  if (!staticMenu || renderDirty) {
+    if (
+      !staticMenu &&
+      !wasStatic &&
+      !transition &&
+      renderQuality.sample(activeElapsed * 1000, fps)
+    )
+      resize();
+    renderer.render(scene, camera);
+    renderedFrames++;
+    renderDirty = false;
+    diagnostics.sampleFrame(now);
+  } else diagnostics.suspend();
   queueFrame();
 }
 queueFrame();
 if (import.meta.env.DEV || new URLSearchParams(location.search).has("playtest"))
   Object.assign(window, {
     superMormon: {
-      performance: () => diagnostics.snapshot(),
+      performance: () => ({
+        ...diagnostics.snapshot(),
+        graphics: {
+          mode: graphicsMode,
+          fpsLimit: GRAPHICS_MODES[graphicsMode].fps,
+          renderScale: renderer.getPixelRatio(),
+          adaptiveFactor: renderQuality.factor,
+          bufferWidth: renderer.domElement.width,
+          bufferHeight: renderer.domElement.height,
+          renderedFrames,
+        },
+      }),
       snapshot: () => ({
         performance: diagnostics.snapshot(),
         world: worldId,

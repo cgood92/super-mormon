@@ -34,7 +34,15 @@ export class StoryMeshObstacles {
         ancestor;
         ancestor = ancestor.parent
       ) {
-        if (!ancestor.visible || actors.some((a) => a.group === ancestor))
+        // LOD levels change as the shot moves. Cache every potential level so
+        // a detailed surface cannot appear inside an already planned camera path.
+        const lodLevel =
+          ancestor.parent instanceof T.LOD &&
+          ancestor.parent.levels.some((level) => level.object === ancestor);
+        if (
+          (!ancestor.visible && !lodLevel) ||
+          actors.some((a) => a.group === ancestor)
+        )
           return;
       }
       const materials = Array.isArray(object.material)

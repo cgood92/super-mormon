@@ -101,6 +101,83 @@ function nearestRoute(point: Point, path: Point[]) {
   return best;
 }
 
+/** Only immutable, non-colliding decorations are eligible. Keeping each named
+ * type in local cells preserves culling across this large world and leaves all
+ * story targets, collision metadata and animated objects independent. */
+function batchVisionDecorations(root: T.Group) {
+  const names = new Set([
+    "gulf cliff face",
+    "luminous spreading foliage",
+    "white fruit",
+    "fountain stones",
+    "field olive tree",
+    "meadow foliage and stone",
+    "distant hills",
+    "garden ground cover",
+    "small garden blossom",
+  ]);
+  const buckets = new Map<
+    string,
+    T.Mesh<T.IcosahedronGeometry, T.MeshStandardMaterial>[]
+  >();
+  root.traverse((object) => {
+    if (
+      !(object instanceof T.Mesh) ||
+      !names.has(object.name) ||
+      !(object.geometry instanceof T.IcosahedronGeometry) ||
+      !(object.material instanceof T.MeshStandardMaterial)
+    )
+      return;
+    const mat = object.material;
+    const key = JSON.stringify([
+      object.parent!.id,
+      object.name,
+      Math.floor(object.position.x / 32),
+      Math.floor(object.position.z / 32),
+      object.geometry.parameters,
+      mat.color.getHex(),
+      mat.emissive.getHex(),
+      mat.emissiveIntensity,
+      mat.roughness,
+      mat.metalness,
+      object.castShadow,
+      object.receiveShadow,
+    ]);
+    const bucket = buckets.get(key) ?? [];
+    bucket.push(object);
+    buckets.set(key, bucket);
+  });
+  for (const meshes of buckets.values()) {
+    if (meshes.length < 2) continue;
+    const first = meshes[0];
+    const parent = first.parent!;
+    const batch = new T.InstancedMesh(
+      first.geometry,
+      first.material,
+      meshes.length,
+    );
+    batch.name = first.name;
+    batch.castShadow = first.castShadow;
+    batch.receiveShadow = first.receiveShadow;
+    for (let i = 0; i < meshes.length; i++) {
+      const mesh = meshes[i];
+      mesh.updateMatrix();
+      batch.setMatrixAt(i, mesh.matrix);
+      mesh.removeFromParent();
+      // Every source decoration owns its material and geometry; retain just the
+      // first pair for the batch and release the discarded construction assets.
+      if (i > 0) {
+        mesh.geometry.dispose();
+        mesh.material.dispose();
+      }
+    }
+    batch.instanceMatrix.needsUpdate = true;
+    batch.computeBoundingBox();
+    batch.computeBoundingSphere();
+    parent.add(batch);
+  }
+}
+
 /** World-space darkness uses horizontal distance so an orbiting camera never hides
  * the avatar or the ground immediately beneath it. Materials are patched locally;
  * restoring their hooks also supports the persistent player rig between worlds. */
@@ -697,6 +774,7 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
       "quiet reflection seat",
     );
   }
+  batchVisionDecorations(group);
   let disposed = false;
   const added = scene.children.filter((child) => !before.has(child));
   return {

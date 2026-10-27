@@ -15,7 +15,7 @@ test("audience chair parts leave both rostrum stairs and approach landings clear
       object.name !== "auditorium seating"
     )
       return;
-    count = object.count;
+    count += object.count;
     object.geometry.computeBoundingBox();
     for (let i = 0; i < object.count; i++) {
       object.getMatrixAt(i, matrix);
@@ -35,7 +35,7 @@ test("audience chair parts leave both rostrum stairs and approach landings clear
       }
     }
   });
-  assert.ok(count > 10000);
+  assert.ok(count / 3 > 10000);
 });
 
 test("front apron and outer aisles have continuous red carpet above the foundation", () => {
