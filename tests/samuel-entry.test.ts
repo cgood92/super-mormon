@@ -12,11 +12,12 @@ import { laterPainting } from "../src/super/gallery-layout";
 import { prepareWorld } from "../src/super/world-loading";
 
 test("Samuel follows the Alma chapters and has a private direct trial entry", () => {
-  assert.equal(STORY_ORDER.at(-1), "samuel");
+  const index = STORY_ORDER.indexOf("samuel");
+  assert.equal(STORY_ORDER[index - 1], "nephihah");
   assert.equal(sceneEntry("?scene=samuel"), "samuel");
   assert.equal(STORY_TITLES.samuel, "Samuel the Lamanite");
   assert.match(WAR_CHAPTERS.samuel!, /HELAMAN 13–16/);
-  const completed = new Set(STORY_ORDER.slice(0, -1));
+  const completed = new Set(STORY_ORDER.slice(0, index));
   assert.equal(nextStory(completed), "samuel");
   assert.equal(canEnter("samuel", completed), true);
   assert.equal(canEnter("samuel", new Set()), false);

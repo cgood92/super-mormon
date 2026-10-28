@@ -22,6 +22,14 @@ test("Conference Center has reachable canvases on their assigned floors and nine
               { x: -56, z: -1 },
               { x: -48, z: -1 },
               { x: -48, z: 47 },
+              ...((portal.y ?? 0) > 22
+                ? [
+                    { x: 48, z: 47 },
+                    { x: 48, z: -1 },
+                    { x: 56, z: -1 },
+                    { x: 56, z: 47 },
+                  ]
+                : []),
               { x: Math.sign(portal.x) * 65, z: 47 },
               { x: Math.sign(portal.x) * 65, z: 1 },
               { x: Math.sign(portal.x) * 85, z: 1 },

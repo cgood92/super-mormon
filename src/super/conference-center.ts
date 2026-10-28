@@ -1,4 +1,5 @@
 import { drawSamuelPainting } from "./samuel-painting";
+import { drawThirdNephiPainting } from "./third-nephi-painting";
 import * as THREE from "three";
 import { label, painting } from "./art";
 import { STORY_ORDER } from "./progression";
@@ -625,6 +626,8 @@ export function gallery(scene: THREE.Scene): WorldData {
           }
         }
         if (id === "samuel") drawSamuelPainting(ctx);
+        if (id === "signs" || id === "gathering" || id === "christ-bountiful")
+          drawThirdNephiPainting(ctx, id);
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
         (image.material as THREE.MeshBasicMaterial).map = texture;

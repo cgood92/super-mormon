@@ -15,6 +15,9 @@
 
 # Game direction and story design
 
+- Design adventures around enjoyable play related to the scripture: navigation, timing, discovery, environmental puzzles, carrying, herding, stealth or helping people. Repeated interaction-button presses and dialogue chains are not a core gameplay loop; short story scenes should support substantial player-controlled activity.
+- Build generous places with multiple inhabitants, branching paths, accessible rooms or architecture, hidden discoveries and rewarding vistas. Include optional brief conversations and secrets that reward curiosity beyond the central story objective; optional finds must not gate sacred events.
+- Physical foreground objects, including buildings, trunks, rocks, walls and substantial props, must block passage and provide matching support where walkable. Validate reachable routes around them with actual player movement.
 - Target older children. Later chapters should demand more navigation, timing, stealth, climbing, or planning than early chapters. Difficulty may come from a large, rewarding world rather than faster enemies. Preserve fair retries and readable objectives.
 - Research each story using the actual Book of Mormon chapters before designing it. Record primary-source links and distinguish scripture from invented dialogue, terrain, costumes, condensed chronology, and player roles. Do not present uncertain geography or reconstructions as established fact.
 - Make every scene worth exploring beyond its main objective: discoverable architecture, side paths, rooms, vistas, and optional conversations. Use real named people only where their presence fits the source and chronology; imagined unnamed inhabitants are fine. Keep dialogue brief and substantive.

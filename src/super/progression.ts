@@ -20,10 +20,16 @@ export const STORY_ORDER = [
   "gid",
   "nephihah",
   "samuel",
+  "signs",
+  "gathering",
+  "christ-bountiful",
 ] as const;
 export type StoryId = (typeof STORY_ORDER)[number];
 
 export const STORY_TITLES: Record<StoryId, string> = {
+  signs: "The Night Without Darkness",
+  gathering: "Lachoneus’s Gathering",
+  "christ-bountiful": "Christ at Bountiful",
   "title-liberty": "The Title of Liberty",
   lehonti: "Lehonti’s Mountain",
   morianton: "The Narrow Pass",

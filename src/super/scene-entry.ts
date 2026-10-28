@@ -13,7 +13,14 @@ export function cameraModeForWorld(id: WorldId): CameraMode {
     return id as CameraMode;
   return "streets";
 }
+/** These open worlds keep their optional routes available after the story ends. */
+export function keepsExploringAfterCompletion(id: WorldId): boolean {
+  return id === "signs" || id === "gathering" || id === "christ-bountiful";
+}
 export const WAR_CHAPTERS: Partial<Record<WorldId, string>> = {
+  signs: "3 NEPHI 1 · THE NIGHT WITHOUT DARKNESS",
+  gathering: "3 NEPHI 3–4 · GATHERING TO SAFETY",
+  "christ-bountiful": "3 NEPHI 11, 17 · CHRIST AT BOUNTIFUL",
   samuel: "HELAMAN 13–16 · ABOUT 6 BC",
   "title-liberty": "ALMA 46 · THE TITLE OF LIBERTY",
   lehonti: "ALMA 47 · MOUNT ANTIPAS",

@@ -49,6 +49,7 @@ import type { WorldData, WorldId } from "./super/worlds";
 import {
   sceneEntry,
   cameraModeForWorld,
+  keepsExploringAfterCompletion,
   WAR_CHAPTERS,
 } from "./super/scene-entry";
 import { prepareWorld } from "./super/world-loading";
@@ -1142,6 +1143,13 @@ function complete() {
   el("seal-count").textContent =
     `Stories ${completed.size} / ${STORY_ORDER.length}`;
   sound("win");
+  if (keepsExploringAfterCompletion(worldId)) {
+    message(
+      "Story complete. Keep exploring, or use the gallery button to return.",
+      7,
+    );
+    return;
+  }
   // The story scene is the ending. Completed adventures return directly to
   // the gallery; replay remains available by entering the painting again.
   warp("hub");
