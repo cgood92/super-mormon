@@ -1500,6 +1500,23 @@ function update(dt: number, activeElapsed = dt) {
       (worldId === "night" &&
         !!(storyScene?.snapshot() as { plates?: boolean } | undefined)?.plates),
   });
+  if (worldId === "title-liberty") {
+    const direction = world.actorParent?.userData;
+    const coat = avatar.group.getObjectByName("moroni-removable-coat");
+    if (coat) coat.visible = direction?.moroniCoatVisible === true;
+    const gesture = direction?.moroniGesture;
+    const right = avatar.group.getObjectByName("right-arm");
+    const left = avatar.group.getObjectByName("left-arm");
+    const head = avatar.group.getObjectByName("head");
+    if (gesture === "pray" || gesture === "work") {
+      if (right)
+        right.rotation.x =
+          -1.1 + (gesture === "work" ? Math.sin(levelTime * 7) * 0.3 : 0);
+      if (left) left.rotation.x = -1.05;
+      if (head) head.rotation.x = gesture === "pray" ? 0.3 : 0.15;
+    }
+    if (gesture === "point" && right) right.rotation.x = -1.8;
+  }
   const adventureCamera = adventure?.camera?.();
   if (!adventureCamera && !organSeated) {
     analytics.camera(

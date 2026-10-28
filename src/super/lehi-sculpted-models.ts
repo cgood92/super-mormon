@@ -1,3 +1,5 @@
+import { addMoroniHead } from "./moroni-head";
+import { addMoroniCommander, shapeMoroni } from "./moroni-commander";
 import * as T from "three";
 import type { CharacterRole } from "./character-types";
 import { APPROVED_NEPHI_FACE } from "./nephi-appearance";
@@ -326,7 +328,8 @@ export const SCULPTED_CAST_TRAITS: Readonly<
     ...ORIGINAL_CAST_TRAITS.guard,
     outfit: "armor",
     beard: "none",
-    hair: 0x60452e,
+    hair: 0x39271d,
+    hairStyle: "swept",
     coat: 0x335b78,
     robe: 0xd7c3a0,
     trim: 0xb8a16d,
@@ -799,7 +802,10 @@ function makeSculpted(
   };
 
   const athletic =
-    role === "nephi" || role === "nephi-disguised" || role === "ammon";
+    role === "nephi" ||
+    role === "nephi-disguised" ||
+    role === "ammon" ||
+    role === "moroni";
   // Chest and shoulders retain their breadth while the waist and garment depth
   // taper. The tunic, fitted coat and sash all sample these same dimensions.
   const body = athletic
@@ -821,6 +827,32 @@ function makeSculpted(
 
   // One continuous cloth field joins shoulders, torso, and both sleeves.
   const shirt: DistanceField = (x, y, z) => {
+    if (role === "moroni") {
+      let d = ellipsoid(x, y, z, 0, 1.215, s.lean, 0.375, 0.3, 0.245);
+      d = smoothUnion(
+        d,
+        ellipsoid(x, y, z, 0, 1.015, s.lean, 0.252, 0.24, 0.225),
+        0.055,
+      );
+      for (const side of [-1, 1])
+        d = smoothUnion(
+          d,
+          capsule(
+            x,
+            y,
+            z,
+            side * 0.32,
+            1.35,
+            0,
+            side * 0.47,
+            1.19,
+            0.03,
+            0.085,
+          ),
+          0.035,
+        );
+      return d;
+    }
     let d = ellipsoid(
       x,
       y,
@@ -930,8 +962,15 @@ function makeSculpted(
     // through its side during a turn. This surface ends beneath the shirt.
     add(
       surface(16, 20, (u, v) => {
-        const y = T.MathUtils.lerp(cast?.hem ?? 0.24, 0.82, v);
-        const width = T.MathUtils.lerp(0.09, 0.135, v);
+        const y = T.MathUtils.lerp(
+          role === "moroni" ? 0.69 : (cast?.hem ?? 0.24),
+          0.82,
+          v,
+        );
+        const width =
+          role === "moroni"
+            ? T.MathUtils.lerp(0.024, 0.055, v)
+            : T.MathUtils.lerp(0.09, 0.135, v);
         const x = (u * 2 - 1) * width;
         const t = T.MathUtils.clamp(
           (y - (cast?.hem ?? 0.24)) / (1.08 - (cast?.hem ?? 0.24)),
@@ -962,7 +1001,8 @@ function makeSculpted(
   // The adventure, animated, guardian and film silhouettes expose real legs.
   // Each trouser is a tapered sculpted volume under its shorter tunic.
   if (index === 0 || index === 2 || index === 3 || index === 5) {
-    const trouserTop = index === 2 ? 0.73 : index === 3 ? 0.67 : 0.72;
+    const trouserTop =
+      role === "moroni" ? 0.95 : index === 2 ? 0.73 : index === 3 ? 0.67 : 0.72;
     for (const side of [-1, 1]) {
       const cx = side * 0.205;
       const trouser: DistanceField = (x, y, z) => {
@@ -995,19 +1035,30 @@ function makeSculpted(
         );
         // The coat conceals the hip. Keep the knee-reaching leg for crawling
         // and climbing, but do not build a full buried white thigh volume.
-        return index === 2 && hasOuterCoat ? Math.max(d, y - 0.64) : d;
+        return index === 2 && hasOuterCoat && role !== "moroni"
+          ? Math.max(d, y - 0.64)
+          : d;
       };
       add(
         sculpt({
           bounds: [
             [cx - 0.21, 0.08, -0.22],
-            [cx + 0.21, 0.89, 0.22],
+            [cx + 0.21, role === "moroni" ? 1.08 : 0.89, 0.22],
           ],
           resolution: resolution(32),
           field: trouser,
-          material: index === 3 ? materials.mantle : materials.robeShadow,
+          material:
+            role === "moroni"
+              ? materials.skin
+              : index === 3
+                ? materials.mantle
+                : materials.robeShadow,
         }).geometry,
-        index === 3 ? materials.mantle : materials.robeShadow,
+        role === "moroni"
+          ? materials.skin
+          : index === 3
+            ? materials.mantle
+            : materials.robeShadow,
         side < 0 ? "left-trouser" : "right-trouser",
       );
     }
@@ -1156,8 +1207,8 @@ function makeSculpted(
     // The lower-detail coat samples the same garment's radial envelope directly.
     // Explicit inner/outer faces and joined edges retain real thickness without
     // requiring a dense voxel grid merely to discover a thin cloth shell.
-    const uCount = quality === "crowd" ? 16 : 36;
-    const vCount = quality === "crowd" ? 12 : 20;
+    const uCount = quality === "crowd" ? (role === "moroni" ? 10 : 16) : 36;
+    const vCount = quality === "crowd" ? (role === "moroni" ? 6 : 12) : 20;
     const bottom = (cast?.hem ?? 0.24) - 0.05;
     const geometry = surface(uCount, vCount, (u, v) => {
       const y = T.MathUtils.lerp(bottom, 1.58, v);
@@ -1224,9 +1275,18 @@ function makeSculpted(
             material: materials.mantle,
           }).geometry
       : surface(78, 35, cloakPoint);
-  if (cast?.outfit !== "undertunic")
-    add(cloakGeometry, materials.mantle, "flowing-mantle");
-  else cloakGeometry.dispose();
+  if (cast?.outfit !== "undertunic") {
+    const mantle = add(cloakGeometry, materials.mantle, "flowing-mantle");
+    if (role === "moroni") {
+      // Alma 46:12 describes a coat torn for the title. This removable cloth
+      // layer leaves the illustrative protective equipment intact beneath it.
+      const coat = new T.Group();
+      coat.name = "moroni-removable-coat";
+      coat.visible = false;
+      group.add(coat);
+      coat.add(mantle);
+    }
+  } else cloakGeometry.dispose();
   const edgePoints: T.Vector3[] = [];
   for (let i = 0; i <= 32; i++) edgePoints.push(cloakPoint(0, i / 32));
   if (index !== 2)
@@ -1321,7 +1381,7 @@ function makeSculpted(
         y,
         z,
         cx,
-        0.96,
+        role === "moroni" ? 1.17 : 0.96,
         0.046,
         cx + side * 0.018,
         0.785,
@@ -2316,7 +2376,7 @@ function makeSculpted(
       "character-headwear",
     );
   }
-  if (cast?.outfit === "armor") {
+  if (cast?.outfit === "armor" && role !== "moroni") {
     const helmetMaterial = materials.mantle.clone();
     helmetMaterial.clearcoat = 0;
     helmetMaterial.metalness = 0;
@@ -2363,30 +2423,48 @@ function makeSculpted(
       helmetMaterial,
       "character-headwear",
     );
-    const breastplate = add(
-      new T.SphereGeometry(
-        1,
-        quality === "hero" ? 24 : quality === "npc" ? 16 : 8,
-        quality === "hero" ? 16 : quality === "npc" ? 10 : 6,
-        0,
-        Math.PI,
-      ),
-      materials.mantle,
-      "guard-breastplate",
+    {
+      const breastplate = add(
+        new T.SphereGeometry(
+          1,
+          quality === "hero" ? 24 : quality === "npc" ? 16 : 8,
+          quality === "hero" ? 16 : quality === "npc" ? 10 : 6,
+          0,
+          Math.PI,
+        ),
+        materials.mantle,
+        "guard-breastplate",
+      );
+      breastplate.scale.set(0.326, 0.275, 0.085);
+      breastplate.position.set(0, 1.23, 0.289);
+      const emblem = add(
+        new T.TorusGeometry(
+          0.065,
+          0.012,
+          quality === "hero" ? 6 : 4,
+          quality === "hero" ? 24 : quality === "npc" ? 16 : 8,
+        ),
+        materials.mantleLining,
+        "guard-armor-emblem",
+      );
+      emblem.position.set(0, 1.27, 0.379);
+    }
+  }
+
+  if (role === "moroni") {
+    addMoroniCommander(
+      group,
+      add,
+      extraMaterials,
+      s.headY,
+      headZ,
+      s.head,
+      quality,
     );
-    breastplate.scale.set(0.326, 0.275, 0.085);
-    breastplate.position.set(0, 1.23, 0.289);
-    const emblem = add(
-      new T.TorusGeometry(
-        0.065,
-        0.012,
-        quality === "hero" ? 6 : 4,
-        quality === "hero" ? 24 : quality === "npc" ? 16 : 8,
-      ),
-      materials.mantleLining,
-      "guard-armor-emblem",
-    );
-    emblem.position.set(0, 1.27, 0.379);
+    group.getObjectByName("character-ear-left")?.removeFromParent();
+    group.getObjectByName("character-ear-right")?.removeFromParent();
+    addMoroniHead(group, add, extraMaterials, s.headY, headZ, s.head, quality);
+    shapeMoroni(group);
   }
 
   // Normalize only once after all silhouettes have been built.
@@ -2426,6 +2504,29 @@ export function buildSculptedCharacter(
     role,
     options.quality ?? "npc",
     options.faceProfile ??
+      (role === "moroni"
+        ? {
+            faceHeight: 1.01,
+            faceDepth: 0.8,
+            faceWidth: 0.8,
+            lowerFaceTaper: 0.78,
+            jawDrop: 0.47,
+            jawDepth: 0.6,
+            chinLength: 0.43,
+            cheekbone: 0.1,
+            noseWidth: 0.039,
+            noseProjection: 0.72,
+            noseBridge: 0.48,
+            browThickness: 0.023,
+            jawSquareness: 1.08,
+            jawWidth: 0.56,
+            eyeOpening: 0.105,
+            eyeWidth: 0.18,
+            hairCut: "side-sweep",
+            hairLength: 0.045,
+            hairColor: 0x39271d,
+          }
+        : undefined) ??
       (role === "nephi" || role === "nephi-disguised"
         ? APPROVED_NEPHI_FACE
         : undefined),

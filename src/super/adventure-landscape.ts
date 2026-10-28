@@ -1,7 +1,11 @@
 import * as T from "three";
 import { material } from "./art";
 import { markScenery, sceneryBox, terracedRock } from "./scenery";
-import { createCharacter, type CharacterRole } from "./character";
+import {
+  createCharacter,
+  type CharacterRole,
+  type CharacterOptions,
+} from "./character";
 import type { Point, Solid } from "./worlds";
 
 /** Small outdoor worlds share one physical surface per visible solid. */
@@ -236,8 +240,12 @@ export function adventureLandscape(
         "Distant horizon beyond all playable bounds; no player route reaches these hills.",
     });
   }
-  const actor = (role: CharacterRole, point: Point) => {
-    const rig = createCharacter(role);
+  const actor = (
+    role: CharacterRole,
+    point: Point,
+    options: CharacterOptions = {},
+  ) => {
+    const rig = createCharacter(role, options);
     actors.push(rig);
     root.add(rig.group);
     rig.update(0, {

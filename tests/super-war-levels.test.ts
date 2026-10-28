@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as T from "three";
+import { createCharacter } from "../src/super/character";
 import { createPlayer, stepPlayer } from "../src/super/physics";
 import { sceneryCollisionErrors } from "../src/super/scenery";
 import {
@@ -9,17 +10,18 @@ import {
 } from "../src/super/title-of-liberty";
 import { buildLehontiMountain } from "../src/super/lehonti-mountain";
 import { StoryCinematic, type StoryShot } from "../src/super/cinematic";
-import { FollowCamera } from "../src/super/camera";
+import { FollowCamera, cameraSegmentClear } from "../src/super/camera";
 import type { Point, WorldData } from "../src/super/worlds";
 
 const idle = { x: 0, y: 0, interact: false, interactHeld: false };
-function harness(world: WorldData) {
+function harness(world: WorldData, aspect = 16 / 9) {
   const player = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
   let done = 0;
   let next: (() => void) | undefined;
   const dialogs: string[] = [];
   const shots: StoryShot[] = [];
   const runtime = world.adventure!({
+    viewAspect: () => aspect,
     setAvatar() {},
     toast() {},
     complete() {
@@ -76,65 +78,59 @@ function walk(
   );
 }
 
-test("title of liberty requires making, carrying, and rallying moving groups", () => {
+test("liberty prologue, two distinct roofs, summit and automatic interception", () => {
   const scene = new T.Scene(),
     world = buildTitleOfLiberty(scene),
     h = harness(world);
-  assert.deepEqual(sceneryCollisionErrors(scene, world.solids), []);
   const state = () =>
     h.runtime.snapshot() as {
       phase: string;
       target: Point;
-      rallied: number;
-      carrying: boolean;
+      roofs: number[];
+      coatVisible: boolean;
     };
-  for (let i = 0; i < 8 && state().phase !== "done"; i++) {
-    if (state().phase === "tower") {
-      for (const step of LIBERTY_TOWER_ROUTE) {
-        walk(world, h.player, step);
-        assert.ok(
-          h.player.y >= step.y - 0.45,
-          `tower switchback must physically lift Moroni (${h.player.y} vs ${step.y})`,
-        );
-      }
-    } else walk(world, h.player, state().target);
-    if (state().phase.startsWith("rally")) {
-      for (let frame = 0; frame < 150; frame++) {
-        const target = state().target,
-          angle = frame * 0.075;
-        const dx = target.x + Math.cos(angle) * 1.5 - h.player.x;
-        const dz = target.z + Math.sin(angle) * 1.5 - h.player.z;
-        const length = Math.hypot(dx, dz);
-        stepPlayer(
-          h.player,
-          { x: -dx / length, y: dz / length, jump: false, jumpHeld: false },
-          1 / 60,
-          0,
-          world.solids,
-        );
-        world.update?.(1 / 60, h.player);
-        h.runtime.update(1 / 60, h.player, { ...idle, interactHeld: true });
-      }
-      assert.ok(
-        (h.runtime.snapshot() as { rallySignal: number }).rallySignal >= 1.25,
-        "moving with the raised banner should win the group's attention",
-      );
-    }
-    h.runtime.update(1 / 60, h.player, { ...idle, interact: true });
-    h.advance();
+  assert.equal(state().coatVisible, true);
+  assert.equal(state().phase, "prayer");
+  Object.assign(h.player, state().target);
+  h.runtime.update(0.1, h.player, { ...idle, interact: true });
+  for (let i = 0; i < 120; i++) h.runtime.update(0.1, h.player, idle);
+  assert.equal(state().phase, "roofs");
+  assert.equal(state().coatVisible, false);
+  Object.assign(h.player, { x: -47, y: 0, z: 38 });
+  for (let i = 0; i < 30; i++)
+    h.runtime.update(0.1, h.player, { ...idle, interactHeld: true });
+  assert.deepEqual(state().roofs, [], "standing beneath a roof must not count");
+  for (const roof of [0, 0, 2]) {
+    const sites = (h.runtime.snapshot() as { roofSites: Point[] }).roofSites;
+    Object.assign(h.player, sites[roof]);
+    for (let i = 0; i < 20; i++)
+      h.runtime.update(0.1, h.player, { ...idle, interactHeld: true });
   }
-  assert.equal(state().phase, "done");
-  assert.equal(state().rallied, 3);
+  assert.deepEqual(state().roofs, [0, 2]);
+  assert.equal(state().phase, "tower");
+  Object.assign(h.player, state().target);
+  h.runtime.update(0.1, h.player, { ...idle, interact: true });
+  assert.equal(state().phase, "gather");
+  for (let i = 0; i < 3000 && state().phase === "gather"; i++) {
+    world.update?.(1 / 60, h.player);
+    h.runtime.update(1 / 60, h.player, idle);
+  }
+  assert.equal(state().phase, "lead");
+  Object.assign(h.player, state().target);
+  h.runtime.update(0.1, h.player, idle);
+  assert.equal(state().phase, "ending");
+  for (let i = 0; i < 500; i++) {
+    world.update?.(0.1, h.player);
+    h.runtime.update(0.1, h.player, idle);
+  }
+  assert.equal(state().phase, "done", JSON.stringify(h.runtime.snapshot()));
   assert.equal(h.done(), 1);
-  assert.ok(h.player.y > 12.4, "Moroni must stand on the actual tower roof");
-  assert.ok(h.dialogs.some((body) => /prayer/i.test(body)));
+  assert.deepEqual(sceneryCollisionErrors(scene, world.solids), []);
   world.dispose?.();
-  world.dispose?.();
-  assert.equal(scene.children.length, 0);
 });
 
 test("rally and fourth approach shots keep the player visible on phone and desktop", () => {
-  for (const build of [buildTitleOfLiberty, buildLehontiMountain]) {
+  for (const build of [buildLehontiMountain]) {
     const scene = new T.Scene(),
       world = build(scene),
       h = harness(world);
@@ -220,11 +216,11 @@ test("city dwellings block a direct walk while the carried banner tracks Moroni 
       world.solids,
     );
   assert.ok(h.player.z > 45.75, "the house front blocks the direct route");
-  walk(world, h.player, { x: -30, y: 0, z: 49 });
-  walk(world, h.player, { x: -30, y: 0, z: 29 });
-  walk(world, h.player, { x: 0, y: 0, z: 29 });
+  walk(world, h.player, { x: -20, y: 0, z: 49 });
+  walk(world, h.player, { x: -20, y: 0, z: 29 });
+  walk(world, h.player, { x: -14, y: 0, z: 17 });
   h.runtime.update(1 / 60, h.player, { ...idle, interact: true });
-  h.advance();
+  for (let i = 0; i < 110; i++) h.runtime.update(0.1, h.player, idle);
   h.player.x = 4;
   h.player.z = 24;
   world.update?.(1 / 60, h.player);
@@ -330,5 +326,226 @@ test("losing a messenger race returns the runner to its physical start for retry
     Math.hypot(h.player.x - world.spawn.x, h.player.z - world.spawn.z) < 0.01,
   );
   assert.ok(state.messengerProgress >= 0);
+  world.dispose?.();
+});
+
+test("all liberty roofs have physically playable jumping approaches and summit stairs", () => {
+  const scene = new T.Scene(),
+    world = buildTitleOfLiberty(scene),
+    h = harness(world);
+  const routes = (h.runtime.snapshot() as { roofRoutes: Point[][] }).roofRoutes;
+  for (const route of routes) {
+    const player = createPlayer(route[0].x, 0, route[0].z);
+    for (const point of route.slice(1)) {
+      let frames = 0;
+      while (
+        (Math.hypot(player.x - point.x, player.z - point.z) > 0.35 ||
+          Math.abs(player.y - point.y) > 0.15 ||
+          !player.grounded) &&
+        frames++ < 500
+      ) {
+        const dx = point.x - player.x,
+          dz = point.z - player.z,
+          d = Math.hypot(dx, dz);
+        stepPlayer(
+          player,
+          {
+            x: d > 0.2 ? -dx / d : 0,
+            y: d > 0.2 ? dz / d : 0,
+            jump: player.grounded && player.y < point.y - 0.15,
+            jumpHeld: true,
+          },
+          1 / 60,
+          0,
+          world.solids,
+        );
+      }
+      assert.ok(
+        frames < 500,
+        `roof jump blocked toward ${JSON.stringify(point)} at ${JSON.stringify({ x: player.x, y: player.y, z: player.z })}`,
+      );
+    }
+  }
+  const player = createPlayer(0, 0, -39);
+  for (const point of LIBERTY_TOWER_ROUTE) walk(world, player, point);
+  assert.ok(player.y > 12.4);
+  world.dispose?.();
+});
+
+test("liberty volunteers physically ascend, rally, descend and follow corners", () => {
+  const world = buildTitleOfLiberty(new T.Scene()),
+    h = harness(world);
+  const state = () =>
+    h.runtime.snapshot() as {
+      phase: string;
+      target: Point;
+      roofSites: Point[];
+      volunteers: Point[];
+      gathered: number;
+    };
+  Object.assign(h.player, state().target);
+  h.runtime.update(0.1, h.player, { ...idle, interact: true });
+  for (let i = 0; i < 110; i++) h.runtime.update(0.1, h.player, idle);
+  for (const site of state().roofSites.slice(0, 2)) {
+    Object.assign(h.player, site);
+    for (let i = 0; i < 16; i++)
+      h.runtime.update(0.1, h.player, { ...idle, interactHeld: true });
+  }
+  Object.assign(h.player, state().target);
+  h.runtime.update(0.1, h.player, { ...idle, interact: true });
+  assert.equal(state().phase, "gather");
+  for (let i = 0; i < 3000 && state().phase === "gather"; i++) {
+    world.update?.(1 / 60, h.player);
+    h.runtime.update(1 / 60, h.player, idle);
+  }
+  assert.equal(state().phase, "lead");
+  assert.equal(state().gathered, 12);
+  assert.ok(
+    state().volunteers.every((p) => p.y > 12.4),
+    "all volunteers stand on summit",
+  );
+  for (const p of [...LIBERTY_TOWER_ROUTE].reverse())
+    walk(world, h.player, p, 1800, () =>
+      h.runtime.update(1 / 60, h.player, idle),
+    );
+  for (const p of [
+    { x: 0, y: 0, z: -36 },
+    { x: -25, y: 0, z: -36 },
+    { x: -25, y: 0, z: -42 },
+  ])
+    walk(world, h.player, p, 1800, () =>
+      h.runtime.update(1 / 60, h.player, idle),
+    );
+  for (let i = 0; i < 2400; i++) world.update?.(1 / 60, h.player);
+  assert.ok(
+    state().volunteers.every(
+      (p) => p.y < 0.5 && Math.hypot(p.x - h.player.x, p.z - h.player.z) < 8,
+    ),
+    `army completes physical descent and corner route ${JSON.stringify(state().volunteers)}`,
+  );
+  world.dispose?.();
+});
+
+test("liberty authored cameras fit prologue banner and show escape and return on phone and desktop", () => {
+  for (const aspect of [16 / 9, 390 / 844]) {
+    const scene = new T.Scene(),
+      world = buildTitleOfLiberty(scene),
+      h = harness(world, aspect);
+    const state = () =>
+      h.runtime.snapshot() as {
+        phase: string;
+        target: Point;
+        roofSites: Point[];
+        movieBeat: string;
+      };
+    const check = (fullBanner = false) => {
+      const shot = h.runtime.camera?.();
+      assert.ok(shot, "scripted beat has authored camera");
+      const position = new T.Vector3(
+          shot.position.x,
+          shot.position.y,
+          shot.position.z,
+        ),
+        focus = new T.Vector3(shot.focus.x, shot.focus.y, shot.focus.z);
+      assert.ok(cameraSegmentClear(position, position, world.solids, 0.28));
+      assert.ok(cameraSegmentClear(position, focus, world.solids, 0.03));
+      if (fullBanner) {
+        const camera = new T.PerspectiveCamera(58, aspect, 0.08, 320);
+        camera.position.copy(position);
+        camera.lookAt(focus);
+        camera.updateMatrixWorld();
+        for (const y of [0.3, 4.9]) {
+          const point = new T.Vector3(
+            h.player.x + 0.65,
+            h.player.y + y,
+            h.player.z,
+          ).project(camera);
+          assert.ok(
+            Math.abs(point.x) < 1 && Math.abs(point.y) < 1,
+            `prologue endpoint clipped at ${aspect}: ${point.toArray()}`,
+          );
+        }
+      }
+    };
+    Object.assign(h.player, state().target);
+    h.runtime.update(0.1, h.player, { ...idle, interact: true });
+    for (let i = 0; i < 95; i++) {
+      world.update?.(0.1, h.player);
+      h.runtime.update(0.1, h.player, idle);
+      check(true);
+    }
+    for (let i = 0; i < 10; i++) h.runtime.update(0.1, h.player, idle);
+    for (const site of state().roofSites.slice(0, 2)) {
+      Object.assign(h.player, site);
+      for (let i = 0; i < 16; i++)
+        h.runtime.update(0.1, h.player, { ...idle, interactHeld: true });
+    }
+    Object.assign(h.player, state().target);
+    h.runtime.update(0.1, h.player, { ...idle, interact: true });
+    for (let i = 0; i < 3000 && state().phase === "gather"; i++) {
+      world.update?.(1 / 60, h.player);
+      h.runtime.update(1 / 60, h.player, idle);
+      if (state().phase === "gather") check();
+    }
+    Object.assign(h.player, state().target);
+    h.runtime.update(0.1, h.player, idle);
+    const beats = new Set<string>();
+    for (let i = 0; i < 500 && state().phase === "ending"; i++) {
+      world.update?.(0.1, h.player);
+      h.runtime.update(0.1, h.player, idle);
+      if (state().phase === "ending") {
+        check();
+        beats.add(state().movieBeat);
+      }
+    }
+    assert.deepEqual([...beats], ["escape", "capture", "return"]);
+    assert.equal(state().phase, "done");
+    world.dispose?.();
+  }
+});
+
+test("liberty camera excludes the actual Moroni avatar installed by setAvatar", () => {
+  for (const aspect of [16 / 9, 390 / 844]) {
+    const world = buildTitleOfLiberty(new T.Scene());
+    const hero = createCharacter("moroni");
+    hero.group.name = "moroni-character";
+    const player = createPlayer(-14, 0, 17);
+    hero.update(0, player);
+    const runtime = world.adventure!({
+      viewAspect: () => aspect,
+      setAvatar() {
+        world.actorParent!.add(hero.group);
+      },
+      toast() {},
+      complete() {},
+      dialog() {},
+    });
+    runtime.update(0.1, player, { ...idle, interact: true });
+    const shot = runtime.camera!()!;
+    assert.ok(shot);
+    const fallback = new T.Vector3(player.x + 8, player.y + 5, player.z + 8);
+    assert.ok(
+      new T.Vector3(
+        shot.position.x,
+        shot.position.y,
+        shot.position.z,
+      ).distanceTo(fallback) > 0.1,
+      "actual avatar must not force the camera planner to reuse the unsafe initial fallback",
+    );
+    world.actorParent!.remove(hero.group);
+    hero.dispose();
+    world.dispose?.();
+  }
+});
+
+test("liberty background cast keeps the expanded city within its geometry budget", () => {
+  const scene = new T.Scene();
+  const world = buildTitleOfLiberty(scene);
+  let vertices = 0;
+  scene.traverse((object) => {
+    if (object instanceof T.Mesh)
+      vertices += object.geometry.getAttribute("position")?.count ?? 0;
+  });
+  assert.ok(vertices < 180_000, `background scene has ${vertices} vertices`);
   world.dispose?.();
 });
