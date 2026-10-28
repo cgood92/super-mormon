@@ -183,6 +183,11 @@ export function createSculptedCharacterRig(
     const socket = new T.Group();
     socket.name = `${side}-hand-socket`;
     socket.position.copy(hand.geometry.boundingBox!.getCenter(new T.Vector3()));
+    // Moroni's hand mesh includes the forearm; equipment belongs in the palm.
+    if (role === "moroni" && side === "right") {
+      socket.position.y = height(0.78);
+      socket.position.z = 0.11;
+    }
     hand.add(socket);
     return socket;
   };
@@ -301,6 +306,8 @@ export function createSculptedCharacterRig(
   );
   footMeshes.forEach((mesh) => mesh.geometry.computeBoundingBox());
   const worldFootBox = new T.Box3();
+  const gripParentRotation = new T.Quaternion();
+  const gripWorldRotation = new T.Quaternion();
   let clothWasMoving = true;
   body.scale.setScalar(actorScale);
   return {
@@ -490,6 +497,15 @@ export function createSculptedCharacterRig(
         worldGaze.transformDirection(gazeParentInverse);
         head.quaternion.setFromUnitVectors(headForward, worldGaze);
       }
+      if (state.holdingBanner) {
+        // The pole pivots at the palm while staying upright as the shoulder,
+        // torso and facing move. Its origin never leaves the hand socket.
+        sockets.rightHand.parent!.getWorldQuaternion(gripParentRotation);
+        group.getWorldQuaternion(gripWorldRotation);
+        sockets.rightHand.quaternion.copy(
+          gripParentRotation.invert().multiply(gripWorldRotation),
+        );
+      } else sockets.rightHand.quaternion.identity();
       // Keep inverse bind transforms in step with actors placed above ground or
       // translated during play; callers can inspect posed bounds before render.
       group.updateMatrixWorld(true);

@@ -1439,6 +1439,8 @@ function update(dt: number, activeElapsed = dt) {
     player.z = T.MathUtils.clamp(player.z, b.minZ + 0.35, b.maxZ - 0.35);
   }
   let adventureCarrying = false;
+  let holdingBanner = false;
+  let wavingBanner = false;
   let adventureAiming = false;
   let holdingBow = false;
   let adventureDraw = 0;
@@ -1450,6 +1452,8 @@ function update(dt: number, activeElapsed = dt) {
         ? `{action} · ${result.prompt}`
         : result.prompt;
     adventureCarrying = !!result.carrying;
+    holdingBanner = !!result.holdingBanner;
+    wavingBanner = !!result.wave;
     adventureAiming = !!result.aiming;
     holdingBow = !!result.holdingBow;
     adventureDraw = result.draw ?? 0;
@@ -1490,6 +1494,8 @@ function update(dt: number, activeElapsed = dt) {
     ...player,
     crouching: organSeated || player.crouching,
     holdingBow,
+    holdingBanner,
+    wave: wavingBanner,
     aiming: adventureAiming,
     draw: adventureDraw,
     carrying:
@@ -1509,13 +1515,13 @@ function update(dt: number, activeElapsed = dt) {
     const left = avatar.group.getObjectByName("left-arm");
     const head = avatar.group.getObjectByName("head");
     if (gesture === "pray" || gesture === "work") {
-      if (right)
+      if (right && !holdingBanner)
         right.rotation.x =
           -1.1 + (gesture === "work" ? Math.sin(levelTime * 7) * 0.3 : 0);
-      if (left) left.rotation.x = -1.05;
+      if (left && !holdingBanner) left.rotation.x = -1.05;
       if (head) head.rotation.x = gesture === "pray" ? 0.3 : 0.15;
     }
-    if (gesture === "point" && right) right.rotation.x = -1.8;
+    if (gesture === "point" && right && !holdingBanner) right.rotation.x = -1.8;
   }
   const adventureCamera = adventure?.camera?.();
   if (!adventureCamera && !organSeated) {

@@ -14,7 +14,11 @@ import { FollowCamera, cameraSegmentClear } from "../src/super/camera";
 import type { Point, WorldData } from "../src/super/worlds";
 
 const idle = { x: 0, y: 0, interact: false, interactHeld: false };
-function harness(world: WorldData, aspect = 16 / 9) {
+function harness(
+  world: WorldData,
+  aspect = 16 / 9,
+  actor?: ReturnType<typeof createCharacter>,
+) {
   const player = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
   let done = 0;
   let next: (() => void) | undefined;
@@ -22,7 +26,15 @@ function harness(world: WorldData, aspect = 16 / 9) {
   const shots: StoryShot[] = [];
   const runtime = world.adventure!({
     viewAspect: () => aspect,
-    setAvatar() {},
+    setAvatar() {
+      if (actor) {
+        world.actorParent!.add(actor.group);
+        actor.update(0, player);
+      }
+    },
+    attachEquipment: actor
+      ? (slot, object) => actor.sockets[slot].add(object)
+      : undefined,
     toast() {},
     complete() {
       done++;
@@ -205,7 +217,8 @@ test("rally and fourth approach shots keep the player visible on phone and deskt
 test("city dwellings block a direct walk while the carried banner tracks Moroni through an alley", () => {
   const scene = new T.Scene(),
     world = buildTitleOfLiberty(scene),
-    h = harness(world);
+    actor = createCharacter("moroni", { quality: "npc" }),
+    h = harness(world, 16 / 9, actor);
   Object.assign(h.player, { x: -47, y: 0, z: 54, vx: 0, vz: 0 });
   for (let i = 0; i < 100; i++)
     stepPlayer(
@@ -228,7 +241,20 @@ test("city dwellings block a direct walk while the carried banner tracks Moroni 
     "Carried title of liberty · rent coat on pole",
   )!;
   assert.equal(banner.visible, true);
-  assert.ok(Math.abs(banner.position.x - h.player.x - 0.65) < 0.01);
+  const result = h.runtime.update(1 / 60, h.player, idle);
+  actor.update(1 / 60, { ...h.player, ...result });
+  assert.ok(
+    banner.parent === actor.sockets.rightHand,
+    "banner remains in hand after traversing the alley",
+  );
+  assert.ok(
+    banner
+      .getWorldPosition(new T.Vector3())
+      .distanceTo(actor.sockets.rightHand.getWorldPosition(new T.Vector3())) <
+      0.001,
+  );
+  h.runtime.dispose();
+  actor.dispose();
   world.dispose?.();
 });
 

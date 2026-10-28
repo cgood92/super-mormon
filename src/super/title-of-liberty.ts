@@ -258,7 +258,8 @@ export function buildTitleOfLiberty(scene: T.Scene): WorldData {
     new T.CylinderGeometry(0.06, 0.08, 4.9, 7),
     new T.MeshStandardMaterial({ color: 0x654b35 }),
   );
-  pole.position.y = 2.45;
+  pole.name = "Title of Liberty flagpole";
+  pole.position.y = 2.45 - 2.1;
   const cloth = new T.Mesh(
     new T.ShapeGeometry(
       new T.Shape([
@@ -312,7 +313,9 @@ export function buildTitleOfLiberty(scene: T.Scene): WorldData {
       (cloth.material as T.MeshStandardMaterial).map = bannerTexture;
     }
   }
-  cloth.position.set(1.38, 3.75, 0);
+  // Flutter about the fastening edge at the pole, not the fabric's center.
+  cloth.geometry.translate(1.38, 0, 0);
+  cloth.position.set(0, 3.75 - 2.1, 0);
   cloth.name = "Rent coat banner fabric · Alma 46:12 inscription";
   banner.add(pole, cloth);
   root.add(banner);
@@ -324,6 +327,7 @@ export function buildTitleOfLiberty(scene: T.Scene): WorldData {
   banner.visible = false;
   const coatPiece = new T.Mesh(cloth.geometry, cloth.material);
   coatPiece.name = "Moroni's coat being rent and inscribed";
+  coatPiece.geometry = cloth.geometry.clone().translate(-1.38, 0, 0);
   coatPiece.rotation.x = -Math.PI / 2;
   coatPiece.position.set(prayer.x, 0.12, prayer.z + 0.7);
   coatPiece.visible = false;
@@ -440,7 +444,7 @@ export function buildTitleOfLiberty(scene: T.Scene): WorldData {
         });
       banner.visible =
         phase !== "prayer" && (phase !== "prologue" || elapsed >= 4.5);
-      banner.position.set(playerPoint.x + 0.65, playerPoint.y, playerPoint.z);
+
       cloth.rotation.y = Math.sin(clock * (signal > 0 ? 12 : 5)) * 0.25;
       let beacon =
         phase === "done" || phase === "ending" || phase === "prologue"
@@ -464,6 +468,9 @@ export function buildTitleOfLiberty(scene: T.Scene): WorldData {
     },
     adventure(hooks) {
       hooks.setAvatar("moroni");
+      hooks.attachEquipment?.("rightHand", banner);
+      banner.position.set(0, 0, 0);
+      banner.rotation.set(0, 0, 0);
       hooks.toast(
         "Alma 46 · Explore an imagined Zarahemla. The rooftop routes and temporary custody court are invented staging.",
       );
@@ -699,9 +706,14 @@ export function buildTitleOfLiberty(scene: T.Scene): WorldData {
                       ? "Journey complete"
                       : "",
             carrying: banner.visible,
+            holdingBanner: banner.visible,
+            wave: signal > 0 || (phase === "prologue" && elapsed >= 8),
           };
         },
-        dispose() {},
+        dispose() {
+          // Return socket equipment before the avatar/world resource passes.
+          root.add(banner);
+        },
       };
     },
     dispose: () => {

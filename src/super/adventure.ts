@@ -39,6 +39,8 @@ export type AdventureRuntime = {
     objective: string;
     prompt: string;
     carrying?: boolean;
+    holdingBanner?: boolean;
+    wave?: boolean;
     aiming?: boolean;
     draw?: number;
     holdingBow?: boolean;

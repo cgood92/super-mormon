@@ -330,6 +330,7 @@ export function createMotionDriver(role: CharacterRole): {
       }
       if (
         state.carrying &&
+        !state.holdingBanner &&
         move !== "crawl" &&
         move !== "ledgeHang" &&
         move !== "climb"
@@ -338,6 +339,14 @@ export function createMotionDriver(role: CharacterRole): {
         arms[1].rotation.x = -1.1;
         arms[0].rotation.z = -0.28;
         arms[1].rotation.z = 0.28;
+      }
+      if (state.holdingBanner) {
+        // Keep the shield at his side; the free right hand bears the pole.
+        arms[0].rotation.set(-0.08, 0, 0.08);
+        if (move !== "crawl" && move !== "ledgeHang" && move !== "climb") {
+          const flourish = state.wave ? Math.sin(idlePhase * 5) * 0.1 : 0;
+          arms[1].rotation.set(-1.95 + flourish, 0, -0.16);
+        }
       }
       if (state.wave && move === "idle" && !state.carrying) {
         arms[1].rotation.z = 2.55 + Math.sin(idlePhase * 3.1) * 0.13;
