@@ -26,11 +26,12 @@ test("Third Nephi follows Samuel and existing finished saves discover the new st
   assert.equal(nextStory(completed), null);
 });
 
-test("new paintings occupy upper side hallways outside the auditorium", () => {
+test("new paintings use existing upper side-wall exhibits outside the auditorium", () => {
   for (const id of additions) {
     const index = STORY_ORDER.indexOf(id) - 6;
     const painting = laterPainting(id, index);
-    assert.equal(Math.abs(painting.x), 77);
+    assert.equal(Math.abs(painting.x), 67.38);
+    assert.ok([-20, -43, -66, -89].includes(painting.z));
     assert.ok(painting.y >= 12);
     assert.ok(painting.title.length > 0);
   }
