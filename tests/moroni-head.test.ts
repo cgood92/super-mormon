@@ -33,21 +33,13 @@ for (const quality of ["hero", "npc", "crowd"] as const)
       assert.ok(eye.position.z > 0.14 && eye.position.z < 0.22);
     }
     group.updateMatrixWorld(true);
-    const cap = group.getObjectByName("single-sculpted-hair-cap") as T.Mesh;
-    for (const x of [-0.15, 0, 0.15])
-      for (const y of [1.87, 1.94]) {
-        const ray = new T.Raycaster(
-          new T.Vector3(x, y, 1),
-          new T.Vector3(0, 0, -1),
-        );
-        const skinHit = ray.intersectObject(face, false)[0];
-        const hairHit = ray.intersectObject(cap, false)[0];
-        assert.ok(skinHit && hairHit, `hair and skin ray at ${x},${y}`);
-        assert.ok(
-          hairHit.point.z > skinHit.point.z + 0.008,
-          `hair must cover forehead at ${x},${y}`,
-        );
-      }
+    assert.ok(
+      !group.getObjectByName("single-sculpted-hair-cap"),
+      "Moroni has no hair cap",
+    );
+    assert.ok(
+      !group.children.some((o) => o.name.startsWith("moroni-swept-lock-")),
+    );
     let vertices = 0;
     group.traverse((o) => {
       if (o instanceof T.Mesh) {

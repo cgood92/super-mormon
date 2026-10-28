@@ -251,22 +251,20 @@ test("Moroni tunic panels cover their thighs through running reversals and crawl
         `moroni-${label}-hip-lame`,
       ) as T.Mesh;
       const thigh = actor.group.getObjectByName(`${label}-trouser`) as T.Mesh;
-      for (const direction of [-1, 1]) {
+      for (let angle = 0; angle < 8; angle++) {
+        const outward = new T.Vector3(
+          Math.sin((angle * Math.PI) / 4),
+          0,
+          Math.cos((angle * Math.PI) / 4),
+        );
+        const frameMatrix = crawl
+          ? actor.group.getObjectByName("sculpted-moroni")!.matrixWorld
+          : panel.matrixWorld;
         const ray = new T.Raycaster(
-          new T.Vector3(
-            side * 0.19,
-            moroniHeight(0.79),
-            direction * 2,
-          ).applyMatrix4(
-            crawl
-              ? actor.group.getObjectByName("sculpted-moroni")!.matrixWorld
-              : panel.matrixWorld,
-          ),
-          new T.Vector3(0, 0, -direction).transformDirection(
-            crawl
-              ? actor.group.getObjectByName("sculpted-moroni")!.matrixWorld
-              : panel.matrixWorld,
-          ),
+          new T.Vector3(side * 0.19, moroniHeight(0.79), 0)
+            .addScaledVector(outward, 2)
+            .applyMatrix4(frameMatrix),
+          outward.clone().negate().transformDirection(frameMatrix),
         );
         const cloth = ray.intersectObject(panel)[0];
         // A folded shin can lie in front of the tunic along the body ray in a
@@ -365,3 +363,69 @@ for (const quality of ["hero", "npc", "crowd"] as const)
     actor.dispose();
     clearCharacterModelCache();
   });
+
+for (const quality of ["hero", "npc", "crowd"] as const) {
+  test(`Moroni ${quality} tunic covers thighs from every horizontal angle`, () => {
+    const model = buildSculptedCharacter("moroni", { quality });
+    model.group.updateMatrixWorld(true);
+    for (const side of [-1, 1]) {
+      const label = side < 0 ? "left" : "right";
+      const cloth = model.group.getObjectByName(`moroni-${label}-hip-lame`)!;
+      const thigh = model.group.getObjectByName(`${label}-trouser`)!;
+      for (const y of [0.6, 0.68, 0.79, 0.85])
+        for (let angle = 0; angle < 8; angle++) {
+          const outward = new T.Vector3(
+            Math.sin((angle * Math.PI) / 4),
+            0,
+            Math.cos((angle * Math.PI) / 4),
+          );
+          const center = new T.Vector3(side * 0.19, moroniHeight(y), 0);
+          const ray = new T.Raycaster(
+            center
+              .clone()
+              .addScaledVector(outward, 2)
+              .applyMatrix4(model.group.matrixWorld),
+            outward
+              .clone()
+              .negate()
+              .transformDirection(model.group.matrixWorld),
+          );
+          const skinHit = ray.intersectObject(thigh)[0];
+          const clothHit = ray.intersectObject(cloth)[0];
+          assert.ok(skinHit, `${label} thigh sample ${y}/${angle}`);
+          assert.ok(
+            clothHit && clothHit.distance + 0.01 < skinHit.distance,
+            `${label} uncovered thigh ${y}/${angle}`,
+          );
+        }
+    }
+    model.dispose();
+  });
+  test(`Moroni ${quality} red front drape stays outside the breastplate`, () => {
+    const model = buildSculptedCharacter("moroni", { quality });
+    model.group.updateMatrixWorld(true);
+    const fold = model.group.getObjectByName("moroni-cloak-fold")!;
+    const plate = model.group.getObjectByName("moroni-breastplate")!;
+    for (const [x, y] of [
+      [-0.2, 1.3],
+      [-0.1, 1.35],
+      [0, 1.4],
+      [0.15, 1.43],
+    ]) {
+      const ray = new T.Raycaster(
+        new T.Vector3(x, moroniHeight(y), 2).applyMatrix4(
+          model.group.matrixWorld,
+        ),
+        new T.Vector3(0, 0, -1).transformDirection(model.group.matrixWorld),
+      );
+      const red = ray.intersectObject(fold)[0],
+        bronze = ray.intersectObject(plate)[0];
+      assert.ok(red && bronze, `drape sample ${x}/${y}`);
+      assert.ok(
+        red.distance + 0.015 < bronze.distance,
+        `armor pierces drape ${x}/${y}`,
+      );
+    }
+    model.dispose();
+  });
+}

@@ -46,7 +46,7 @@ export function addMoroniHead(
   };
   const skin = mat(0xbc8760),
     lip = mat(0x815142),
-    hair = mat(0x30231c),
+    browMaterial = mat(0x30231c),
     white = mat(0xd8cdb8, 0.5),
     iris = mat(0x38291b, 0.4);
   const place = (
@@ -149,49 +149,6 @@ export function addMoroniHead(
     skin,
     "sculpted-face-neck-nose",
   );
-  // A cut hair shell supplies the back and temples; overlapping tapered locks define its swept crown.
-  place(
-    grid(crowd ? 5 : 10, crowd ? 12 : 24, (v, u) => {
-      const a = u * Math.PI * 2,
-        lower = 0.015 + 0.13 * Math.max(0, Math.cos(a)),
-        p = (1 - v) * Math.acos(lower / 0.41);
-      return new T.Vector3(
-        0.33 * Math.sin(p) * Math.sin(a),
-        0.41 * Math.cos(p),
-        -0.025 + 0.285 * Math.sin(p) * Math.cos(a),
-      );
-    }),
-    hair,
-    "single-sculpted-hair-cap",
-  );
-  const locks = crowd ? 4 : 10;
-  for (let k = 0; k < locks; k++) {
-    const x = -0.25 + (k / (locks - 1)) * 0.48;
-    place(
-      grid(
-        crowd ? 4 : 8,
-        crowd ? 4 : 6,
-        (v, u) => {
-          const a = u * Math.PI * 2,
-            taper = 0.24 + 0.76 * Math.sin(Math.PI * v) ** 0.55,
-            side = x + 0.1 * Math.sin(v * Math.PI) * (0.7 + x),
-            y =
-              0.23 +
-              (0.13 + 0.035 * Math.sin(k * 0.8)) * Math.sin(v * Math.PI) +
-              0.035 * (1 - x),
-            z = 0.21 - 0.43 * v;
-          return new T.Vector3(
-            side + 0.062 * taper * Math.cos(a),
-            y + 0.043 * taper * Math.sin(a),
-            z,
-          );
-        },
-        false,
-      ),
-      hair,
-      `moroni-swept-lock-${k}`,
-    );
-  }
   const oval = (
     name: string,
     m: T.Material,
@@ -267,7 +224,7 @@ export function addMoroniHead(
       },
       false,
     );
-    place(brow, hair, `${label}-brow`);
+    place(brow, browMaterial, `${label}-brow`);
     if (!crowd) {
       for (const upper of [true, false]) {
         const g = grid(
@@ -328,7 +285,7 @@ export function addMoroniHead(
     return new T.Vector3(x, y, front(x, y) + 0.002);
   });
   place(mouth, lip, "character-mouth");
-  // Batch static facial patches and rooted locks while preserving the rig's canonical nodes.
+  // Batch static facial patches while preserving the rig's canonical nodes.
   const batch = (ownerName: string, select: (name: string) => boolean) => {
     const owner = group.getObjectByName(ownerName) as T.Mesh;
     const parts = group.children.filter(
@@ -346,17 +303,12 @@ export function addMoroniHead(
     owner.removeFromParent();
     for (const part of parts) part.removeFromParent();
   };
-  batch("single-sculpted-hair-cap", (name) =>
-    name.startsWith("moroni-swept-lock-"),
-  );
   batch("sculpted-face-neck-nose", (name) =>
     /^moroni-(left|right)-(upper-lid|lower-lid|ear-tragus)$/.test(name),
   );
   const face = group.getObjectByName("sculpted-face-neck-nose")!;
-  const hairShell = group.getObjectByName("single-sculpted-hair-cap")!;
   for (const child of [...group.children]) {
-    if (child.name.startsWith("moroni-swept-lock-")) hairShell.add(child);
-    else if (
+    if (
       /^moroni-(left|right)-(upper-lid|lower-lid|ear-concha|ear-tragus)$/.test(
         child.name,
       )

@@ -288,25 +288,32 @@ export function addMoroniCommander(
     const panels = new T.BufferGeometry();
     const pp: number[] = [],
       pi: number[] = [];
-    for (let back = 0; back < 2; back++) {
-      const offset = pp.length / 3;
-      for (let row = 0; row <= 4; row++)
-        for (let col = 0; col <= 4; col++) {
-          const u = col / 4,
-            v = row / 4,
-            x = side * 0.19 + (u - 0.5) * (0.29 + 0.04 * v);
-          pp.push(
-            x,
-            0.98 - 0.29 * v,
-            (back ? -1 : 1) * (0.2 + 0.055 * Math.sin(u * Math.PI) + 0.025 * v),
-          );
-        }
-      for (let r = 0; r < 4; r++)
-        for (let c = 0; c < 4; c++) {
-          const n = offset + r * 5 + c;
-          pi.push(n, n + 5, n + 1, n + 1, n + 5, n + 6);
-        }
+    // Closed, flared thigh coverage: front, back and both sides share one
+    // surface and follow the same leg/hip deformation through every pose.
+    const segments = quality === "crowd" ? 12 : 24;
+    for (let row = 0; row <= 6; row++) {
+      const v = row / 6;
+      for (let col = 0; col <= segments; col++) {
+        const angle = (col / segments) * Math.PI * 2;
+        pp.push(
+          side * 0.19 + Math.sin(angle) * (0.18 + 0.045 * v),
+          0.98 - 0.44 * v,
+          Math.cos(angle) * (0.255 + 0.035 * v),
+        );
+      }
     }
+    for (let row = 0; row < 6; row++)
+      for (let col = 0; col < segments; col++) {
+        const n = row * (segments + 1) + col;
+        pi.push(
+          n,
+          n + segments + 1,
+          n + 1,
+          n + 1,
+          n + segments + 1,
+          n + segments + 2,
+        );
+      }
     panels.setAttribute("position", new T.Float32BufferAttribute(pp, 3));
     panels.setIndex(pi);
     panels.computeVertexNormals();
@@ -355,7 +362,10 @@ export function addMoroniCommander(
   fold.setAttribute(
     "position",
     new T.Float32BufferAttribute(
-      [-0.32, 1.37, 0.32, 0.3, 1.48, 0.32, -0.29, 1.12, 0.36, 0.24, 1.37, 0.39],
+      [
+        -0.32, 1.37, 0.405, 0.3, 1.48, 0.365, -0.29, 1.12, 0.415, 0.24, 1.37,
+        0.425,
+      ],
       3,
     ),
   );
@@ -364,7 +374,7 @@ export function addMoroniCommander(
   add(fold, red, "moroni-cloak-fold");
   const clasp = new T.CylinderGeometry(0.059, 0.059, 0.025, 12);
   clasp.rotateX(Math.PI / 2);
-  clasp.translate(0.27, 1.46, 0.355);
+  clasp.translate(0.27, 1.46, 0.4);
   add(clasp, gold, "moroni-cloak-clasp");
   const shield = box(
     "moroni-shield",
