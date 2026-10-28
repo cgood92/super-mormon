@@ -1,3 +1,4 @@
+import { moroniHeight, isMoroniHeadPart } from "./moroni-commander";
 import * as T from "three";
 import { createClothNormalUpdater } from "./cloth-normals";
 import type { CharacterState, CharacterRole } from "./character-types";
@@ -13,6 +14,7 @@ export function createSculptedCharacterRig(
   update(dt: number, state: CharacterState): void;
   dispose(): void;
 } {
+  const height = role === "moroni" ? moroniHeight : (y: number) => y;
   const driver = createMotionDriver(role);
   const model = acquireCharacterModel(role, options.quality ?? "npc");
   const group = new T.Group();
@@ -53,7 +55,7 @@ export function createSculptedCharacterRig(
   const armBones = [-1, 1].map((side) => {
     const bone = new T.Bone();
     bone.name = side < 0 ? "left-arm" : "right-arm";
-    bone.position.set(side * 0.385, 1.3, 0);
+    bone.position.set(side * 0.385, height(1.3), 0);
     rootBone.add(bone);
     return bone;
   });
@@ -109,27 +111,27 @@ export function createSculptedCharacterRig(
 
   const head = new T.Group();
   head.name = "head";
-  head.position.set(0, 1.49, 0);
+  head.position.set(0, height(1.49), 0);
   model.group.add(head);
   const armPivots = armBones;
   const legPivots = [-1, 1].map((side) => {
     const leg = new T.Group();
     leg.name = side < 0 ? "left-leg" : "right-leg";
-    leg.position.set(side * 0.205, 0.72, 0);
+    leg.position.set(side * 0.205, height(0.72), 0);
     model.group.add(leg);
     return leg;
   });
   const kneePivots = legPivots.map((leg, i) => {
     const knee = new T.Group();
     knee.name = i === 0 ? "left-knee" : "right-knee";
-    knee.position.y = -0.35;
+    knee.position.y = height(0.37) - height(0.72);
     leg.add(knee);
     return knee;
   });
   const footPivots = kneePivots.map((knee, i) => {
     const foot = new T.Group();
     foot.name = i === 0 ? "left-foot" : "right-foot";
-    foot.position.y = -0.27;
+    foot.position.y = height(0.1) - height(0.37);
     knee.add(foot);
     return foot;
   });
@@ -150,12 +152,21 @@ export function createSculptedCharacterRig(
     "right-brow",
     "lehi-headband",
     "character-headwear",
-    "moroni-helmet-rim",
+    "moroni-headband",
     "character-ear-left",
     "character-ear-right",
     "character-mouth",
   ])
     attach(name, head);
+  if (role === "moroni") {
+    const parts: T.Object3D[] = [];
+    model.group.traverse((o) => {
+      if (isMoroniHeadPart(o.name)) parts.push(o);
+    });
+    for (const part of parts)
+      if (part.parent === model.group) head.attach(part);
+  }
+  attach("moroni-shield", armPivots[0]);
   attach("left-hand", armPivots[0]);
   attach("right-hand", armPivots[1]);
   for (let side = 0; side < 2; side++) {
@@ -208,9 +219,29 @@ export function createSculptedCharacterRig(
     mesh ? createClothNormalUpdater(mesh.geometry) : undefined,
   );
   const trouserPoint = new T.Vector3();
+  const upperHipPoint = new T.Vector3();
+  const hipInverse = new T.Matrix4();
+  const hipPanels =
+    role === "moroni"
+      ? ["left", "right"].map((side) => {
+          const mesh = model.group.getObjectByName(
+            `moroni-${side}-hip-lame`,
+          ) as T.Mesh;
+          const position = mesh.geometry.getAttribute(
+            "position",
+          ) as T.BufferAttribute;
+          return {
+            mesh,
+            position,
+            rest: Float32Array.from(position.array),
+            updateNormals: createClothNormalUpdater(mesh.geometry),
+          };
+        })
+      : [];
 
   const cloth = [
     "flowing-mantle",
+    "moroni-half-cloak",
     "mantle-edge",
     "left-regal-embroidery",
     "right-regal-embroidery",
@@ -304,7 +335,7 @@ export function createSculptedCharacterRig(
       if (crawling) body.position.y *= actorScale / 0.825;
       if (crawling) body.scale.setScalar(actorScale);
       for (let i = 0; i < 2; i++) {
-        legPivots[i].scale.y = crawling ? 1.4 : 1;
+        legPivots[i].scale.y = crawling && role !== "moroni" ? 1.4 : 1;
         legPivots[i].position.z = crawling ? -0.02 : 0;
         armPivots[i].scale.y = 1;
       }
@@ -315,9 +346,11 @@ export function createSculptedCharacterRig(
         footPivots[i].rotation.copy(driverFeet[i].rotation);
         footPivots[i].scale.setScalar(crawling ? 0.65 : 1);
         footPivots[i].position.z = crawling ? -0.14 : 0;
-        footPivots[i].position.y = -0.27 + (driverFeet[i].position.y + 0.28);
+        footPivots[i].position.y =
+          height(0.1) - height(0.37) + (driverFeet[i].position.y + 0.28);
       }
       if (crawling || wasCrawling) {
+        model.group.updateWorldMatrix(true, true);
         for (let side = 0; side < 2; side++) {
           const mesh = trousers[side];
           if (!mesh) continue;
@@ -325,19 +358,41 @@ export function createSculptedCharacterRig(
             "position",
           ) as T.BufferAttribute;
           const rest = mesh.userData.crawlRest as Float32Array;
+          if (role === "moroni")
+            hipInverse
+              .copy(mesh.matrixWorld)
+              .invert()
+              .multiply(model.group.matrixWorld);
           for (let i = 0; i < attribute.count; i++) {
             const j = i * 3;
             trouserPoint.set(rest[j], rest[j + 1], rest[j + 2]);
             if (crawling) {
-              trouserPoint.y = Math.min(trouserPoint.y, 0.6);
+              if (role !== "moroni")
+                trouserPoint.y = Math.min(trouserPoint.y, height(0.6));
               const weight =
-                1 - T.MathUtils.smoothstep(trouserPoint.y - 0.72, -0.4, -0.29);
-              const y = trouserPoint.y - 0.72 + 0.35;
+                1 -
+                T.MathUtils.smoothstep(
+                  trouserPoint.y - height(0.72),
+                  height(0.32) - height(0.72),
+                  height(0.43) - height(0.72),
+                );
+              const y = trouserPoint.y - height(0.37);
               const z = trouserPoint.z;
               const angle = kneePivots[side].rotation.x * weight;
               trouserPoint.y =
-                0.72 - 0.35 + y * Math.cos(angle) - z * Math.sin(angle);
+                height(0.37) + y * Math.cos(angle) - z * Math.sin(angle);
               trouserPoint.z = y * Math.sin(angle) + z * Math.cos(angle);
+            }
+            if (crawling && role === "moroni") {
+              const anchor = T.MathUtils.smoothstep(
+                rest[j + 1],
+                height(0.58),
+                height(0.72),
+              );
+              upperHipPoint
+                .set(rest[j], rest[j + 1], rest[j + 2])
+                .applyMatrix4(hipInverse);
+              trouserPoint.lerp(upperHipPoint, anchor);
             }
             attribute.setXYZ(i, trouserPoint.x, trouserPoint.y, trouserPoint.z);
           }
@@ -347,6 +402,31 @@ export function createSculptedCharacterRig(
           mesh.geometry.computeBoundingSphere();
         }
       }
+      if (crawling || wasCrawling)
+        for (const { mesh, position, rest, updateNormals } of hipPanels) {
+          hipInverse
+            .copy(mesh.matrixWorld)
+            .invert()
+            .multiply(model.group.matrixWorld);
+          for (let i = 0; i < position.count; i++) {
+            const j = i * 3;
+            trouserPoint.set(rest[j], rest[j + 1], rest[j + 2]);
+            if (crawling) {
+              const anchor = T.MathUtils.smoothstep(
+                rest[j + 1],
+                height(0.58),
+                height(0.72),
+              );
+              upperHipPoint.copy(trouserPoint).applyMatrix4(hipInverse);
+              trouserPoint.lerp(upperHipPoint, anchor);
+            }
+            position.setXYZ(i, trouserPoint.x, trouserPoint.y, trouserPoint.z);
+          }
+          position.needsUpdate = true;
+          updateNormals();
+          mesh.geometry.computeBoundingSphere();
+          mesh.geometry.computeBoundingBox();
+        }
       // Plant the actual sculpted sole, rather than assuming the old primitive
       // sandal's thickness. This preserves the motion driver's horizontal anchor.
       const groundedWalk =
