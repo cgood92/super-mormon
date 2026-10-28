@@ -930,7 +930,11 @@ function makeSculpted(
     // through its side during a turn. This surface ends beneath the shirt.
     add(
       surface(16, 20, (u, v) => {
-        const y = T.MathUtils.lerp(cast?.hem ?? 0.24, 0.82, v);
+        const y = T.MathUtils.lerp(
+          role === "moroni" ? 0.68 : (cast?.hem ?? 0.24),
+          0.82,
+          v,
+        );
         const width = T.MathUtils.lerp(0.09, 0.135, v);
         const x = (u * 2 - 1) * width;
         const t = T.MathUtils.clamp(
@@ -962,7 +966,8 @@ function makeSculpted(
   // The adventure, animated, guardian and film silhouettes expose real legs.
   // Each trouser is a tapered sculpted volume under its shorter tunic.
   if (index === 0 || index === 2 || index === 3 || index === 5) {
-    const trouserTop = index === 2 ? 0.73 : index === 3 ? 0.67 : 0.72;
+    const trouserTop =
+      role === "moroni" ? 0.95 : index === 2 ? 0.73 : index === 3 ? 0.67 : 0.72;
     for (const side of [-1, 1]) {
       const cx = side * 0.205;
       const trouser: DistanceField = (x, y, z) => {
@@ -995,13 +1000,15 @@ function makeSculpted(
         );
         // The coat conceals the hip. Keep the knee-reaching leg for crawling
         // and climbing, but do not build a full buried white thigh volume.
-        return index === 2 && hasOuterCoat ? Math.max(d, y - 0.64) : d;
+        return index === 2 && hasOuterCoat && role !== "moroni"
+          ? Math.max(d, y - 0.64)
+          : d;
       };
       add(
         sculpt({
           bounds: [
             [cx - 0.21, 0.08, -0.22],
-            [cx + 0.21, 0.89, 0.22],
+            [cx + 0.21, role === "moroni" ? 1.08 : 0.89, 0.22],
           ],
           resolution: resolution(32),
           field: trouser,
@@ -1156,8 +1163,8 @@ function makeSculpted(
     // The lower-detail coat samples the same garment's radial envelope directly.
     // Explicit inner/outer faces and joined edges retain real thickness without
     // requiring a dense voxel grid merely to discover a thin cloth shell.
-    const uCount = quality === "crowd" ? 16 : 36;
-    const vCount = quality === "crowd" ? 12 : 20;
+    const uCount = quality === "crowd" ? (role === "moroni" ? 10 : 16) : 36;
+    const vCount = quality === "crowd" ? (role === "moroni" ? 6 : 12) : 20;
     const bottom = (cast?.hem ?? 0.24) - 0.05;
     const geometry = surface(uCount, vCount, (u, v) => {
       const y = T.MathUtils.lerp(bottom, 1.58, v);
@@ -1224,9 +1231,18 @@ function makeSculpted(
             material: materials.mantle,
           }).geometry
       : surface(78, 35, cloakPoint);
-  if (cast?.outfit !== "undertunic")
-    add(cloakGeometry, materials.mantle, "flowing-mantle");
-  else cloakGeometry.dispose();
+  if (cast?.outfit !== "undertunic") {
+    const mantle = add(cloakGeometry, materials.mantle, "flowing-mantle");
+    if (role === "moroni") {
+      // Alma 46:12 describes a coat torn for the title. This removable cloth
+      // layer leaves the illustrative protective equipment intact beneath it.
+      const coat = new T.Group();
+      coat.name = "moroni-removable-coat";
+      coat.visible = false;
+      group.add(coat);
+      coat.add(mantle);
+    }
+  } else cloakGeometry.dispose();
   const edgePoints: T.Vector3[] = [];
   for (let i = 0; i <= 32; i++) edgePoints.push(cloakPoint(0, i / 32));
   if (index !== 2)
@@ -2319,8 +2335,8 @@ function makeSculpted(
   if (cast?.outfit === "armor") {
     const helmetMaterial = materials.mantle.clone();
     helmetMaterial.clearcoat = 0;
-    helmetMaterial.metalness = 0;
-    helmetMaterial.roughness = 1;
+    helmetMaterial.metalness = role === "moroni" ? 0.55 : 0;
+    helmetMaterial.roughness = role === "moroni" ? 0.55 : 1;
     helmetMaterial.specularIntensity = 0;
     extraMaterials.push(helmetMaterial);
     const helmet: DistanceField = (x, y, z) => {
@@ -2363,30 +2379,119 @@ function makeSculpted(
       helmetMaterial,
       "character-headwear",
     );
-    const breastplate = add(
-      new T.SphereGeometry(
+    if (role !== "moroni") {
+      const breastplate = add(
+        new T.SphereGeometry(
+          1,
+          quality === "hero" ? 24 : quality === "npc" ? 16 : 8,
+          quality === "hero" ? 16 : quality === "npc" ? 10 : 6,
+          0,
+          Math.PI,
+        ),
+        materials.mantle,
+        "guard-breastplate",
+      );
+      breastplate.scale.set(0.326, 0.275, 0.085);
+      breastplate.position.set(0, 1.23, 0.289);
+      const emblem = add(
+        new T.TorusGeometry(
+          0.065,
+          0.012,
+          quality === "hero" ? 6 : 4,
+          quality === "hero" ? 24 : quality === "npc" ? 16 : 8,
+        ),
+        materials.mantleLining,
+        "guard-armor-emblem",
+      );
+      emblem.position.set(0, 1.27, 0.379);
+    }
+  }
+
+  if (role === "moroni") {
+    // Storybook armor, not a claim about an archaeological reconstruction.
+    // All shells are explicit exterior surfaces; the ordinary tunic, trousers
+    // and feet remain underneath and use the same movement rig.
+    const steel = materials.mantle.clone();
+    steel.color.setHex(0x42657b);
+    steel.metalness = 0.65;
+    steel.roughness = 0.48;
+    const bronze = materials.mantleLining.clone();
+    bronze.metalness = 0.6;
+    bronze.roughness = 0.52;
+    extraMaterials.push(steel, bronze);
+    group.userData.costume = "illustrative-full-armor";
+    group.userData.removableCoat = "moroni-removable-coat";
+    const segments = quality === "hero" ? 24 : quality === "npc" ? 16 : 6;
+    const shell = (
+      name: string,
+      center: [number, number, number],
+      size: [number, number, number],
+      material: T.Material = steel,
+      back = false,
+    ) => {
+      const geometry = new T.SphereGeometry(
         1,
-        quality === "hero" ? 24 : quality === "npc" ? 16 : 8,
-        quality === "hero" ? 16 : quality === "npc" ? 10 : 6,
+        segments,
+        Math.ceil(segments / 2),
         0,
         Math.PI,
-      ),
-      materials.mantle,
-      "guard-breastplate",
+      );
+      if (back) geometry.rotateY(Math.PI);
+      geometry.scale(...size);
+      geometry.translate(...center);
+      return add(geometry, material, name);
+    };
+    // Replace the small guard badge with a complete matching front/back cuirass.
+    shell("moroni-breastplate", [0, 1.22, 0.07], [0.405, 0.315, 0.315]);
+    shell(
+      "moroni-backplate",
+      [0, 1.22, -0.015],
+      [0.405, 0.315, 0.35],
+      steel,
+      true,
     );
-    breastplate.scale.set(0.326, 0.275, 0.085);
-    breastplate.position.set(0, 1.23, 0.289);
-    const emblem = add(
-      new T.TorusGeometry(
-        0.065,
-        0.012,
-        quality === "hero" ? 6 : 4,
-        quality === "hero" ? 24 : quality === "npc" ? 16 : 8,
-      ),
-      materials.mantleLining,
-      "guard-armor-emblem",
+    for (const side of [-1, 1]) {
+      const label = side < 0 ? "left" : "right";
+      shell(
+        `moroni-${label}-pauldron`,
+        [side * 0.405, 1.36, 0.005],
+        [0.205, 0.145, 0.235],
+      );
+      shell(
+        `moroni-${label}-bracer`,
+        [side * 0.49, 1.0, 0.025],
+        [0.155, 0.16, 0.18],
+      );
+      shell(
+        `moroni-${label}-greave`,
+        [side * 0.205, 0.3, 0.005],
+        [0.145, 0.19, 0.16],
+      );
+      // Short, separated hip lames reveal trousers and allow a clear stride.
+      shell(
+        `moroni-${label}-hip-lame`,
+        [side * 0.22, 0.88, 0.04],
+        [0.19, 0.19, 0.315],
+      );
+      const rim = new T.TorusGeometry(0.112, 0.014, 5, segments);
+      rim.scale(1.2, 0.8, 1);
+      rim.translate(side * 0.205, 0.43, 0.142);
+      add(rim, bronze, `moroni-${label}-greave-trim`);
+    }
+    const crest = new T.TorusGeometry(0.075, 0.014, 6, segments);
+    crest.translate(0, 1.29, 0.384);
+    add(crest, bronze, "moroni-cuirass-emblem");
+    // The helmet keeps the approved face visible; no mask or invented insignia.
+    const brow = new T.TorusGeometry(
+      s.head * 1.015,
+      0.018,
+      5,
+      segments,
+      Math.PI,
     );
-    emblem.position.set(0, 1.27, 0.379);
+    brow.rotateX(Math.PI / 2);
+    brow.translate(0, s.headY + 0.08, headZ);
+    add(brow, bronze, "moroni-helmet-rim");
   }
 
   // Normalize only once after all silhouettes have been built.

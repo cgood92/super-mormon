@@ -294,10 +294,19 @@ export function gallery(scene: THREE.Scene): WorldData {
     exhibit.position.set(x - side * 0.28, y, wallZ);
     exhibit.rotation.y = (side * Math.PI) / 2;
     group.add(exhibit);
-    const image = painting(exhibit, 0, 0.7, 0, "", 0xffffff);
-    image.onBeforeRender = () => {};
+    const image = painting(
+      exhibit,
+      0,
+      0.7,
+      0,
+      id === "title-liberty"
+        ? `${import.meta.env?.BASE_URL ?? "/"}art/gallery/title-liberty.jpg`
+        : "",
+      0xffffff,
+    );
+    if (id !== "title-liberty") image.onBeforeRender = () => {};
     image.name = `${id} story painting`;
-    if (typeof document !== "undefined") {
+    if (id !== "title-liberty" && typeof document !== "undefined") {
       const canvas = document.createElement("canvas");
       canvas.width = 384;
       canvas.height = 512;
@@ -601,14 +610,6 @@ export function gallery(scene: THREE.Scene): WorldData {
             ctx.lineTo(110, 270);
             ctx.lineTo(180, 160);
             ctx.stroke();
-          } else if (id === "title-liberty") {
-            ctx.fillStyle = "#665039";
-            ctx.fillRect(124, 140, 12, 335);
-            ctx.fillStyle = "#e9dcc0";
-            ctx.fillRect(136, 140, 165, 110);
-            ctx.fillStyle = "#3f4a58";
-            ctx.font = "bold 18px serif";
-            ctx.fillText("LIBERTY", 155, 202);
           } else {
             ctx.fillStyle = "#aa916d";
             ctx.fillRect(20, 310, 344, 202);

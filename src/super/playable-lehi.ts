@@ -89,8 +89,9 @@ export function createSculptedCharacterRig(
     const skinned = new T.SkinnedMesh(mesh.geometry, mesh.material);
     skinned.name = mesh.name;
     skinned.castShadow = skinned.receiveShadow = true;
-    model.group.remove(mesh);
-    model.group.add(skinned);
+    const parent = mesh.parent ?? model.group;
+    parent.remove(mesh);
+    parent.add(skinned);
     model.group.updateMatrixWorld(true);
     skinned.bind(skeleton);
     skinned.boundingSphere = new T.Sphere(new T.Vector3(0, 1, 0), 2.3);
@@ -149,6 +150,7 @@ export function createSculptedCharacterRig(
     "right-brow",
     "lehi-headband",
     "character-headwear",
+    "moroni-helmet-rim",
     "character-ear-left",
     "character-ear-right",
     "character-mouth",
@@ -156,6 +158,14 @@ export function createSculptedCharacterRig(
     attach(name, head);
   attach("left-hand", armPivots[0]);
   attach("right-hand", armPivots[1]);
+  for (let side = 0; side < 2; side++) {
+    const label = side === 0 ? "left" : "right";
+    attach(`moroni-${label}-pauldron`, armPivots[side]);
+    attach(`moroni-${label}-bracer`, armPivots[side]);
+    attach(`moroni-${label}-greave`, kneePivots[side]);
+    attach(`moroni-${label}-greave-trim`, kneePivots[side]);
+    attach(`moroni-${label}-hip-lame`, legPivots[side]);
+  }
   const handSocket = (side: "left" | "right") => {
     const hand = model.group.getObjectByName(`${side}-hand`) as T.Mesh;
     hand.geometry.computeBoundingBox();
