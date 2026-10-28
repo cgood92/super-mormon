@@ -33,10 +33,29 @@ for (const quality of ["hero", "npc", "crowd"] as const)
       assert.ok(eye.position.z > 0.14 && eye.position.z < 0.22);
     }
     group.updateMatrixWorld(true);
+    const hair = group.getObjectByName("single-sculpted-hair-cap") as T.Mesh;
+    assert.ok(hair, "short flat hair covers the scalp");
+    hair.geometry.computeBoundingBox();
     assert.ok(
-      !group.getObjectByName("single-sculpted-hair-cap"),
-      "Moroni has no hair cap",
+      hair.geometry.boundingBox!.max.y <= b.max.y + 0.012,
+      "hair stays close to the crown",
     );
+    for (const x of [-0.1, 0, 0.1]) {
+      const ray = new T.Raycaster(
+        new T.Vector3(x, 1.92, 1),
+        new T.Vector3(0, 0, -1),
+      );
+      const scalp = ray.intersectObject(face)[0],
+        cap = ray.intersectObject(hair)[0];
+      assert.ok(
+        scalp && cap && cap.distance < scalp.distance,
+        "hair covers the upper scalp",
+      );
+      assert.ok(
+        scalp.distance - cap.distance < 0.02,
+        "hair lies flat against the scalp",
+      );
+    }
     assert.ok(
       !group.children.some((o) => o.name.startsWith("moroni-swept-lock-")),
     );

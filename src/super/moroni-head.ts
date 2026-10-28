@@ -149,6 +149,31 @@ export function addMoroniHead(
     skin,
     "sculpted-face-neck-nose",
   );
+  // A single close-cut surface follows the authored scalp exactly. No locks,
+  // swept crest or extra crown volume; the forehead and ears remain exposed.
+  place(
+    grid(crowd ? 6 : 16, crowd ? 12 : 32, (v, u) => {
+      const angle = u * Math.PI * 2;
+      const lower =
+        0.035 +
+        0.135 * Math.max(0, Math.cos(angle)) -
+        0.11 * Math.max(0, -Math.cos(angle));
+      const y = T.MathUtils.lerp(lower, 0.34, v);
+      const x = Math.sin(angle) * sample(y, 1);
+      const z =
+        Math.cos(angle) >= 0
+          ? front(x, y)
+          : sample(y, 3) + Math.cos(angle) * sample(y, 2);
+      const thickness = 0.006 * Math.sqrt(1 - v);
+      return new T.Vector3(
+        x + Math.sin(angle) * thickness,
+        y + 0.004,
+        z + Math.cos(angle) * thickness,
+      );
+    }),
+    browMaterial,
+    "single-sculpted-hair-cap",
+  );
   const oval = (
     name: string,
     m: T.Material,
