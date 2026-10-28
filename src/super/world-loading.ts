@@ -13,15 +13,24 @@ type PreparedWorld = {
 // Load code first, then let the caller atomically replace the active scene.
 export async function prepareWorld(id: WorldId): Promise<PreparedWorld> {
   if (id === "signs") {
-    const module = await import("./signs-night");
+    const module = await deployedScene(
+      "src/super/signs-night.ts",
+      () => import("./signs-night"),
+    );
     return { buildWorld: (_, scene) => module.buildSignsNight(scene) };
   }
   if (id === "gathering") {
-    const module = await import("./lachoneus-gathering");
+    const module = await deployedScene(
+      "src/super/lachoneus-gathering.ts",
+      () => import("./lachoneus-gathering"),
+    );
     return { buildWorld: (_, scene) => module.buildLachoneusGathering(scene) };
   }
   if (id === "christ-bountiful") {
-    const module = await import("./christ-bountiful");
+    const module = await deployedScene(
+      "src/super/christ-bountiful.ts",
+      () => import("./christ-bountiful"),
+    );
     return { buildWorld: (_, scene) => module.buildChristBountiful(scene) };
   }
   if (id === "samuel") {
