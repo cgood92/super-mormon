@@ -92,25 +92,27 @@ test("house route reaches the upper gallery and every treasure has a clear appro
 test("gallery paintings have reachable jump launch points close to their planes", () => {
   const { data } = world("hub");
   for (const portal of data.portals ?? []) {
-    const side = portal.facing === "east";
+    const side = portal.facing === "east" || portal.facing === "west";
+    const direction = portal.facing === "east" ? -1 : 1;
+    const floor = portal.y - 0.59;
     assert.ok(
       standingClear(
-        side ? portal.x - 0.7 : portal.x,
-        0.18,
+        side ? portal.x + direction * 0.7 : portal.x,
+        floor,
         side ? portal.z : portal.z + 0.6,
         data.solids,
       ),
     );
     const player = createPlayer(
-      side ? portal.x - 1.3 : portal.x,
-      0.18,
+      side ? portal.x + direction * 1.3 : portal.x,
+      floor,
       side ? portal.z : portal.z + 1.3,
     );
     for (let frame = 0; frame < 20; frame++)
       stepPlayer(
         player,
         {
-          x: side ? -1 : 0,
+          x: side ? direction : 0,
           y: side ? 0 : -1,
           jump: frame === 0,
           jumpHeld: true,
@@ -120,7 +122,10 @@ test("gallery paintings have reachable jump launch points close to their planes"
         data.solids,
       );
     assert.ok(Math.hypot(player.x - portal.x, player.z - portal.z) < 1.2);
-    assert.ok(player.y > 0.45, "jump should enter the painting trigger");
+    assert.ok(
+      player.y > floor + 0.45,
+      "jump should enter the painting trigger",
+    );
   }
 });
 

@@ -287,8 +287,14 @@ export function gallery(scene: THREE.Scene): WorldData {
   for (const { id, title, x, y, z: wallZ } of STORY_ORDER.slice(6).map(
     laterPainting,
   )) {
-    add(x, y, wallZ, 8, 6, 0.45, C.pale, "side hallway story wall");
-    const image = painting(group, x, y + 0.7, wallZ + 0.3, "", 0xffffff);
+    // Replace an existing wall exhibit, leaving the hallway open from end to end.
+    const side = Math.sign(x);
+    const exhibit = new THREE.Group();
+    exhibit.name = `${id} wall exhibit`;
+    exhibit.position.set(x - side * 0.28, y, wallZ);
+    exhibit.rotation.y = (side * Math.PI) / 2;
+    group.add(exhibit);
+    const image = painting(exhibit, 0, 0.7, 0, "", 0xffffff);
     image.onBeforeRender = () => {};
     image.name = `${id} story painting`;
     if (typeof document !== "undefined") {
@@ -633,15 +639,15 @@ export function gallery(scene: THREE.Scene): WorldData {
         (image.material as THREE.MeshBasicMaterial).map = texture;
       }
     }
-    label(group, title, x, y + 0.55, wallZ + 0.7, 7, 0.52);
-    solids.push({ x, y: y + 0.55, z: wallZ + 0.7, w: 7, h: 0.52, d: 0.18 });
+    // Caption is a thin wall decoration, backed by the solid canvas.
+    label(exhibit, title, 0, 0.55, 0.28, 7, 0.52);
     const portal = {
       id,
       x,
       y: y + 0.59,
-      z: wallZ + 0.58,
+      z: wallZ,
       title,
-      facing: "north" as const,
+      facing: side > 0 ? ("west" as const) : ("east" as const),
     };
     portals.push(portal);
     solids.push(paintingCollider(portal));
@@ -758,13 +764,19 @@ export function gallery(scene: THREE.Scene): WorldData {
       );
     }
   }
-  // Original, non-interactive landscape exhibits keep the side halls art-filled.
+  // Unassigned wall bays retain their original landscape exhibits.
   const exhibitPositions: { side: number; y: number; z: number }[] = [];
   for (const y of CONFERENCE_LEVELS)
     for (const side of [-1, 1])
       for (const z of [-20, -43, -66, -89]) {
+        if (
+          portals.some(
+            (p) => Math.sign(p.x) === side && p.y === y + 0.59 && p.z === z,
+          )
+        )
+          continue;
         exhibitPositions.push({ side, y, z });
-        decor(
+        add(
           side * 67,
           y + 2,
           z,

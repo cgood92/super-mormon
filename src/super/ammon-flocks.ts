@@ -150,17 +150,17 @@ export function buildAmmonFlocks(scene: T.Scene): WorldData {
       reason: "High flexible canopy over the solid trunk",
     });
   }
-  // Shallow water is a visual inset outside the flock's bounded grazing area.
+  // Animals reach the shallow southern edge of the visible water to drink.
   const water = new T.Mesh(new T.CircleGeometry(5, 32), material(0x78b9bf));
   water.rotation.x = -Math.PI / 2;
   water.position.set(0, 0.015, 37);
   root.add(water);
   markScenery(water, {
     kind: "decoration",
-    reason: "Shallow water surface; flock stays on the bank south of z=31",
+    reason: "Shallow drinking water over the single owning pasture ground",
   });
   const court = point(0, -25),
-    sebus = point(0, 24);
+    sebus = point(0, 34);
   const king = createCharacter("lamoni"),
     servant = createCharacter("sam");
   king.group.position.set(-3, 0, -25);
@@ -176,6 +176,7 @@ export function buildAmmonFlocks(scene: T.Scene): WorldData {
     body.position.y = 0.8;
     group.add(body);
     const head = new T.Mesh(new T.SphereGeometry(0.25, 8, 6), face);
+    head.name = "Flock drinking head";
     head.position.set(0, 0.95, 0.75);
     group.add(head);
     for (const x of [-0.26, 0.26])
@@ -193,8 +194,19 @@ export function buildAmmonFlocks(scene: T.Scene): WorldData {
       reason:
         "Moving flock actors; player pressure steers animals without static blocking boxes",
     });
+    const indicator = new T.Mesh(
+      new T.ConeGeometry(0.18, 0.45, 6),
+      material(0xffd771),
+    );
+    indicator.name = "Stray flock indicator";
+    indicator.rotation.z = Math.PI;
+    indicator.position.y = 2;
+    indicator.visible = false;
+    group.add(indicator);
     return {
       group,
+      indicator,
+      settled: false,
       position: new T.Vector3(
         ((i % 3) - 1) * 1.8,
         0,
@@ -206,16 +218,43 @@ export function buildAmmonFlocks(scene: T.Scene): WorldData {
   flock.forEach((a) => a.group.position.copy(a.position));
   const raiders = Array.from({ length: 3 }, (_, i) => {
     const model = createCharacter("laman", { quality: "crowd" });
+    // Costume communicates the role; ancestry and skin tone never identify enemies.
+    model.group.name = `Masked flock raider ${i + 1}`;
+    model.group.traverse((object) => {
+      if (!(object instanceof T.Mesh)) return;
+      if (object.name.includes("beard")) object.visible = false;
+      if (/robe|coat|mantle|tunic|trouser|sleeve|sash/.test(object.name)) {
+        for (const mat of Array.isArray(object.material)
+          ? object.material
+          : [object.material])
+          if (mat instanceof T.MeshStandardMaterial) mat.color.set(0x242933);
+      }
+    });
+    const mask = new T.Mesh(new T.SphereGeometry(1, 12, 8), material(0x171c25));
+    mask.name = "Imagined dark cloth face covering";
+    mask.position.set(0, 0.075, 0.33);
+    mask.scale.set(0.23, 0.115, 0.105);
+    model.group.getObjectByName("head")!.add(mask);
     root.add(model.group);
     model.group.visible = false;
     return {
       id: `raider-${i}`,
       model,
+      mask,
       position: new T.Vector3(-13 + i * 13, 1, 29),
       previous: new T.Vector3(),
       radius: 0.85,
       retreat: false,
+      attackClock: i * 0.8,
+      projectile: undefined as
+        { position: T.Vector3; velocity: T.Vector3; age: number } | undefined,
+      missile: createStoneModel(),
     };
+  });
+  raiders.forEach((r) => {
+    r.missile.name = "Raider thrown stone";
+    r.missile.visible = false;
+    root.add(r.missile);
   });
   const sling = createSlingModel();
   root.add(sling.group);
@@ -252,7 +291,7 @@ export function buildAmmonFlocks(scene: T.Scene): WorldData {
     name: "Ammon and the King's Flocks",
     subtitle:
       "Serve and protect • Alma 17:19–39 • Imagined landscape and flock species",
-    initialObjective: "Meet King Lamoni and his servants",
+    initialObjective: "Guide the flock to the water’s edge at Sebus",
     spawn: { ...point(0, -31), yaw: 0 },
     solids,
     actorParent: root,
@@ -264,61 +303,40 @@ export function buildAmmonFlocks(scene: T.Scene): WorldData {
     ],
     adventure(hooks) {
       hooks.setAvatar("ammon");
-      let phase = "meet",
-        dialog = false,
+      let phase = "drive",
         time = 0,
         aiming = false,
         yaw = 0,
         pitch = 0.02,
-        pressure = 0,
         recovered = false;
+      let scatterTime = 0,
+        drinkingTime = 0,
+        attackCount = 0;
+      const scatterStarts = flock.map((a) => a.position.clone());
+      let cinematicCamera:
+        { position: T.Vector3; focus: T.Vector3; cut: boolean } | undefined;
       let spin = createSlingSpinState();
       let stone: ReturnType<typeof releaseSlingStone> | undefined;
       let camera: { position: T.Vector3; focus: T.Vector3 } | undefined;
       const target = () =>
-        phase === "meet" || phase === "return" || phase === "done"
-          ? court
-          : sebus;
+        phase === "return" || phase === "done" ? court : sebus;
       const countAt = (at: Point, radius: number) =>
         flock.filter(
           (a) => Math.hypot(a.position.x - at.x, a.position.z - at.z) < radius,
         ).length;
-      const say = (title: string, body: string, next: string) => {
-        dialog = true;
-        hooks.dialog(
-          "Alma 17:19–39",
-          title,
-          body,
-          () => {
-            phase = next;
-            dialog = false;
-          },
-          {
-            focus: court,
-            playerGesture: "talk",
-            actors: [
-              { group: king.group, speaker: true, gesture: "talk" },
-              { group: servant.group, gesture: "talk" },
-            ],
-          },
-        );
-      };
-      const scatter = () => {
-        flock.forEach((a, i) => {
-          const angle = (i * Math.PI) / 3;
-          a.position.set(Math.sin(angle) * 11, 0, 22 + Math.cos(angle) * 7);
-        });
-      };
       return {
-        movementLocked: () => dialog || aiming,
-        camera: () => (aiming ? camera : undefined),
+        movementLocked: () => aiming || phase === "scatter",
+        camera: () =>
+          phase === "scatter" ? cinematicCamera : aiming ? camera : undefined,
         snapshot: () => ({
           phase,
           aiming,
           yaw,
           pitch,
           charge: slingCharge(spin),
-          pressure,
+          attackCount,
+          drinkingTime,
+          flockMarkers: flock.filter((a) => a.indicator.visible).length,
           recovered,
           target: target(),
           flock: flock.map((a) => ({ position: a.position.clone() })),
@@ -334,17 +352,13 @@ export function buildAmmonFlocks(scene: T.Scene): WorldData {
         update(dt, player, input) {
           dt = Math.min(dt, 0.05);
           time += dt;
+          raiders.forEach((r) => r.previous.copy(r.position));
           const at = target();
           let prompt = "";
           const near = Math.hypot(player.x - at.x, player.z - at.z) < 4;
-          if (!dialog && input.interact && near && phase === "meet")
-            say(
-              "I will be thy servant",
-              "Ammon chooses to serve King Lamoni. Join the servants taking the king’s flocks to the waters of Sebus. Walk behind the animals to guide them; give them room to turn.",
-              "drive",
-            );
-          if (!dialog && phase !== "meet" && phase !== "done")
+          if (["drive", "recover", "return"].includes(phase))
             flock.forEach((a, i) => {
+              if (a.settled && phase !== "return") return;
               const dx = a.position.x - player.x,
                 dz = a.position.z - player.z,
                 distance = Math.hypot(dx, dz);
@@ -364,7 +378,7 @@ export function buildAmmonFlocks(scene: T.Scene): WorldData {
               }
               a.velocity.set(vx, 0, vz);
               a.position.x = T.MathUtils.clamp(a.position.x + vx * dt, -20, 20);
-              a.position.z = T.MathUtils.clamp(a.position.z + vz * dt, -29, 30);
+              a.position.z = T.MathUtils.clamp(a.position.z + vz * dt, -29, 38);
               // Slide animal centers out of solid trunks and walls with body clearance.
               for (const solid of solids) {
                 if (solid.y + solid.h < 0.3) continue;
@@ -395,31 +409,196 @@ export function buildAmmonFlocks(scene: T.Scene): WorldData {
                 Math.sin(time * 10 + i) *
                 Math.min(0.045, a.velocity.length() * 0.02);
             });
-          if (phase === "drive" && countAt(sebus, 8) === 6) {
-            phase = "recover";
-            scatter();
-            hooks.toast(
-              "Men scatter the flocks! Circle behind each animal and gather them back to Sebus.",
-            );
+          // Park animals that arrive, so recovering one stray cannot undo five successes.
+          if (phase === "drive" || phase === "recover") {
+            flock.forEach((a, i) => {
+              if (
+                !a.settled &&
+                Math.hypot(a.position.x - sebus.x, a.position.z - sebus.z) < 2.1
+              ) {
+                a.settled = true;
+                a.position.set(
+                  ((i % 3) - 1) * 1.15,
+                  0,
+                  33.5 + Math.floor(i / 3) * 1.2,
+                );
+                a.group.position.copy(a.position);
+              }
+            });
           }
-          if (phase === "recover" && countAt(sebus, 8) === 6) {
+          if (phase === "drive" && flock.every((a) => a.settled)) {
+            drinkingTime += dt;
+            if (drinkingTime >= 1.5) {
+              phase = "scatter";
+              scatterTime = 0;
+              flock.forEach((a, i) => scatterStarts[i].copy(a.position));
+              hooks.toast(
+                "At the waters of Sebus, men approach the drinking flock…",
+              );
+            }
+          }
+          if (phase === "scatter") {
+            scatterTime += dt;
+            const rush = T.MathUtils.smoothstep(scatterTime, 1.6, 4.2);
+            const flee = T.MathUtils.smoothstep(scatterTime, 3.6, 7.2);
+            raiders.forEach((r, i) => {
+              r.position.set(
+                T.MathUtils.lerp(-15 + i * 15, -5 + i * 5, rush),
+                1,
+                T.MathUtils.lerp(41, 35, rush),
+              );
+            });
+            flock.forEach((a, i) => {
+              const angle = (i * Math.PI) / 3;
+              const destination = new T.Vector3(
+                Math.sin(angle) * 12,
+                0,
+                25 + Math.cos(angle) * 6,
+              );
+              a.position.lerpVectors(scatterStarts[i], destination, flee);
+              a.group.position.copy(a.position);
+              a.group.position.y =
+                Math.sin(scatterTime * 16 + i) *
+                0.065 *
+                Math.sin(flee * Math.PI);
+              a.group.rotation.y = Math.atan2(
+                destination.x - scatterStarts[i].x,
+                destination.z - scatterStarts[i].z,
+              );
+            });
+            // Fit the entire acted encounter to the narrower screen dimension.
+            const subjects = [
+              new T.Vector3(player.x, player.y + 1, player.z),
+              ...flock.map((a) =>
+                a.position.clone().add(new T.Vector3(0, 0.8, 0)),
+              ),
+              ...raiders.map((r) => r.position.clone()),
+            ];
+            const focus = new T.Box3()
+              .setFromPoints(subjects)
+              .getCenter(new T.Vector3());
+            const radius = Math.max(
+              8,
+              ...subjects.map((p) => p.distanceTo(focus) + 1.5),
+            );
+            const aspect = Math.max(0.2, hooks.viewAspect?.() ?? 16 / 9);
+            const halfAngle = Math.atan(
+              Math.tan(T.MathUtils.degToRad(29)) * Math.min(1, aspect),
+            );
+            const distance = (radius / Math.sin(halfAngle)) * 1.08;
+            cinematicCamera = {
+              position: focus
+                .clone()
+                .addScaledVector(
+                  new T.Vector3(
+                    scatterTime < 3.6 ? 1 : -1,
+                    0.9,
+                    -1.3,
+                  ).normalize(),
+                  distance,
+                ),
+              focus,
+              cut: true,
+            };
+            // Cut endpoints and sightline must clear trunks, rocks and opaque canopies.
+            const opaque = [
+              ...solids,
+              ...[-18, 19].map((x) => ({
+                x,
+                y: 3.4,
+                z: 9,
+                w: 6.2,
+                h: 2.6,
+                d: 6.2,
+              })),
+            ];
+            for (
+              let attempt = 0;
+              attempt < 60 &&
+              !cameraSegmentClear(
+                cinematicCamera.position,
+                focus,
+                opaque,
+                0.25,
+              );
+              attempt++
+            )
+              cinematicCamera.position.y += 1;
+            if (scatterTime >= 8.5) {
+              phase = "recover";
+              flock.forEach((a) => (a.settled = false));
+              hooks.toast(
+                "Circle behind the gold-marked strays. Each animal stays gathered once it reaches the water.",
+              );
+            }
+          }
+          if (phase === "recover" && flock.every((a) => a.settled)) {
             phase = "protect";
             recovered = true;
+            servant.group.position.set(-3, 0, 33);
             hooks.toast(
-              "The flock is gathered. Hold {action} to spin the sling; aim with {move}; release to cast. {jump} / {crouch} cancels.",
+              "The servants hold the flock safely. Face the masked raiders; hold {action} to spin, aim with {move}, release to cast.",
             );
           }
+          flock.forEach((a) => {
+            a.indicator.visible = phase === "recover" && !a.settled;
+            const head = a.group.getObjectByName("Flock drinking head")!;
+            const drinking =
+              a.settled && phase !== "scatter" && phase !== "return";
+            head.position.y = drinking
+              ? 0.43 + Math.sin(time * 3) * 0.025
+              : 0.95;
+            head.rotation.x = drinking ? 0.6 : 0;
+            if (drinking)
+              a.group.rotation.y = Math.atan2(-a.position.x, 37 - a.position.z);
+          });
           raiders.forEach((r, i) => {
-            r.previous.copy(r.position);
             r.model.group.visible =
-              phase === "protect" || (phase === "return" && r.position.z < 43);
+              phase === "scatter" ||
+              phase === "recover" ||
+              phase === "protect" ||
+              (phase === "return" && r.position.z < 43);
             if (r.retreat) r.position.z += dt * 5;
             else if (phase === "protect") {
-              r.position.x = -12 + i * 12 + Math.sin(time * 0.65 + i * 2) * 2;
-              r.position.z = 28 + Math.sin(time * 0.45 + i) * 2;
+              r.position.x = -7 + i * 7 + Math.sin(time * 0.4 + i * 2) * 0.5;
+              r.position.z = 39;
+              r.attackClock += dt;
+              if (r.attackClock >= 4.5) {
+                r.attackClock = 0;
+                attackCount++;
+                const start = r.position.clone().add(new T.Vector3(0, 0.25, 0));
+                // Alma 17:36: their stones fail to hit Ammon. Aim beside his current feet.
+                const flight = 1.1;
+                const destination = new T.Vector3(
+                  player.x + (i % 2 ? -1.4 : 1.4),
+                  player.y,
+                  player.z,
+                );
+                r.projectile = {
+                  position: start,
+                  velocity: destination
+                    .sub(start)
+                    .divideScalar(flight)
+                    .add(new T.Vector3(0, (9.8 * flight) / 2, 0)),
+                  age: 0,
+                };
+              }
             }
             r.model.group.position.set(r.position.x, 0, r.position.z);
-            r.model.group.rotation.y = r.retreat ? 0 : Math.PI;
+            r.model.group.rotation.y = r.retreat
+              ? 0
+              : phase === "scatter"
+                ? Math.atan2(-r.position.x, 34 - r.position.z)
+                : Math.atan2(player.x - r.position.x, player.z - r.position.z);
+            if (r.projectile) {
+              r.projectile.age += dt;
+              r.projectile.position.addScaledVector(r.projectile.velocity, dt);
+              r.projectile.velocity.y -= 9.8 * dt;
+              r.missile.position.copy(r.projectile.position);
+              if (r.projectile.position.y <= 0 || r.projectile.age > 2)
+                r.projectile = undefined;
+            }
+            r.missile.visible = !!r.projectile && phase === "protect";
             if (
               r.model.group.visible &&
               Math.floor(time * 10) !== Math.floor((time - dt) * 10)
@@ -433,39 +612,21 @@ export function buildAmmonFlocks(scene: T.Scene): WorldData {
                 vz: (r.position.z - r.previous.z) / dt,
                 yaw: r.model.group.rotation.y,
                 grounded: true,
-                runSpeed: r.retreat ? 5 : 1.5,
-                move: "run",
+                runSpeed:
+                  r.position.distanceTo(r.previous) / Math.max(dt, 0.001),
+                move:
+                  r.position.distanceTo(r.previous) > 0.001 ? "run" : "idle",
+                pointing:
+                  phase === "protect" && !r.retreat && r.attackClock > 3.7,
               });
           });
-          if (phase === "protect") {
-            const threatened = flock.some((a) =>
-              raiders.some(
-                (r) => !r.retreat && r.position.distanceTo(a.position) < 4,
-              ),
-            );
-            pressure = T.MathUtils.clamp(
-              pressure + (threatened ? dt : -dt * 0.8),
-              0,
-              24,
-            );
-            if (pressure >= 24) {
-              phase = "recover";
-              scatter();
-              pressure = 0;
-              aiming = false;
-              spin = createSlingSpinState();
-              hooks.toast(
-                "The flock scattered again. Take a breath and gather them; your servants are helping.",
-              );
-            }
-          }
           const origin = () =>
             new T.Vector3(
               player.x + Math.cos(yaw) * 0.38,
               player.y + 1.3,
               player.z - Math.sin(yaw) * 0.38,
             ).addScaledVector(aimDirection(yaw, pitch), 0.55);
-          if (phase === "protect" && !dialog) {
+          if (phase === "protect") {
             prompt = aiming
               ? `Release {action} to cast • {move} aims • ${Math.round(slingCharge(spin) * 100)}% • {jump} / {crouch} cancel`
               : "Hold {action} to spin and aim the sling";
@@ -506,8 +667,9 @@ export function buildAmmonFlocks(scene: T.Scene): WorldData {
               const r = raiders.find((r) => r.id === hit.targetId);
               if (r) {
                 r.retreat = true;
-                pressure = Math.max(0, pressure - 8);
-                hooks.toast("A raider withdraws. Keep the flock together.");
+                hooks.toast(
+                  "A masked raider withdraws. The servants are keeping the flock safe.",
+                );
               }
             }
           }
@@ -515,6 +677,7 @@ export function buildAmmonFlocks(scene: T.Scene): WorldData {
           if (stone) stoneModel.position.copy(stone.position);
           if (phase === "protect" && raiders.every((r) => r.retreat)) {
             phase = "return";
+            flock.forEach((a) => (a.settled = false));
             aiming = false;
             hooks.toast(
               "The flock is safe. Guide all six back to the king’s yard.",
@@ -526,10 +689,13 @@ export function buildAmmonFlocks(scene: T.Scene): WorldData {
           sling.setSpin(spin.phase, aiming);
           const eye = new T.Vector3(player.x, player.y + 1.6, player.z),
             direction = aimDirection(yaw, pitch);
-          const cameraPosition = eye
+          // Align the reticle with the pouch at its forward release tangent.
+          const releasePoint = origin().add(
+            new T.Vector3(-Math.cos(yaw) * 0.8, 0, Math.sin(yaw) * 0.8),
+          );
+          const cameraPosition = releasePoint
             .clone()
-            .addScaledVector(direction, -2)
-            .add(new T.Vector3(Math.cos(yaw) * 0.8, 0.4, -Math.sin(yaw) * 0.8));
+            .addScaledVector(direction, -2);
           const cameraSolids = [
             ...solids,
             ...[-18, 19].map((x) => ({
@@ -563,45 +729,37 @@ export function buildAmmonFlocks(scene: T.Scene): WorldData {
             cameraPosition.y += 0.3;
           camera = {
             position: cameraPosition,
-            focus: eye.clone().addScaledVector(direction, 24),
+            focus: releasePoint.clone().addScaledVector(direction, 24),
           };
           marker.visible = !aiming && phase !== "done";
           marker.position.set(at.x, 2.8 + Math.sin(time * 2) * 0.15, at.z);
-          if (
-            phase === "return" &&
-            near &&
-            countAt(court, 9) === 6 &&
-            input.interact &&
-            !dialog
-          )
-            say(
-              "The servants report",
-              "The servants return with the flock and tell Lamoni what Ammon did. Alma records that Ammon cast stones with his sling, then faced attackers with a sword. This non-graphic adaptation shows raiders withdrawing and abridges the further violent confrontation. Ammon’s faithful service prepares the way for teaching the king.",
-              "done",
+          if (phase === "return" && near && countAt(court, 9) === 6) {
+            phase = "done";
+            hooks.toast(
+              "The flock is home. The servants report Ammon’s faithful service to Lamoni. Adapted from Alma 17:19–39.",
             );
+          }
           if (phase === "done" && recovered) {
             recovered = false;
             hooks.complete();
           }
           const objective =
-            phase === "meet"
-              ? "Meet King Lamoni and his servants"
-              : phase === "drive"
-                ? `Guide the flock to Sebus • ${countAt(sebus, 8)}/6`
+            phase === "drive"
+              ? `Guide the flock to the water’s edge • ${flock.filter((a) => a.settled).length}/6 drinking`
+              : phase === "scatter"
+                ? "At Sebus • the flock is scattered"
                 : phase === "recover"
-                  ? `Gather the scattered flock at Sebus • ${countAt(sebus, 8)}/6`
+                  ? `Gather the gold-marked strays at the water • ${flock.filter((a) => a.settled).length}/6`
                   : phase === "protect"
                     ? `Protect the gathered flock • ${raiders.filter((r) => r.retreat).length}/3 raiders withdrawn`
                     : phase === "return"
-                      ? `Return the flock and speak to the servants • ${countAt(court, 9)}/6`
+                      ? `Return the flock to the king’s yard • ${countAt(court, 9)}/6`
                       : "Ammon served faithfully";
           if (!prompt)
             prompt =
-              near && (phase === "meet" || phase === "return")
-                ? "{action} Speak"
-                : phase === "drive" || phase === "recover" || phase === "return"
-                  ? "Walk behind animals to guide them; circle around strays"
-                  : "";
+              phase === "drive" || phase === "recover" || phase === "return"
+                ? "Walk behind animals to guide them; circle around strays"
+                : "";
           return { objective, prompt, aiming, draw: slingCharge(spin) };
         },
         dispose() {
@@ -619,7 +777,12 @@ export function buildAmmonFlocks(scene: T.Scene): WorldData {
       shrubs.dispose();
       king.dispose();
       servant.dispose();
-      raiders.forEach((r) => r.model.dispose());
+      raiders.forEach((r) => {
+        // Added after the cached character clone, so the actor cache does not own these.
+        r.mask.geometry.dispose();
+        (r.mask.material as T.Material).dispose();
+        r.model.dispose();
+      });
       const geometries = new Set<T.BufferGeometry>(),
         materials = new Set<T.Material>();
       root.traverse((o) => {

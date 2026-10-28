@@ -52,7 +52,7 @@ test("later chapters prepare their own interactive worlds and leave no scene res
     ["vineyard", "learn"],
     ["jacob", "search"],
     ["waters", "city"],
-    ["ammon", "meet"],
+    ["ammon", "drive"],
   ] as const) {
     const scene = new Scene();
     const prepared = await prepareWorld(id);

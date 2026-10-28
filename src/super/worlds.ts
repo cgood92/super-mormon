@@ -75,7 +75,7 @@ export type WorldData = {
     y: number;
     z: number;
     title: string;
-    facing?: "north" | "east";
+    facing?: "north" | "east" | "west";
   }[];
   treasures?: { id: string; name: string; x: number; y: number; z: number }[];
   climbables?: Climbable[];

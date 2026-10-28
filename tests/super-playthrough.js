@@ -80,22 +80,38 @@ export async function enter(id) {
   document.querySelector("#home").click();
   await new Promise((r) => setTimeout(r, 750));
   const p = snapshot().portals.find((p) => p.id === id);
-  const side = p.facing === "east";
+  if (!p) throw Error(`Unknown story painting ${id}`);
+  const side = p.facing === "east" || p.facing === "west";
+  const outward = p.facing === "east" ? -1 : 1;
   if (side) {
-    await go(0, 47, 0.3);
-    await go(70, 47, 0.3);
-    await go(70, p.z, 0.3);
-    await go(p.x - 1.8, p.z, 0.25);
+    await go(-5, 47, 0.3);
+    const floor = Math.round((p.y - 0.59) / 12);
+    // Ride the actual alternating escalators; skirt the open wells on landings.
+    for (let level = 0; level < floor; level++) {
+      const x = level % 2 === 0 ? -56 : 56;
+      const startZ = level % 2 === 0 ? 47 : -1;
+      const endZ = level % 2 === 0 ? -1 : 47;
+      if (level > 0) {
+        await go(x - Math.sign(x) * 8, 47, 0.3);
+        await go(x - Math.sign(x) * 8, startZ, 0.3);
+      }
+      await go(x, startZ, 0.3);
+      await go(x, endZ, 0.3);
+      await go(x - Math.sign(x) * 8, endZ, 0.3);
+      await go(x - Math.sign(x) * 8, 47, 0.3);
+    }
+    const wing = Math.sign(p.x);
+    await go(wing * 65, 47, 0.3);
+    await go(wing * 65, 1, 0.3);
+    await go(wing * 85, 1, 0.3);
+    await go(wing * 85, p.z, 0.3);
+    await go(p.x + outward * 1.8, p.z, 0.25);
   } else {
-    if (Math.abs(p.x) > 25 && p.z < 20) {
-      await go(Math.sign(p.x) * 25, 36, 0.3);
-      await go(Math.sign(p.x) * 25, 22, 0.3);
-      await go(p.x, 22, 0.3);
-    } else await go(p.x, 36, 0.3);
+    await go(p.x, 36, 0.3);
     await go(p.x, p.z + 1.8, 0.25);
   }
   const yaw = snapshot().cameraYaw;
-  const dx = side ? 1 : 0,
+  const dx = side ? -outward : 0,
     dz = side ? 0 : -1;
   pad.axes[0] = -Math.cos(yaw) * dx + Math.sin(yaw) * dz;
   pad.axes[1] = -(Math.sin(yaw) * dx + Math.cos(yaw) * dz);

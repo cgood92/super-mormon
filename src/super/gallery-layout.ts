@@ -5,7 +5,11 @@ import { STORY_TITLES, type StoryId } from "./progression";
 export function laterPaintingLocation(index: number) {
   const floor = Math.floor(index / 8);
   const slot = index % 8;
-  return { x: slot < 4 ? 77 : -77, y: floor * 12, z: -14 - (slot % 4) * 17 };
+  return {
+    x: slot < 4 ? 67.38 : -67.38,
+    y: floor * 12,
+    z: -20 - (slot % 4) * 23,
+  };
 }
 export function laterPainting(id: StoryId, index: number) {
   return {

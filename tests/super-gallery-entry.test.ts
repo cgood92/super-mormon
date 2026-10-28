@@ -59,3 +59,37 @@ for (const facing of ["north", "east"] as const) {
     );
   });
 }
+
+test("west-facing wall painting is solid and enters from the hallway", () => {
+  const portal = { x: 0, z: 0, facing: "west" as const };
+  const solid = paintingCollider(portal);
+  assert.equal(solid.w, 0.2);
+  assert.equal(solid.d, 3.36);
+  const player = createPlayer(2, 0, 0);
+  const solids = [solid, { x: 0, y: -1, z: 0, w: 20, h: 1, d: 20 }];
+  for (let i = 0; i < 120; i++)
+    stepPlayer(
+      player,
+      { x: 1, y: 0, jump: false, jumpHeld: false },
+      1 / 60,
+      0,
+      solids,
+    );
+  assert.ok(player.x >= 0.419);
+  let entered = false;
+  for (let i = 0; i < 45; i++) {
+    stepPlayer(
+      player,
+      { x: 1, y: 0, jump: i === 0, jumpHeld: i < 15 },
+      1 / 60,
+      0,
+      solids,
+    );
+    entered ||= canJumpIntoPainting(player, portal);
+  }
+  assert.ok(entered);
+  assert.equal(
+    canJumpIntoPainting({ x: -0.42, y: 1, z: 0, grounded: false }, portal),
+    false,
+  );
+});
