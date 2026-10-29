@@ -62,7 +62,7 @@ export function buildRooftop(parent: T.Group): {
     if (solid) solids.push({ x, y: y - h / 2, z, w, h, d });
     return mesh;
   }
-  // Slab is split around the escalator shaft, which the hub supplies and guards.
+  // Slab is split around the stair shaft, which the hub supplies and guards.
   box("west roof support", -76.5, 35.8, -25, 27, 0.4, 160, stone, true);
   box("east roof support", 20.5, 35.8, -25, 139, 0.4, 160, stone, true);
   box("north roof support", -56, 35.8, -49.5, 14, 0.4, 111, stone, true);

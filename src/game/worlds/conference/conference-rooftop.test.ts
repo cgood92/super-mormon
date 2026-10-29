@@ -4,7 +4,7 @@ import * as T from "three";
 import { buildRooftop } from "./conference-rooftop";
 import { createPlayer, stepPlayer } from "../../physics/physics";
 
-test("roof has sealed skylights, instanced gardens and an open escalator shaft", () => {
+test("roof has sealed skylights, instanced gardens and an open stair shaft", () => {
   const group = new T.Group(),
     roof = buildRooftop(group);
   assert.equal(group.children.length, 1);

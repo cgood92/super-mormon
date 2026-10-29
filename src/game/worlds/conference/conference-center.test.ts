@@ -1,11 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
-import {
-  gallery,
-  CONFERENCE_ESCALATORS,
-  advanceEscalator,
-} from "./conference-center";
+import { gallery, CONFERENCE_STAIRS } from "./conference-center";
 import { createPlayer, stepPlayer } from "../../physics/physics";
 import { STORY_ORDER } from "../../runtime/progression";
 import { canJumpIntoPainting } from "./gallery-entry";
@@ -100,9 +96,9 @@ test("Conference Center has reachable canvases on their assigned floors and nine
   world.dispose?.();
 });
 
-test("escalators physically walk to all three floors and the roof without jumping", () => {
+test("stairs allow walking up and down every flight without jumping", () => {
   const world = gallery(new THREE.Scene());
-  for (const flight of CONFERENCE_ESCALATORS) {
+  for (const flight of CONFERENCE_STAIRS) {
     const direction = Math.sign(flight.endZ - flight.startZ);
     const player = createPlayer(
       flight.x,
@@ -123,6 +119,29 @@ test("escalators physically walk to all three floors and the roof without jumpin
     assert.ok(
       highest >= flight.y + 11.95,
       `flight ${flight.y}: ${JSON.stringify({ x: player.x, y: player.y, z: player.z })}`,
+    );
+    const descending = createPlayer(
+      flight.x,
+      flight.y + 12,
+      flight.endZ + direction * 1.5,
+    );
+    for (let frame = 0; frame < 440; frame++) {
+      stepPlayer(
+        descending,
+        { x: 0, y: -direction, jump: false, jumpHeld: false },
+        1 / 60,
+        0,
+        world.solids,
+      );
+      world.update?.(1 / 60, descending);
+    }
+    assert.ok(
+      Math.abs(descending.y - flight.y) < 0.01,
+      "descends to lower floor",
+    );
+    assert.ok(
+      (descending.z - flight.startZ) * direction < 0,
+      "walks off the bottom onto the landing",
     );
   }
   world.dispose?.();
@@ -179,18 +198,6 @@ test("spawn connects through foyer landings to auditorium levels and roof", () =
   walk(-56, 47, 24);
   walk(-56, -1, 36);
   world.dispose?.();
-});
-
-test("moving escalator belts carry grounded feet and leave air and nearby halls alone", async () => {
-  const { advanceEscalator } = await import("./conference-center");
-  const player = { x: -56, y: 0.3, z: 39.5, grounded: true };
-  assert.equal(advanceEscalator(player, 0.1), true);
-  assert.ok(player.z < 39.5);
-  const airborne = { ...player, grounded: false };
-  assert.equal(advanceEscalator(airborne, 0.1), false);
-  const hall = { x: 0, y: 0, z: 30, grounded: true };
-  assert.equal(advanceEscalator(hall, 0.1), false);
-  assert.equal(advanceEscalator(player, -1), false);
 });
 
 test("roof shaft rails stop ordinary walking while the north arrival stays open", () => {
@@ -351,7 +358,7 @@ test("movement studio near spawn has a walk-in doorway and contains every practi
     );
     assert.ok(Math.abs(player.y) < 0.1, "walk remains on ground floor");
   }
-  // Cross behind the escalator, then enter through the open welcome space.
+  // Cross behind the stairs, then enter through the open welcome space.
   for (const [x, z] of [
     [-5, 36],
     [-5, 47],
@@ -430,10 +437,10 @@ test("unassigned landscape exhibit frames also stop a jump through the artwork",
   world.dispose?.();
 });
 
-test("stopping on every escalator stays supported while the belt carries the player", () => {
+test("stopping on every gallery stair stays still and upright", () => {
   const world = gallery(new THREE.Scene());
   const idle = { x: 0, y: 0, jump: false, jumpHeld: false };
-  for (const flight of CONFERENCE_ESCALATORS) {
+  for (const flight of CONFERENCE_STAIRS) {
     const direction = Math.sign(flight.endZ - flight.startZ);
     const player = createPlayer(
       flight.x,
@@ -442,19 +449,27 @@ test("stopping on every escalator stays supported while the belt carries the pla
     );
     for (let frame = 0; frame < 180; frame++) {
       stepPlayer(player, { ...idle, y: direction }, 1 / 60, 0, world.solids);
-      advanceEscalator(player, 1 / 60);
+      world.update?.(1 / 60, player);
     }
-    const stopHeight = player.y;
+    // Let normal input deceleration finish before measuring a stationary stop.
+    for (let frame = 0; frame < 60; frame++) {
+      stepPlayer(player, idle, 1 / 60, 0, world.solids);
+      world.update?.(1 / 60, player);
+    }
+    const stopped = { x: player.x, y: player.y, z: player.z };
+    assert.ok(player.y > flight.y + 1 && player.y < flight.y + 11);
     for (let frame = 0; frame < 600; frame++) {
       stepPlayer(player, idle, 1 / 60, 0, world.solids);
-      advanceEscalator(player, 1 / 60);
-      assert.ok(
-        player.y >= stopHeight - 0.01,
-        `stopped flight ${flight.y}: feet ${player.y}, started ${stopHeight}`,
+      world.update?.(1 / 60, player);
+      assert.deepEqual(
+        { x: player.x, y: player.y, z: player.z },
+        stopped,
+        `idle stair on floor ${flight.y} must not carry the player`,
       );
       assert.equal(player.grounded, true);
+      assert.equal(player.crouching, false, "no forced crouch on open stairs");
+      assert.equal(player.move, "idle");
     }
-    assert.ok(player.y > stopHeight + 1, "idle rider continues uphill");
   }
   world.dispose?.();
 });
@@ -480,7 +495,7 @@ test("first upper landing gives a broad supported turn toward either hallway", (
           0,
           world.solids,
         );
-        advanceEscalator(player, 1 / 60);
+        world.update?.(1 / 60, player);
       }
       assert.ok(Math.hypot(player.x - target.x, player.z - target.z) < 0.15);
       assert.ok(

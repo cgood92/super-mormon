@@ -11,7 +11,7 @@ const measure = (text: string, size: number) =>
 for (const [words, width, height] of [
   ["STORY GALLERY", 25, 1],
   ["AUDITORIUM · ALL LEVELS OPEN", 12, 0.85],
-  ["ROOF GARDENS ↑ ESCALATORS", 14, 0.8],
+  ["ROOF GARDENS ↑ STAIRS", 14, 0.8],
   [
     "A long painting caption explaining the journey through the wilderness",
     6,

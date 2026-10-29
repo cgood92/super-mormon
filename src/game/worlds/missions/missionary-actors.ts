@@ -48,7 +48,7 @@ export function buildWanderingElders(parent: T.Group, solids: Solid[]) {
     missionaryActor(parent, true, 0),
     missionaryActor(parent, true, 1),
   ];
-  // Both ends of the second-to-third-floor escalator have wide landings.
+  // Both ends of the second-to-third-floor stair have wide landings.
   // A long upper-floor promenade precedes the occasional lower-floor visit.
   const route = [
     { x: 30, y: 24, z: 29 },

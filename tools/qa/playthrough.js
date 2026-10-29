@@ -86,7 +86,7 @@ export async function enter(id) {
   if (side) {
     await go(-5, 47, 0.3);
     const floor = Math.round((p.y - 0.59) / 12);
-    // Ride the actual alternating escalators; skirt the open wells on landings.
+    // Walk the alternating stairs; skirt the open wells on landings.
     for (let level = 0; level < floor; level++) {
       const x = level % 2 === 0 ? -56 : 56;
       const startZ = level % 2 === 0 ? 47 : -1;
