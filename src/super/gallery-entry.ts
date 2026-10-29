@@ -1,4 +1,5 @@
 import type { PlayerState, Solid } from "./physics";
+import type { WorldData, WorldId, Point } from "./worlds";
 
 /** Coordinates are the visible canvas plane; north faces +Z, east faces -X. */
 export type PaintingPortal = {
@@ -40,4 +41,19 @@ export function canJumpIntoPainting(
     normal <= THICKNESS / 2 + 0.52 &&
     Math.abs(tangent) <= WIDTH / 2 - 0.15
   );
+}
+
+/** Return to the story's own floor, clear of the canvas and caption plinth. */
+export function galleryReturnSpawn(
+  world: Pick<WorldData, "spawn" | "portals">,
+  story: WorldId | undefined,
+): Point {
+  const portal = world.portals?.find((entry) => entry.id === story);
+  if (!portal) return world.spawn;
+  return {
+    x: portal.x - (portal.facing === "east" ? 3 : 0),
+    y: portal.y - 0.59,
+    z: portal.z + (portal.facing === "east" ? 0 : 3),
+    yaw: portal.facing === "east" ? -Math.PI / 2 : 0,
+  };
 }

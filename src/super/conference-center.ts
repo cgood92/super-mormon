@@ -2,9 +2,10 @@ import { drawSamuelPainting } from "./samuel-painting";
 import { drawThirdNephiPainting } from "./third-nephi-painting";
 import * as THREE from "three";
 import { label, painting } from "./art";
-import { STORY_ORDER } from "./progression";
+import { STORY_ORDER, type StoryId } from "./progression";
 import { laterPainting } from "./gallery-layout";
 import { paintingCollider } from "./gallery-entry";
+import { paintingCaption } from "./gallery-caption";
 import type { WorldData } from "./worlds";
 import {
   conferenceKit,
@@ -14,6 +15,13 @@ import {
 import { buildConferenceChristus } from "./conference-christus";
 import { buildAuditorium } from "./conference-auditorium";
 import { buildRooftop } from "./conference-rooftop";
+
+const GALLERY_ARTWORK: Partial<Record<StoryId, string>> = {
+  "broken-bow": "broken-bow.jpg",
+  bountiful: "ship.jpg",
+  voyage: "voyage.jpg",
+  promised: "promised-land.jpg",
+};
 
 export const CONFERENCE_LEVELS = [0, 12, 24] as const;
 export const CONFERENCE_ESCALATORS = [
@@ -270,8 +278,7 @@ export function gallery(scene: THREE.Scene): WorldData {
       `${import.meta.env?.BASE_URL ?? "/"}art/gallery/${file}`,
       0xffffff,
     );
-    label(group, title, x, 0.55, 15.7, 6, 0.52);
-    solids.push({ x, y: 0.55, z: 15.7, w: 6, h: 0.52, d: 0.18 });
+    paintingCaption(group, solids, title, x, 0, 15.7, 6);
     const portal = {
       id,
       x,
@@ -288,10 +295,20 @@ export function gallery(scene: THREE.Scene): WorldData {
     laterPainting,
   )) {
     add(x, y, wallZ, 8, 6, 0.45, C.pale, "side hallway story wall");
-    const image = painting(group, x, y + 0.7, wallZ + 0.3, "", 0xffffff);
-    image.onBeforeRender = () => {};
+    const artwork = GALLERY_ARTWORK[id];
+    const image = painting(
+      group,
+      x,
+      y + 0.7,
+      wallZ + 0.3,
+      artwork
+        ? `${import.meta.env?.BASE_URL ?? "/"}art/gallery/${artwork}`
+        : "",
+      0xffffff,
+    );
+    if (!artwork) image.onBeforeRender = () => {};
     image.name = `${id} story painting`;
-    if (typeof document !== "undefined") {
+    if (!artwork && typeof document !== "undefined") {
       const canvas = document.createElement("canvas");
       canvas.width = 384;
       canvas.height = 512;
@@ -633,8 +650,7 @@ export function gallery(scene: THREE.Scene): WorldData {
         (image.material as THREE.MeshBasicMaterial).map = texture;
       }
     }
-    label(group, title, x, y + 0.55, wallZ + 0.7, 7, 0.52);
-    solids.push({ x, y: y + 0.55, z: wallZ + 0.7, w: 7, h: 0.52, d: 0.18 });
+    paintingCaption(group, solids, title, x, y, wallZ + 0.7, 7);
     const portal = {
       id,
       x,
@@ -646,16 +662,6 @@ export function gallery(scene: THREE.Scene): WorldData {
     portals.push(portal);
     solids.push(paintingCollider(portal));
   }
-  label(
-    group,
-    "MORE STORIES · SIDE HALLWAYS & UPPER FLOORS",
-    39,
-    6.8,
-    15.65,
-    20,
-    0.8,
-  );
-  label(group, "THE BOOK OF MORMON · STORY GALLERY", 0, 6.8, 15.65, 25, 1);
   // Ground-floor movement studio: wide east doorway and clear hall passages at z=0/43.
   add(-78, 0, 4, 20, 9.8, 0.35, C.pale, "movement studio north wall");
   add(-78, 0, 40, 20, 9.8, 0.35, C.pale, "movement studio south wall");
@@ -663,9 +669,6 @@ export function gallery(scene: THREE.Scene): WorldData {
   add(-68, 0, 15.5, 0.35, 9.8, 23, C.pale, "movement studio east north wall");
   add(-68, 0, 37.5, 0.35, 9.8, 5, C.pale, "movement studio east south wall");
   add(-68, 7.4, 31, 0.35, 2.4, 8, C.pale, "movement studio doorway lintel");
-  const studioSign = label(group, "MOVEMENT STUDIO", -67.78, 6.2, 31, 11, 1);
-  studioSign.rotation.y = Math.PI / 2;
-  studioSign.name = "movement studio entrance sign";
   add(-82, 0, 30, 3.2, 2.25, 3.2, 0xa5b6a5, "practice ledge");
   add(-84, 0, 14, 0.35, 3.6, 0.35, C.timber, "practice pole");
   add(-75.6, 0, 14, 0.35, 1.4, 3.3, 0x879a91);
