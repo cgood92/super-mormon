@@ -17,7 +17,7 @@ Keep PR checks read-only. Put asset retention (`contents: write`) in a separate 
 
 ## Repository snapshot · October 29, 2026
 
-The workflow deploys only on a push to `main` or a manual run from `main`. The `github-pages` environment independently allows only the `main` branch, but permits administrator bypass and has no required reviewer. No rulesets were returned. The Actions policy endpoint denied access, and classic branch protection returned HTTP 404; those settings remain unverified.
+The workflow deploys only on a push to `main` or a manual run from `main`. The `github-pages` environment independently allows only the `main` branch, but permits administrator bypass and has no required reviewer. Using the owner account, Actions defaults to read-only and cannot create/approve pull requests, but outside-run approval covers only first-time contributors. The `main` branch has no classic protection and no rulesets.
 
 The build job currently requests `contents: write` for asset retention, including PR checks. Normal fork token restrictions reduce that permission, but separating the privileged job is still recommended. These documentation changes do not change workflows or repository settings.
 
