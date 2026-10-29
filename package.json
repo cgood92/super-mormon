@@ -19,7 +19,7 @@
     "prettier": "^3.9.10",
     "tsx": "^4.20.6",
     "typescript": "^7.0.2",
-    "vite": "^6.4.1"
+    "vite": "^8.3.5"
   },
   "license": "MIT"
 }
