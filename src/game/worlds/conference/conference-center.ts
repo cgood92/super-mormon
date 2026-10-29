@@ -24,7 +24,7 @@ const GALLERY_ARTWORK: Partial<Record<StoryId, string>> = {
 };
 
 export const CONFERENCE_LEVELS = [0, 12, 24] as const;
-export const CONFERENCE_ESCALATORS = [
+export const CONFERENCE_STAIRS = [
   { x: -56, y: 0, startZ: 40, endZ: 6 },
   { x: 56, y: 12, startZ: 6, endZ: 40 },
   { x: -56, y: 24, startZ: 40, endZ: 6 },
@@ -104,7 +104,7 @@ export function gallery(scene: THREE.Scene): WorldData {
     if (y === 0)
       add(0, -0.55, -25, 180, 0.55, 160, C.stone, "ground foundation");
     else {
-      // Open wells accommodate actual continuous escalator stair surfaces.
+      // Open wells accommodate continuous stair surfaces.
       add(0, y - 0.5, 47.5, 180, 0.5, 15, C.stone, "south landing");
       add(0, y - 0.5, 2.5, 124, 0.5, 7, C.stone, "north landing");
       add(0, y - 0.5, 23, 100, 0.5, 34, C.stone, "central foyer slab");
@@ -219,10 +219,10 @@ export function gallery(scene: THREE.Scene): WorldData {
       12,
       0.85,
     );
-    label(group, "ROOF GARDENS ↑  ·  ESCALATORS", -53, y + 6.2, 41, 14, 0.8);
+    label(group, "ROOF GARDENS ↑  ·  STAIRS", -53, y + 6.2, 41, 14, 0.8);
   }
-  // Wide paired escalator belts with small climbable risers and bronze rails.
-  for (const flight of CONFERENCE_ESCALATORS) {
+  // Stationary stairs with small climbable risers and bronze rails.
+  for (const flight of CONFERENCE_STAIRS) {
     const count = 40,
       run = (flight.endZ - flight.startZ) / count;
     for (let i = 0; i < count; i++)
@@ -234,7 +234,7 @@ export function gallery(scene: THREE.Scene): WorldData {
         0.3,
         Math.abs(run),
         0x777d7b,
-        "escalator tread",
+        "stair tread",
       );
     for (const dx of [-3.8, 3.8]) {
       const rail = new THREE.Mesh(
@@ -676,13 +676,13 @@ export function gallery(scene: THREE.Scene): WorldData {
   group.add(ring);
   for (const y of [12, 24])
     for (const x of [-62, -50, 50, 62])
-      add(x, y, 23, 0.18, 1.1, 32, C.bronze, "escalator well balustrade");
+      add(x, y, 23, 0.18, 1.1, 32, C.bronze, "stair well balustrade");
   // The roof opening is wider than the lower wells; guard its exact slab edges.
   for (const x of [-63, -49])
-    add(x, 36, 23, 0.2, 1.15, 34, C.bronze, "roof escalator shaft rail");
+    add(x, 36, 23, 0.2, 1.15, 34, C.bronze, "roof stair shaft rail");
   add(-56, 36, 40, 14.2, 1.15, 0.2, C.bronze, "roof shaft south rail");
   // Warm auditorium boundary with three permanently open entries on each level.
-  // Side doors align with the escalator approaches; the foyer at z=0 stays clear.
+  // Side doors align with the stair approaches; the foyer at z=0 stays clear.
   for (const y of CONFERENCE_LEVELS) {
     for (const [left, right] of [
       [-66, -60.5],
@@ -842,7 +842,6 @@ export function gallery(scene: THREE.Scene): WorldData {
     name: "Conference Center",
     secretEntrance: elders.point,
     update: (dt, player) => {
-      advanceEscalator(player, dt);
       elders.update(dt, player);
     },
     subtitle: "Explore three floors, the auditorium and roof gardens",
@@ -964,33 +963,4 @@ function practiceLessons(): NonNullable<WorldData["tutorials"]> {
     z: Number(z) + 78,
     radius: 3,
   }));
-}
-
-/** Slow moving treads assist grounded visitors; normal movement can overcome the belt. */
-export function advanceEscalator(
-  player: { x: number; y: number; z: number; grounded: boolean },
-  dt: number,
-): boolean {
-  if (!player.grounded || !Number.isFinite(dt) || dt <= 0) return false;
-  for (const flight of CONFERENCE_ESCALATORS) {
-    if (Math.abs(player.x - flight.x) > 3.1) continue;
-    const direction = Math.sign(flight.endZ - flight.startZ),
-      distance = (player.z - flight.startZ) * direction,
-      length = Math.abs(flight.endZ - flight.startZ),
-      treadDepth = length / 40;
-    if (distance < 0 || distance >= length) continue;
-    const top =
-      flight.y + 0.3 * Math.min(40, Math.floor(distance / treadDepth) + 1);
-    if (Math.abs(player.y - top) > 0.36) continue;
-    const next = Math.min(length, distance + 0.9 * Math.min(dt, 0.1));
-    player.z = flight.startZ + direction * next;
-    // Step-up can already have placed the leading foot on the next tread.
-    // Belt motion must never pull it back down inside that tread.
-    player.y = Math.max(
-      player.y,
-      flight.y + 0.3 * Math.min(40, Math.floor(next / treadDepth) + 1),
-    );
-    return true;
-  }
-  return false;
 }
