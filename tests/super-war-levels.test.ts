@@ -258,7 +258,7 @@ test("city dwellings block a direct walk while the carried banner tracks Moroni 
   world.dispose?.();
 });
 
-test("Antipas has a walkable spiral and three timed messenger races before the historical fourth request", () => {
+test("Antipas has three playable messenger races that automatically warn Lehonti at the summit", () => {
   const scene = new T.Scene(),
     world = buildLehontiMountain(scene),
     h = harness(world);
@@ -314,7 +314,7 @@ test("Antipas has a walkable spiral and three timed messenger races before the h
         );
       }
     } else walk(world, h.player, before.target, 3000);
-    h.runtime.update(1 / 60, h.player, { ...idle, interact: true });
+    h.runtime.update(1 / 60, h.player, idle);
     h.advance();
     if (before.phase === "race" && raced < 3)
       assert.ok(
@@ -326,11 +326,11 @@ test("Antipas has a walkable spiral and three timed messenger races before the h
   assert.equal(raced, 3);
   assert.equal(state().phase, "done");
   assert.equal(h.done(), 1);
-  assert.ok(h.dialogs.some((body) => /fourth/i.test(body)));
-  assert.ok(h.dialogs.some((body) => /poison/i.test(body)));
+  assert.match(h.dialogs.at(-1)!, /He’s not going down this time. Great job/);
+  assert.doesNotMatch(h.dialogs.at(-1)!, /invented|fictional/i);
   assert.equal(
     h.dialogs.filter((body) => /warn Lehonti/i.test(body)).length,
-    3,
+    2,
   );
   world.dispose?.();
   world.dispose?.();
@@ -573,5 +573,34 @@ test("liberty background cast keeps the expanded city within its geometry budget
       vertices += object.geometry.getAttribute("position")?.count ?? 0;
   });
   assert.ok(vertices < 180_000, `background scene has ${vertices} vertices`);
+  world.dispose?.();
+});
+
+test("Antipas messenger runs facing the trail with moving legs and terrace-supported feet", () => {
+  const scene = new T.Scene(),
+    world = buildLehontiMountain(scene),
+    h = harness(world);
+  const messenger = scene.getObjectByName("Actual embassy messenger 1")!;
+  const leg = messenger.getObjectByName("left-leg")!;
+  let minLeg = Infinity,
+    maxLeg = -Infinity;
+  for (let frame = 0; frame < 90; frame++) {
+    h.runtime.update(1 / 60, h.player, idle);
+    world.update?.(1 / 60, h.player);
+    minLeg = Math.min(minLeg, leg.rotation.x);
+    maxLeg = Math.max(maxLeg, leg.rotation.x);
+    const support = Math.max(
+      ...world.solids
+        .filter(
+          (s) =>
+            Math.abs(messenger.position.x - s.x) <= s.w / 2 &&
+            Math.abs(messenger.position.z - s.z) <= s.d / 2,
+        )
+        .map((s) => s.y + s.h),
+    );
+    assert.ok(Math.abs(messenger.position.y - support) < 0.001);
+  }
+  assert.ok(Math.abs(Math.sin(messenger.rotation.y + Math.PI / 2)) < 0.02);
+  assert.ok(maxLeg - minLeg > 0.2, "messenger legs must animate while racing");
   world.dispose?.();
 });

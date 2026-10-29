@@ -71,7 +71,7 @@ type CastTraits = {
   hem: number;
   width: number;
   brow: number;
-  outfit: "travel" | "regal" | "undertunic" | "armor" | "shawl";
+  outfit: "travel" | "regal" | "undertunic" | "armor" | "shawl" | "modern";
 };
 
 // Identity changes anatomy, hair and the garment cut as well as color. These
@@ -80,6 +80,8 @@ const ORIGINAL_CAST_TRAITS: Readonly<
   Record<
     Exclude<
       SculptedCharacterRole,
+      | "warning-runner"
+      | "missionary"
       | "moroni"
       | "teancum"
       | "morianton"
@@ -324,6 +326,22 @@ export const SCULPTED_CAST_TRAITS: Readonly<
   Record<SculptedCharacterRole, CastTraits>
 > = {
   ...ORIGINAL_CAST_TRAITS,
+  missionary: {
+    ...ORIGINAL_CAST_TRAITS.sam,
+    outfit: "modern",
+    beard: "none",
+    hair: 0x493a2c,
+    robe: 0xfafafa,
+    coat: 0xffffff,
+    trim: 0x202631,
+    hem: 0.86,
+  },
+  "warning-runner": {
+    ...ORIGINAL_CAST_TRAITS.guard,
+    robe: 0xc2c3c4,
+    coat: 0x92979d,
+    trim: 0xd5d6d8,
+  },
   moroni: {
     ...ORIGINAL_CAST_TRAITS.guard,
     outfit: "armor",
@@ -942,7 +960,12 @@ function makeSculpted(
     );
     return smoothUnion(shirt(x, y, z), skirt, 0.075);
   };
-  const hasOuterCoat = cast?.outfit !== "undertunic";
+  const modern = cast?.outfit === "modern";
+  if (modern) {
+    materials.robeShadow.color.setHex(0x242934);
+    materials.leather.color.setHex(0x161b23);
+  }
+  const hasOuterCoat = cast?.outfit !== "undertunic" && !modern;
   add(
     sculpt({
       bounds: [
@@ -950,7 +973,12 @@ function makeSculpted(
         [0.82, 1.64, 0.5],
       ],
       resolution: resolution(index === 2 && !hasOuterCoat ? 64 : 48),
-      field: index === 2 && !hasOuterCoat ? longGarment : shirt,
+      field: modern
+        ? (x, y, z) =>
+            Math.max(shirt(x, y, z), Math.abs(x) < 0.35 ? 0.86 - y : -1)
+        : index === 2 && !hasOuterCoat
+          ? longGarment
+          : shirt,
       material: materials.robe,
     }).geometry,
     materials.robe,
@@ -1001,8 +1029,15 @@ function makeSculpted(
   // The adventure, animated, guardian and film silhouettes expose real legs.
   // Each trouser is a tapered sculpted volume under its shorter tunic.
   if (index === 0 || index === 2 || index === 3 || index === 5) {
-    const trouserTop =
-      role === "moroni" ? 0.95 : index === 2 ? 0.73 : index === 3 ? 0.67 : 0.72;
+    const trouserTop = modern
+      ? 0.94
+      : role === "moroni"
+        ? 0.95
+        : index === 2
+          ? 0.73
+          : index === 3
+            ? 0.67
+            : 0.72;
     for (const side of [-1, 1]) {
       const cx = side * 0.205;
       const trouser: DistanceField = (x, y, z) => {
@@ -1043,7 +1078,7 @@ function makeSculpted(
         sculpt({
           bounds: [
             [cx - 0.21, 0.08, -0.22],
-            [cx + 0.21, role === "moroni" ? 1.08 : 0.89, 0.22],
+            [cx + 0.21, modern ? 1.12 : role === "moroni" ? 1.08 : 0.89, 0.22],
           ],
           resolution: resolution(32),
           field: trouser,
@@ -1275,7 +1310,7 @@ function makeSculpted(
             material: materials.mantle,
           }).geometry
       : surface(78, 35, cloakPoint);
-  if (cast?.outfit !== "undertunic") {
+  if (cast?.outfit !== "undertunic" && !modern) {
     const mantle = add(cloakGeometry, materials.mantle, "flowing-mantle");
     if (role === "moroni") {
       // Alma 46:12 describes a coat torn for the title. This removable cloth
@@ -1287,6 +1322,7 @@ function makeSculpted(
       coat.add(mantle);
     }
   } else cloakGeometry.dispose();
+
   const edgePoints: T.Vector3[] = [];
   for (let i = 0; i <= 32; i++) edgePoints.push(cloakPoint(0, i / 32));
   if (index !== 2)
@@ -2468,6 +2504,28 @@ function makeSculpted(
   }
 
   // Normalize only once after all silhouettes have been built.
+  if (modern) {
+    const belt = group.getObjectByName("leather-belt");
+    if (belt) belt.visible = false;
+    const waist = add(
+      new T.BoxGeometry(0.61, 0.16, 0.44),
+      materials.robeShadow,
+      "modern-waistband",
+    );
+    waist.position.set(0, 0.87, 0);
+    const tie = add(
+      new T.BoxGeometry(0.075, 0.42, 0.025),
+      materials.leather,
+      "modern-tie",
+    );
+    tie.position.set(0, 1.29, 0.315);
+    const tag = add(
+      new T.BoxGeometry(0.19, 0.1, 0.025),
+      materials.leather,
+      "missionary-name-tag",
+    );
+    tag.position.set(0.18, 1.4, 0.3);
+  }
   group.updateMatrixWorld(true);
   const bounds = new T.Box3().setFromObject(group);
   const scale = 2 / (bounds.max.y - bounds.min.y);

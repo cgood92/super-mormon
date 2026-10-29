@@ -904,7 +904,9 @@ async function load(id: WorldId) {
   }
   el("world-name").textContent = world.name;
   el("chapter-label").textContent =
-    WAR_CHAPTERS[id] ??
+    (id === "missionary"
+      ? "A FICTIONAL NEIGHBORHOOD CHALLENGE"
+      : WAR_CHAPTERS[id]) ??
     (id === "hub"
       ? "SALT LAKE CITY · THE CONFERENCE CENTER"
       : id === "streets"
@@ -998,7 +1000,11 @@ async function load(id: WorldId) {
   if (started)
     analytics.start(
       id,
-      id === "hub" ? "gallery" : completed.has(id) ? "replay" : "painting",
+      id === "hub"
+        ? "gallery"
+        : isStoryId(id) && completed.has(id)
+          ? "replay"
+          : "painting",
       input.device,
     );
   renderQuality.reset();
@@ -1010,7 +1016,7 @@ async function load(id: WorldId) {
   updateObjective();
   if (started)
     message(
-      WAR_CHAPTERS[id]
+      WAR_CHAPTERS[id] || id === "missionary"
         ? (world.initialObjective ?? world.subtitle)
         : id === "hub"
           ? nextStory(completed)
@@ -1648,6 +1654,13 @@ function update(dt: number, activeElapsed = dt) {
         } catch {
           message("Organ audio is unavailable in this browser.", 3);
         }
+      }
+    }
+    if (world.secretEntrance && near(world.secretEntrance, 3, 2)) {
+      prompt = "{action} · Join the elders’ neighborhood challenge";
+      if (state.interact) {
+        warp("missionary");
+        return;
       }
     }
     const p = world.portals?.find((p) => near(p, 2.2, 4));

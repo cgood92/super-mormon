@@ -14,6 +14,8 @@ export type CharacterRole =
   | "lehi"
   | "laman"
   | "guard"
+  | "warning-runner"
+  | "missionary"
   | "laban"
   | "laban-undressed"
   | "sariah"

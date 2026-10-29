@@ -197,6 +197,7 @@ export function buildTitleOfLiberty(scene: T.Scene): WorldData {
       cursor: number;
     },
     dt: number,
+    leader?: (typeof volunteers)[number],
   ) => {
     for (let remain = dt; remain > 1e-6; remain -= 1 / 60) {
       const point = actor.path[actor.cursor];
@@ -210,11 +211,27 @@ export function buildTitleOfLiberty(scene: T.Scene): WorldData {
         dx = next ? next.x - actor.body.x : 0,
         dz = next ? next.z - actor.body.z : 0,
         d = Math.hypot(dx, dz);
+      // Keep a single-file gap on the shared switchbacks. Ground trail points
+      // spread back into each volunteer's own place in the marching formation.
+      const waiting =
+        leader &&
+        next &&
+        next.y > 0 &&
+        leader.cursor >= actor.cursor &&
+        Math.hypot(
+          leader.body.x - actor.body.x,
+          leader.body.y - actor.body.y,
+          leader.body.z - actor.body.z,
+        ) < 1.8;
+      if (waiting) {
+        actor.body.vx = 0;
+        actor.body.vz = 0;
+      }
       stepPlayer(
         actor.body,
         {
-          x: d > 0.1 ? -dx / d : 0,
-          y: d > 0.1 ? dz / d : 0,
+          x: !waiting && d > 0.1 ? -dx / d : 0,
+          y: !waiting && d > 0.1 ? dz / d : 0,
           jump: false,
           jumpHeld: false,
         },
@@ -415,12 +432,19 @@ export function buildTitleOfLiberty(scene: T.Scene): WorldData {
           Math.abs(last.y - playerPoint.y) > 0.4
         ) {
           trail.push({ ...playerPoint });
-          volunteers.forEach((v) => v.path.push({ ...playerPoint }));
+          volunteers.forEach((v, i) =>
+            v.path.push({
+              ...playerPoint,
+              x: playerPoint.x + ((i % 4) - 1.5) * 1.8,
+              z: playerPoint.z + (Math.floor(i / 4) - 1) * 1.8,
+            }),
+          );
         }
       }
-      volunteers.forEach((v) => {
+      volunteers.forEach((v, i) => {
         v.sword.visible = gathered;
-        if (roofs.size > 0 || gathered) moveActor(v, delta);
+        if (roofs.size > 0 || gathered)
+          moveActor(v, delta, phase === "lead" ? volunteers[i - 1] : undefined);
       });
       if (phase === "ending" || phase === "done")
         opponentWalkers.forEach((v, i) => {

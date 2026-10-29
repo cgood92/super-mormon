@@ -12,6 +12,15 @@ type PreparedWorld = {
 
 // Load code first, then let the caller atomically replace the active scene.
 export async function prepareWorld(id: WorldId): Promise<PreparedWorld> {
+  if (id === "missionary") {
+    const module = await deployedScene(
+      "src/super/missionary-neighborhood.ts",
+      () => import("./missionary-neighborhood"),
+    );
+    return {
+      buildWorld: (_, scene) => module.buildMissionaryNeighborhood(scene),
+    };
+  }
   if (id === "signs") {
     const module = await deployedScene(
       "src/super/signs-night.ts",

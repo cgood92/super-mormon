@@ -221,14 +221,13 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
     reason:
       "Small pennants above the solid summit terraces; they do not support the player.",
   });
-  let phase: "race" | "fourth" | "done" = "race";
+  let phase: "race" | "done" = "race";
   let race = 0,
     pending = false,
     time = 0,
     retries = 0,
     messengerProgress = 0,
-    runnerProgress = 0,
-    tableau = 0;
+    runnerProgress = 0;
   const trailhead = { x: route[0].x, y: 0, z: route[0].z + 3.3 };
   const target = () => summit;
   function updateActors(dt: number) {
@@ -236,28 +235,42 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
       rig.group.visible = phase === "race" && i === race;
       if (i === race && phase === "race") {
         const p = locationAt(messengerProgress);
-        rig.group.position.set(p.x, p.y, p.z);
+        const ahead = locationAt(
+          Math.min(route.length - 1, messengerProgress + 0.01),
+        );
+        const behind = locationAt(Math.max(0, messengerProgress - 0.01));
+        const dx = ahead.x - behind.x,
+          dz = ahead.z - behind.z;
+        const length = Math.hypot(dx, dz) || 1;
+        const speed = race === 2 ? 1.25 : race === 1 ? 1.17 : 1.1;
+        // Terrace tops are level, so feet follow their actual support height
+        // instead of hovering along an interpolated slope between steps.
+        const support = Math.max(
+          ...route
+            .filter(
+              (step) =>
+                Math.abs(step.x - p.x) <= 2.85 &&
+                Math.abs(step.z - p.z) <= 2.85,
+            )
+            .map((step) => step.y),
+        );
+        rig.update(dt, {
+          ...p,
+          y: support,
+          vx: (dx / length) * speed * 5,
+          vy: 0,
+          vz: (dz / length) * speed * 5,
+          yaw: Math.atan2(dx, dz),
+          grounded: true,
+          runSpeed: speed * 5,
+          move: "run",
+        });
       }
     });
-    if (phase === "fourth") {
-      tableau = Math.min(1, tableau + dt / 2.4);
-      amalickiah.group.visible = true;
-      const p = locationAt(route.length - 9 + tableau * 5.5);
-      amalickiah.group.position.set(p.x, p.y, p.z);
-      const descent = locationAt(route.length - 1 - tableau * 2);
-      lehonti.group.position.set(descent.x, descent.y, descent.z);
-      summitGuards.forEach((guard, i) =>
-        guard.group.position.set(
-          descent.x + (i ? 1.3 : -1.3),
-          descent.y,
-          descent.z + 0.8,
-        ),
-      );
-    }
   }
   return {
     name: "Lehonti on Mount Antipas",
-    subtitle: "Three refusals and a small descent · Alma 47",
+    subtitle: "Race to warn Lehonti · inspired by Alma 47",
     initialObjective: "Race the first messenger up the winding mountain trail",
     spawn: trailhead,
     solids,
@@ -287,7 +300,7 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
       } else land.update(delta, phase === "done" ? undefined : target());
     },
     adventure(hooks) {
-      hooks.setAvatar("guard");
+      hooks.setAvatar("warning-runner");
       hooks.toast(
         "Game invention: you are an unnamed warning runner. The three embassies, Lehonti's refusals, and later tragedy are from Alma 47.",
       );
@@ -305,7 +318,7 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
           retries,
           pending,
         }),
-        update(dt, player, input) {
+        update(dt, player) {
           if (phase === "done")
             return {
               objective: "Lehonti's story remembered",
@@ -338,7 +351,7 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
                 `The messenger reached Lehonti's camp first. Try the full ascent for race ${race + 1} again; follow the blue trail beacon.`,
               );
             }
-            if (reached && input.interact && !pending) {
+            if (reached && !pending) {
               pending = true;
               const stories = [
                 "First embassy: Amalickiah sends a secret messenger at night asking Lehonti to come down to the foot of Antipas. You warn Lehonti at his summit camp. Lehonti refuses. Your warning and race are invented.",
@@ -348,13 +361,15 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
               hooks.dialog(
                 `Alma 47:${race === 0 ? "10–11" : "11"}`,
                 `Message ${race + 1} · Lehonti refuses`,
-                stories[race],
+                race === 2
+                  ? "Amalickiah tried to convince Lehonti to come down the mountain. You arrived in time to warn him. He’s not going down this time. Great job."
+                  : stories[race],
                 () => {
                   race++;
                   pending = false;
                   if (race === 3) {
-                    phase = "fourth";
-                    tableau = 0;
+                    phase = "done";
+                    hooks.complete();
                   } else {
                     // A short imagined return trip gives the next messenger a
                     // fresh full ascent without requiring a long downhill replay.
@@ -388,40 +403,8 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
             return {
               objective: `Race ${race + 1}/3: climb the whole spiral to Lehonti's camp (${Math.max(0, Math.ceil((segmentLength - runnerProgress) * 5))} m)`,
               prompt: reached
-                ? "Interact to witness Lehonti's answer"
+                ? "Lehonti hears your warning"
                 : `Messenger race · ${Math.ceil(time)} s`,
-            };
-          }
-          if (phase === "fourth") {
-            const near = withinTask(player, summit, 3.4);
-            if (near && input.interact && !pending) {
-              pending = true;
-              hooks.dialog(
-                "Alma 47:12–19",
-                "A little descent · a tragic betrayal",
-                "Fourth message: Amalickiah climbs nearly to Lehonti's camp, asks him to come down only a little, and tells him to bring his guards. Lehonti descends with them. He later surrounds Amalickiah's army, but Amalickiah gains the position of second leader and has a servant poison Lehonti by degrees. Lehonti dies; Amalickiah takes command. The warning runner is invented and cannot change this recorded ending.",
-                () => {
-                  phase = "done";
-                  pending = false;
-                  hooks.complete();
-                },
-                {
-                  focus: { x: summit.x, y: summit.y + 1.2, z: summit.z },
-                  wide: 6.5,
-                  actors: [
-                    { group: lehonti.group, gesture: "talk", speaker: true },
-                    { group: amalickiah.group, gesture: "point" },
-                    ...summitGuards.map((guard) => ({ group: guard.group })),
-                  ],
-                },
-              );
-            }
-            return {
-              objective:
-                "Watch Amalickiah's fourth approach near Lehonti's camp",
-              prompt: near
-                ? "Interact to witness the ending"
-                : "Return to the summit beacon",
             };
           }
           return {
