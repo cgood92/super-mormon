@@ -1,3 +1,4 @@
+import { buildMissionaryNeighborhood } from "./missionary-neighborhood";
 import { buildSamuelWall } from "./samuel-wall";
 import { buildSignsNight } from "./signs-night";
 import { buildLachoneusGathering } from "./lachoneus-gathering";
@@ -24,6 +25,7 @@ import { gallery } from "./conference-center";
 import type { Climbable, PlayerState } from "./physics";
 import type { AdventureHooks, AdventureRuntime } from "./adventure";
 export type WorldId =
+  | "missionary"
   | "signs"
   | "gathering"
   | "christ-bountiful"
@@ -67,6 +69,7 @@ export type WorldData = {
   solids: Solid[];
   adventure?: (hooks: AdventureHooks) => AdventureRuntime;
   actorParent?: THREE.Group;
+  secretEntrance?: { x: number; y: number; z: number };
   organ?: ReturnType<typeof import("./conference-organ").buildConferenceOrgan>;
   landmarks?: { name: string; x: number; y: number; z: number }[];
   portals?: {
@@ -75,7 +78,7 @@ export type WorldData = {
     y: number;
     z: number;
     title: string;
-    facing?: "north" | "east";
+    facing?: "north" | "east" | "west";
   }[];
   treasures?: { id: string; name: string; x: number; y: number; z: number }[];
   climbables?: Climbable[];
@@ -110,6 +113,8 @@ export type WorldData = {
 
 export function buildWorld(id: WorldId, scene: THREE.Scene): WorldData {
   switch (id) {
+    case "missionary":
+      return buildMissionaryNeighborhood(scene);
     case "signs":
       return buildSignsNight(scene);
     case "gathering":

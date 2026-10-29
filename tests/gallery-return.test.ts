@@ -9,14 +9,21 @@ test("story returns land safely in front of every painting with a walkable exit"
   const world = gallery(new THREE.Scene());
   for (const portal of world.portals!) {
     const spawn = galleryReturnSpawn(world, portal.id);
-    assert.equal(spawn.x, portal.x);
-    assert.equal(spawn.z, portal.z + 3);
-    assert.equal(spawn.yaw, 0);
+    const side = portal.facing === "east" || portal.facing === "west";
+    const direction = portal.facing === "east" ? -1 : 1;
+    assert.equal(spawn.x, portal.x + (side ? direction * 3 : 0));
+    assert.equal(spawn.z, portal.z + (side ? 0 : 3));
+    assert.equal(spawn.yaw, side ? (direction * Math.PI) / 2 : 0);
     const player = createPlayer(spawn.x, spawn.y, spawn.z);
     for (let frame = 0; frame < 90; frame++) {
       stepPlayer(
         player,
-        { x: 0, y: 1, jump: false, jumpHeld: false },
+        {
+          x: side ? -direction : 0,
+          y: side ? 0 : 1,
+          jump: false,
+          jumpHeld: false,
+        },
         1 / 60,
         0,
         world.solids,
@@ -26,7 +33,11 @@ test("story returns land safely in front of every painting with a walkable exit"
       Math.abs(player.y - spawn.y) < 0.1,
       `${portal.id}: return floor ${player.y}`,
     );
-    assert.ok(player.z > spawn.z + 4, `${portal.id}: walk away from painting`);
+    assert.ok(
+      side ? direction * (player.x - spawn.x) > 4 : player.z > spawn.z + 4,
+      `${portal.id}: walk away from painting`,
+    );
   }
   assert.deepEqual(galleryReturnSpawn(world, undefined), world.spawn);
+  world.dispose?.();
 });

@@ -1,6 +1,7 @@
 import * as T from "three";
 import { adventureLandscape, withinTask } from "./adventure-landscape";
-import { createCharacter, type CharacterRole } from "./character";
+import { createPlayer, stepPlayer } from "./physics";
+import { planStoryCamera, StoryMeshObstacles } from "./cinematic";
 import { markScenery } from "./scenery";
 import type { Point, WorldData } from "./worlds";
 
@@ -32,22 +33,6 @@ export function buildTitleOfLiberty(scene: T.Scene): WorldData {
     180,
   );
   const { root, solids, solid } = land;
-  const crowdRigs: ReturnType<typeof createCharacter>[] = [];
-  const crowd = (role: CharacterRole, point: Point) => {
-    const rig = createCharacter(role, { quality: "crowd" });
-    rig.update(0, {
-      ...point,
-      vx: 0,
-      vy: 0,
-      vz: 0,
-      yaw: Math.PI,
-      grounded: true,
-      runSpeed: 0,
-    });
-    root.add(rig.group);
-    crowdRigs.push(rig);
-    return rig;
-  };
   scene.background = new T.Color(0xd7c8a8);
   scene.fog = new T.Fog(0xd7c8a8, 110, 235);
   const wall = (
@@ -104,40 +89,215 @@ export function buildTitleOfLiberty(scene: T.Scene): WorldData {
       bridge ? "Tower roof bridge" : "Tower switchback stair",
     );
   });
-  const craft = place(0, 29),
-    prayer = place(-14, 17),
+  const prayer = place(-14, 17),
     tower = towerRoute[towerRoute.length - 1];
-  const groups = rallySites.map((base, i) => {
-    const people = Array.from({ length: 4 }, (_, j) => {
-      const role =
-        j === 0 ? "guard" : j === 1 ? "sariah" : j === 2 ? "sam" : "child";
-      const rig = (j === 0 ? land.actor : crowd)(
-        role,
-        place(base.x + (j % 2 ? 1.4 : -1.4), base.z + (j < 2 ? -1 : 1)),
-      );
-      rig.group.name = `Rally group ${i + 1} citizen ${j + 1}`;
-      return rig;
-    });
-    return { base, people, rallied: false, x: base.x, z: base.z };
-  });
-  const guards = [
-    land.actor("guard", place(-14, -14)),
-    land.actor("guard", place(19, 22)),
+  const roofSpecs = [
+    [-47, 38, 16, 15, 8],
+    [45, 36, 19, 13, 9],
+    [-49, -19, 17, 16, 8],
+    [-48, 12, 17, 15, 10],
+    [48, 7, 18, 17, 8],
+    [48, -29, 18, 16, 10],
+    [-44, -53, 18, 13, 9],
+    [42, -55, 18, 14, 8],
   ];
-  guards.forEach((guard, i) => {
-    guard.group.name = `City watch patrol ${i + 1}`;
+  const roofSites: Point[] = roofSpecs.map(([x, z, _w, _d, y]) => ({
+    x,
+    y,
+    z,
+  }));
+  const onRoof = (player: Point, index: number) => {
+    const [x, z, w, d, h] = roofSpecs[index];
+    return (
+      Math.abs(player.x - x) < w / 2 - 0.3 &&
+      Math.abs(player.z - z) < d / 2 - 0.3 &&
+      Math.abs(player.y - h) < 0.6
+    );
+  };
+  // Broad offset terraces lead to short, readable jumping gaps; the houses
+  // themselves own their roof surfaces. No overlay roof mesh is added.
+  const roofRoutes = roofSites.map((roof, index) => {
+    const direction = roof.x > 0 ? -1 : 1;
+    const edge = roof.x + (direction * roofSpecs[index][2]) / 2;
+    const route: Point[] = [place(edge + direction * 14, roof.z + 7)];
+    for (let step = 0; step < 8; step++) {
+      const point = {
+        x: edge + direction * (12 - step * 1.5),
+        y: ((step + 1) * roof.y) / 9,
+        z: roof.z + (step % 2 ? 1 : 3),
+      };
+      solid(
+        { ...point, y: 0, w: 1.4, d: 1.7, h: point.y },
+        0xb79c73,
+        "Rooftop jumping terrace",
+      );
+      route.push(point);
+    }
+    route.push(roof);
+    return route;
   });
+  root.userData.libertyRoofRoutes = roofRoutes;
+  const groups = rallySites.map((base, i) => ({
+    base,
+    x: base.x,
+    z: base.z,
+    people: Array.from({ length: 4 }, (_, j) => {
+      const rig = land.actor(
+        j % 2 ? "sam" : "guard",
+        place(base.x + (j % 2 ? 1.5 : -1.5), base.z + (j < 2 ? -1 : 1)),
+        { quality: "crowd" },
+      );
+      rig.group.name = `Liberty volunteer ${i + 1}.${j + 1}`;
+      const sword = new T.Group();
+      const blade = new T.Mesh(
+        new T.BoxGeometry(0.13, 1.15, 0.07),
+        new T.MeshStandardMaterial({
+          color: 0xc0c5c4,
+          metalness: 0.65,
+          roughness: 0.4,
+        }),
+      );
+      const cross = new T.Mesh(
+        new T.BoxGeometry(0.45, 0.09, 0.13),
+        new T.MeshStandardMaterial({ color: 0x8d7443 }),
+      );
+      blade.position.y = 0.6;
+      sword.add(blade, cross);
+      sword.position.set(0.6, 0.85, 0);
+      sword.rotation.z = -0.3;
+      sword.name = "Volunteer sword held upright";
+      sword.visible = false;
+      rig.group.add(sword);
+      markScenery(sword, {
+        kind: "decoration",
+        reason: "Carried equipment follows an animated volunteer.",
+      });
+      return { rig, sword };
+    }),
+  }));
+  const volunteers = groups
+    .flatMap((g) => g.people)
+    .map(({ rig, sword }, i) => ({
+      rig,
+      sword,
+      body: createPlayer(rig.group.position.x, 0, rig.group.position.z),
+      path: [
+        place(0, rig.group.position.z),
+        place(0, -39),
+        ...towerRoute,
+        { x: -4.5 + (i % 4) * 3, y: 12.8, z: -63 - Math.floor(i / 4) * 1.5 },
+      ],
+      cursor: 0,
+    }));
+  const moveActor = (
+    actor: {
+      rig: (typeof volunteers)[number]["rig"];
+      body: ReturnType<typeof createPlayer>;
+      path: Point[];
+      cursor: number;
+    },
+    dt: number,
+    leader?: (typeof volunteers)[number],
+  ) => {
+    for (let remain = dt; remain > 1e-6; remain -= 1 / 60) {
+      const point = actor.path[actor.cursor];
+      if (
+        point &&
+        Math.hypot(point.x - actor.body.x, point.z - actor.body.z) < 0.32 &&
+        Math.abs(point.y - actor.body.y) < 0.6
+      )
+        actor.cursor++;
+      const next = actor.path[actor.cursor],
+        dx = next ? next.x - actor.body.x : 0,
+        dz = next ? next.z - actor.body.z : 0,
+        d = Math.hypot(dx, dz);
+      // Keep a single-file gap on the shared switchbacks. Ground trail points
+      // spread back into each volunteer's own place in the marching formation.
+      const waiting =
+        leader &&
+        next &&
+        next.y > 0 &&
+        leader.cursor >= actor.cursor &&
+        Math.hypot(
+          leader.body.x - actor.body.x,
+          leader.body.y - actor.body.y,
+          leader.body.z - actor.body.z,
+        ) < 1.8;
+      if (waiting) {
+        actor.body.vx = 0;
+        actor.body.vz = 0;
+      }
+      stepPlayer(
+        actor.body,
+        {
+          x: !waiting && d > 0.1 ? -dx / d : 0,
+          y: !waiting && d > 0.1 ? dz / d : 0,
+          jump: false,
+          jumpHeld: false,
+        },
+        Math.min(1 / 60, remain),
+        0,
+        solids,
+      );
+    }
+    actor.rig.update(dt, actor.body);
+  };
+  let descentStarted = false;
+  const camp = place(-69, -54),
+    custody = place(12, 34);
+  const opponents = Array.from({ length: 6 }, (_, i) => {
+    const rig = land.actor(
+      i === 0 ? "amalickiah" : "guard",
+      place(camp.x + (i % 3) * 2, camp.z + Math.floor(i / 3) * 3),
+      { quality: i === 0 ? "npc" : "crowd" },
+    );
+    rig.group.name =
+      i === 0
+        ? "Amalickiah at the wilderness camp"
+        : `Amalickiah follower ${i}`;
+    return rig;
+  });
+  const opponentWalkers = opponents.map((rig) => ({
+    rig,
+    body: createPlayer(rig.group.position.x, 0, rig.group.position.z),
+    path: [] as Point[],
+    cursor: 0,
+  }));
+  // Open-sided temporary custody court, an invented staging location.
+  wall(7, 34, 0.7, 10, 3, 0xa98d68, "Custody court west wall");
+  wall(12, 39, 10, 0.7, 3, 0xa98d68, "Custody court rear wall");
+  land.actor("guard", place(-14, -14), { quality: "crowd" });
+  land.actor("guard", place(19, 22), { quality: "crowd" });
   const banner = new T.Group();
   banner.name = "Carried title of liberty · rent coat on pole";
+  banner.scale.setScalar(0.65);
   const pole = new T.Mesh(
     new T.CylinderGeometry(0.06, 0.08, 4.9, 7),
     new T.MeshStandardMaterial({ color: 0x654b35 }),
   );
-  pole.position.y = 2.45;
+  pole.name = "Title of Liberty flagpole";
+  pole.position.y = 2.45 - 2.1;
   const cloth = new T.Mesh(
-    new T.PlaneGeometry(2.8, 1.35, 8, 3),
+    new T.ShapeGeometry(
+      new T.Shape([
+        new T.Vector2(-1.4, 0.65),
+        new T.Vector2(-0.7, 0.95),
+        new T.Vector2(-0.35, 0.5),
+        new T.Vector2(0.25, 0.55),
+        new T.Vector2(0.65, 0.95),
+        new T.Vector2(1.4, 0.55),
+        new T.Vector2(1.2, 0.12),
+        new T.Vector2(0.8, 0.22),
+        new T.Vector2(0.72, -0.7),
+        new T.Vector2(0.25, -0.56),
+        new T.Vector2(-0.1, -0.78),
+        new T.Vector2(-0.55, -0.62),
+        new T.Vector2(-0.8, 0.12),
+        new T.Vector2(-1.25, 0.02),
+      ]),
+    ),
     new T.MeshStandardMaterial({
-      color: 0xeee0bb,
+      color: 0x335b78,
       side: T.DoubleSide,
       roughness: 1,
     }),
@@ -149,21 +309,19 @@ export function buildTitleOfLiberty(scene: T.Scene): WorldData {
     canvas.height = 512;
     const context = canvas.getContext("2d");
     if (context) {
-      context.fillStyle = "#eee0bb";
+      context.fillStyle = "#335b78";
       context.fillRect(0, 0, canvas.width, canvas.height);
-      context.strokeStyle = "#755d43";
-      context.lineWidth = 12;
-      context.strokeRect(23, 20, canvas.width - 46, canvas.height - 40);
-      context.fillStyle = "#483a30";
+
+      context.fillStyle = "#fff0c7";
       context.textAlign = "center";
-      context.font = "bold 53px Georgia, serif";
+      context.font = "bold 34px Georgia, serif";
       [
         "In memory of our God,",
         "our religion, and freedom,",
         "and our peace, our wives,",
         "and our children",
       ].forEach((line, i) =>
-        context.fillText(line, canvas.width / 2, 125 + i * 96),
+        context.fillText(line, canvas.width / 2, 220 + i * 55, 470),
       );
       bannerTexture = new T.CanvasTexture(canvas);
       bannerTexture.colorSpace = T.SRGBColorSpace;
@@ -172,7 +330,9 @@ export function buildTitleOfLiberty(scene: T.Scene): WorldData {
       (cloth.material as T.MeshStandardMaterial).map = bannerTexture;
     }
   }
-  cloth.position.set(1.38, 3.75, 0);
+  // Flutter about the fastening edge at the pole, not the fabric's center.
+  cloth.geometry.translate(1.38, 0, 0);
+  cloth.position.set(0, 3.75 - 2.1, 0);
   cloth.name = "Rent coat banner fabric · Alma 46:12 inscription";
   banner.add(pole, cloth);
   root.add(banner);
@@ -182,247 +342,406 @@ export function buildTitleOfLiberty(scene: T.Scene): WorldData {
       "Carried fabric and pole are animated with the player, not a fixed obstacle.",
   });
   banner.visible = false;
-  const stages = [
-    {
-      id: "make",
-      at: craft,
-      objective: "Rend Moroni's coat and fasten the title of liberty to a pole",
-      ref: "Alma 46:11–12",
-      title: "A coat becomes a standard",
-      body: "As Moroni, you rend your coat and write a call to remember God, religion, freedom, peace, wives, and children. Fasten it to the pole and carry the banner.",
-    },
-    {
-      id: "prayer",
-      at: prayer,
-      objective: "Carry the banner to the quiet court and pray",
-      ref: "Alma 46:13–18",
-      title: "Prayer before the rally",
-      body: "Moroni bows and prays for liberty and for the people who believe in Christ. The prayer is the first act of his campaign.",
-    },
-    {
-      id: "rally-1",
-      at: rallySites[0],
-      objective: "Find the west street group and raise the banner",
-      ref: "Alma 46:19–21",
-      title: "The first families gather",
-      body: "Moroni goes among the people, waving the rent cloth and calling them to defend their rights and religion. These unnamed citizens and this street are imagined.",
-    },
-    {
-      id: "rally-2",
-      at: rallySites[1],
-      objective: "Carry the standard through the east market",
-      ref: "Alma 46:19–22",
-      title: "People run together",
-      body: "People run toward Moroni and make a covenant. Their gathering, rather than a battle, is the answer to his public call.",
-    },
-    {
-      id: "rally-3",
-      at: rallySites[2],
-      objective: "Rally the families at the southern square",
-      ref: "Alma 46:21–28",
-      title: "The gathering grows",
-      body: "More people join Moroni. In the record, he also sends others through the land to gather those who want to maintain liberty.",
-    },
-    {
-      id: "tower",
-      at: tower,
-      objective:
-        "Climb the switchback stairs and plant the title of liberty on the tower",
-      ref: "Alma 46:36",
-      title: "A standard on the towers",
-      body: "Moroni later has the title of liberty raised on every tower in Nephite land. Plant the standard you carried atop this tower as the people gather to defend liberty.",
-    },
-  ];
-  let index = 0,
-    pending = false,
-    done = false,
+  const coatPiece = new T.Mesh(cloth.geometry, cloth.material);
+  coatPiece.name = "Moroni's coat being rent and inscribed";
+  coatPiece.geometry = cloth.geometry.clone().translate(-1.38, 0, 0);
+  coatPiece.rotation.x = -Math.PI / 2;
+  coatPiece.position.set(prayer.x, 0.12, prayer.z + 0.7);
+  coatPiece.visible = false;
+  root.add(coatPiece);
+  markScenery(coatPiece, {
+    kind: "decoration",
+    reason:
+      "Thin loose garment laid on the ground during the acted coat preparation.",
+  });
+  // ShapeGeometry UVs use model coordinates; fit the inscription to the cloth.
+  const uv = cloth.geometry.getAttribute("uv");
+  for (let i = 0; i < uv.count; i++)
+    uv.setXY(i, (uv.getX(i) + 1.4) / 2.8, (uv.getY(i) + 0.78) / 1.73);
+  let phase:
+    | "prayer"
+    | "prologue"
+    | "roofs"
+    | "tower"
+    | "gather"
+    | "lead"
+    | "ending"
+    | "done" = "prayer";
+  let elapsed = 0,
     clock = 0,
-    rallySignal = 0,
-    playerPoint = place(0, 54);
-  const currentTarget = () => {
-    if (index >= stages.length) return tower;
-    if (index >= 2 && index <= 4) {
-      const group = groups[index - 2];
-      return place(group.x, group.z);
-    }
-    return stages[index].at;
+    signal = 0,
+    coatVisible = true,
+    playerPoint = place(0, 53);
+  const roofs = new Set<number>();
+  const trail: Point[] = [];
+  let trailStarted = false;
+
+  const target = (): Point =>
+    phase === "prayer" || phase === "prologue"
+      ? prayer
+      : phase === "roofs"
+        ? roofSites.find((_, i) => !roofs.has(i))!
+        : phase === "tower"
+          ? tower
+          : camp;
+  const syncPose = () => {
+    root.userData.moroniCoatVisible = coatVisible;
+    root.userData.moroniGesture =
+      phase === "prologue"
+        ? elapsed < 4.5
+          ? "work"
+          : elapsed < 8
+            ? "pray"
+            : "point"
+        : undefined;
   };
+  syncPose();
   return {
     name: "The Title of Liberty",
     subtitle: "Moroni rallies the people · Alma 46",
-    initialObjective: stages[0].objective,
+    initialObjective: "Go to the quiet prayer court wearing Moroni's coat",
     spawn: place(0, 53),
     solids,
     actorParent: root,
-    bounds: { minX: -76, maxX: 76, minZ: -76, maxZ: 76 },
-    goal: { ...tower, radius: 3 },
+    bounds: { minX: -79, maxX: 79, minZ: -79, maxZ: 76 },
+    goal: { ...camp, radius: 6 },
     landmarks: [
-      { name: "Moroni's workshop", ...craft },
       { name: "Prayer court", ...prayer },
-      { name: "Tower of liberty", ...tower },
+      ...roofSites.map((p, i) => ({
+        name: `Accessible rooftop ${i + 1}`,
+        ...p,
+      })),
+      { name: "High standard", ...tower },
+      { name: "Wilderness camp", ...camp },
     ],
     update(dt, player) {
       const delta = Math.min(Math.max(dt, 0), 0.1);
       clock += delta;
       if (player) playerPoint = { x: player.x, y: player.y, z: player.z };
-      groups.forEach((group, i) => {
-        const destination = group.rallied
-          ? place((i - 1) * 3, -40 - i * 2)
-          : group.base;
-        const wave = group.rallied
-          ? 0
-          : Math.sin(clock * (0.55 + i * 0.12) + i) * 2;
-        group.x += (destination.x + wave - group.x) * Math.min(1, delta * 1.8);
-        group.z += (destination.z - group.z) * Math.min(1, delta * 1.8);
-        group.people.forEach((rig, j) =>
-          rig.group.position.set(
-            group.x + (j % 2 ? 1.25 : -1.25),
-            0,
-            group.z + (j < 2 ? -1 : 1),
-          ),
-        );
+      const gathered = ["gather", "lead", "ending", "done"].includes(phase);
+      coatPiece.visible = phase === "prologue" && elapsed >= 2 && elapsed < 4.5;
+      if (
+        phase === "lead" &&
+        (trailStarted || (playerPoint.y < 0.5 && playerPoint.z > -42))
+      ) {
+        trailStarted = true;
+        const last = trail.at(-1);
+        if (
+          !last ||
+          Math.hypot(last.x - playerPoint.x, last.z - playerPoint.z) > 0.65 ||
+          Math.abs(last.y - playerPoint.y) > 0.4
+        ) {
+          trail.push({ ...playerPoint });
+          volunteers.forEach((v, i) =>
+            v.path.push({
+              ...playerPoint,
+              x: playerPoint.x + ((i % 4) - 1.5) * 1.8,
+              z: playerPoint.z + (Math.floor(i / 4) - 1) * 1.8,
+            }),
+          );
+        }
+      }
+      volunteers.forEach((v, i) => {
+        v.sword.visible = gathered;
+        if (roofs.size > 0 || gathered)
+          moveActor(v, delta, phase === "lead" ? volunteers[i - 1] : undefined);
       });
-      guards.forEach((guard, i) =>
-        guard.group.position.set(
-          (i ? 19 : -14) + Math.sin(clock * 0.7 + i) * 4,
-          0,
-          (i ? 22 : -14) + Math.cos(clock * 0.7 + i) * 2,
-        ),
-      );
-      banner.visible = index >= 1;
-      if (done) banner.position.set(0, 12.8, -65);
-      else
-        banner.position.set(playerPoint.x + 0.65, playerPoint.y, playerPoint.z);
-      banner.rotation.y = Math.sin(clock * 3) * 0.1;
-      cloth.rotation.y =
-        Math.sin(clock * (rallySignal > 0 ? 12 : 5)) *
-        (rallySignal > 0 ? 0.34 : 0.14);
-      if (!done && index === 5 && player) {
+      if (phase === "ending" || phase === "done")
+        opponentWalkers.forEach((v, i) => {
+          if (!v.path.length) {
+            v.path =
+              i < 2
+                ? [place(-78, -78)]
+                : [
+                    place(-66, -40),
+                    place(-66, 51),
+                    place(20, 51),
+                    place(20, 30),
+                    place(
+                      custody.x + (i % 2) * 2,
+                      custody.z - Math.floor(i / 2) * 2,
+                    ),
+                  ];
+          }
+          moveActor(v, delta * 2);
+          v.rig.group.visible = !(i < 2 && v.cursor >= v.path.length);
+        });
+      banner.visible =
+        phase !== "prayer" && (phase !== "prologue" || elapsed >= 4.5);
+
+      cloth.rotation.y = Math.sin(clock * (signal > 0 ? 12 : 5)) * 0.25;
+      let beacon =
+        phase === "done" || phase === "ending" || phase === "prologue"
+          ? undefined
+          : target();
+      if (phase === "tower" && player) {
         let nearest = 0,
           score = Infinity;
-        towerRoute.forEach((point, i) => {
-          const cost =
-            Math.hypot(player.x - point.x, player.z - point.z) +
-            Math.abs(player.y - point.y) * 2.5;
-          if (cost < score) {
-            score = cost;
+        towerRoute.forEach((p, i) => {
+          const d =
+            Math.hypot(player.x - p.x, player.z - p.z) +
+            Math.abs(player.y - p.y) * 2.5;
+          if (d < score) {
+            score = d;
             nearest = i;
           }
         });
-        land.update(
-          dt,
-          towerRoute[Math.min(towerRoute.length - 1, nearest + 2)],
-        );
-      } else land.update(dt, done ? undefined : currentTarget());
+        beacon = towerRoute[Math.min(towerRoute.length - 1, nearest + 2)];
+      }
+      land.update(dt, beacon);
     },
     adventure(hooks) {
       hooks.setAvatar("moroni");
+      hooks.attachEquipment?.("rightHand", banner);
+      banner.position.set(0, 0, 0);
+      banner.rotation.set(0, 0, 0);
       hooks.toast(
-        "Alma 46 · Explore the imagined city as Moroni. The title of liberty is a piece of his own coat, carried on a pole.",
+        "Alma 46 · Explore an imagined Zarahemla. The rooftop routes and temporary custody court are invented staging.",
       );
+      let cinematicCamera:
+        { position: T.Vector3; focus: T.Vector3; cut: boolean } | undefined;
+      let cameraClock = 0;
+      const prologueAnchor = new T.Group();
+      prologueAnchor.scale.setScalar(3);
+      const playerActor = root.getObjectByName("moroni-character");
+      const cameraActors = [
+        ...(playerActor ? [{ group: playerActor }] : []),
+        ...volunteers.map((v) => ({ group: v.rig.group })),
+        ...opponents.map((r) => ({ group: r.group })),
+      ];
+      const meshObstacles = new StoryMeshObstacles(root, cameraActors);
       return {
+        movementLocked: () =>
+          phase === "prologue" || phase === "gather" || phase === "ending",
+        camera: () => cinematicCamera,
         snapshot: () => ({
-          phase: done ? "done" : stages[index].id,
-          target: currentTarget(),
-          index,
-          pending,
-          carrying: index >= 1 && !done,
-          rallied: groups.filter((g) => g.rallied).length,
-          rallySignal,
-          groupPositions: groups.map((g) => place(g.x, g.z)),
+          phase,
+          volunteers: volunteers.map((v) => ({
+            x: v.body.x,
+            y: v.body.y,
+            z: v.body.z,
+          })),
+          gathered: descentStarted
+            ? 12
+            : volunteers.filter((v) => v.cursor >= v.path.length).length,
+          opponentPositions: opponentWalkers.map((v) => ({
+            x: v.body.x,
+            y: v.body.y,
+            z: v.body.z,
+          })),
+          movieBeat:
+            phase === "ending"
+              ? elapsed < 4
+                ? "escape"
+                : elapsed < 12
+                  ? "capture"
+                  : "return"
+              : undefined,
+          target: target(),
+          roofs: [...roofs],
+          roofSites,
+          roofRoutes,
+          coatVisible,
+          prologueBeat:
+            phase === "prologue"
+              ? elapsed < 2
+                ? "remove"
+                : elapsed < 4.5
+                  ? "rend-and-write"
+                  : elapsed < 8
+                    ? "pray"
+                    : "raise"
+              : undefined,
+          carrying: banner.visible,
+          rallySignal: signal,
+          rallied: roofs.size,
+          escaped: phase === "done" ? 2 : 0,
+          captured: phase === "done" ? 4 : 0,
         }),
         update(dt, player, input) {
-          if (done)
-            return {
-              objective: "The standard is raised",
-              prompt: "Journey complete",
-              carrying: false,
-            };
-          const stage = stages[index],
-            target = currentTarget(),
-            near = withinTask(player, target, 3.8);
-          const rallying = index >= 2 && index <= 4;
-          if (rallying && !pending) {
-            const movingBanner =
-              near && input.interactHeld && player.runSpeed > 0.8;
-            rallySignal = T.MathUtils.clamp(
-              rallySignal +
-                Math.min(0.1, Math.max(0, dt)) * (movingBanner ? 1 : -0.4),
-              0,
-              1.35,
-            );
+          const delta = Math.min(0.1, Math.max(0, dt));
+          if (
+            phase === "prayer" &&
+            input.interact &&
+            withinTask(player, prayer, 3.8)
+          ) {
+            phase = "prologue";
+            elapsed = 0;
           }
-          const patrol = guards.find(
-            (guard) =>
-              Math.hypot(
-                player.x - guard.group.position.x,
-                player.z - guard.group.position.z,
-              ) < 2.2,
-          );
-          if (input.interact && patrol && !pending && !near)
-            hooks.toast(
-              "City watch: The streets are unsettled. Keep the banner visible and call people together.",
+          if (phase === "prologue") {
+            elapsed += delta;
+            coatVisible = elapsed < 2;
+            if (elapsed >= 10) {
+              phase = "roofs";
+              hooks.toast(
+                "Climb any two different rooftops. Hold action on each roof to wave the torn coat.",
+              );
+            }
+          } else if (phase === "roofs") {
+            const roof = roofSites.findIndex(
+              (p, i) => !roofs.has(i) && onRoof(player, i),
             );
-          if (input.interact && near && rallying && rallySignal < 1.25)
+            signal = roof >= 0 && input.interactHeld ? signal + delta : 0;
+            if (signal >= 1.5) {
+              roofs.add(roof);
+              signal = 0;
+              hooks.toast(
+                "The people see the title of liberty and begin to gather.",
+              );
+              if (roofs.size === 2) phase = "tower";
+            }
+          } else if (
+            phase === "tower" &&
+            input.interact &&
+            withinTask(player, tower, 4)
+          ) {
+            phase = "gather";
             hooks.toast(
-              "Keep moving among this group while holding the action button to wave Moroni's banner.",
+              "The armed volunteers are climbing to gather around Moroni. Wait as they arrive at the high standard.",
             );
+          } else if (
+            phase === "gather" &&
+            volunteers.every((v) => v.cursor >= v.path.length)
+          ) {
+            phase = "lead";
+            descentStarted = true;
+            volunteers.forEach((v) => {
+              v.path = [
+                tower,
+                ...[...towerRoute].reverse().slice(1),
+                place(0, -39),
+              ];
+              v.cursor = 0;
+            });
+            trail.length = 0;
+            hooks.toast(
+              "The army has gathered around the standard. Lead them down the switchback stairs and out to the wilderness camp.",
+            );
+          } else if (phase === "lead" && withinTask(player, camp, 8)) {
+            phase = "ending";
+            elapsed = 0;
+            hooks.toast(
+              "Alma 46:29–33 · Amalickiah escapes with a few followers. The others surrender and are brought back to Zarahemla.",
+            );
+          } else if (phase === "ending") {
+            elapsed += delta;
+            if (
+              elapsed >= 12 &&
+              opponentWalkers.slice(2).every((v) => v.cursor >= v.path.length)
+            ) {
+              phase = "done";
+              hooks.complete();
+            }
+          }
           if (
             input.interact &&
-            near &&
-            !pending &&
-            (!rallying || rallySignal >= 1.25)
+            phase === "roofs" &&
+            !roofSites.some((_, i) => onRoof(player, i))
           ) {
-            pending = true;
-            hooks.dialog(
-              stage.ref,
-              stage.title,
-              stage.body,
-              () => {
-                if (index >= 2 && index <= 4) groups[index - 2].rallied = true;
-                index++;
-                rallySignal = 0;
-                pending = false;
-                if (index === stages.length) {
-                  done = true;
-                  hooks.complete();
-                }
-              },
-              {
-                focus: { x: target.x, y: target.y + 1.25, z: target.z },
-                wide: index === 5 ? 7 : 5,
-                playerGesture:
-                  index === 0 ? "work" : index === 1 ? "pray" : "point",
-                actors:
-                  index >= 2 && index <= 4
-                    ? groups[index - 2].people.map((person, i) => ({
-                        group: person.group,
-                        gesture: i === 0 ? ("talk" as const) : undefined,
-                        speaker: i === 0,
-                      }))
-                    : [],
-              },
-            );
+            if (withinTask(player, camp, 10))
+              hooks.toast(
+                "Amalickiah's followers are gathering here. Moroni first calls the people to defend their liberty.",
+              );
+            else if (
+              groups.some((g) => Math.hypot(player.x - g.x, player.z - g.z) < 4)
+            )
+              hooks.toast(
+                "Citizen: We can see across the streets from the flat roofs. Look for the offset terraces beside the houses.",
+              );
           }
+          if (
+            phase === "prologue" ||
+            phase === "ending" ||
+            phase === "gather"
+          ) {
+            cameraClock -= delta;
+            if (cameraClock <= 0) {
+              cameraClock = 0.25;
+              prologueAnchor.position.set(player.x, player.y, player.z);
+              prologueAnchor.scale.setScalar(phase === "prologue" ? 3 : 1);
+              prologueAnchor.updateMatrixWorld(true);
+              const anchor =
+                phase === "prologue"
+                  ? prologueAnchor
+                  : phase === "gather"
+                    ? prologueAnchor
+                    : elapsed < 4
+                      ? opponents[0].group
+                      : opponents[2].group;
+              const camera = new T.PerspectiveCamera(
+                58,
+                hooks.viewAspect?.() ?? 16 / 9,
+                0.08,
+                320,
+              );
+              camera.position.copy(anchor.position).add(new T.Vector3(8, 5, 8));
+              camera.lookAt(anchor.position);
+              const plan = planStoryCamera(
+                camera,
+                {
+                  cutaway: true,
+                  actors: [{ group: anchor }],
+                  wide: phase === "prologue" ? 10 : 7,
+                },
+                solids,
+                meshObstacles,
+              );
+              cinematicCamera = {
+                position: plan.wide,
+                focus: plan.focus,
+                cut: true,
+              };
+            }
+          } else {
+            cinematicCamera = undefined;
+            cameraClock = 0;
+          }
+          syncPose();
+          const objective =
+            phase === "prayer"
+              ? "Go to the quiet prayer court wearing Moroni's coat"
+              : phase === "prologue"
+                ? elapsed < 4.5
+                  ? "Moroni removes and rends his coat, then writes the title"
+                  : elapsed < 8
+                    ? "Moroni bows in prayer for liberty"
+                    : "Moroni raises the torn coat on its pole"
+                : phase === "roofs"
+                  ? `Climb and wave on any two distinct building roofs (${roofs.size}/2)`
+                  : phase === "tower"
+                    ? "Climb the great switchback stairs and raise the banner a third time"
+                    : phase === "gather"
+                      ? "The armed volunteers gather around Moroni at the high standard"
+                      : phase === "lead"
+                        ? "Lead the armed volunteers outside the city to the back-left wilderness camp"
+                        : phase === "ending"
+                          ? "Amalickiah escapes; the surrendered followers return to Zarahemla"
+                          : "The people covenant to maintain peace and liberty";
           return {
-            objective:
-              rallying && rallySignal < 1.25
-                ? `${stage.objective} · wave while moving (${Math.round((rallySignal / 1.25) * 100)}%)`
-                : stage.objective,
-            prompt: near
-              ? rallying && rallySignal < 1.25
-                ? "Hold action and move through the group"
-                : "Interact to continue"
-              : `Seek ${stage.id === "tower" ? "the tower" : "the blue beacon"}`,
-            carrying: index >= 1,
+            objective,
+            prompt:
+              phase === "roofs"
+                ? "Find a rooftop route · hold action on the roof to wave"
+                : phase === "prayer" || phase === "tower"
+                  ? "Follow the beacon · interact when you arrive"
+                  : phase === "lead"
+                    ? "Explore toward the back-left camp"
+                    : phase === "done"
+                      ? "Journey complete"
+                      : "",
+            carrying: banner.visible,
+            holdingBanner: banner.visible,
+            wave: signal > 0 || (phase === "prologue" && elapsed >= 8),
           };
         },
-        dispose() {},
+        dispose() {
+          // Return socket equipment before the avatar/world resource passes.
+          root.add(banner);
+        },
       };
     },
     dispose: () => {
       bannerTexture?.dispose();
-      crowdRigs.forEach((rig) => rig.dispose());
       land.dispose();
     },
   };

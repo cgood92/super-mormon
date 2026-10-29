@@ -16,7 +16,7 @@ export function paintingCaption(
   const height = 0.4;
   const centerY = floor + 0.25;
   const depth = 0.18;
-  sceneryBox(
+  const backing = sceneryBox(
     group,
     solids,
     new THREE.MeshBasicMaterial({ color: palette.indigo }),
@@ -30,6 +30,20 @@ export function paintingCaption(
     },
     "story caption backing",
   );
+  // Exhibit groups can rotate onto side walls. Physics always consumes world AABBs.
+  backing.updateWorldMatrix(true, false);
+  const bounds = new THREE.Box3().setFromObject(backing);
+  const support = solids[solids.length - 1];
+  const size = bounds.getSize(new THREE.Vector3());
+  const center = bounds.getCenter(new THREE.Vector3());
+  Object.assign(support, {
+    x: center.x,
+    y: bounds.min.y,
+    z: center.z,
+    w: size.x,
+    h: size.y,
+    d: size.z,
+  });
   const caption = label(
     group,
     title,

@@ -1,0 +1,9 @@
+# Ammon and the flocks at Sebus
+
+Primary source: [Alma 17:19–39](https://www.churchofjesuschrist.org/study/scriptures/bofm/alma/17?lang=eng).
+
+Verses 25–27 describe Ammon serving among Lamoni’s servants, taking the flocks to Sebus to water, and men scattering them. Verses 31–34 describe gathering them back to the water, the servants encircling them, and Ammon going to contend with the men. Verse 32 specifically says the servants followed Ammon; this game represents that with passive walking companions during herding. Verse 36 says Ammon killed some attackers with sling stones and their own stones could not hit him. Verse 37 distinguishes the later club attackers who fled after Ammon withstood their blows. The game depicts the sling enemies as slain, removing them without wounds, blood, or a fleeing animation; the later sword-and-club encounter is abridged rather than reenacted.
+
+The player begins after Ammon has entered service. Herding all six animals into the visible shallows and a short drinking pause precede an acted scatter sequence. Touching any bank of the visible water counts an animal as watered; gold markers identify remaining strays. Animals are recovered once; servants then hold them while Ammon uses his sling. A projectile collision retries only the battle, preserving all herding progress. This fair-retry challenge is a gameplay invention, not a claim that the scriptural Ammon was struck. Returning the flock concludes the playable service.
+
+The water’s shape, landscape, buildings, flock species/count, three attackers, masks and dark clothes, dialogue, cinematic choreography, timing, and controls are illustrative inventions. Dark costumes and masks identify gameplay roles, not a historical Lamanite uniform. Both Ammon’s fellow servants and the attackers are Lamanites in this account; skin color and ancestry do not communicate allegiance. No specific modern location is asserted for Sebus.

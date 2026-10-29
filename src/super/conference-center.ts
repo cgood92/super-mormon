@@ -1,5 +1,5 @@
-import { drawSamuelPainting } from "./samuel-painting";
-import { drawThirdNephiPainting } from "./third-nephi-painting";
+import { galleryPaintingFile } from "./gallery-paintings";
+import { buildWanderingElders } from "./missionary-actors";
 import * as THREE from "three";
 import { label, painting } from "./art";
 import { STORY_ORDER, type StoryId } from "./progression";
@@ -294,21 +294,25 @@ export function gallery(scene: THREE.Scene): WorldData {
   for (const { id, title, x, y, z: wallZ } of STORY_ORDER.slice(6).map(
     laterPainting,
   )) {
-    add(x, y, wallZ, 8, 6, 0.45, C.pale, "side hallway story wall");
-    const artwork = GALLERY_ARTWORK[id];
-    const image = painting(
-      group,
-      x,
-      y + 0.7,
-      wallZ + 0.3,
-      artwork
-        ? `${import.meta.env?.BASE_URL ?? "/"}art/gallery/${artwork}`
-        : "",
-      0xffffff,
-    );
-    if (!artwork) image.onBeforeRender = () => {};
+    // Replace an existing wall exhibit, leaving the hallway open from end to end.
+    const side = Math.sign(x);
+    const exhibit = new THREE.Group();
+    exhibit.name = `${id} wall exhibit`;
+    exhibit.position.set(x - side * 0.28, y, wallZ);
+    exhibit.rotation.y = (side * Math.PI) / 2;
+    group.add(exhibit);
+    const galleryFile =
+      galleryPaintingFile(id) ??
+      (GALLERY_ARTWORK[id]
+        ? `${import.meta.env?.BASE_URL ?? "/"}art/gallery/${GALLERY_ARTWORK[id]}`
+        : undefined) ??
+      (id === "title-liberty"
+        ? `${import.meta.env?.BASE_URL ?? "/"}art/gallery/title-liberty.jpg`
+        : undefined);
+    const image = painting(exhibit, 0, 0.7, 0, galleryFile ?? "", 0xffffff);
+    if (!galleryFile) image.onBeforeRender = () => {};
     image.name = `${id} story painting`;
-    if (!artwork && typeof document !== "undefined") {
+    if (!galleryFile && typeof document !== "undefined") {
       const canvas = document.createElement("canvas");
       canvas.width = 384;
       canvas.height = 512;
@@ -612,14 +616,6 @@ export function gallery(scene: THREE.Scene): WorldData {
             ctx.lineTo(110, 270);
             ctx.lineTo(180, 160);
             ctx.stroke();
-          } else if (id === "title-liberty") {
-            ctx.fillStyle = "#665039";
-            ctx.fillRect(124, 140, 12, 335);
-            ctx.fillStyle = "#e9dcc0";
-            ctx.fillRect(136, 140, 165, 110);
-            ctx.fillStyle = "#3f4a58";
-            ctx.font = "bold 18px serif";
-            ctx.fillText("LIBERTY", 155, 202);
           } else {
             ctx.fillStyle = "#aa916d";
             ctx.fillRect(20, 310, 344, 202);
@@ -642,22 +638,19 @@ export function gallery(scene: THREE.Scene): WorldData {
             }
           }
         }
-        if (id === "samuel") drawSamuelPainting(ctx);
-        if (id === "signs" || id === "gathering" || id === "christ-bountiful")
-          drawThirdNephiPainting(ctx, id);
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
         (image.material as THREE.MeshBasicMaterial).map = texture;
       }
     }
-    paintingCaption(group, solids, title, x, y, wallZ + 0.7, 7);
+    paintingCaption(exhibit, solids, title, 0, 0, 0.4, 7);
     const portal = {
       id,
       x,
       y: y + 0.59,
-      z: wallZ + 0.58,
+      z: wallZ,
       title,
-      facing: "north" as const,
+      facing: side > 0 ? ("west" as const) : ("east" as const),
     };
     portals.push(portal);
     solids.push(paintingCollider(portal));
@@ -761,13 +754,19 @@ export function gallery(scene: THREE.Scene): WorldData {
       );
     }
   }
-  // Original, non-interactive landscape exhibits keep the side halls art-filled.
+  // Unassigned wall bays retain their original landscape exhibits.
   const exhibitPositions: { side: number; y: number; z: number }[] = [];
   for (const y of CONFERENCE_LEVELS)
     for (const side of [-1, 1])
       for (const z of [-20, -43, -66, -89]) {
+        if (
+          portals.some(
+            (p) => Math.sign(p.x) === side && p.y === y + 0.59 && p.z === z,
+          )
+        )
+          continue;
         exhibitPositions.push({ side, y, z });
-        decor(
+        add(
           side * 67,
           y + 2,
           z,
@@ -838,11 +837,15 @@ export function gallery(scene: THREE.Scene): WorldData {
   const auditorium = buildAuditorium(group),
     roof = buildRooftop(group);
   solids.push(...auditorium.solids, ...roof.solids);
+  const elders = buildWanderingElders(group, solids);
+  elders.update(0);
   let disposed = false;
   return {
     name: "Conference Center",
+    secretEntrance: elders.point,
     update: (dt, player) => {
       advanceEscalator(player, dt);
+      elders.update(dt, player);
     },
     subtitle: "Explore three floors, the auditorium and roof gardens",
     spawn: { x: 0, y: 0, z: 36, yaw: Math.PI },
@@ -887,6 +890,7 @@ export function gallery(scene: THREE.Scene): WorldData {
       if (disposed) return;
       disposed = true;
       auditorium.organ.dispose();
+      elders.dispose();
       disposeConference(group);
       scene.background = priorBackground;
       scene.fog = priorFog;

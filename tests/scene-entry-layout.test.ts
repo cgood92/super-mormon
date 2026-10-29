@@ -5,6 +5,7 @@ import { STORY_ORDER } from "../src/super/progression";
 import { laterPaintingLocation } from "../src/super/gallery-layout";
 
 test("direct scene entry accepts every registered story and rejects invalid values", () => {
+  assert.equal(sceneEntry("?scene=missionary"), "missionary");
   for (const id of STORY_ORDER) {
     assert.equal(sceneEntry(`?scene=${id}`), id);
     assert.ok(

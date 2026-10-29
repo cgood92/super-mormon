@@ -14,6 +14,8 @@ export type CharacterRole =
   | "lehi"
   | "laman"
   | "guard"
+  | "warning-runner"
+  | "missionary"
   | "laban"
   | "laban-undressed"
   | "sariah"
@@ -60,6 +62,7 @@ export type CharacterState = {
   moveTime?: number;
   jumpStage?: number;
   carrying?: boolean;
+  holdingBanner?: boolean;
   holdingBow?: boolean;
   wave?: boolean;
   pointing?: boolean;

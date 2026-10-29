@@ -19,14 +19,14 @@ export function applyAdventureCamera(
     shot.position.y,
     shot.position.z,
   );
-  // Recover an authored endpoint upward before starting a transition into scenery.
-  for (
-    let i = 0;
-    i < 32 && !cameraSegmentClear(destination, destination, solids, 0.2);
-    i++
-  )
-    destination.y += 0.3;
-  if (!cameraSegmentClear(destination, destination, solids, 0.2)) return;
+  const focus = new T.Vector3(shot.focus.x, shot.focus.y, shot.focus.z);
+  // Edited cutaways need a clear sightline; aim views may deliberately target a wall.
+  const clear = (eye: T.Vector3) =>
+    cameraSegmentClear(eye, eye, solids, 0.2) &&
+    (!shot.cut || cameraSegmentClear(eye, focus, solids, 0.2));
+  // Recover both the eye and sightline before entering an edited view.
+  for (let i = 0; i < 32 && !clear(destination); i++) destination.y += 0.3;
+  if (!clear(destination)) return;
   const candidate = camera.position
     .clone()
     .lerp(destination, 1 - Math.exp(-8 * Math.min(dt, 0.1)));

@@ -611,17 +611,19 @@ function decorateGalleryProgress() {
     const prior = prerequisite(portal.id, completed);
     if (!prior) continue;
     const badge = new T.Group();
+    const side = portal.facing === "east" || portal.facing === "west";
+    const normal = portal.facing === "east" ? -1 : 1;
     const plaque = label(
       badge,
       "LOCKED",
-      portal.facing === "east" ? portal.x - 0.17 : portal.x + 0.75,
+      side ? portal.x + normal * 0.17 : portal.x + 0.75,
       (portal.y ?? 0.59) + 3.96,
-      portal.facing === "east" ? portal.z : portal.z + 0.07,
+      side ? portal.z : portal.z + 0.07,
       1.55,
       0.5,
     );
     plaque.renderOrder = 2;
-    if (portal.facing === "east") plaque.rotation.y = -Math.PI / 2;
+    if (side) plaque.rotation.y = (normal * Math.PI) / 2;
     scene.add(badge);
   }
 }
@@ -906,7 +908,9 @@ async function load(id: WorldId) {
   el("world-title").hidden = id === "hub";
   el("world-name").textContent = world.name;
   el("chapter-label").textContent =
-    WAR_CHAPTERS[id] ??
+    (id === "missionary"
+      ? "A FICTIONAL NEIGHBORHOOD CHALLENGE"
+      : WAR_CHAPTERS[id]) ??
     (id === "hub"
       ? ""
       : id === "streets"
@@ -975,6 +979,7 @@ async function load(id: WorldId) {
   }
   adventure =
     world.adventure?.({
+      viewAspect: () => camera.aspect,
       dialog: storyDialog,
       toast: (text) => message(text, 4),
       complete,
@@ -999,7 +1004,11 @@ async function load(id: WorldId) {
   if (started)
     analytics.start(
       id,
-      id === "hub" ? "gallery" : completed.has(id) ? "replay" : "painting",
+      id === "hub"
+        ? "gallery"
+        : isStoryId(id) && completed.has(id)
+          ? "replay"
+          : "painting",
       input.device,
     );
   renderQuality.reset();
@@ -1011,7 +1020,7 @@ async function load(id: WorldId) {
   updateObjective();
   if (started)
     message(
-      WAR_CHAPTERS[id]
+      WAR_CHAPTERS[id] || id === "missionary"
         ? (world.initialObjective ?? world.subtitle)
         : id === "hub"
           ? nextStory(completed)
@@ -1440,6 +1449,8 @@ function update(dt: number, activeElapsed = dt) {
     player.z = T.MathUtils.clamp(player.z, b.minZ + 0.35, b.maxZ - 0.35);
   }
   let adventureCarrying = false;
+  let holdingBanner = false;
+  let wavingBanner = false;
   let adventureAiming = false;
   let holdingBow = false;
   let adventureDraw = 0;
@@ -1451,6 +1462,8 @@ function update(dt: number, activeElapsed = dt) {
         ? `{action} · ${result.prompt}`
         : result.prompt;
     adventureCarrying = !!result.carrying;
+    holdingBanner = !!result.holdingBanner;
+    wavingBanner = !!result.wave;
     adventureAiming = !!result.aiming;
     holdingBow = !!result.holdingBow;
     adventureDraw = result.draw ?? 0;
@@ -1491,6 +1504,8 @@ function update(dt: number, activeElapsed = dt) {
     ...player,
     crouching: organSeated || player.crouching,
     holdingBow,
+    holdingBanner,
+    wave: wavingBanner,
     aiming: adventureAiming,
     draw: adventureDraw,
     carrying:
@@ -1501,6 +1516,23 @@ function update(dt: number, activeElapsed = dt) {
       (worldId === "night" &&
         !!(storyScene?.snapshot() as { plates?: boolean } | undefined)?.plates),
   });
+  if (worldId === "title-liberty") {
+    const direction = world.actorParent?.userData;
+    const coat = avatar.group.getObjectByName("moroni-removable-coat");
+    if (coat) coat.visible = direction?.moroniCoatVisible === true;
+    const gesture = direction?.moroniGesture;
+    const right = avatar.group.getObjectByName("right-arm");
+    const left = avatar.group.getObjectByName("left-arm");
+    const head = avatar.group.getObjectByName("head");
+    if (gesture === "pray" || gesture === "work") {
+      if (right && !holdingBanner)
+        right.rotation.x =
+          -1.1 + (gesture === "work" ? Math.sin(levelTime * 7) * 0.3 : 0);
+      if (left && !holdingBanner) left.rotation.x = -1.05;
+      if (head) head.rotation.x = gesture === "pray" ? 0.3 : 0.15;
+    }
+    if (gesture === "point" && right && !holdingBanner) right.rotation.x = -1.8;
+  }
   const adventureCamera = adventure?.camera?.();
   if (!adventureCamera && !organSeated) {
     analytics.camera(
@@ -1626,6 +1658,13 @@ function update(dt: number, activeElapsed = dt) {
         } catch {
           message("Organ audio is unavailable in this browser.", 3);
         }
+      }
+    }
+    if (world.secretEntrance && near(world.secretEntrance, 3, 2)) {
+      prompt = "{action} · Join the elders’ neighborhood challenge";
+      if (state.interact) {
+        warp("missionary");
+        return;
       }
     }
     const p = world.portals?.find((p) => near(p, 2.2, 4));

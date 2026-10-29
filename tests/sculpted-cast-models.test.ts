@@ -129,7 +129,7 @@ test("every NPC and crowd role fits the vertex budget and keeps its coat outside
         "continuous-robe-and-sleeves",
       ) as T.Mesh;
       assert.ok(tunic);
-      if (SCULPTED_CAST_TRAITS[role].outfit === "undertunic")
+      if (["undertunic", "modern"].includes(SCULPTED_CAST_TRAITS[role].outfit))
         assert.equal(coat, undefined);
       else {
         assert.ok(coat, label);

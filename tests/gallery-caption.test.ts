@@ -9,14 +9,18 @@ test("every story caption has its own surface below the painting frame and match
   scene.updateMatrixWorld(true);
   for (const portal of world.portals!) {
     const floor = (portal.y ?? 0.59) - 0.59;
-    const caption = scene.children
-      .flatMap((object) => [object, ...object.children])
-      .find(
-        (object) =>
-          object.name === "plaque" &&
-          Math.abs(object.position.x - portal.x) < 0.01 &&
-          Math.abs(object.position.y - floor - 0.25) < 0.01,
-      ) as THREE.Mesh | undefined;
+    const captions: THREE.Mesh[] = [];
+    scene.traverse((object) => {
+      if (object instanceof THREE.Mesh && object.name === "plaque")
+        captions.push(object);
+    });
+    const caption = captions.find((object) => {
+      const position = object.getWorldPosition(new THREE.Vector3());
+      return (
+        Math.hypot(position.x - portal.x, position.z - portal.z) < 0.5 &&
+        Math.abs(position.y - floor - 0.25) < 0.01
+      );
+    });
     assert.ok(caption, `${portal.id}: caption must sit below its frame`);
     const bounds = new THREE.Box3().setFromObject(caption);
     assert.ok(bounds.min.y > floor, `${portal.id}: caption clears floor`);
@@ -31,10 +35,17 @@ test("every story caption has its own surface below the painting frame and match
     assert.equal(caption.renderOrder, 0);
     const support = world.solids.find(
       (solid) =>
-        Math.abs(solid.x - portal.x) < 0.01 &&
+        Math.hypot(solid.x - portal.x, solid.z - portal.z) < 0.5 &&
         Math.abs(solid.y - bounds.min.y) < 1e-6 &&
         Math.abs(solid.h - 0.4) < 1e-6 &&
-        Math.abs(solid.w - (bounds.max.x - bounds.min.x)) < 1e-6,
+        Math.abs(
+          (portal.facing === "east" || portal.facing === "west"
+            ? solid.d
+            : solid.w) -
+            (portal.facing === "east" || portal.facing === "west"
+              ? bounds.max.z - bounds.min.z
+              : bounds.max.x - bounds.min.x),
+        ) < 1e-6,
     );
     assert.ok(support, `${portal.id}: support shares caption dimensions`);
   }

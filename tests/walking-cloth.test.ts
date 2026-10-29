@@ -119,7 +119,6 @@ test("turning coats cover the lower side while retaining their open fronts", () 
       "jacob",
       "convert",
       "ammon",
-      "moroni",
     ] as const) {
       const actor = createSculptedCharacterRig(role, { quality });
       const coat = actor.group.getObjectByName(
@@ -322,7 +321,9 @@ test("the complete inner costume stays inside the side and rear coat through tur
 
 test("coated actors build only the visible front inset and short footwear", () => {
   for (const quality of ["hero", "npc", "crowd"] as const) {
-    for (const role of ["nephi", "lehi", "moroni"] as const) {
+    // Moroni wears short armor lames; its exposed-trouser and removable-coat
+    // coverage is verified in moroni-armor.test.ts.
+    for (const role of ["nephi", "lehi"] as const) {
       const actor = createSculptedCharacterRig(role, { quality });
       const shirt = actor.group.getObjectByName(
         "continuous-robe-and-sleeves",
