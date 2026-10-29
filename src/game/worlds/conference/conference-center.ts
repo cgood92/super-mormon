@@ -15,6 +15,7 @@ import {
 import { buildConferenceChristus } from "./conference-christus";
 import { buildAuditorium } from "./conference-auditorium";
 import { buildRooftop } from "./conference-rooftop";
+import { tileFloor } from "./conference-floor";
 
 const GALLERY_ARTWORK: Partial<Record<StoryId, string>> = {
   "broken-bow": "broken-bow.jpg",
@@ -29,54 +30,6 @@ export const CONFERENCE_STAIRS = [
   { x: 56, y: 12, startZ: 6, endZ: 40 },
   { x: -56, y: 24, startZ: 40, endZ: 6 },
 ] as const;
-const stairHole = (x: number, z: number) =>
-  Math.abs(Math.abs(x) - 56) < 5 && z > 6 && z < 40;
-function tileFloor(group: THREE.Group, y: number, upper: boolean) {
-  const geometry = new THREE.BoxGeometry(2.75, 0.035, 2.75),
-    matrix = new THREE.Matrix4(),
-    rotation = new THREE.Quaternion().setFromAxisAngle(
-      new THREE.Vector3(0, 1, 0),
-      Math.PI / 4,
-    );
-  const points: [number, number, number][] = [];
-  for (let a = -60; a <= 60; a++)
-    for (let b = -60; b <= 60; b++) {
-      const x = ((a - b) * 2.75) / Math.SQRT2,
-        z = ((a + b) * 2.75) / Math.SQRT2;
-      if (
-        Math.abs(x) > 88 ||
-        z < -102 ||
-        z > 53 ||
-        (z < 1 && Math.abs(x) < 67) ||
-        (upper && stairHole(x, z))
-      )
-        continue;
-      points.push([x, z, (a + b) & 1]);
-    }
-  for (let shade = 0; shade < 2; shade++) {
-    const list = points.filter((p) => p[2] === shade),
-      mesh = new THREE.InstancedMesh(
-        geometry,
-        new THREE.MeshStandardMaterial({
-          color: shade ? 0xb5ad9c : 0xe7e1d2,
-          roughness: 0.34,
-          metalness: 0.06,
-        }),
-        list.length,
-      );
-    list.forEach(([x, z], i) => {
-      matrix.compose(
-        new THREE.Vector3(x, y + 0.025, z),
-        rotation,
-        new THREE.Vector3(1, 1, 1),
-      );
-      mesh.setMatrixAt(i, matrix);
-    });
-    mesh.name = "diagonal polished limestone checkerboard";
-    mesh.receiveShadow = true;
-    group.add(mesh);
-  }
-}
 export function gallery(scene: THREE.Scene): WorldData {
   const group = new THREE.Group();
   group.name = "Conference Center";
