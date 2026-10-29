@@ -159,7 +159,9 @@ function supportHeight(player: PlayerState, solids: Solid[]): number {
   for (const solid of solids) {
     const top = solid.y + solid.h;
     if (
-      top <= player.y + STEP_HEIGHT + EPS &&
+      // Vertical support must be at or below the feet. Higher treads are
+      // handled by horizontal step-up, not allowed to mask the floor below.
+      top <= player.y + EPS &&
       horizontalOverlap(player.x, player.z, solid)
     )
       result = Math.max(result, top);

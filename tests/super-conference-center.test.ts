@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
-import { gallery, CONFERENCE_ESCALATORS } from "../src/super/conference-center";
+import {
+  gallery,
+  CONFERENCE_ESCALATORS,
+  advanceEscalator,
+} from "../src/super/conference-center";
 import { createPlayer, stepPlayer } from "../src/super/physics";
 import { STORY_ORDER } from "../src/super/progression";
 import { canJumpIntoPainting } from "../src/super/gallery-entry";
@@ -422,6 +426,77 @@ test("unassigned landscape exhibit frames also stop a jump through the artwork",
         assert.ok(side * player.x >= 67.51, `landscape blocks side ${side}`);
     }
     assert.ok(touched, "jump actually reaches the landscape canvas height");
+  }
+  world.dispose?.();
+});
+
+test("stopping on every escalator stays supported while the belt carries the player", () => {
+  const world = gallery(new THREE.Scene());
+  const idle = { x: 0, y: 0, jump: false, jumpHeld: false };
+  for (const flight of CONFERENCE_ESCALATORS) {
+    const direction = Math.sign(flight.endZ - flight.startZ);
+    const player = createPlayer(
+      flight.x,
+      flight.y,
+      flight.startZ - direction * 1.5,
+    );
+    for (let frame = 0; frame < 180; frame++) {
+      stepPlayer(player, { ...idle, y: direction }, 1 / 60, 0, world.solids);
+      advanceEscalator(player, 1 / 60);
+    }
+    const stopHeight = player.y;
+    for (let frame = 0; frame < 600; frame++) {
+      stepPlayer(player, idle, 1 / 60, 0, world.solids);
+      advanceEscalator(player, 1 / 60);
+      assert.ok(
+        player.y >= stopHeight - 0.01,
+        `stopped flight ${flight.y}: feet ${player.y}, started ${stopHeight}`,
+      );
+      assert.equal(player.grounded, true);
+    }
+    assert.ok(player.y > stopHeight + 1, "idle rider continues uphill");
+  }
+  world.dispose?.();
+});
+
+test("first upper landing gives a broad supported turn toward either hallway", () => {
+  const world = gallery(new THREE.Scene());
+  for (const targetX of [-65, -46]) {
+    const player = createPlayer(-56, 0, 42);
+    const idle = { x: 0, y: 0, jump: false, jumpHeld: false };
+    for (const target of [
+      { x: -56, z: 4 },
+      { x: targetX, z: 4 },
+    ]) {
+      for (let frame = 0; frame < 1000; frame++) {
+        const dx = target.x - player.x,
+          dz = target.z - player.z;
+        const distance = Math.hypot(dx, dz);
+        if (distance < 0.12) break;
+        stepPlayer(
+          player,
+          { ...idle, x: -dx / distance, y: dz / distance },
+          1 / 60,
+          0,
+          world.solids,
+        );
+        advanceEscalator(player, 1 / 60);
+      }
+      assert.ok(Math.hypot(player.x - target.x, player.z - target.z) < 0.15);
+      assert.ok(
+        Math.abs(player.y - 12) < 0.01,
+        `landing supports turn at ${player.x},${player.z}: ${player.y}`,
+      );
+    }
+  }
+  for (const x of [-65, -56, -46, 46, 56, 65]) {
+    const owners = world.solids.filter(
+      (s) =>
+        Math.abs(s.y + s.h - 12) < 0.001 &&
+        Math.abs(x - s.x) < s.w / 2 &&
+        Math.abs(4 - s.z) < s.d / 2,
+    );
+    assert.equal(owners.length, 1, `one landing surface owner at ${x},4`);
   }
   world.dispose?.();
 });

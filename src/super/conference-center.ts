@@ -25,12 +25,12 @@ const GALLERY_ARTWORK: Partial<Record<StoryId, string>> = {
 
 export const CONFERENCE_LEVELS = [0, 12, 24] as const;
 export const CONFERENCE_ESCALATORS = [
-  { x: -56, y: 0, startZ: 40, endZ: 0 },
-  { x: 56, y: 12, startZ: 0, endZ: 40 },
-  { x: -56, y: 24, startZ: 40, endZ: 0 },
+  { x: -56, y: 0, startZ: 40, endZ: 6 },
+  { x: 56, y: 12, startZ: 6, endZ: 40 },
+  { x: -56, y: 24, startZ: 40, endZ: 6 },
 ] as const;
 const stairHole = (x: number, z: number) =>
-  Math.abs(Math.abs(x) - 56) < 5 && z > 0 && z < 40;
+  Math.abs(Math.abs(x) - 56) < 5 && z > 6 && z < 40;
 function tileFloor(group: THREE.Group, y: number, upper: boolean) {
   const geometry = new THREE.BoxGeometry(2.75, 0.035, 2.75),
     matrix = new THREE.Matrix4(),
@@ -106,8 +106,8 @@ export function gallery(scene: THREE.Scene): WorldData {
     else {
       // Open wells accommodate actual continuous escalator stair surfaces.
       add(0, y - 0.5, 47.5, 180, 0.5, 15, C.stone, "south landing");
-      add(0, y - 0.5, 0, 180, 0.5, 2, C.stone, "north landing");
-      add(0, y - 0.5, 20, 100, 0.5, 40, C.stone, "central foyer slab");
+      add(0, y - 0.5, 2.5, 124, 0.5, 7, C.stone, "north landing");
+      add(0, y - 0.5, 23, 100, 0.5, 34, C.stone, "central foyer slab");
       for (const side of [-1, 1]) {
         add(
           side * 76,
@@ -118,16 +118,6 @@ export function gallery(scene: THREE.Scene): WorldData {
           140,
           C.stone,
           "side gallery slab",
-        );
-        add(
-          side * 65,
-          y - 0.5,
-          20,
-          6,
-          0.5,
-          40,
-          C.stone,
-          "escalator outer landing",
         );
       }
     }
@@ -242,16 +232,24 @@ export function gallery(scene: THREE.Scene): WorldData {
         flight.startZ + run * (i + 0.5),
         7,
         0.3,
-        Math.abs(run) + 0.04,
+        Math.abs(run),
         0x777d7b,
         "escalator tread",
       );
     for (const dx of [-3.8, 3.8]) {
       const rail = new THREE.Mesh(
-        new THREE.BoxGeometry(0.2, 0.18, Math.hypot(40, 12)),
+        new THREE.BoxGeometry(
+          0.2,
+          0.18,
+          Math.hypot(flight.endZ - flight.startZ, 12),
+        ),
         new THREE.MeshStandardMaterial({ color: C.bronze }),
       );
-      rail.position.set(flight.x + dx, flight.y + 7, 20);
+      rail.position.set(
+        flight.x + dx,
+        flight.y + 7,
+        (flight.startZ + flight.endZ) / 2,
+      );
       rail.rotation.x = -Math.atan(12 / (flight.endZ - flight.startZ));
       group.add(rail);
     }
@@ -678,10 +676,10 @@ export function gallery(scene: THREE.Scene): WorldData {
   group.add(ring);
   for (const y of [12, 24])
     for (const x of [-62, -50, 50, 62])
-      add(x, y, 20, 0.18, 1.1, 38, C.bronze, "escalator well balustrade");
+      add(x, y, 23, 0.18, 1.1, 32, C.bronze, "escalator well balustrade");
   // The roof opening is wider than the lower wells; guard its exact slab edges.
   for (const x of [-63, -49])
-    add(x, 36, 20, 0.2, 1.15, 40, C.bronze, "roof escalator shaft rail");
+    add(x, 36, 23, 0.2, 1.15, 34, C.bronze, "roof escalator shaft rail");
   add(-56, 36, 40, 14.2, 1.15, 0.2, C.bronze, "roof shaft south rail");
   // Warm auditorium boundary with three permanently open entries on each level.
   // Side doors align with the escalator approaches; the foyer at z=0 stays clear.
@@ -977,13 +975,21 @@ export function advanceEscalator(
   for (const flight of CONFERENCE_ESCALATORS) {
     if (Math.abs(player.x - flight.x) > 3.1) continue;
     const direction = Math.sign(flight.endZ - flight.startZ),
-      distance = (player.z - flight.startZ) * direction;
-    if (distance < 0 || distance >= 40) continue;
-    const top = flight.y + 0.3 * Math.min(40, Math.floor(distance) + 1);
+      distance = (player.z - flight.startZ) * direction,
+      length = Math.abs(flight.endZ - flight.startZ),
+      treadDepth = length / 40;
+    if (distance < 0 || distance >= length) continue;
+    const top =
+      flight.y + 0.3 * Math.min(40, Math.floor(distance / treadDepth) + 1);
     if (Math.abs(player.y - top) > 0.36) continue;
-    const next = Math.min(40, distance + 0.9 * Math.min(dt, 0.1));
+    const next = Math.min(length, distance + 0.9 * Math.min(dt, 0.1));
     player.z = flight.startZ + direction * next;
-    player.y = flight.y + 0.3 * Math.min(40, Math.floor(next) + 1);
+    // Step-up can already have placed the leading foot on the next tread.
+    // Belt motion must never pull it back down inside that tread.
+    player.y = Math.max(
+      player.y,
+      flight.y + 0.3 * Math.min(40, Math.floor(next / treadDepth) + 1),
+    );
     return true;
   }
   return false;

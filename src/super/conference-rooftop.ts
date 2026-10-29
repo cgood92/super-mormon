@@ -62,7 +62,7 @@ export function buildRooftop(parent: T.Group): {
   // Slab is split around the escalator shaft, which the hub supplies and guards.
   box("west roof support", -76.5, 35.8, -25, 27, 0.4, 160, stone, true);
   box("east roof support", 20.5, 35.8, -25, 139, 0.4, 160, stone, true);
-  box("north roof support", -56, 35.8, -52.5, 14, 0.4, 105, stone, true);
+  box("north roof support", -56, 35.8, -49.5, 14, 0.4, 111, stone, true);
   box("south roof support", -56, 35.8, 47.5, 14, 0.4, 15, stone, true);
   box("arrival granite promenade", -56, 36.03, -3, 35, 0.06, 6, paving);
   // Broad orthogonal promenades leave room for children to run around the gardens.
