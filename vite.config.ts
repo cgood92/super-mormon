@@ -7,11 +7,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         game: "index.html",
-        cast: "cast.html",
-        faces: "nephi-faces.html",
-        poses: "lehi-poses.html",
-        styles: "lehi-styles.html",
-        play: "lehi-play.html",
+        cast: "tools/cast/index.html",
       },
       output: { manualChunks: { three: ["three"] } },
     },

@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Character cloth QA</title>
+    <style>
+      body {
+        margin: 0;
+        background: #eee;
+        font: 14px system-ui;
+      }
+      #labels {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+        pointer-events: none;
+      }
+      span {
+        padding: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="labels"></div>
+    <script type="module" src="/tools/qa/character-visual.ts"></script>
+  </body>
+</html>

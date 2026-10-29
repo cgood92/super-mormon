@@ -3,24 +3,27 @@ import {
   activeFrameSeconds,
   browserAnalytics,
   movementActions,
-} from "./super/analytics";
-import { StoryCinematic, type StoryShot } from "./super/cinematic";
-import type { AdventureRuntime } from "./super/adventure";
+} from "./game/runtime/analytics";
+import { StoryCinematic, type StoryShot } from "./game/camera/cinematic";
+import type { AdventureRuntime } from "./game/runtime/adventure";
 import * as T from "three";
 import "./style.css";
-import { Input } from "./super/input";
-import { createControllerSetup } from "./super/controller-setup";
-import { resolveControllerProfile } from "./super/gamepad";
-import { MenuNavigation } from "./super/menu";
-import type { createStoryScene } from "./super/story-scenes";
-import type { createTreeOfLifeScene } from "./super/tree-of-life";
-import { canJumpIntoPainting, galleryReturnSpawn } from "./super/gallery-entry";
+import { Input } from "./game/controls/input";
+import { createControllerSetup } from "./game/controls/controller-setup";
+import { resolveControllerProfile } from "./game/controls/gamepad";
+import { MenuNavigation } from "./game/ui/menu";
+import type { createStoryScene } from "./game/worlds/jerusalem/story-scenes";
+import type { createTreeOfLifeScene } from "./game/worlds/nephi/tree-of-life";
+import {
+  canJumpIntoPainting,
+  galleryReturnSpawn,
+} from "./game/worlds/conference/gallery-entry";
 import {
   renderControlText,
   renderControlLegend,
   type ControlDevice,
-} from "./super/controls";
-import { hasLineOfSight } from "./super/interactions";
+} from "./game/controls/controls";
+import { hasLineOfSight } from "./game/physics/interactions";
 import {
   createCarryObject,
   nearestCarryObject,
@@ -31,29 +34,29 @@ import {
   stepCarryObjects,
   objectInTarget,
   type CarryObject,
-} from "./super/objects";
+} from "./game/physics/objects";
 import {
   createPlayer,
   stepPlayer,
   type PlayerState,
   type Solid,
-} from "./super/physics";
-import { createCharacter } from "./super/character";
-import { createPoundImpact } from "./super/pound-impact";
+} from "./game/physics/physics";
+import { createCharacter } from "./game/characters/character";
+import { createPoundImpact } from "./game/rendering/pound-impact";
 import {
   applyAdventureCamera,
   adventureCameraYaw,
-} from "./super/adventure-camera";
-import { FollowCamera } from "./super/camera";
-import type { WorldData, WorldId } from "./super/worlds";
+} from "./game/camera/adventure-camera";
+import { FollowCamera } from "./game/camera/camera";
+import type { WorldData, WorldId } from "./game/runtime/worlds";
 import {
   sceneEntry,
   cameraModeForWorld,
   keepsExploringAfterCompletion,
   WAR_CHAPTERS,
-} from "./super/scene-entry";
-import { prepareWorld } from "./super/world-loading";
-import { createPerformanceDiagnostics } from "./super/performance";
+} from "./game/runtime/scene-entry";
+import { prepareWorld } from "./game/runtime/world-loading";
+import { createPerformanceDiagnostics } from "./game/rendering/performance";
 import {
   FramePacer,
   RenderQuality,
@@ -61,9 +64,9 @@ import {
   readGraphicsMode,
   renderScale,
   type GraphicsMode,
-} from "./super/render-policy";
-import { conferenceLocation } from "./super/conference-location";
-import { label } from "./super/art";
+} from "./game/rendering/render-policy";
+import { conferenceLocation } from "./game/worlds/conference/conference-location";
+import { label } from "./game/rendering/art";
 import {
   canEnter,
   isStoryId,
@@ -73,7 +76,7 @@ import {
   STORY_TITLES,
   STORY_ORDER,
   type StoryId,
-} from "./super/progression";
+} from "./game/runtime/progression";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 app.innerHTML = `<div id="viewport" data-look></div><div class="vignette"></div>

@@ -6,10 +6,10 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc --noEmit && vite build",
-    "test": "node --import tsx --test tests/*.test.ts",
+    "test": "node scripts/test.mjs",
     "preview": "vite preview --host 127.0.0.1",
-    "format": "prettier --write src tests scripts index.html README.md vite.config.ts",
-    "format:check": "prettier --check src tests scripts index.html README.md vite.config.ts"
+    "format": "prettier --write src scripts tools index.html README.md AGENTS.md vite.config.ts tsconfig.json package.json",
+    "format:check": "prettier --check src scripts tools index.html README.md AGENTS.md vite.config.ts tsconfig.json package.json"
   },
   "dependencies": {
     "three": "^0.180.0"

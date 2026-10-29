@@ -2,6 +2,20 @@
 
 An original third-person 3D adventure prototype. Run, jump, explore, and enter early Book of Mormon scenes through paintings in an original interpretation of the Conference Center.
 
+## Repository layout
+
+- `src/main.ts` and `src/style.css`: application startup, game loop and screen layout.
+- `src/game/`: shared systems grouped into `characters`, `controls`, `physics`, `camera`, `rendering`, `ui` and `runtime`.
+- `src/game/worlds/`: Conference Center, Jerusalem, Nephi stories, missions, war chapters and Third Nephi stories. Shared scenery and landscape helpers live in `worlds/shared`.
+- `*.test.ts`: tests live next to the module or feature they exercise. Cross-world integration and disposal tests live beside the world runtime. `npm test` discovers every test under `src` and `scripts`.
+- `tools/cast/`: the current cast inspection page (`/tools/cast/` on the dev server).
+- `tools/qa/`: the static character inspection page and virtual-controller playthrough helper. These are development tools; only the game and cast page are production build entries.
+- `scripts/`: test discovery and durable deployment asset tooling, with its tests alongside it.
+- `public/`: stable public URLs, including painting originals and gallery derivatives. Keep existing public asset URLs available for already-open games.
+- `docs/`: `stories` for scripture/adaptation notes, `reference` for art and architecture, `development` for verification and analytics, `playtests` for observations, and `plans`/`design` for development history.
+
+The retired face, pose, style and playground previews and their exclusive models have been removed. The approved character rig and current cast viewer remain in use.
+
 ## Play locally
 
 ```sh
@@ -40,9 +54,9 @@ This uses the N64 buttons for the corresponding existing game actions. The camer
 
 The Conference Center opens with all three public floors, the auditorium and roof gardens available immediately. The first six story paintings stay in the entrance gallery; later paintings occupy side hallways and progressively higher floors. Walk up to a painting and jump into its canvas to enter. The canvases are physical surfaces: standing against one does not enter it, and jumping while touching its front does. The 24 stories unlock in scripture sequence, with completed scenes available for replay. The latest three follow Samuel:
 
-- **The Night Without Darkness:** explore an inhabited town, climb rooftop stairs, cross a bridge, discover hidden places and watch Samuel's promised sign from a high terrace. [Sources and routes](docs/signs-night.md).
-- **Lachoneus's Gathering:** carry visible provision sacks through a broad fortified valley, find alternate entrances, and guide a family safely to the refuge. Explore the spring, courtyard and watchtower. [Sources and routes](docs/lachoneus-gathering.md).
-- **Christ at Bountiful:** explore temple courts, rooms, garden terraces and optional conversations; carry water and accompany a neighbor home. Christ's ministry is remembered through brief source-grounded narration and a restrained light tableau. [Sources and routes](docs/christ-bountiful.md).
+- **The Night Without Darkness:** explore an inhabited town, climb rooftop stairs, cross a bridge, discover hidden places and watch Samuel's promised sign from a high terrace. [Sources and routes](docs/stories/signs-night.md).
+- **Lachoneus's Gathering:** carry visible provision sacks through a broad fortified valley, find alternate entrances, and guide a family safely to the refuge. Explore the spring, courtyard and watchtower. [Sources and routes](docs/stories/lachoneus-gathering.md).
+- **Christ at Bountiful:** explore temple courts, rooms, garden terraces and optional conversations; carry water and accompany a neighbor home. Christ's ministry is remembered through brief source-grounded narration and a restrained light tableau. [Sources and routes](docs/stories/christ-bountiful.md).
 
 These three adventures save completion while keeping the world open for exploration. Use the gallery button when ready to leave. Their architecture, terrain, errands and unnamed inhabitants are artistic adaptations.
 
@@ -101,9 +115,9 @@ npm run build
 npm run format:check
 ```
 
-Physics tests cover camera-relative movement, collision, jumping, step climbing and ceiling clearance. Camera tests cover wall obstruction and movement/orbit behavior. Browser and route checks are recorded in [prototype checks](docs/prototype-checks.md).
+Physics tests cover camera-relative movement, collision, jumping, step climbing and ceiling clearance. Camera tests cover wall obstruction and movement/orbit behavior. Browser and route checks are recorded in [prototype checks](docs/development/prototype-checks.md).
 
-Scene code loads in level chunks as needed; the runtime builds only the active scene. Gallery paintings request their images when first rendered. The six gallery derivatives total 1.28 MB, down from 15.56 MB for the originals (91.7% smaller); the originals are retained. For opt-in development FPS, render workload, and repeated-scene resource checks, see [performance checks](docs/performance-checks.md). These diagnostics do not establish physical phone performance.
+Scene code loads in level chunks as needed; the runtime builds only the active scene. Gallery paintings request their images when first rendered. The six gallery derivatives total 1.28 MB, down from 15.56 MB for the originals (91.7% smaller); the originals are retained. For opt-in development FPS, render workload, and repeated-scene resource checks, see [performance checks](docs/development/performance-checks.md). These diagnostics do not establish physical phone performance.
 
 ## Deploy on GitHub Pages
 
