@@ -28,3 +28,7 @@ npm run format:check
 Coding agents must read [AGENTS.md](AGENTS.md) before making changes. It covers gameplay, scripture sources, collision, cameras, and visual checks.
 
 See the [repository reference](docs/development/game-reference.md) for the code layout, [story notes](docs/stories/) for sources and adaptations, and [deployment notes](docs/development/deployment.md) for hosting. Maintainers should also read [release security](docs/development/release-security.md).
+
+## License
+
+Super Mormon uses the [MIT License](LICENSE). Contributions are welcome under the same license. Only submit code and assets you have permission to share; third-party dependencies retain their own licenses.

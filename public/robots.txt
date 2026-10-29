@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://cgood92.github.io/super-mormon/sitemap.xml

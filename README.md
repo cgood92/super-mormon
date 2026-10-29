@@ -2,7 +2,7 @@
 
 **Step into the stories. Find your own adventure.**
 
-Explore Jerusalem, follow the iron rod, build a ship, and discover 24 Book of Mormon adventures in a free browser game. Run, jump, climb, and explore on a computer, phone, or controller.
+Explore Jerusalem, follow the iron rod, build a ship, and discover 24 Book of Mormon adventures in a free, open-source browser game. Run, jump, climb, and explore on a computer, phone, or controller.
 
 [**Play the game →**](https://cgood92.github.io/super-mormon/)
 
@@ -10,7 +10,7 @@ Explore Jerusalem, follow the iron rod, build a ship, and discover 24 Book of Mo
 
 _Posed scenes rendered with the game’s own characters and scenery._
 
-An independent game in development. Stories, places, and characters include artistic adaptations.
+An independent game in development, shared under the [MIT License](LICENSE). Stories, places, and characters include artistic adaptations.
 
 ## Feedback & contributions
 
