@@ -1,0 +1,11 @@
+# GitHub Pages deployment
+
+The GitHub Actions workflow checks formatting, runs tests, and builds on pull requests and pushes to `main`. A successful push to `main` (or a manual run from `main`) prepares the static `dist` folder, then waits for @cgood92 to approve the `github-pages` deployment before publishing. In the repository's **Settings → Pages**, set **Build and deployment → Source** to **GitHub Actions**. Before uploading, deployment restores the durable `pages-assets` branch, adds this build's content-addressed `dist/assets` files, and publishes their union. Existing tabs keep their original code and can enter previously unvisited paintings after subsequent deployments; new page loads get the latest HTML and code. There is no forced refresh or change to saved progress. The archive is committed before deployment and never automatically expires or prunes assets. On first use, it seeds itself from all available, unexpired main-branch Pages artifacts so recently opened tabs are covered too. Initialization verifies that the currently live deployment is included and stops if its artifact is unavailable. Code already removed by older deployments cannot be recovered this way.
+
+The main-only asset-retention job needs `contents: write` to maintain `pages-assets` and `actions: read` and `deployments: read` for the initial artifact seed. Keep that branch: do not delete it or reset it to only the latest build. Archive restoration, immutable filename collisions, push failures, or a combined site larger than 900 MiB stop deployment instead of publishing a broken site. If storage approaches that limit, migrate the archive to durable hosting; do not expire old code silently. Retention adds deployment storage, not extra downloads on startup. Public files outside Vite's hashed `assets` directory (such as painting images) still use stable paths; keep those paths available when changing them.
+
+Play at [cgood92.github.io/super-mormon](https://cgood92.github.io/super-mormon/).
+
+Local development serves at `/`. The workflow builds with `VITE_BASE_PATH=/super-mormon/` so scripts, styles, and gallery paintings load under the GitHub Pages project path. To reproduce that build locally, run `VITE_BASE_PATH=/super-mormon/ npm run build`.
+
+See [release security](release-security.md) before accepting outside contributions.
