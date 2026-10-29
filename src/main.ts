@@ -418,11 +418,6 @@ function pause() {
     [
       { label: "Keep exploring", run: () => {} },
       {
-        label: `Graphics · ${GRAPHICS_MODES[graphicsMode].label}`,
-        run: () => showGraphics(),
-        secondary: true,
-      },
-      {
         label: "Moves & practice",
         run: () => showMoves(),
         secondary: true,
@@ -436,11 +431,6 @@ function pause() {
             "noopener,noreferrer",
           );
         },
-        secondary: true,
-      },
-      {
-        label: "Set up N64 controller",
-        run: () => openControllerSetup(),
         secondary: true,
       },
       {
@@ -461,13 +451,6 @@ function pause() {
         secondary: true,
       },
       {
-        label: soundOn ? "Turn sound off" : "Turn sound on",
-        run: () => {
-          soundOn = !soundOn;
-        },
-        secondary: true,
-      },
-      {
         label: document.fullscreenElement ? "Leave full screen" : "Full screen",
         run: () => {
           if (document.fullscreenElement) void document.exitFullscreen();
@@ -475,6 +458,35 @@ function pause() {
         },
         secondary: true,
       },
+      { label: "Settings", run: () => showSettings(), secondary: true },
+    ],
+  );
+  pauseMenuOpen = true;
+}
+function showSettings() {
+  modal(
+    "SETTINGS",
+    "Make yourself comfortable.",
+    "Adjust sound, graphics, or your controller.",
+    [
+      {
+        label: `Sound · ${soundOn ? "On" : "Off"}`,
+        run: () => {
+          soundOn = !soundOn;
+          showSettings();
+        },
+      },
+      {
+        label: `Graphics · ${GRAPHICS_MODES[graphicsMode].label}`,
+        run: () => showGraphics(),
+        secondary: true,
+      },
+      {
+        label: "Set up N64 controller",
+        run: () => openControllerSetup(showSettings),
+        secondary: true,
+      },
+      { label: "Back", run: () => pause(), secondary: true },
     ],
   );
   pauseMenuOpen = true;
@@ -498,15 +510,15 @@ function showGraphics() {
           renderQuality.reset();
           previous = performance.now();
           resize();
-          pause();
+          showSettings();
         },
         secondary: mode !== graphicsMode,
       })),
-      { label: "Back", run: () => pause(), secondary: true },
+      { label: "Back", run: () => showSettings(), secondary: true },
     ],
   );
 }
-function openControllerSetup() {
+function openControllerSetup(onDone?: () => void) {
   if (transition || controllerSetup) return;
   analytics.flush();
   renderDirty = true;
@@ -527,6 +539,7 @@ function openControllerSetup() {
     paused = false;
     waitForControllerRelease = true;
     input.reset();
+    onDone?.();
   });
 }
 function connectedController() {
