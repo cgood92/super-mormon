@@ -78,3 +78,14 @@ test("player lands on raised platforms and cannot jump through ceilings", () => 
   tick(q, { ...still, jump: true, jumpHeld: true }, [ceiling], 14);
   assert.ok(q.y <= 0.36);
 });
+
+test("standing beside a higher tread keeps support from the tread beneath the feet", () => {
+  const solids = [
+    { x: 0, y: 0, z: 0, w: 3, h: 1, d: 1 },
+    { x: 0, y: 1, z: -1, w: 3, h: 0.3, d: 1 },
+  ];
+  const player = createPlayer(0, 1, -0.3);
+  tick(player, still, solids, 120);
+  assert.equal(player.y, 1);
+  assert.equal(player.grounded, true);
+});
