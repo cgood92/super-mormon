@@ -1,10 +1,12 @@
 # Repository workflow
 
+- Keep tests beside the module or feature they exercise (`*.test.ts`). Cross-world integration tests belong beside the world runtime; deployment tests belong beside their script. `npm test` discovers tests recursively under `src` and `scripts`.
+
 - The brainstorming skill is optional in this repository. For concrete playtest feedback and clear feature or bugfix requests, proceed directly with investigation, implementation and verification; do not require a brainstorming session, a new specification or a separate design approval. Ask only for information that materially blocks the work.
 
 # Scenery acceptance rules
 
-- Build foreground solid scenery with shared geometry-and-collision helpers in `src/super/scenery.ts`. Use one dimension source for its visible surface and physical support. Register deliberate decoration/backdrops explicitly with a reason; do not turn all render meshes into enclosing AABBs.
+- Build foreground solid scenery with shared geometry-and-collision helpers in `src/game/worlds/shared/scenery.ts`. Use one dimension source for its visible surface and physical support. Register deliberate decoration/backdrops explicitly with a reason; do not turn all render meshes into enclosing AABBs.
 - Trees must have solid trunks. Add climbables for trees intended to be climbed. Rocks and mountains need matching walkable terraces or carefully fitted physical surfaces, preserving story routes and clear paths around obstacles.
 - New scenery must pass semantic collision validation and actual `stepPlayer` traversal checks (blocked walking, walking around, landing, and climbing as appropriate). Verify a normal player browser route, rather than only teleporting to story targets.
 - Each walk surface has one owner. Avoid coplanar overlapping floor meshes; remove the duplicate or separate surfaces with real thickness. Check close and distant views and raycast representative surfaces to catch duplicate hits/z-fighting.
