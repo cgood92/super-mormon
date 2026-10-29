@@ -1,1 +1,39 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#24473b"/><path d="M16 48V16h32v32M22 41V23h20v18M12 49h40" fill="none" stroke="#efd59e" stroke-width="4"/><path d="m28 33 4-6 4 6-4 6z" fill="#efd59e"/></svg>
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 96 96"
+  role="img"
+  aria-label="Mormon"
+>
+  <title>Super Mormon</title>
+  <rect width="96" height="96" rx="22" fill="#289b96" />
+  <path d="M15 96V78c0-16 15-25 33-25s33 9 33 25v18" fill="#153f35" />
+  <path d="m28 59 20 18 20-18-9 37H37z" fill="#f5ce72" />
+  <path d="M23 34c0-19 12-26 25-26s25 7 25 26v17H23z" fill="#e6dfc9" />
+  <path
+    d="M29 31c0-12 38-12 38 0v21c0 12-10 23-19 23S29 64 29 52z"
+    fill="#d6a577"
+  />
+  <path
+    d="M25 43c4 3 7 7 10 13l13 3 13-3c3-6 6-10 10-13v17L59 78H37L25 60z"
+    fill="#fff5d8"
+  />
+  <path
+    d="M40 45h1M56 45h1"
+    stroke="#0c2e2a"
+    stroke-width="5"
+    stroke-linecap="round"
+  />
+  <path
+    d="M43 56h10"
+    stroke="#a16d4c"
+    stroke-width="4"
+    stroke-linecap="round"
+  />
+  <path
+    d="M24 30c9 0 15-4 24-9 9 5 15 9 24 9"
+    fill="none"
+    stroke="#fff5d8"
+    stroke-width="7"
+    stroke-linecap="round"
+  />
+</svg>

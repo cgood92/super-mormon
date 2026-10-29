@@ -1,0 +1,31 @@
+{
+  "id": "./",
+  "name": "Super Mormon",
+  "short_name": "Super Mormon",
+  "description": "A 3D Book of Mormon adventure game.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "theme_color": "#24473b",
+  "background_color": "#24473b",
+  "icons": [
+    {
+      "src": "mormon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "mormon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "mormon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
