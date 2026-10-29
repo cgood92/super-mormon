@@ -4,12 +4,16 @@ export default defineConfig({
   server: { hmr: false },
   build: {
     manifest: "scene-manifest.json",
-    rollupOptions: {
+    rolldownOptions: {
       input: {
         game: "index.html",
         cast: "tools/cast/index.html",
       },
-      output: { manualChunks: { three: ["three"] } },
+      output: {
+        codeSplitting: {
+          groups: [{ name: "three", test: /[\\/]node_modules[\\/]three[\\/]/ }],
+        },
+      },
     },
   },
 });
