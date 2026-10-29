@@ -3,9 +3,9 @@ import type { CameraMode } from "./camera";
 import type { WorldId } from "./worlds";
 
 /** Deliberately undocumented in the player UI; test sessions never save progress. */
-export function sceneEntry(search: string): StoryId | null {
+export function sceneEntry(search: string): StoryId | "missionary" | null {
   const candidate = new URLSearchParams(search).get("scene");
-  return isStoryId(candidate) ? candidate : null;
+  return candidate === "missionary" || isStoryId(candidate) ? candidate : null;
 }
 export function cameraModeForWorld(id: WorldId): CameraMode {
   if (id === "hub") return "conference";

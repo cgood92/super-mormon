@@ -1,5 +1,5 @@
-import { drawSamuelPainting } from "./samuel-painting";
-import { drawThirdNephiPainting } from "./third-nephi-painting";
+import { galleryPaintingFile } from "./gallery-paintings";
+import { buildWanderingElders } from "./missionary-actors";
 import * as THREE from "three";
 import { label, painting } from "./art";
 import { STORY_ORDER } from "./progression";
@@ -294,19 +294,15 @@ export function gallery(scene: THREE.Scene): WorldData {
     exhibit.position.set(x - side * 0.28, y, wallZ);
     exhibit.rotation.y = (side * Math.PI) / 2;
     group.add(exhibit);
-    const image = painting(
-      exhibit,
-      0,
-      0.7,
-      0,
-      id === "title-liberty"
+    const galleryFile =
+      galleryPaintingFile(id) ??
+      (id === "title-liberty"
         ? `${import.meta.env?.BASE_URL ?? "/"}art/gallery/title-liberty.jpg`
-        : "",
-      0xffffff,
-    );
-    if (id !== "title-liberty") image.onBeforeRender = () => {};
+        : undefined);
+    const image = painting(exhibit, 0, 0.7, 0, galleryFile ?? "", 0xffffff);
+    if (!galleryFile) image.onBeforeRender = () => {};
     image.name = `${id} story painting`;
-    if (id !== "title-liberty" && typeof document !== "undefined") {
+    if (!galleryFile && typeof document !== "undefined") {
       const canvas = document.createElement("canvas");
       canvas.width = 384;
       canvas.height = 512;
@@ -632,9 +628,6 @@ export function gallery(scene: THREE.Scene): WorldData {
             }
           }
         }
-        if (id === "samuel") drawSamuelPainting(ctx);
-        if (id === "signs" || id === "gathering" || id === "christ-bountiful")
-          drawThirdNephiPainting(ctx, id);
         const texture = new THREE.CanvasTexture(canvas);
         texture.colorSpace = THREE.SRGBColorSpace;
         (image.material as THREE.MeshBasicMaterial).map = texture;
@@ -848,11 +841,15 @@ export function gallery(scene: THREE.Scene): WorldData {
   const auditorium = buildAuditorium(group),
     roof = buildRooftop(group);
   solids.push(...auditorium.solids, ...roof.solids);
+  const elders = buildWanderingElders(group, solids);
+  elders.update(0);
   let disposed = false;
   return {
     name: "Conference Center",
+    secretEntrance: elders.point,
     update: (dt, player) => {
       advanceEscalator(player, dt);
+      elders.update(dt, player);
     },
     subtitle: "Explore three floors, the auditorium and roof gardens",
     spawn: { x: 0, y: 0, z: 36, yaw: Math.PI },
@@ -897,6 +894,7 @@ export function gallery(scene: THREE.Scene): WorldData {
       if (disposed) return;
       disposed = true;
       auditorium.organ.dispose();
+      elders.dispose();
       disposeConference(group);
       scene.background = priorBackground;
       scene.fog = priorFog;
