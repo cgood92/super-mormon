@@ -15,14 +15,11 @@ test("all sixteen doors must be blue; victory is immediate and permanent", () =>
   visitHouse(game, 0);
   assert.equal(game.houses[0], "blue");
 });
-test("visitors wait at each door and travel slower than the player", () => {
+test("opposition claims several doors within the opening minute", () => {
   const game = createContest();
   tagHouse(game, 0);
-  advanceContest(game, 1);
-  assert.equal(game.houses[0], "blue");
-  for (let i = 0; i < 120; i++) advanceContest(game, 1);
-  assert.ok(game.houses.includes("red"));
-  assert.ok(game.visitors.every((v) => v.speed < 3));
+  for (let i = 0; i < 45 * 60; i++) advanceContest(game, 1 / 60);
+  assert.ok(game.houses.filter((color) => color === "red").length >= 4);
 });
 
 import * as T from "three";
@@ -146,4 +143,51 @@ test("elders follow the real Conference Center architecture to the lower landing
     "The complete authored route clears real floors, rails, walls, and stair treads",
   );
   world.dispose!();
+});
+
+import { missionaryActor } from "./missionary-actors";
+import * as actors from "./missionary-actors";
+test("visitors have blue shirts and brown trousers without changing elders", () => {
+  const root = new T.Group();
+  const elder = missionaryActor(root, true);
+  const visitor = missionaryActor(root, false);
+  const color = (actor: typeof elder, name: string) =>
+    (
+      (actor.group.getObjectByName(name) as T.Mesh)
+        .material as T.MeshStandardMaterial
+    ).color.getHex();
+  assert.equal(color(visitor, "left-trouser"), 0x805b3b);
+  assert.equal(color(visitor, "modern-waistband"), 0x805b3b);
+  assert.equal(color(visitor, "continuous-robe-and-sleeves"), 0x4e91cf);
+  assert.notEqual(color(elder, "left-trouser"), color(visitor, "left-trouser"));
+  assert.equal(
+    visitor.group.getObjectByName("missionary-name-tag")!.visible,
+    false,
+  );
+  elder.dispose();
+  visitor.dispose();
+});
+test("companion stays beside the player through turns and avoids buildings", () => {
+  const root = new T.Group();
+  const wall = { x: 1, y: 0, z: 0, w: 0.6, h: 3, d: 5 };
+  const companion = actors.buildMissionaryCompanion(root, [wall]);
+  const player = createPlayer(0, 0, 0);
+  for (const yaw of [0, Math.PI / 2, Math.PI, -Math.PI / 2, Math.PI / 4]) {
+    player.yaw = yaw;
+    companion.update(1 / 60, player);
+    const p = companion.group.position;
+    assert.ok(Math.hypot(p.x - player.x, p.z - player.z) <= 1.5);
+    assert.ok(Math.hypot(p.x - player.x, p.z - player.z) >= 0.8);
+    assert.ok(Math.abs(p.x - wall.x) >= 0.6 || Math.abs(p.z) >= 2.8);
+  }
+  player.x = 15;
+  player.y = 2;
+  player.z = 4;
+  companion.update(1 / 60, player);
+  assert.equal(companion.group.position.y, 2);
+  assert.ok(
+    companion.group.position.distanceTo(new T.Vector3(15, 2, 4)) <= 1.5,
+  );
+  companion.dispose();
+  assert.equal(root.children.length, 0);
 });
