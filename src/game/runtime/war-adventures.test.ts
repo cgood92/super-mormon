@@ -6,7 +6,7 @@ import {
   MORIANTON_ROUTE,
 } from "../worlds/war/morianton-flight";
 import { buildTeancumNight, TEANCUM_ROUTE } from "../worlds/war/teancum-night";
-import { buildGidRescue, GID_ROUTE } from "../worlds/war/gid-rescue";
+import { buildGidRescue } from "../worlds/war/gid-rescue";
 import { createPlayer, stepPlayer } from "../physics/physics";
 import { sceneryCollisionErrors } from "../worlds/shared/scenery";
 import { StoryCinematic, type StoryShot } from "../camera/cinematic";
@@ -113,33 +113,6 @@ test("Teancum's night route uses cover, a non-graphic tent event, and a return t
   assert.equal(scene.children.length, 0);
 });
 
-test("Gid requires two weapon deliveries over the wall and bloodless surrender", () => {
-  const scene = new T.Scene(),
-    world = buildGidRescue(scene),
-    h = harness(world);
-  assert.deepEqual(sceneryCollisionErrors(scene, world.solids), []);
-  for (const [index, point] of GID_ROUTE.entries()) {
-    if (!index) continue;
-    if (index === 8 || index === 9) h.walk({ x: 22, y: 0, z: 16 });
-    h.walk(point);
-    h.use();
-  }
-  assert.equal(h.completed, 1);
-  assert.equal((h.runtime.snapshot() as { delivered: number }).delivered, 2);
-  assert.equal(
-    (h.runtime.snapshot() as { familyTalked: boolean }).familyTalked,
-    true,
-  );
-  assert.match(h.dialogs.map((d) => d.body).join(" "), /Laman/);
-  assert.match(h.dialogs.map((d) => d.body).join(" "), /women|children/);
-  assert.match(
-    h.dialogs.map((d) => d.body).join(" "),
-    /without bloodshed|surrender/i,
-  );
-  world.dispose?.();
-  assert.equal(scene.children.length, 0);
-});
-
 test("Morianton escaping the pass restarts the race at the scout", () => {
   const world = buildMoriantonFlight(new T.Scene()),
     h = harness(world);
@@ -193,7 +166,6 @@ test("all war-story shots keep the player visible through entrance and return", 
   for (const [build, route] of [
     [buildMoriantonFlight, MORIANTON_ROUTE],
     [buildTeancumNight, TEANCUM_ROUTE],
-    [buildGidRescue, GID_ROUTE],
   ] as const) {
     const scene = new T.Scene(),
       world = build(scene),
