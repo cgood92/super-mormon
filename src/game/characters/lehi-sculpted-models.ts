@@ -80,6 +80,13 @@ const ORIGINAL_CAST_TRAITS: Readonly<
   Record<
     Exclude<
       SculptedCharacterRole,
+      | "peace-builder"
+      | "mormon"
+      | "ammaron"
+      | "jared"
+      | "jared-brother"
+      | "ether"
+      | "moroni-keeper"
       | "warning-runner"
       | "missionary"
       | "moroni"
@@ -326,6 +333,128 @@ export const SCULPTED_CAST_TRAITS: Readonly<
   Record<SculptedCharacterRole, CastTraits>
 > = {
   ...ORIGINAL_CAST_TRAITS,
+  // Illustrative anatomy, clothing and tools; scripture does not describe
+  // these appearances. The two Moronis are separate people and profiles.
+  "peace-builder": {
+    ...ORIGINAL_CAST_TRAITS.sam,
+    head: 0.312,
+    tall: 1.02,
+    faceWidth: 0.92,
+    jaw: 0.81,
+    nose: 0.064,
+    hairStyle: "waves",
+    beard: "scruff",
+    hair: 0x594331,
+    width: 0.35,
+    hem: 0.34,
+    brow: 0.035,
+    robe: 0xd9bf91,
+    coat: 0x537e78,
+    trim: 0x8c6846,
+  },
+  mormon: {
+    ...ORIGINAL_CAST_TRAITS.zoram,
+    head: 0.327,
+    tall: 1.07,
+    faceWidth: 0.91,
+    jaw: 0.86,
+    nose: 0.076,
+    hairStyle: "cropped",
+    beard: "trimmed",
+    hair: 0x60574d,
+    width: 0.365,
+    hem: 0.26,
+    brow: 0.012,
+    robe: 0xd6c8ad,
+    coat: 0x6d687f,
+    trim: 0xa18a60,
+  },
+  ammaron: {
+    ...ORIGINAL_CAST_TRAITS.lehi,
+    head: 0.319,
+    tall: 0.98,
+    faceWidth: 0.86,
+    jaw: 0.7,
+    nose: 0.079,
+    hairStyle: "receding",
+    beard: "elder",
+    hair: 0xc1b9aa,
+    width: 0.35,
+    hem: 0.22,
+    brow: 0.04,
+    robe: 0xd3c6a4,
+    coat: 0x806848,
+    trim: 0xb6a487,
+  },
+  jared: {
+    ...ORIGINAL_CAST_TRAITS.laman,
+    head: 0.33,
+    tall: 1.04,
+    faceWidth: 0.96,
+    jaw: 0.85,
+    nose: 0.07,
+    hairStyle: "swept",
+    beard: "trimmed",
+    hair: 0x4a3527,
+    width: 0.37,
+    hem: 0.31,
+    brow: 0.025,
+    robe: 0xc1ad82,
+    coat: 0x986449,
+    trim: 0x6c765f,
+  },
+  "jared-brother": {
+    ...ORIGINAL_CAST_TRAITS.sam,
+    head: 0.338,
+    tall: 1.09,
+    faceWidth: 0.89,
+    jaw: 0.78,
+    nose: 0.074,
+    hairStyle: "waves",
+    beard: "elder",
+    hair: 0x503b2d,
+    width: 0.375,
+    hem: 0.25,
+    brow: 0.05,
+    robe: 0xd7c7a2,
+    coat: 0x647962,
+    trim: 0x9a7850,
+  },
+  ether: {
+    ...ORIGINAL_CAST_TRAITS.zoram,
+    head: 0.305,
+    tall: 1.03,
+    faceWidth: 0.82,
+    jaw: 0.73,
+    nose: 0.067,
+    hairStyle: "receding",
+    beard: "scruff",
+    hair: 0x766d5e,
+    width: 0.335,
+    hem: 0.29,
+    brow: 0.02,
+    robe: 0xcabfa4,
+    coat: 0x7f6759,
+    trim: 0x747d78,
+  },
+  "moroni-keeper": {
+    ...ORIGINAL_CAST_TRAITS.nephi,
+    head: 0.321,
+    tall: 1.06,
+    faceWidth: 0.86,
+    jaw: 0.8,
+    nose: 0.071,
+    hairStyle: "swept",
+    beard: "trimmed",
+    hair: 0x46352b,
+    width: 0.35,
+    hem: 0.28,
+    brow: 0.03,
+    robe: 0xd5c3a0,
+    coat: 0x687581,
+    trim: 0x99836a,
+  },
+
   missionary: {
     ...ORIGINAL_CAST_TRAITS.sam,
     outfit: "modern",
@@ -2169,6 +2298,118 @@ function makeSculpted(
   if (index !== 2) {
     belt.position.y = 1.045;
     belt.rotation.x = Math.PI / 2;
+  }
+
+  // Small occupational tools sit on the front belt, clear of limb articulation.
+  // These are imagined props, not reconstructions or sacred-object depictions.
+  if (
+    role &&
+    [
+      "peace-builder",
+      "mormon",
+      "ammaron",
+      "jared",
+      "jared-brother",
+      "ether",
+      "moroni-keeper",
+    ].includes(role)
+  ) {
+    const equipment = new T.Group();
+    equipment.name = `${role}-equipment`;
+    group.add(equipment);
+    const accessory = (
+      geometry: T.BufferGeometry,
+      material: T.Material,
+      name: string,
+      x: number,
+      y: number,
+      z: number,
+    ) => {
+      const mesh = add(geometry, material, name);
+      equipment.add(mesh);
+      mesh.position.set(x, y, z);
+      return mesh;
+    };
+    if (role === "peace-builder") {
+      accessory(
+        new T.BoxGeometry(0.13, 0.055, 0.065),
+        materials.leather,
+        "artisan-mallet-head",
+        0.17,
+        1.025,
+        0.39,
+      );
+      accessory(
+        new T.CylinderGeometry(0.016, 0.016, 0.19, 6),
+        materials.leather,
+        "artisan-mallet-handle",
+        0.17,
+        0.92,
+        0.39,
+      );
+    } else if (role === "jared") {
+      const rope = accessory(
+        new T.TorusGeometry(0.072, 0.014, 5, 12),
+        materials.leather,
+        "traveler-rope-coil",
+        0.17,
+        0.99,
+        0.39,
+      );
+      rope.rotation.y = 0.2;
+      accessory(
+        new T.TorusGeometry(0.051, 0.011, 5, 12),
+        materials.leather,
+        "traveler-inner-coil",
+        0.17,
+        0.99,
+        0.395,
+      );
+    } else if (role === "jared-brother") {
+      accessory(
+        new T.BoxGeometry(0.13, 0.15, 0.07),
+        materials.leather,
+        "builder-tool-pouch",
+        -0.16,
+        1,
+        0.37,
+      );
+      accessory(
+        new T.CylinderGeometry(0.018, 0.018, 0.16, 6),
+        materials.mantleLining,
+        "builder-measuring-rod",
+        -0.15,
+        1.11,
+        0.38,
+      );
+    } else {
+      const width = role === "ammaron" ? 0.19 : role === "ether" ? 0.12 : 0.16;
+      accessory(
+        new T.BoxGeometry(width, 0.15, 0.065),
+        materials.leather,
+        "record-keeper-case",
+        0.13,
+        1.0,
+        0.38,
+      );
+      accessory(
+        new T.BoxGeometry(width + 0.012, 0.035, 0.072),
+        materials.mantleLining,
+        "record-case-flap",
+        0.13,
+        1.075,
+        0.384,
+      );
+      if (role === "mormon" || role === "moroni-keeper")
+        accessory(
+          new T.CylinderGeometry(0.008, 0.008, 0.18, 5),
+          materials.mantleLining,
+          "record-keeper-stylus",
+          0.25,
+          1.045,
+          0.385,
+        ).rotation.z = -0.15;
+    }
   }
 
   // Footwear follows the same silhouette language, with grounded soles.

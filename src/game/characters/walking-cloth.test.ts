@@ -258,64 +258,77 @@ test("a reversing coat stays in front of its posed trousers at the side camera",
 
 test("the complete inner costume stays inside the side and rear coat through turns", () => {
   for (const quality of ["hero", "npc", "crowd"] as const) {
-    const actor = createSculptedCharacterRig("nephi", { quality });
-    const coat = actor.group.getObjectByName("flowing-mantle") as T.SkinnedMesh;
-    const inner = [
-      "continuous-robe-and-sleeves",
-      "visible-front-tunic",
-      "left-trouser",
-      "right-trouser",
-      "left-sandal",
-      "right-sandal",
-    ].map((name) => actor.group.getObjectByName(name) as T.Mesh);
-    assert.ok(inner.every(Boolean));
-    const model = coat.parent!;
-    let x = 0;
-    let z = 0;
-    for (let frame = 0; frame < 48; frame++) {
-      const yaw = frame < 12 ? 0 : frame < 28 ? Math.PI / 2 : -Math.PI / 2;
-      const travelYaw =
-        frame < 18 ? 0 : frame < 36 ? Math.PI / 2 : -Math.PI / 2;
-      const vx = Math.sin(travelYaw) * 5;
-      const vz = Math.cos(travelYaw) * 5;
-      x += vx / 60;
-      z += vz / 60;
-      actor.update(1 / 60, { ...walking, x, z, vx, vz, yaw, runSpeed: 5 });
-      if (frame % 6 !== 2) continue;
-      actor.group.updateMatrixWorld(true);
-      coat.skeleton.update();
-      for (const degrees of [80, 90, 100, 180, 260, 270, 280]) {
-        const angle = (degrees * Math.PI) / 180;
-        const radial = new T.Vector3(Math.sin(angle), 0, Math.cos(angle));
-        const across = new T.Vector3(Math.cos(angle), 0, -Math.sin(angle));
-        const direction = radial
-          .clone()
-          .negate()
-          .transformDirection(model.matrixWorld);
-        for (const projectedX of [-0.15, 0, 0.15]) {
-          for (const y of [0.36, 0.48, 0.65]) {
-            const origin = radial
-              .clone()
-              .multiplyScalar(2)
-              .addScaledVector(across, projectedX);
-            origin.y = y;
-            const ray = new T.Raycaster(
-              origin.applyMatrix4(model.matrixWorld),
-              direction,
-            );
-            const coatHit = ray.intersectObject(coat, false)[0];
-            if (!coatHit) continue;
-            const innerHit = ray.intersectObjects(inner, false)[0];
-            if (!innerHit) continue;
-            assert.ok(
-              coatHit.distance <= innerHit.distance + 0.002,
-              `${quality} frame ${frame} angle ${degrees} y=${y}: ${innerHit.object.name} lies outside coat by ${(coatHit.distance - innerHit.distance).toFixed(3)}m`,
-            );
+    for (const role of [
+      "nephi",
+      "peace-builder",
+      "mormon",
+      "ammaron",
+      "jared",
+      "jared-brother",
+      "ether",
+      "moroni-keeper",
+    ] as const) {
+      const actor = createSculptedCharacterRig(role, { quality });
+      const coat = actor.group.getObjectByName(
+        "flowing-mantle",
+      ) as T.SkinnedMesh;
+      const inner = [
+        "continuous-robe-and-sleeves",
+        "visible-front-tunic",
+        "left-trouser",
+        "right-trouser",
+        "left-sandal",
+        "right-sandal",
+      ].map((name) => actor.group.getObjectByName(name) as T.Mesh);
+      assert.ok(inner.every(Boolean));
+      const model = coat.parent!;
+      let x = 0;
+      let z = 0;
+      for (let frame = 0; frame < 48; frame++) {
+        const yaw = frame < 12 ? 0 : frame < 28 ? Math.PI / 2 : -Math.PI / 2;
+        const travelYaw =
+          frame < 18 ? 0 : frame < 36 ? Math.PI / 2 : -Math.PI / 2;
+        const vx = Math.sin(travelYaw) * 5;
+        const vz = Math.cos(travelYaw) * 5;
+        x += vx / 60;
+        z += vz / 60;
+        actor.update(1 / 60, { ...walking, x, z, vx, vz, yaw, runSpeed: 5 });
+        if (frame % 6 !== 2) continue;
+        actor.group.updateMatrixWorld(true);
+        coat.skeleton.update();
+        for (const degrees of [80, 90, 100, 180, 260, 270, 280]) {
+          const angle = (degrees * Math.PI) / 180;
+          const radial = new T.Vector3(Math.sin(angle), 0, Math.cos(angle));
+          const across = new T.Vector3(Math.cos(angle), 0, -Math.sin(angle));
+          const direction = radial
+            .clone()
+            .negate()
+            .transformDirection(model.matrixWorld);
+          for (const projectedX of [-0.15, 0, 0.15]) {
+            for (const y of [0.36, 0.48, 0.65]) {
+              const origin = radial
+                .clone()
+                .multiplyScalar(2)
+                .addScaledVector(across, projectedX);
+              origin.y = y;
+              const ray = new T.Raycaster(
+                origin.applyMatrix4(model.matrixWorld),
+                direction,
+              );
+              const coatHit = ray.intersectObject(coat, false)[0];
+              if (!coatHit) continue;
+              const innerHit = ray.intersectObjects(inner, false)[0];
+              if (!innerHit) continue;
+              assert.ok(
+                coatHit.distance <= innerHit.distance + 0.002,
+                `${quality} frame ${frame} angle ${degrees} y=${y}: ${innerHit.object.name} lies outside coat by ${(coatHit.distance - innerHit.distance).toFixed(3)}m`,
+              );
+            }
           }
         }
       }
+      actor.dispose();
     }
-    actor.dispose();
   }
 });
 
@@ -323,7 +336,17 @@ test("coated actors build only the visible front inset and short footwear", () =
   for (const quality of ["hero", "npc", "crowd"] as const) {
     // Moroni wears short armor lames; its exposed-trouser and removable-coat
     // coverage is verified in moroni-armor.test.ts.
-    for (const role of ["nephi", "lehi"] as const) {
+    for (const role of [
+      "nephi",
+      "lehi",
+      "peace-builder",
+      "mormon",
+      "ammaron",
+      "jared",
+      "jared-brother",
+      "ether",
+      "moroni-keeper",
+    ] as const) {
       const actor = createSculptedCharacterRig(role, { quality });
       const shirt = actor.group.getObjectByName(
         "continuous-robe-and-sleeves",
@@ -368,7 +391,17 @@ test("coated actors build only the visible front inset and short footwear", () =
 
 test("crawl gathers the rear coat ahead of bent shoes through a full gait", () => {
   for (const quality of ["hero", "npc", "crowd"] as const) {
-    for (const role of ["nephi", "sariah"] as const) {
+    for (const role of [
+      "nephi",
+      "sariah",
+      "peace-builder",
+      "mormon",
+      "ammaron",
+      "jared",
+      "jared-brother",
+      "ether",
+      "moroni-keeper",
+    ] as const) {
       const actor = createSculptedCharacterRig(role, { quality });
       const coat = actor.group.getObjectByName(
         "flowing-mantle",
@@ -438,7 +471,17 @@ test("crawl gathers the rear coat ahead of bent shoes through a full gait", () =
 });
 
 test("crawl and return keep coincident garment vertices smoothly shaded", () => {
-  for (const role of ["lehi", "nephi"] as const) {
+  for (const role of [
+    "lehi",
+    "nephi",
+    "peace-builder",
+    "mormon",
+    "ammaron",
+    "jared",
+    "jared-brother",
+    "ether",
+    "moroni-keeper",
+  ] as const) {
     const actor = createSculptedCharacterRig(role, { quality: "hero" });
     const names = [
       "flowing-mantle",
@@ -463,14 +506,28 @@ test("crawl and return keep coincident garment vertices smoothly shaded", () => 
       }
       return [{ name, mesh, pairs }];
     });
-    assert.ok(
-      seams.find((part) => part.name === "flowing-mantle")!.pairs.length > 0,
-    );
+    // These original cuts intentionally exercise duplicate-vertex smoothing.
+    // Other mantle cuts are welded, so there is no duplicate seam to compare.
+    if (role === "lehi" || role === "nephi")
+      assert.ok(
+        seams.find((part) => part.name === "flowing-mantle")!.pairs.length > 0,
+      );
     const check = (pose: string) => {
       for (const { name, mesh, pairs } of seams) {
         const normals = mesh.geometry.getAttribute(
           "normal",
         ) as T.BufferAttribute;
+        for (let i = 0; i < normals.count; i++) {
+          const length = Math.hypot(
+            normals.getX(i),
+            normals.getY(i),
+            normals.getZ(i),
+          );
+          assert.ok(
+            Number.isFinite(length) && Math.abs(length - 1) < 0.001,
+            `${role} ${name} ${pose}: invalid surface normal at ${i}`,
+          );
+        }
         for (const [a, b] of pairs) {
           const mismatch = Math.hypot(
             normals.getX(a) - normals.getX(b),

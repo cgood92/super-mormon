@@ -12,9 +12,13 @@ import { laterPainting } from "../worlds/conference/gallery-layout";
 const additions = ["signs", "gathering", "christ-bountiful"] as const;
 
 test("Third Nephi follows Samuel and existing finished saves discover the new stories", () => {
-  assert.deepEqual(STORY_ORDER.slice(-4), ["samuel", ...additions]);
+  const start = STORY_ORDER.indexOf("samuel");
+  assert.deepEqual(STORY_ORDER.slice(start, start + 4), [
+    "samuel",
+    ...additions,
+  ]);
   const completed = readCompleted(
-    STORY_ORDER.filter(
+    STORY_ORDER.slice(0, STORY_ORDER.indexOf("christ-bountiful") + 1).filter(
       (id) => !additions.includes(id as (typeof additions)[number]),
     ),
   );
@@ -23,7 +27,7 @@ test("Third Nephi follows Samuel and existing finished saves discover the new st
     assert.ok(STORY_TITLES[id]);
     completed.add(id);
   }
-  assert.equal(nextStory(completed), null);
+  assert.equal(nextStory(completed), "peace-city");
 });
 
 test("new paintings use existing upper side-wall exhibits outside the auditorium", () => {
@@ -31,7 +35,7 @@ test("new paintings use existing upper side-wall exhibits outside the auditorium
     const index = STORY_ORDER.indexOf(id) - 6;
     const painting = laterPainting(id, index);
     assert.equal(Math.abs(painting.x), 67.38);
-    assert.ok([-20, -43, -66, -89].includes(painting.z));
+    assert.ok([-16, -34, -52, -70, -88].includes(painting.z));
     assert.ok(painting.y >= 12);
     assert.ok(painting.title.length > 0);
   }

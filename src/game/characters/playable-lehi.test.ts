@@ -513,7 +513,19 @@ test("playable crawl keeps its face and grounded supports in the travel directio
     });
     return box;
   };
-  for (const role of ["nephi", "lehi", "child", "guard"] as const) {
+  for (const role of [
+    "nephi",
+    "lehi",
+    "child",
+    "guard",
+    "peace-builder",
+    "mormon",
+    "ammaron",
+    "jared",
+    "jared-brother",
+    "ether",
+    "moroni-keeper",
+  ] as const) {
     for (const yaw of [
       0,
       Math.PI / 4,

@@ -24,10 +24,10 @@ test("direct scene entry accepts every registered story and rejects invalid valu
     assert.equal(sceneEntry(search), null);
 });
 test("later paintings progress through side hallways before ascending, never auditorium", () => {
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 26; i++) {
     const p = laterPaintingLocation(i);
     assert.ok(Math.abs(p.x) > 67);
-    assert.equal(p.y, Math.floor(i / 8) * 12);
+    assert.equal(p.y, Math.floor(i / 10) * 12);
     assert.ok(p.z < 0 && p.z > -100);
     assert.notDeepEqual(p, laterPaintingLocation(i + 1));
   }

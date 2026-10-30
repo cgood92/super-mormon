@@ -1,4 +1,11 @@
 export type CharacterRole =
+  | "peace-builder"
+  | "mormon"
+  | "ammaron"
+  | "jared"
+  | "jared-brother"
+  | "ether"
+  | "moroni-keeper"
   | "moroni"
   | "teancum"
   | "morianton"

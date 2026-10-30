@@ -12,6 +12,62 @@ type PreparedWorld = {
 
 // Load code first, then let the caller atomically replace the active scene.
 export async function prepareWorld(id: WorldId): Promise<PreparedWorld> {
+  if (id === "jared-expedition") {
+    const module = await deployedScene(
+      "src/game/worlds/final/jared-expedition.ts",
+      () => import("../worlds/final/jared-expedition"),
+    );
+    return { buildWorld: (_, scene) => module.buildJaredExpedition(scene) };
+  }
+  if (id === "jared-barges") {
+    const module = await deployedScene(
+      "src/game/worlds/final/jared-barges.ts",
+      () => import("../worlds/final/jared-barges"),
+    );
+    return { buildWorld: (_, scene) => module.buildJaredBarges(scene) };
+  }
+  if (id === "shelem-stones") {
+    const module = await deployedScene(
+      "src/game/worlds/final/shelem-stones.ts",
+      () => import("../worlds/final/shelem-stones"),
+    );
+    return { buildWorld: (_, scene) => module.buildShelemStones(scene) };
+  }
+  if (id === "jared-crossing") {
+    const module = await deployedScene(
+      "src/game/worlds/final/jared-crossing.ts",
+      () => import("../worlds/final/jared-crossing"),
+    );
+    return { buildWorld: (_, scene) => module.buildJaredCrossing(scene) };
+  }
+  if (id === "ether-refuge") {
+    const module = await deployedScene(
+      "src/game/worlds/final/ether-refuge.ts",
+      () => import("../worlds/final/ether-refuge"),
+    );
+    return { buildWorld: (_, scene) => module.buildEtherRefuge(scene) };
+  }
+  if (id === "moroni-farewell") {
+    const module = await deployedScene(
+      "src/game/worlds/final/moroni-farewell.ts",
+      () => import("../worlds/final/moroni-farewell"),
+    );
+    return { buildWorld: (_, scene) => module.buildMoroniFarewell(scene) };
+  }
+  if (id === "peace-city") {
+    const module = await deployedScene(
+      "src/game/worlds/final/peace-city.ts",
+      () => import("../worlds/final/peace-city"),
+    );
+    return { buildWorld: (_, scene) => module.buildPeaceCity(scene) };
+  }
+  if (id === "mormon-records") {
+    const module = await deployedScene(
+      "src/game/worlds/final/mormon-records.ts",
+      () => import("../worlds/final/mormon-records"),
+    );
+    return { buildWorld: (_, scene) => module.buildMormonRecords(scene) };
+  }
   if (id === "missionary") {
     const module = await deployedScene(
       "src/game/worlds/missions/missionary-neighborhood.ts",
