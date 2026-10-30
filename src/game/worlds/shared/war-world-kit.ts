@@ -9,7 +9,12 @@ import { markScenery, sceneryBox } from "./scenery";
 import type { Point, Solid } from "../../runtime/worlds";
 
 /** Shared set dressing for the three Alma war accounts. Each solid uses its render dimensions. */
-export function warWorld(scene: T.Scene, name: string, night = false) {
+export function warWorld(
+  scene: T.Scene,
+  name: string,
+  night = false,
+  ground = { width: 110, depth: 140 },
+) {
   const previousBackground = scene.background,
     previousFog = scene.fog;
   const root = new T.Group();
@@ -40,7 +45,7 @@ export function warWorld(scene: T.Scene, name: string, night = false) {
   const solid = (shape: Solid, color: number, label: string) =>
     sceneryBox(root, solids, material(color), shape, label);
   solid(
-    { x: 0, y: -0.6, z: 0, w: 110, h: 0.6, d: 140 },
+    { x: 0, y: -0.6, z: 0, w: ground.width, h: 0.6, d: ground.depth },
     night ? 0x596a62 : 0xbda980,
     "Single earth walk surface",
   );

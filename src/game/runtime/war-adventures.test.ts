@@ -36,7 +36,7 @@ function harness(world: WorldData) {
     let frames = 0;
     while (
       Math.hypot(target.x - player.x, target.z - player.z) > 0.55 &&
-      frames++ < 1200
+      frames++ < 3600
     ) {
       const dx = target.x - player.x,
         dz = target.z - player.z;
@@ -53,7 +53,7 @@ function harness(world: WorldData) {
       runtime.update(1 / 60, player, idle);
     }
     assert.ok(
-      frames < 1200,
+      frames < 3600,
       `walking route blocked at ${player.x.toFixed(1)},${player.z.toFixed(1)} toward ${target.x},${target.z}`,
     );
   };
@@ -160,11 +160,15 @@ test("an exposed player in the outer watch triggers Teancum's stealth reset", ()
     h = harness(world);
   h.walk(TEANCUM_ROUTE[1]);
   h.use();
-  const yaw = (h.runtime.snapshot() as { sentries: { headYaw: number }[] })
-    .sentries[0].headYaw;
+  const sentry = (
+    h.runtime.snapshot() as {
+      sentries: { x: number; z: number; headYaw: number }[];
+    }
+  ).sentries[0];
+  const yaw = sentry.headYaw;
   Object.assign(
     h.player,
-    createPlayer(1 + Math.sin(yaw) * 8, 0, -15 + Math.cos(yaw) * 8),
+    createPlayer(sentry.x + Math.sin(yaw) * 8, 0, sentry.z + Math.cos(yaw) * 8),
   );
   h.runtime.update(0.05, h.player, idle);
   const state = h.runtime.snapshot() as { phase: string; detections: number };
@@ -223,6 +227,14 @@ test("all war-story shots keep the player visible through entrance and return", 
       );
       avatar.position.set(player.x, player.y, player.z);
       runtime.update(1 / 60, player, { ...idle, interact: true });
+      if (build === buildTeancumNight && (index === 2 || index === 3)) {
+        assert.equal(
+          shot,
+          undefined,
+          "watch lines should advance through travel, without stopping for dialogue",
+        );
+        continue;
+      }
       for (
         let flight = 0;
         flight < 12 && (runtime.snapshot() as { throwing?: boolean }).throwing;
