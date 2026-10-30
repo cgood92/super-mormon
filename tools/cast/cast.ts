@@ -6,6 +6,37 @@ import {
 } from "../../src/game/characters/character";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 const cast: [CharacterRole, string, string][] = [
+  [
+    "peace-builder",
+    "Community artisan",
+    "Imagined adult artisan, wavy hair, short beard and belt mallet.",
+  ],
+  [
+    "mormon",
+    "Mormon",
+    "Adult record keeper with broad jaw, cropped graying hair and stylus case.",
+  ],
+  [
+    "ammaron",
+    "Ammaron",
+    "Elder custodian with receding silver hair, long beard and wide record case.",
+  ],
+  ["jared", "Jared", "Swept hair, square jaw, trimmed beard and travel rope."],
+  [
+    "jared-brother",
+    "The brother of Jared",
+    "Wavy hair, full beard and an imagined builder's tool pouch.",
+  ],
+  [
+    "ether",
+    "Ether",
+    "Narrow face, receding hair, short beard and compact record case.",
+  ],
+  [
+    "moroni-keeper",
+    "Moroni, son of Mormon",
+    "Record keeper with swept hair and trimmed beard; distinct from Captain Moroni.",
+  ],
   ["moroni", "Captain Moroni", "Blue cloak, armor and determined expression."],
   ["teancum", "Teancum", "Lean veteran with teal clothing and cropped hair."],
   ["morianton", "Morianton", "Rust mantle and an impatient expression."],

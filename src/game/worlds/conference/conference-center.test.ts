@@ -384,7 +384,7 @@ test("later story canvases replace existing wall exhibits and leave a clear side
   const world = gallery(scene);
   for (const portal of world.portals!.slice(6)) {
     assert.equal(Math.abs(portal.x), 67.38);
-    assert.ok([-20, -43, -66, -89].includes(portal.z));
+    assert.ok([-16, -34, -52, -70, -88].includes(portal.z));
     assert.equal(portal.facing, portal.x > 0 ? "west" : "east");
     const player = createPlayer(
       Math.sign(portal.x) * 77,

@@ -15,9 +15,17 @@ export function cameraModeForWorld(id: WorldId): CameraMode {
 }
 /** These open worlds keep their optional routes available after the story ends. */
 export function keepsExploringAfterCompletion(id: WorldId): boolean {
-  return id === "signs" || id === "gathering" || id === "christ-bountiful";
+  return [
+    "signs",
+    "gathering",
+    "christ-bountiful",
+    "peace-city",
+    "mormon-records",
+  ].includes(id);
 }
 export const WAR_CHAPTERS: Partial<Record<WorldId, string>> = {
+  "peace-city": "4 NEPHI 1 · A PEOPLE OF PEACE",
+  "mormon-records": "MORMON 1, 4, 6 · PRESERVING THE RECORDS",
   signs: "3 NEPHI 1 · THE NIGHT WITHOUT DARKNESS",
   gathering: "3 NEPHI 3–4 · GATHERING TO SAFETY",
   "christ-bountiful": "3 NEPHI 11, 17 · CHRIST AT BOUNTIFUL",

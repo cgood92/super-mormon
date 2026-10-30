@@ -23,10 +23,14 @@ export const STORY_ORDER = [
   "signs",
   "gathering",
   "christ-bountiful",
+  "peace-city",
+  "mormon-records",
 ] as const;
 export type StoryId = (typeof STORY_ORDER)[number];
 
 export const STORY_TITLES: Record<StoryId, string> = {
+  "peace-city": "A People of Peace",
+  "mormon-records": "Mormon and the Hidden Records",
   signs: "The Night Without Darkness",
   gathering: "Lachoneus’s Gathering",
   "christ-bountiful": "Christ at Bountiful",

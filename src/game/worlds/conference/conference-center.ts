@@ -3,7 +3,7 @@ import { buildWanderingElders } from "../missions/missionary-actors";
 import * as THREE from "three";
 import { label, painting } from "../../rendering/art";
 import { STORY_ORDER, type StoryId } from "../../runtime/progression";
-import { laterPainting } from "./gallery-layout";
+import { laterPainting, SIDE_HALL_PAINTING_Z } from "./gallery-layout";
 import { paintingCollider } from "./gallery-entry";
 import { paintingCaption } from "./gallery-caption";
 import type { WorldData } from "../../runtime/worlds";
@@ -709,7 +709,7 @@ export function gallery(scene: THREE.Scene): WorldData {
   const exhibitPositions: { side: number; y: number; z: number }[] = [];
   for (const y of CONFERENCE_LEVELS)
     for (const side of [-1, 1])
-      for (const z of [-20, -43, -66, -89]) {
+      for (const z of SIDE_HALL_PAINTING_Z) {
         if (
           portals.some(
             (p) => Math.sign(p.x) === side && p.y === y + 0.59 && p.z === z,
