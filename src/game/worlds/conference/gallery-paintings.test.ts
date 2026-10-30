@@ -3,8 +3,11 @@ import { readFileSync, statSync } from "node:fs";
 import test from "node:test";
 import { GALLERY_PAINTINGS, galleryPaintingFile } from "./gallery-paintings";
 
-test("all nine later paintings have bounded JPEG assets and stable URLs", () => {
-  assert.equal(Object.keys(GALLERY_PAINTINGS).length, 9);
+test("all twelve generated story paintings have bounded JPEG assets and stable URLs", () => {
+  assert.equal(Object.keys(GALLERY_PAINTINGS).length, 12);
+  for (const id of ["jacob", "waters", "ammon"]) {
+    assert.equal(galleryPaintingFile(id), `/art/gallery/${id}.jpg`);
+  }
   for (const [id, file] of Object.entries(GALLERY_PAINTINGS)) {
     const path = new URL(
       `../../../../public/art/gallery/${file}`,

@@ -1,6 +1,8 @@
 export type CharacterRole =
   | "moroni"
   | "teancum"
+  | "teancum-soldier"
+  | "morianton-follower"
   | "morianton"
   | "amalickiah"
   | "lehonti"
@@ -27,6 +29,7 @@ export type CharacterRole =
   | "alma"
   | "convert"
   | "spy"
+  | "maidservant"
   | "wife"
   | "lamans-wife"
   | "lemuels-wife";

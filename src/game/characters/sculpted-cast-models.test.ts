@@ -134,7 +134,9 @@ test("every NPC and crowd role fits the vertex budget and keeps its coat outside
       else {
         assert.ok(coat, label);
         actor.group.updateMatrixWorld(true);
-        for (const y of [0.5, 0.8, 1.0, 1.1, 1.25, 1.4]) {
+        for (const y of [0.5, 0.8, 1.0, 1.1, 1.25, 1.4].filter(
+          (y) => y > SCULPTED_CAST_TRAITS[role].hem,
+        )) {
           for (const x of [-0.18, 0, 0.18]) {
             const ray = new T.Raycaster(
               new T.Vector3(x, y, -3).applyMatrix4(coat.matrixWorld),

@@ -28,6 +28,16 @@ Portrait 3:4 exquisite luminous traditional oil painting for a museum gallery. A
 
 Nine original artworks generated with the built-in image generation tool, October 2026. Production derivatives are portrait JPEGs in `public/art/gallery`, sized for the gallery's portrait surfaces. Raw generation files stay outside the deployment. The shared `painting()` helper requests textures only when rendered and disposes loaded/in-flight textures with the material. The four early journey replacements are documented above.
 
+## October 30 playtest replacements
+
+The old canvas illustrations for Jacob and Sherem, the waters of Mormon, and Ammon and the king's flocks now use three original portraits generated with the built-in imagegen tool. Final assets are `public/art/gallery/jacob.jpg`, `waters.jpg`, and `ammon.jpg`, each 768 × 1024 pixels, optimized JPEGs under 400 KB. The shared gallery mapping selects these lazily loaded images in place of the procedural fallback art. Full generation prompts are recorded under `jacob`, `waters`, and `ammon` in `gallery-painting-prompts.json`.
+
+- [Jacob 7:6–12](https://www.churchofjesuschrist.org/study/scriptures/bofm/jacob/7?lang=eng): Jacob and Sherem discuss belief in Christ and the scriptures. The painting depicts their conversation, before Sherem's demand for a sign; it does not depict punishment. The listeners and courtyard are artistic staging.
+- [Mosiah 18:5–16](https://www.churchofjesuschrist.org/study/scriptures/bofm/mosiah/18?lang=eng): Alma teaches near pure water and a thicket of small trees, and baptizes Helam. The painting depicts Alma and Helam preparing for baptism, with believers on the bank. The exact pool, hills, poses and arrangement of observers are imagined.
+- [Alma 17:26–32](https://www.churchofjesuschrist.org/study/scriptures/bofm/alma/17?lang=eng): Ammon and fellow servants gather Lamoni's scattered flocks and return them to the water of Sebus. The painting depicts service and gathering before the later confrontation, without violence. Sheep are an artistic interpretation of the unspecified flocks.
+
+All three portraits use imagined terrain, clothing, architecture and faces. No depicted geography or reconstruction is presented as established fact, and skin color does not denote moral allegiance.
+
 ## Primary scripture sources and subjects
 
 - [Lehonti — Alma 47:7–13](https://www.churchofjesuschrist.org/study/scriptures/bofm/alma/47?lang=eng): camp on Mount Antipas, embassy and valley camp; the painting anticipates the guarded meeting.

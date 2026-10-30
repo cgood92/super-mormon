@@ -1,5 +1,8 @@
 /** Optimized gallery art. painting() requests these only when first rendered. */
 export const GALLERY_PAINTINGS = {
+  jacob: "jacob.jpg",
+  waters: "waters.jpg",
+  ammon: "ammon.jpg",
   lehonti: "lehonti.jpg",
   morianton: "morianton.jpg",
   teancum: "teancum.jpg",

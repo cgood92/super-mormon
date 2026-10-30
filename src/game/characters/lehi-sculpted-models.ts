@@ -84,6 +84,8 @@ const ORIGINAL_CAST_TRAITS: Readonly<
       | "missionary"
       | "moroni"
       | "teancum"
+      | "teancum-soldier"
+      | "morianton-follower"
       | "morianton"
       | "amalickiah"
       | "lehonti"
@@ -96,6 +98,7 @@ const ORIGINAL_CAST_TRAITS: Readonly<
       | "spy"
       | "ammon"
       | "lamoni"
+      | "maidservant"
       | "wife"
       | "lamans-wife"
       | "lemuels-wife"
@@ -357,23 +360,43 @@ export const SCULPTED_CAST_TRAITS: Readonly<
   },
   teancum: {
     ...ORIGINAL_CAST_TRAITS.guard,
-    outfit: "armor",
-    beard: "trimmed",
+    outfit: "travel",
+    beard: "none",
     hairStyle: "cropped",
     hair: 0x3e3027,
-    coat: 0x3f7066,
-    robe: 0x88785d,
-    trim: 0x9a9e85,
+    coat: 0x282e35,
+    robe: 0x343e49,
+    trim: 0x456778,
     faceWidth: 0.82,
-    width: 0.34,
+    width: 0.3,
+    hem: 0.64,
+    brow: -0.035,
     tall: 1.07,
+  },
+  "teancum-soldier": {
+    ...ORIGINAL_CAST_TRAITS.guard,
+    outfit: "armor",
+    beard: "none",
+    robe: 0x3c7297,
+    coat: 0x315d80,
+    trim: 0xc4a56b,
+    brow: 0.025,
+  },
+  "morianton-follower": {
+    ...ORIGINAL_CAST_TRAITS.guard,
+    outfit: "travel",
+    beard: "scruff",
+    robe: 0x30333b,
+    coat: 0x542d3c,
+    trim: 0x6b514c,
+    brow: -0.055,
   },
   morianton: {
     ...ORIGINAL_CAST_TRAITS.laman,
     beard: "scruff",
     hairStyle: "swept",
-    coat: 0x8c5944,
-    robe: 0xb99a6a,
+    coat: 0x482b37,
+    robe: 0x39343b,
     trim: 0x65513f,
     brow: -0.025,
   },
@@ -480,6 +503,19 @@ export const SCULPTED_CAST_TRAITS: Readonly<
     trim: 0xbca45d,
     beard: "trimmed",
     faceWidth: 0.94,
+  },
+  maidservant: {
+    ...ORIGINAL_CAST_TRAITS.sariah,
+    hairStyle: "waves",
+    outfit: "travel",
+    hair: 0x49352b,
+    coat: 0x86745b,
+    robe: 0xe1cfaf,
+    head: 0.3,
+    faceWidth: 0.86,
+    width: 0.285,
+    hem: 0.2,
+    brow: 0.045,
   },
   wife: {
     ...ORIGINAL_CAST_TRAITS.sariah,
@@ -762,6 +798,8 @@ function makeSculpted(
           headTall: cast.tall,
           nose: faceProfile?.noseWidth ?? cast.nose,
           hem: cast.width,
+          shoulder: role === "maidservant" ? 0.33 : base.shoulder,
+          waist: role === "maidservant" ? 0.25 : base.waist,
           beard:
             cast.beard === "trimmed"
               ? 0.045
@@ -823,6 +861,7 @@ function makeSculpted(
     role === "nephi" ||
     role === "nephi-disguised" ||
     role === "ammon" ||
+    role === "teancum" ||
     role === "moroni";
   // Chest and shoulders retain their breadth while the waist and garment depth
   // taper. The tunic, fitted coat and sash all sample these same dimensions.
@@ -1243,7 +1282,14 @@ function makeSculpted(
     // Explicit inner/outer faces and joined edges retain real thickness without
     // requiring a dense voxel grid merely to discover a thin cloth shell.
     const uCount = quality === "crowd" ? (role === "moroni" ? 10 : 16) : 36;
-    const vCount = quality === "crowd" ? (role === "moroni" ? 6 : 12) : 20;
+    const vCount =
+      quality === "crowd"
+        ? role === "moroni"
+          ? 6
+          : role === "teancum"
+            ? 8
+            : 12
+        : 20;
     const bottom = (cast?.hem ?? 0.24) - 0.05;
     const geometry = surface(uCount, vCount, (u, v) => {
       const y = T.MathUtils.lerp(bottom, 1.58, v);
@@ -1921,6 +1967,41 @@ function makeSculpted(
     );
   }
 
+  if (role === "maidservant") {
+    // One static sculpted fall of hair rests outside the back of the coat.
+    // It belongs to the body, so turning the head does not swing it into fabric.
+    add(
+      sculpt({
+        bounds: [
+          [-0.3, 0.94, -0.52],
+          [0.3, 1.88, -0.15],
+        ],
+        resolution: quality === "hero" ? 38 : quality === "npc" ? 24 : 14,
+        field: (x, y, z) => {
+          const taper = T.MathUtils.smoothstep(y, 1.03, 1.5);
+          const wave = 0.011 * Math.cos(y * 13 + x * 4);
+          return (
+            ellipsoid(
+              x,
+              y,
+              z,
+              0,
+              1.43,
+              -0.33 + wave,
+              0.17 + 0.055 * taper,
+              0.4,
+              0.105,
+            ) +
+            0.004 * Math.sin(x * 70 + y * 3)
+          );
+        },
+        material: materials.hair,
+      }).geometry,
+      materials.hair,
+      "long-sculpted-back-hair",
+    );
+  }
+
   const beard: DistanceField = (x, y, z) => {
     if (cast && cast.beard !== "elder") {
       // A close, fitted jaw shell leaves the lips and cheeks visible. Scruff
@@ -2413,11 +2494,24 @@ function makeSculpted(
     );
   }
   if (cast?.outfit === "armor" && role !== "moroni") {
-    const helmetMaterial = materials.mantle.clone();
+    const patrolSoldier = role === "teancum-soldier";
+    const armorMaterial = patrolSoldier
+      ? materials.mantle.clone()
+      : materials.mantle;
+    if (patrolSoldier) {
+      // Metal plates are separate pieces above woven blue garments.
+      armorMaterial.color.setHex(0xa8753e);
+      armorMaterial.metalness = 0.6;
+      armorMaterial.roughness = 0.48;
+      extraMaterials.push(armorMaterial);
+      materials.mantle.metalness = 0;
+      materials.mantle.roughness = 0.9;
+    }
+    const helmetMaterial = armorMaterial.clone();
     helmetMaterial.clearcoat = 0;
-    helmetMaterial.metalness = 0;
-    helmetMaterial.roughness = 1;
-    helmetMaterial.specularIntensity = 0;
+    helmetMaterial.metalness = patrolSoldier ? 0.6 : 0;
+    helmetMaterial.roughness = patrolSoldier ? 0.48 : 1;
+    helmetMaterial.specularIntensity = patrolSoldier ? 0.5 : 0;
     extraMaterials.push(helmetMaterial);
     const helmet: DistanceField = (x, y, z) => {
       const outer = ellipsoid(
@@ -2444,7 +2538,7 @@ function makeSculpted(
       );
       return Math.max(outer, -inner, s.headY + 0.07 - y);
     };
-    add(
+    const helmetGeometry =
       quality === "hero"
         ? sculpt({
             bounds: [
@@ -2455,10 +2549,14 @@ function makeSculpted(
             field: helmet,
             material: helmetMaterial,
           }).geometry
-        : fittedHeadwear(false),
-      helmetMaterial,
-      "character-headwear",
-    );
+        : fittedHeadwear(false);
+    if (patrolSoldier) {
+      // Leave clearance for the coarse hair surface at the lower helmet edge.
+      helmetGeometry.translate(0, -s.headY - 0.035, -headZ);
+      helmetGeometry.scale(1.08, 1.03, 1.08);
+      helmetGeometry.translate(0, s.headY + 0.035, headZ);
+    }
+    add(helmetGeometry, helmetMaterial, "character-headwear");
     {
       const breastplate = add(
         new T.SphereGeometry(
@@ -2468,7 +2566,7 @@ function makeSculpted(
           0,
           Math.PI,
         ),
-        materials.mantle,
+        armorMaterial,
         "guard-breastplate",
       );
       breastplate.scale.set(0.326, 0.275, 0.085);
@@ -2484,6 +2582,114 @@ function makeSculpted(
         "guard-armor-emblem",
       );
       emblem.position.set(0, 1.27, 0.379);
+    }
+    if (patrolSoldier) {
+      for (const side of [-1, 1]) {
+        const cuff = new T.CylinderGeometry(
+          0.13,
+          0.1,
+          0.19,
+          quality === "hero" ? 12 : 8,
+        );
+        cuff.translate(side * (s.shoulder + 0.15), 0.9, 0.065);
+        add(
+          cuff,
+          armorMaterial,
+          side < 0 ? "patrol-left-bracer" : "patrol-right-bracer",
+        );
+      }
+    }
+  }
+
+  if (role === "teancum") {
+    // An illustrative bandit silhouette: cloth hood, face wrap and short layers.
+    // These costume choices are imagined, rather than literal historical armor.
+    const dark = materials.mantle;
+    const wrap = materials.mantleLining.clone();
+    wrap.color.setHex(0x202831);
+    wrap.metalness = 0;
+    wrap.roughness = 1;
+    extraMaterials.push(wrap);
+    const hoodU = quality === "hero" ? 32 : quality === "npc" ? 24 : 10;
+    const hoodV = quality === "hero" ? 20 : quality === "npc" ? 14 : 6;
+    const hood = surface(hoodU, hoodV, (u, v) => {
+      const a = 0.91 + u * (Math.PI * 2 - 1.82);
+      const theta = 2.62 * (1 - v);
+      return new T.Vector3(
+        s.head * 1.11 * Math.sin(theta) * Math.sin(a),
+        s.headY + 0.035 + s.head * 1.21 * Math.cos(theta),
+        headZ - 0.025 + s.head * 1.08 * Math.sin(theta) * Math.cos(a),
+      );
+    });
+    add(thicken(hood, hoodU, hoodV), dark, "character-headwear");
+    const maskU = quality === "hero" ? 32 : quality === "npc" ? 20 : 10;
+    const maskV = quality === "hero" ? 6 : quality === "npc" ? 4 : 2;
+    const mask = surface(maskU, maskV, (u, v) => {
+      const a = T.MathUtils.lerp(-1.85, 1.85, u);
+      return new T.Vector3(
+        0.29 * Math.sin(a),
+        T.MathUtils.lerp(1.475, 1.683 - 0.016 * Math.abs(Math.sin(a)), v),
+        headZ + 0.39 * Math.cos(a) + 0.004 * Math.sin(v * Math.PI * 4),
+      );
+    });
+    add(thicken(mask, maskU, maskV), wrap, "teancum-face-wrap");
+    const capeU = quality === "hero" ? 20 : quality === "npc" ? 12 : 8;
+    const capeV = quality === "hero" ? 10 : quality === "npc" ? 6 : 3;
+    const cape = surface(capeU, capeV, (u, v) => {
+      const x = T.MathUtils.lerp(-0.32, 0.2, u) * (1 + 0.12 * v);
+      const y = T.MathUtils.lerp(
+        1.47 - (0.11 * Math.abs(x)) / 0.32,
+        1.02 + 0.055 * Math.sin(u * Math.PI),
+        v,
+      );
+      let lo = 0,
+        hi = 0.7;
+      for (let i = 0; i < 20; i++) {
+        const z = (lo + hi) / 2;
+        if (longGarment(x, y, -z) < 0.078 + 0.012 * v) lo = z;
+        else hi = z;
+      }
+      return new T.Vector3(
+        x,
+        y,
+        -(lo + hi) / 2 - 0.004 * Math.sin(u * Math.PI * 6) * v,
+      );
+    });
+    add(thicken(cape, capeU, capeV), dark, "teancum-shoulder-cape");
+    belt.visible = false;
+    const sashU = quality === "crowd" ? 10 : 24;
+    const sashV = quality === "crowd" ? 1 : 2;
+    const sash = surface(sashU, sashV, (u, v) => {
+      const a = T.MathUtils.lerp(-0.78, 0.78, u);
+      const y = T.MathUtils.lerp(0.99, 1.075, v) + 0.018 * Math.sin(a);
+      let lo = 0,
+        hi = 0.7;
+      for (let i = 0; i < 20; i++) {
+        const r = (lo + hi) / 2;
+        if (longGarment(Math.sin(a) * r, y, Math.cos(a) * r) < 0) lo = r;
+        else hi = r;
+      }
+      const r = (lo + hi) / 2 + 0.018;
+      return new T.Vector3(Math.sin(a) * r, y, Math.cos(a) * r);
+    });
+    add(
+      thicken(sash, sashU, sashV),
+      materials.mantleLining,
+      "teancum-blue-sash",
+    );
+    for (const side of [-1, 1]) {
+      const cuff = new T.CylinderGeometry(
+        0.13,
+        0.1,
+        0.19,
+        quality === "hero" ? 12 : 8,
+      );
+      cuff.translate(side * (s.shoulder + 0.15), 0.9, 0.065);
+      add(
+        cuff,
+        wrap,
+        side < 0 ? "teancum-left-bracer" : "teancum-right-bracer",
+      );
     }
   }
 

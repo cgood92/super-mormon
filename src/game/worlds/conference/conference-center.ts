@@ -157,21 +157,19 @@ export function gallery(scene: THREE.Scene): WorldData {
       }
     }
     add(0, y, -104.5, 180, 11, 0.6, C.stone, "north building wall");
-    // Open warm wood surrounds lead directly into each auditorium level.
-    for (const x of [-10, 10])
-      decor(x, y, 1, 1.1, 6, 0.7, C.timber, "auditorium door surround");
-    decor(0, y + 6, 1, 21, 0.9, 0.7, C.timber, "auditorium lintel");
-    label(
+    // Mount the sign at the actual foyer/bowl opening; no freestanding frame.
+    const auditoriumSign = label(
       group,
       y === 0
         ? "AUDITORIUM · ALL LEVELS OPEN"
         : `AUDITORIUM · LEVEL ${y / 12 + 1}`,
       0,
       y + 7.2,
-      1.5,
+      0.04,
       12,
       0.85,
     );
+    auditoriumSign.name = "auditorium entrance sign";
     label(group, "ROOF GARDENS ↑  ·  STAIRS", -53, y + 6.2, 41, 14, 0.8);
   }
   // Stationary stairs with small climbable risers and bronze rails.
