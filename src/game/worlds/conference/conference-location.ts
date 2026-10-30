@@ -20,6 +20,6 @@ export function conferenceLocation(p: { x: number; y: number; z: number }) {
   const level = Math.min(3, Math.floor((Math.max(0, p.y) + 0.4) / 12) + 1);
   return {
     name: `Level ${level} · Art Hallways`,
-    hint: "Explore the hallways. Follow signs to the auditorium and roof gardens.",
+    hint: "",
   };
 }

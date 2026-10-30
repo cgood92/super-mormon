@@ -211,11 +211,25 @@ export function label(
   ctx.textBaseline = "middle";
   for (const line of layout.lines)
     ctx.fillText(line.text, canvas.width / 2, line.y);
-  const texture = new THREE.CanvasTexture(canvas);
+  // Mobile browsers may discard a backgrounded 2D canvas. Keep independent CPU
+  // pixels so WebGL context restoration never uploads an empty canvas surface.
+  const texture = new THREE.DataTexture(
+    new Uint8Array(ctx.getImageData(0, 0, canvas.width, canvas.height).data),
+    canvas.width,
+    canvas.height,
+  );
+  texture.flipY = true;
+  texture.magFilter = THREE.LinearFilter;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.generateMipmaps = true;
+  texture.needsUpdate = true;
   texture.colorSpace = THREE.SRGBColorSpace;
   const mesh = new THREE.Mesh(
     geometry,
     new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide }),
+  );
+  (mesh.material as THREE.Material).addEventListener("dispose", () =>
+    texture.dispose(),
   );
   mesh.position.set(x, y, z);
   mesh.name = "plaque";
