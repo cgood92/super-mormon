@@ -9,6 +9,7 @@ export function missionaryActor(parent: T.Group, elder = true, variant = 0) {
   const group = rig.group;
   group.name = elder ? "Latter-day Saint elder" : "Jehovah’s Witness visitor";
   parent.add(group);
+  const costumeMaterials: T.Material[] = [];
   group.traverse((o) => {
     if (o instanceof T.Mesh) {
       markScenery(o, {
@@ -16,18 +17,37 @@ export function missionaryActor(parent: T.Group, elder = true, variant = 0) {
         reason: "Moving visitor character; architecture owns fixed collision.",
       });
       if (!elder && o.name === "missionary-name-tag") o.visible = false;
-      if (!elder && o.name === "continuous-robe-and-sleeves")
-        for (const mat of Array.isArray(o.material) ? o.material : [o.material])
-          (mat as T.MeshStandardMaterial).color.setHex(0xc5d5e5);
-      if (variant && o.name === "single-sculpted-hair-cap")
-        for (const mat of Array.isArray(o.material) ? o.material : [o.material])
-          (mat as T.MeshStandardMaterial).color.setHex(0x6b513a);
+      const color =
+        !elder && o.name === "continuous-robe-and-sleeves"
+          ? 0x4e91cf
+          : !elder &&
+              ["left-trouser", "right-trouser", "modern-waistband"].includes(
+                o.name,
+              )
+            ? 0x805b3b
+            : variant && o.name === "single-sculpted-hair-cap"
+              ? 0x6b513a
+              : undefined;
+      if (color !== undefined) {
+        const tint = (source: T.Material) => {
+          const mat = source.clone() as T.MeshStandardMaterial;
+          mat.color.setHex(color);
+          costumeMaterials.push(mat);
+          return mat;
+        };
+        o.material = Array.isArray(o.material)
+          ? o.material.map(tint)
+          : tint(o.material);
+      }
     }
   });
   let previous = 0;
   return {
     group,
-    dispose: rig.dispose,
+    dispose() {
+      costumeMaterials.forEach((mat) => mat.dispose());
+      rig.dispose();
+    },
     update(time: number, moving = true) {
       const dt = Math.max(0, time - previous);
       previous = time;
@@ -141,6 +161,47 @@ export function buildWanderingElders(parent: T.Group, solids: Solid[]) {
         Object.assign(bodies[i], { x, y: point.y, z });
         actor.update(time, !blocked);
       });
+    },
+  };
+}
+
+/** The companion shares the player's movement, including jumps and immediate reversals. */
+export function buildMissionaryCompanion(parent: T.Group, solids: Solid[]) {
+  const actor = missionaryActor(parent, true, 1);
+  actor.group.name = "Player missionary companion";
+  let time = 0;
+  return {
+    group: actor.group,
+    dispose: actor.dispose,
+    update(dt: number, player: PlayerState) {
+      time += dt;
+      // Try either shoulder, then diagonal/behind positions at tight doorways.
+      const angles = [
+        Math.PI / 2,
+        -Math.PI / 2,
+        Math.PI * 0.75,
+        -Math.PI * 0.75,
+        Math.PI,
+        0,
+      ];
+      const positions = angles.map((angle) => ({
+        x: player.x + Math.sin(player.yaw + angle) * 1.15,
+        y: player.y,
+        z: player.z + Math.cos(player.yaw + angle) * 1.15,
+      }));
+      const position = positions.find(
+        (p) =>
+          !solids.some(
+            (s) =>
+              s.y + s.h > p.y + 0.2 &&
+              s.y < p.y + 1.9 &&
+              Math.abs(s.x - p.x) < s.w / 2 + 0.3 &&
+              Math.abs(s.z - p.z) < s.d / 2 + 0.3,
+          ),
+      ) ?? { x: player.x, y: player.y, z: player.z };
+      actor.group.position.set(position.x, position.y, position.z);
+      actor.group.rotation.y = player.yaw;
+      actor.update(time, player.runSpeed > 0.1);
     },
   };
 }

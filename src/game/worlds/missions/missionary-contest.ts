@@ -14,12 +14,12 @@ export function createContest() {
     elapsed: 0,
     started: false,
     won: false,
-    visitors: [0, 8].map((index) => ({
+    visitors: [8].map((index) => ({
       index,
       x: HOUSE_DOORS[index].x,
       z: HOUSE_DOORS[index].z + 5,
-      speed: 1.15,
-      wait: 12,
+      speed: 3.7,
+      wait: 1.5,
       stage: 2,
     })),
   };
@@ -29,7 +29,7 @@ export function tagHouse(game: Contest, index: number) {
   if (game.won || index < 0 || index >= 16) return;
   game.started = true;
   game.houses[index] = "blue";
-  game.protectedUntil[index] = game.elapsed + 48;
+  game.protectedUntil[index] = game.elapsed + 28;
   game.won = game.houses.every((color) => color === "blue");
 }
 export function visitHouse(game: Contest, index: number) {
@@ -71,7 +71,7 @@ export function advanceContest(game: Contest, dt: number) {
         visitHouse(game, v.index);
         v.index = (v.index + 1) % 16;
         v.stage = 0;
-        v.wait = 9;
+        v.wait = 1.5;
       }
     } else {
       v.x += (dx / d) * step;
