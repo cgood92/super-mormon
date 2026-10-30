@@ -1,0 +1,9 @@
+# The Barge Builders
+
+Primary source: [Ether 2:16–25](https://www.churchofjesuschrist.org/study/scriptures/bofm/ether/2?lang=eng), consulted October 30, 2026. Eight vessels are specified in [Ether 3:1](https://www.churchofjesuschrist.org/study/scriptures/bofm/ether/3?lang=eng).
+
+Ether describes small, light, tight vessels with tight ends, tops, bottoms and doors. The Lord's instruction includes an opening above and below, with stopping/uncovering as needed for air. The problem of light remains unresolved at this episode's end. There are no windows, sails, rudders or player-created revelations.
+
+Seven closed timber representations and one accessible construction cutaway make the fleet visible. Their stepped rounded silhouettes, joinery, square keel support, flat plank, tall air collar, work platforms, ventilation ribbon, benches, timber loft, tidepool and bluff are imaginative explanations for a spatial construction game. The specific parts and a walk-to-the-back airflow test are not scripture or a claimed divine schematic. The lower opening is contextual; the player safely tests the upper opening in the raised work bay. Jared, his brother and unnamed traveling companions fit the period; all dialogue and costumes are imagined. No exact ancient location or species of timber is asserted.
+
+QA: from western benches, carry each visibly different piece up the broad central stairs and match its guide at the west edge of the work bay. Open the cover, walk to the rear aisle to observe air, and return to close it. Completion acknowledges the remaining light problem and allows further exploration. Optional timber loft, tidepool and bluff never gate completion. Public `jaredBargesRoute` contains frozen coordinates; runtime snapshot returns copied state. Fallen carried pieces reset to their original bench, and disposed runtimes stop acting.

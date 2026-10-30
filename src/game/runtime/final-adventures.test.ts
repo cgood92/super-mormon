@@ -10,7 +10,16 @@ import {
 import { keepsExploringAfterCompletion, WAR_CHAPTERS } from "./scene-entry";
 import { laterPaintingLocation } from "../worlds/conference/gallery-layout";
 
-const additions = ["peace-city", "mormon-records"] as const;
+const additions = [
+  "peace-city",
+  "mormon-records",
+  "jared-expedition",
+  "jared-barges",
+  "shelem-stones",
+  "jared-crossing",
+  "ether-refuge",
+  "moroni-farewell",
+] as const;
 
 test("finished Bountiful saves naturally discover the final adventures without fabricated completion", () => {
   const end = STORY_ORDER.indexOf("christ-bountiful");

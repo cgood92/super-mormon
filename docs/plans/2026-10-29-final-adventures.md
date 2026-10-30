@@ -112,13 +112,13 @@ All builders take `(scene: THREE.Scene): WorldData`, return `adventure(hooks): A
 
 **Files:** runtime `worlds.ts`, `world-loading.ts`, `progression.ts`, `scene-entry.ts`; conference `gallery-layout.ts`, `gallery-paintings.ts`; relevant tests; README count and source notes.
 
-- [ ] Add only implemented worlds to StoryId/WorldId/order/titles, both dispatch paths and chapter banners. Scheduled empty stubs must not appear in the player's menu.
-- [ ] New sequence after christ-bountiful: peace-city, mormon-records, jared-expedition, jared-barges, shelem-stones, jared-crossing, ether-refuge, moroni-farewell. Existing saved completion must detect additions naturally, not silently mark them complete.
-- [ ] Keep optional exploration after completion for all eight; ensure complete fires exactly once and disposed callbacks do nothing.
-- [ ] Fix gallery capacity to accommodate 26 later paintings in three side-hall floors. Prefer five slots per wing per floor (10/floor) with supported z range and collision-free caption/portal spacing; preserve first six entrance paintings. Test stairs, upper-hall reachability and painting entry/exit.
-- [ ] Generate one beautiful portrait oil painting per scene via built-in imagegen; final JPEG assets in `public/art/gallery/<id>.jpg` at ~1024 long edge. Distinct subject/mood; no lettering/borders/watermarks, architecture/costumes imagined. Save prompts + primary links in docs/reference/final-gallery-paintings.md. Do not deploy references outside repository or temporary placeholder art.
-- [ ] Fix brittle tests expecting the previous end-of-order suffix while preserving their original assertions about relative sequence and discovery of new stories. Expand disposal/lazy loading tests to new worlds.
-- [ ] Verify normal browser entry routes from gallery, each scene's complete main mechanic, optional route, desktop and phone aspect ratios; use QA public controller helper for real walking, not teleporting. Query start okay for extra scene inspections but not sole normal-route proof.
+- [x] Add only implemented worlds to StoryId/WorldId/order/titles, both dispatch paths and chapter banners. Scheduled empty stubs must not appear in the player's menu.
+- [x] New sequence after christ-bountiful: peace-city, mormon-records, jared-expedition, jared-barges, shelem-stones, jared-crossing, ether-refuge, moroni-farewell. Existing saved completion must detect additions naturally, not silently mark them complete.
+- [x] Keep optional exploration after completion for all eight; ensure complete fires exactly once and disposed callbacks do nothing.
+- [x] Fix gallery capacity to accommodate 26 later paintings in three side-hall floors. Prefer five slots per wing per floor (10/floor) with supported z range and collision-free caption/portal spacing; preserve first six entrance paintings. Test stairs, upper-hall reachability and painting entry/exit.
+- [x] Generate one beautiful portrait oil painting per scene via built-in imagegen; final JPEG assets in `public/art/gallery/<id>.jpg` at ~1024 long edge. Distinct subject/mood; no lettering/borders/watermarks, architecture/costumes imagined. Save prompts + primary links in docs/reference/final-gallery-paintings.md. Do not deploy references outside repository or temporary placeholder art.
+- [x] Fix brittle tests expecting the previous end-of-order suffix while preserving their original assertions about relative sequence and discovery of new stories. Expand disposal/lazy loading tests to new worlds.
+- [x] Verify normal browser entry routes from gallery, each scene's complete main mechanic, optional route, desktop and phone aspect ratios; use QA public controller helper for real walking, not teleporting. Query start okay for extra scene inspections but not sole normal-route proof.
 - [ ] Run `npm test`, `npm run build`, `npm run format:check`; review diffs, fix findings; commit and integrate/push main to personal repo. One deploy check if necessary, no repeated pipeline monitoring.
 
 ## Review focus and evidence ledger
@@ -140,11 +140,29 @@ All builders take `(scene: THREE.Scene): WorldData`, return `adventure(hooks): A
 - [x] Task 2 implemented; 5/5 colocated tests pass including full ascent/return, ladder climb/landing, hazard/carry checkpoints and optional discoveries. Browser complete: normal painting entry, continuous ascent/record pickup/east-stair carrying return to refuge, once completion and explicit Cumorah epilogue.
 - [x] Seven distinct cast profiles implemented; 27 targeted cases verified across initial suite and seam correction rerun. All7 hero/NPC browser turn, reversal and crawl sampled. Report /private/tmp/final-cast-report.md.
 - [x] First two paintings generated, saved as 768x1024 JPEGs, integrated and inspected. Prompts/provenance in docs/reference/final-gallery-paintings.md.
-- [ ] First-quarter delivery: integration and independent review clean; build and formatting pass. Initial full suite 495/496 passed; only new JPEG size budget failed, both re-encoded to 316351/338208 bytes and asset tests 2/2 pass. Final full rerun: 496/496 pass, zero failures (334.2s). Objective copy shortened after phone inspection; focused Mormon tests 5/5, final build and format check pass. Browser normal hub/stairs/gallery entry and return plus both main mechanics complete; phone ascent/carrier and visibility-event pause/workload checked. Commit/PR/release pending.
-- [ ] Tasks 3–8 implemented and individually verified overnight.
-- [ ] Remaining six paintings generated and inspected.
+- [ ] First-quarter delivery: integration and independent review clean; build and formatting pass. Initial full suite 495/496 passed; only new JPEG size budget failed, both re-encoded to 316351/338208 bytes and asset tests 2/2 pass. Final full rerun: 496/496 pass, zero failures (334.2s). Objective copy shortened after phone inspection; focused Mormon tests 5/5, final build and format check pass. Browser normal hub/stairs/gallery entry and return plus both main mechanics complete; phone ascent/carrier and visibility-event pause/workload checked. First-quarter commit2863cc2 is in PR31; release is combined with the final six chapters.
+- [x] Tasks 3–8 implemented and individually verified overnight: expedition/barges8 targeted cases, Shelem/crossing7, Ether/Moroni8; all six main loops completed with normal browser controller input on desktop/phone as appropriate.
+- [x] Remaining six paintings generated, visually inspected and saved at768x1024 below400000bytes; crossing corrected to two light stones. Prompts in reference/final-gallery-paintings.md.
 - [ ] All 32 adventures accessible/playable, final verification/review/deployment.
 
 ### Autonomous overnight execution strategy
 
 At wakeup read this ledger and git first. If the first-quarter PR has merged, fetch main and create a fresh codex/final-adventures-overnight branch in this retained worktree before further changes. If it is still pending, finish or incorporate it deliberately before opening another PR. Use a pair of scene builders with exclusive module/test/source files while the coordinator integrates and generates art. Build in small verified waves (expedition+barges, Shelem+crossing, Ether+Moroni). Keep agents brief and source-grounded. Do not spend reset capacity rewriting the plan or duplicating completed cast work. Persist exact test evidence and remaining gaps here; do not report the 8 a.m. goal achieved unless all six games are built, verified and delivered.
+
+## Overnight run — October 30, 2:15 a.m. Mountain
+
+- Resumed clean branch at 2863cc2. PR31 remains open; its required build passed. Main fetched; extending the same owner-authored PR for the final eight-game delivery. No repository protection settings changed.
+- Three bounded Sol implementers own expedition+barges, Shelem+crossing, and Ether+Moroni respectively; coordinator owns integration, six paintings, booklet, cross-world QA and release.
+- Integration expected-order regression observed failing for missing six IDs, then passing after registering all eight final worlds. Gallery capacity remains ten per floor across three floors, first six fixed.
+- All six new module files exist; workers finishing targeted behavioral and browser checks.
+
+### Final overnight review and QA
+
+- All six new main loops completed by their builders in actual browser movement. Coordinator additionally walked from the normal gallery ground entrance through both stair flights and jumped into Moroni on floor24, then completed pivot/carrying crossing/writing/dawn. Own isolated prior31-story fixture did not alter user saves.
+- Independent reviewer found two P2s: Shelem coplanar ascent joins and duplicate named brother-of-Jared NPC. Both were reproduced in new regression tests, fixed by their owners, and independently re-reviewed as addressed.
+- Coordinator cross-world/gallery/art suite17/17 passed. Production build and format check pass. Final full suite519/519 passed, zero failures (373.6s), after all source edits froze; no costume changes or duplicate cloth runs by workers.
+- Source/runtime now has32 registered playable stories; all26 later paintings fit existing floors0/12/24. Player booklet and metadata updated to32.
+- Detailed routes, camera/resource observations and image provenance: docs/playtests/2026-10-30-final-adventures.md. All task-owned test browser tabs closed; unrelated Workfront tabs preserved.
+- Release uses existing PR31, protected build requirement and owner environment approval; no repository protection changes. Final CI/deployment state is tracked on https://github.com/cgood92/super-mormon/pull/31.
+
+- Final local gate:519 tests passed, build and formatting passed, both review findings independently closed. All six final paintings are below400KB; all new main mechanics and final normal gallery entry completed in browser. Final release proceeds via PR31; CI head and protected deployment evidence are recorded in its description.

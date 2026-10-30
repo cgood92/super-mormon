@@ -25,10 +25,23 @@ export const STORY_ORDER = [
   "christ-bountiful",
   "peace-city",
   "mormon-records",
+  "jared-expedition",
+  "jared-barges",
+  "shelem-stones",
+  "jared-crossing",
+  "ether-refuge",
+  "moroni-farewell",
 ] as const;
 export type StoryId = (typeof STORY_ORDER)[number];
 
 export const STORY_TITLES: Record<StoryId, string> = {
+  "jared-expedition": "Jared’s Wilderness Journey",
+  "jared-barges": "The Barge Builders",
+  "shelem-stones": "The Sixteen Stones of Shelem",
+  "jared-crossing": "Light upon the Waters",
+  "ether-refuge": "Ether’s Refuge",
+  "moroni-farewell": "Moroni’s Farewell",
+
   "peace-city": "A People of Peace",
   "mormon-records": "Mormon and the Hidden Records",
   signs: "The Night Without Darkness",

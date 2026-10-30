@@ -1,5 +1,12 @@
 /** Optimized gallery art. painting() requests these only when first rendered. */
 export const GALLERY_PAINTINGS = {
+  "jared-expedition": "jared-expedition.jpg",
+  "jared-barges": "jared-barges.jpg",
+  "shelem-stones": "shelem-stones.jpg",
+  "jared-crossing": "jared-crossing.jpg",
+  "ether-refuge": "ether-refuge.jpg",
+  "moroni-farewell": "moroni-farewell.jpg",
+
   "peace-city": "peace-city.jpg",
   "mormon-records": "mormon-records.jpg",
   lehonti: "lehonti.jpg",

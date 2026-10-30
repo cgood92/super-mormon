@@ -415,10 +415,39 @@ test("later story canvases replace existing wall exhibits and leave a clear side
 });
 
 test("unassigned landscape exhibit frames also stop a jump through the artwork", () => {
-  const world = gallery(new THREE.Scene());
-  // The third floor has no story assignments yet and retains the original exhibits.
-  for (const side of [-1, 1]) {
-    const player = createPlayer(side * 70, 24, -20);
+  const scene = new THREE.Scene();
+  const world = gallery(scene);
+  // Architecture is instanced; identify the remaining real wall bays from portal assignments.
+  const frames = [0, 12, 24].flatMap((floor) =>
+    [-1, 1].flatMap((side) =>
+      [-16, -34, -52, -70, -88]
+        .filter(
+          (z) =>
+            !world.portals!.some(
+              (portal) =>
+                Math.sign(portal.x) === side &&
+                portal.y === floor + 0.59 &&
+                portal.z === z,
+            ),
+        )
+        .map((z) => ({ floor, side, z })),
+    ),
+  );
+  assert.ok(
+    frames.length > 0,
+    "unassigned wall bays retain landscape exhibits",
+  );
+  for (const { floor, side, z } of frames) {
+    assert.ok(
+      world.solids.some(
+        (solid) =>
+          solid.x === side * 67 &&
+          solid.z === z &&
+          solid.y === floor + 2 &&
+          solid.h === 4.7,
+      ),
+    );
+    const player = createPlayer(side * 70, floor, z);
     let touched = false;
     for (let i = 0; i < 120; i++) {
       stepPlayer(
@@ -428,9 +457,12 @@ test("unassigned landscape exhibit frames also stop a jump through the artwork",
         0,
         world.solids,
       );
-      if (player.y > 26) touched = true;
-      if (player.y > 25.2)
-        assert.ok(side * player.x >= 67.51, `landscape blocks side ${side}`);
+      if (player.y > floor + 2) touched = true;
+      if (player.y > floor + 1.2)
+        assert.ok(
+          side * player.x >= 67.51,
+          "landscape blocks a jump through its actual bay",
+        );
     }
     assert.ok(touched, "jump actually reaches the landscape canvas height");
   }
