@@ -1093,6 +1093,7 @@ function updateObjective() {
               ? "Run through the gate. Your brothers are outside."
               : "Find Laban and ask for the brass plates.");
   renderControlText(el("objective"), objectiveText, input.device);
+  el("objective").parentElement!.hidden = !objectiveText;
 }
 function near(
   p: { x: number; y: number; z: number },

@@ -1,3 +1,11 @@
+import { buildJaredExpedition } from "../worlds/final/jared-expedition";
+import { buildJaredBarges } from "../worlds/final/jared-barges";
+import { buildShelemStones } from "../worlds/final/shelem-stones";
+import { buildJaredCrossing } from "../worlds/final/jared-crossing";
+import { buildEtherRefuge } from "../worlds/final/ether-refuge";
+import { buildMoroniFarewell } from "../worlds/final/moroni-farewell";
+import { buildPeaceCity } from "../worlds/final/peace-city";
+import { buildMormonRecords } from "../worlds/final/mormon-records";
 import { buildMissionaryNeighborhood } from "../worlds/missions/missionary-neighborhood";
 import { buildSamuelWall } from "../worlds/third-nephi/samuel-wall";
 import { buildSignsNight } from "../worlds/third-nephi/signs-night";
@@ -25,6 +33,14 @@ import { gallery } from "../worlds/conference/conference-center";
 import type { Climbable, PlayerState } from "../physics/physics";
 import type { AdventureHooks, AdventureRuntime } from "./adventure";
 export type WorldId =
+  | "jared-expedition"
+  | "jared-barges"
+  | "shelem-stones"
+  | "jared-crossing"
+  | "ether-refuge"
+  | "moroni-farewell"
+  | "peace-city"
+  | "mormon-records"
   | "missionary"
   | "signs"
   | "gathering"
@@ -115,6 +131,23 @@ export type WorldData = {
 
 export function buildWorld(id: WorldId, scene: THREE.Scene): WorldData {
   switch (id) {
+    case "jared-expedition":
+      return buildJaredExpedition(scene);
+    case "jared-barges":
+      return buildJaredBarges(scene);
+    case "shelem-stones":
+      return buildShelemStones(scene);
+    case "jared-crossing":
+      return buildJaredCrossing(scene);
+    case "ether-refuge":
+      return buildEtherRefuge(scene);
+    case "moroni-farewell":
+      return buildMoroniFarewell(scene);
+
+    case "peace-city":
+      return buildPeaceCity(scene);
+    case "mormon-records":
+      return buildMormonRecords(scene);
     case "missionary":
       return buildMissionaryNeighborhood(scene);
     case "signs":

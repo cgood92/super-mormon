@@ -15,9 +15,30 @@ export function cameraModeForWorld(id: WorldId): CameraMode {
 }
 /** These open worlds keep their optional routes available after the story ends. */
 export function keepsExploringAfterCompletion(id: WorldId): boolean {
-  return id === "signs" || id === "gathering" || id === "christ-bountiful";
+  return [
+    "signs",
+    "gathering",
+    "christ-bountiful",
+    "peace-city",
+    "mormon-records",
+    "jared-expedition",
+    "jared-barges",
+    "shelem-stones",
+    "jared-crossing",
+    "ether-refuge",
+    "moroni-farewell",
+  ].includes(id);
 }
 export const WAR_CHAPTERS: Partial<Record<WorldId, string>> = {
+  "jared-expedition": "ETHER 1–2 · AN EARLIER PEOPLE",
+  "jared-barges": "ETHER 2 · THE BARGE BUILDERS",
+  "shelem-stones": "ETHER 3 · THE STONES OF SHELEM",
+  "jared-crossing": "ETHER 6 · LIGHT UPON THE WATERS",
+  "ether-refuge": "ETHER 13, 15 · A WITNESS IN HIDING",
+  "moroni-farewell": "MORMON 8 · MORONI 1, 10 · FAREWELL",
+
+  "peace-city": "4 NEPHI 1 · A PEOPLE OF PEACE",
+  "mormon-records": "MORMON 1, 4, 6 · PRESERVING THE RECORDS",
   signs: "3 NEPHI 1 · THE NIGHT WITHOUT DARKNESS",
   gathering: "3 NEPHI 3–4 · GATHERING TO SAFETY",
   "christ-bountiful": "3 NEPHI 11, 17 · CHRIST AT BOUNTIFUL",

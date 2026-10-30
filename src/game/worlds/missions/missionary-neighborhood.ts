@@ -1,13 +1,15 @@
 import * as T from "three";
 import { label, material } from "../../rendering/art";
 import { sceneryBox, markScenery } from "../shared/scenery";
-import { missionaryActor } from "./missionary-actors";
+import { missionaryActor, buildMissionaryCompanion } from "./missionary-actors";
 import {
   advanceContest,
   createContest,
   HOUSE_DOORS,
   tagHouse,
 } from "./missionary-contest";
+import { buildStreetLife } from "./missionary-street-life";
+import { createPlayer } from "../../physics/physics";
 import type { WorldData } from "../../runtime/worlds";
 
 export function buildMissionaryNeighborhood(scene: T.Scene): WorldData {
@@ -123,37 +125,36 @@ export function buildMissionaryNeighborhood(scene: T.Scene): WorldData {
     block(x, 0, 40, 3, 0.5, 0.65, wood, "Park bench");
     block(x, 0, 40.45, 3, 1.2, 0.15, wood, "Park bench back");
   }
-  label(root, "NEIGHBORHOOD COLOR CHALLENGE", 0, 3, -40, 12, 0.8);
-  label(
-    root,
-    "Visit every front door • Turn all 16 houses blue",
-    0,
-    2.1,
-    -40,
-    12,
-    0.6,
-  );
-  label(
-    root,
-    "Fictional friendly contest • Pause: retry or return to gallery",
-    0,
-    1.45,
-    -40,
-    13,
-    0.5,
-  );
   const visitors = [
     missionaryActor(root, false, 0),
     missionaryActor(root, false, 1),
   ];
+  const streetLife = buildStreetLife(root);
+  const companion = buildMissionaryCompanion(root, solids);
+  companion.update(0, { ...createPlayer(0, 0, 38), yaw: Math.PI });
   let game = createContest(),
+    visitorYaw = Math.PI,
     time = 0,
     announced = false,
     disposed = false;
+  const placeVisitors = () =>
+    visitors.forEach((actor, i) => {
+      const v = game.visitors[0],
+        offset = i ? -0.65 : 0.65;
+      actor.group.rotation.y = visitorYaw;
+      actor.group.position.set(
+        v.x + Math.cos(visitorYaw) * offset,
+        0,
+        v.z - Math.sin(visitorYaw) * offset,
+      );
+    });
+  placeVisitors();
   const dispose = () => {
     if (disposed) return;
     disposed = true;
     visitors.forEach((visitor) => visitor.dispose());
+    companion.dispose();
+    streetLife.dispose();
     const geometries = new Set<T.BufferGeometry>(),
       materials = new Set<T.Material>(),
       textures = new Set<T.Texture>();
@@ -186,9 +187,21 @@ export function buildMissionaryNeighborhood(scene: T.Scene): WorldData {
     dispose,
     adventure: (hooks) => {
       hooks.setAvatar("missionary");
+      let introduced = false;
       return {
         update(dt, player, input) {
+          if (!introduced) {
+            introduced = true;
+            hooks.dialog(
+              "A fictional friendly contest",
+              "Neighborhood Color Challenge",
+              "Move with your companion to visit front doors and turn all 16 houses blue at once. The Jehovah’s Witness pair walks quickly and turns houses red. Your blue houses are protected for 28 seconds. Plan a route and revisit red houses! Use Pause to retry or return to the gallery.",
+              () => {},
+            );
+          }
           time += dt;
+          companion.update(dt, player);
+          streetLife.update(dt, player);
           // Tag before visitors move: the sixteenth blue door wins on this frame.
           HOUSE_DOORS.forEach((door, i) => {
             if (
@@ -198,7 +211,13 @@ export function buildMissionaryNeighborhood(scene: T.Scene): WorldData {
             )
               tagHouse(game, i);
           });
+          const priorX = game.visitors[0].x,
+            priorZ = game.visitors[0].z;
           advanceContest(game, dt);
+          const dx = game.visitors[0].x - priorX,
+            dz = game.visitors[0].z - priorZ;
+          if (Math.hypot(dx, dz) > 0.00001) visitorYaw = Math.atan2(dx, dz);
+          placeVisitors();
           houses.forEach((wall, i) =>
             wall.color.setHex(
               game.houses[i] === "blue"
@@ -208,32 +227,43 @@ export function buildMissionaryNeighborhood(scene: T.Scene): WorldData {
                   : 0xe3d6b4,
             ),
           );
-          visitors.forEach((actor, i) => {
-            const v = game.visitors[i];
-            const dx = v.x - actor.group.position.x,
-              dz = v.z - actor.group.position.z;
-            actor.group.position.set(v.x, 0, v.z);
-            if (Math.hypot(dx, dz) > 0.001)
-              actor.group.rotation.y = Math.atan2(dx, dz);
-            actor.update(time, game.started && !game.won && v.wait <= 0);
-          });
+          visitors.forEach((actor) =>
+            actor.update(
+              time,
+              game.started && !game.won && game.visitors[0].wait <= 0,
+            ),
+          );
           if (game.won && !announced) {
             announced = true;
             hooks.toast("All sixteen houses blue! Neighborhood challenge won.");
           }
           if (game.won && input.interact) {
             game = createContest();
+            visitorYaw = Math.PI;
+            placeVisitors();
             announced = false;
           }
           const count = game.houses.filter((c) => c === "blue").length;
           return {
             objective: game.won
               ? "You won! All 16 houses are blue. Explore, retry, or return to the gallery."
-              : `${count} / 16 houses blue · Visit front doors. Jehovah’s Witness visitors turn houses red; blue lasts at least 48 seconds.`,
+              : `${count} / 16 houses blue · Visit front doors. Jehovah’s Witness visitors turn houses red; blue lasts at least 28 seconds.`,
             prompt: game.won ? "Play the neighborhood again" : "",
           };
         },
-        snapshot: () => ({ phase: game.won ? "won" : "playing", ...game }),
+        snapshot: () => ({
+          phase: game.won ? "won" : "playing",
+          ...game,
+          companion: {
+            x: companion.group.position.x,
+            y: companion.group.position.y,
+            z: companion.group.position.z,
+          },
+          visitorPair: visitors.map((a) => ({
+            x: a.group.position.x,
+            z: a.group.position.z,
+          })),
+        }),
         dispose: () => {},
       };
     },
