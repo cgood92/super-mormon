@@ -780,7 +780,7 @@ async function load(id: WorldId) {
   completionSceneSeen = false;
   pendingAdventureReset = null;
   organSeated = false;
-  app.classList.remove("bow-aiming");
+  app.classList.remove("bow-aiming", "story-opening");
   storyCheckpoint = null;
   storyObjective = "";
   learnedMoves = new Set();
@@ -849,7 +849,7 @@ async function load(id: WorldId) {
     scene.add(g);
     treasureMeshes.set(t.id, g);
   }
-  if (id !== "hub" && id !== "tree" && !world.adventure)
+  if (id !== "hub" && id !== "tree" && (!world.adventure || id === "streets"))
     goalMarker = marker(world.goal.x, world.goal.y, world.goal.z);
   const spawnGuards =
     id === "trade" || id === "night"
@@ -863,7 +863,9 @@ async function load(id: WorldId) {
           : []));
   for (const p of spawnGuards) {
     const state = createPlayer(p.x, p.y, p.z),
-      actor = createCharacter("guard");
+      actor = createCharacter(
+        id === "streets" ? (guards.length ? "spy" : "convert") : "guard",
+      );
     scene.add(actor.group);
     actor.update(0, state);
     guards.push({ state, actor, path: [], timer: 0 });
@@ -964,6 +966,7 @@ async function load(id: WorldId) {
   }
   adventure =
     world.adventure?.({
+      avatar: avatar.group,
       viewAspect: () => camera.aspect,
       dialog: storyDialog,
       toast: (text) => message(text, 4),
@@ -1324,11 +1327,13 @@ function update(dt: number, activeElapsed = dt) {
     return;
   }
   time += dt;
-  levelTime += dt;
+  const opening = worldId === "streets" && !!adventure?.movementLocked?.();
+  app.classList.toggle("story-opening", opening);
+  if (!opening) levelTime += dt;
   analytics.setDevice(input.device);
   analytics.tick(activeFrameSeconds(activeElapsed));
   app.classList.toggle("chapter-faded", levelTime >= 10);
-  caughtGrace = Math.max(0, caughtGrace - dt);
+  if (!opening) caughtGrace = Math.max(0, caughtGrace - dt);
   if (
     organSeated &&
     (!world.organ?.playing() || state.interact || state.jump)
@@ -1380,6 +1385,7 @@ function update(dt: number, activeElapsed = dt) {
   let adventureCarrying = false;
   let holdingBanner = false;
   let wavingBanner = false;
+  let pointing = false;
   let adventureAiming = false;
   let holdingBow = false;
   let adventureDraw = 0;
@@ -1393,6 +1399,7 @@ function update(dt: number, activeElapsed = dt) {
     adventureCarrying = !!result.carrying;
     holdingBanner = !!result.holdingBanner;
     wavingBanner = !!result.wave;
+    pointing = !!result.pointing;
     adventureAiming = !!result.aiming;
     holdingBow = !!result.holdingBow;
     adventureDraw = result.draw ?? 0;
@@ -1435,6 +1442,7 @@ function update(dt: number, activeElapsed = dt) {
     holdingBow,
     holdingBanner,
     wave: wavingBanner,
+    pointing,
     aiming: adventureAiming,
     draw: adventureDraw,
     carrying:
@@ -1705,7 +1713,7 @@ function update(dt: number, activeElapsed = dt) {
         : `{action} · ${result.prompt}`;
     if (paused || transition) return;
   }
-  if (guardsActive && levelTime > 1.5) {
+  if (guardsActive && !movementLocked && levelTime > 1.5) {
     for (const guard of guards) {
       guard.timer -= dt;
       if (guard.timer <= 0) {
