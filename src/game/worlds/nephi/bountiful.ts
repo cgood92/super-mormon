@@ -4,7 +4,12 @@ import {
   palmFrondGeometry,
 } from "../../rendering/soft-geometry";
 import * as T from "three";
-import { markScenery, sceneryBox, terracedRock } from "../shared/scenery";
+import {
+  markScenery,
+  sceneryBox,
+  sceneryTerraceUnion,
+  terracedRock,
+} from "../shared/scenery";
 import { buildFamilyCamp } from "../shared/family-camp";
 import { buildShip } from "./ship";
 import { createCharacter } from "../../characters/character";
@@ -149,36 +154,22 @@ export function buildBountiful(scene: T.Scene): WorldData {
       z = -35 + Math.floor(i / 4) * 14;
     rock(x, 0, z, 8.8, 6, 12, 0xb6ab85, "Coastal limestone");
   }
-  // A broad stair trail gives every mountain ascent a physically traversable surface.
-  for (let i = 0; i < 30; i++)
-    block(
-      -36,
-      0,
-      13 + i * 0.85,
-      5,
-      (i + 1) * 0.3,
-      1,
-      i % 2 ? 0xb7a478 : 0xc3b38c,
-      true,
-      "Mountain prayer trail",
-    );
-  block(-36, 0, 41, 11, 9, 6, 0xa69a73, true, "Mountain summit");
-  for (let i = 0; i < 9; i++) {
-    const z = 20 + i * 3,
-      height = 2 + i * 0.9;
-    for (const side of [-1, 1])
-      rock(
-        -36 + side * 5,
-        0,
-        z,
-        8.6,
-        height * 1.05,
-        10,
-        i % 2 ? 0x9a9e74 : 0xa8a47b,
-        "Mountain rock shoulders",
-      );
-  }
-  rock(-43, 0, 43, 16, 11, 20, 0x9b9e77, "Mountain western crag");
+  // Imagined mountain terrain: generous landings, but each exposed rock face
+  // exceeds a walking step. One union owns the surface, including its summit.
+  sceneryTerraceUnion(
+    root,
+    solids,
+    Array.from({ length: 8 }, (_, i) => ({
+      x: -36 + [0, -1.4, 0.8, -0.6, 1.1, -0.8, 0.4, 0][i],
+      y: 0,
+      z: 15 + i * 3.5,
+      w: [23, 21, 20, 18, 17, 15, 13, 11][i],
+      h: (i + 1) * 1.125,
+      d: i === 7 ? 8 : 6,
+      color: [0xa7a27c, 0xb1a781, 0xa69d76, 0xb3a482][i % 4],
+    })),
+    "Mountain prayer ledges",
+  );
   const summit = point(-36, 39, 9),
     ore = point(-22, 18),
     forge = point(-8, 10),

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as T from "three";
 import { buildBountiful } from "./bountiful";
 import { createPlayer, stepPlayer } from "../../physics/physics";
+import { sceneryCollisionErrors } from "../shared/scenery";
 
 test("Bountiful requires prayer, tools, reconciliation and four individually aligned timbers", () => {
   const scene = new T.Scene(),
@@ -171,26 +172,81 @@ test("Bountiful geometry is finite, bounded, and disposed once even with shared 
   });
   let disposed = 0;
   geometries.forEach((g) => g.addEventListener("dispose", () => disposed++));
-  assert.ok(world.solids.filter((s) => s.x === -36).length >= 30);
+  assert.ok(scene.getObjectByName("Mountain prayer ledges"));
   assert.ok(world.bounds!.minZ <= -62);
   world.dispose!();
   world.dispose!();
   assert.equal(disposed, geometries.size);
 });
 
-test("mountain trail can be walked continuously onto the prayer summit", () => {
-  const world = buildBountiful(new T.Scene());
-  const p = createPlayer(-36, 0, 11);
-  for (let i = 0; i < 280; i++)
+test("prayer mountain requires jumps and supports a full ascent and return", () => {
+  const scene = new T.Scene();
+  const world = buildBountiful(scene);
+  const p = createPlayer(-36, 0, 10);
+  const move = (forward: number, jump = false) =>
     stepPlayer(
       p,
+      { x: 0, y: forward, jump, jumpHeld: jump },
+      1 / 60,
+      0,
+      world.solids,
+    );
+  for (let i = 0; i < 90; i++) move(1);
+  assert.ok(
+    p.y < 0.1 && p.z < 13,
+    `walking bypassed the first ledge: ${p.z}, ${p.y}`,
+  );
+  for (let tier = 1; tier <= 8; tier++) {
+    const startHeight = p.y;
+    move(1, true);
+    let landed = false;
+    for (let frame = 0; frame < 100; frame++) {
+      move(p.z < 15 + (tier - 1) * 3.5 ? 1 : 0);
+      if (p.grounded && p.y > startHeight + 0.8) {
+        landed = true;
+        break;
+      }
+    }
+    assert.ok(landed, `jump ${tier} missed its ledge: ${p.x}, ${p.y}, ${p.z}`);
+    assert.ok(Math.abs(p.y - tier * 1.125) < 0.01);
+    for (let i = 0; i < 80; i++) move(tier < 8 ? 1 : 0);
+  }
+  for (let i = 0; i < 90; i++) move(p.z < 39 ? 1 : 0);
+  assert.ok(p.z > 38.5 && p.y >= 8.99, `summit unreachable: ${p.z}, ${p.y}`);
+  for (let i = 0; i < 360; i++) move(-1);
+  assert.ok(
+    p.z < 12 && p.y < 0.01 && p.grounded,
+    `return blocked: ${p.z}, ${p.y}`,
+  );
+  const around = createPlayer(-50, 0, 9);
+  for (let i = 0; i < 360; i++)
+    stepPlayer(
+      around,
       { x: 0, y: 1, jump: false, jumpHeld: false },
       1 / 60,
       0,
       world.solids,
     );
-  assert.ok(p.z > 38.5, `Ascent stopped at ${p.z}, height ${p.y}`);
-  assert.ok(p.y >= 8.99);
+  assert.ok(
+    around.z > 45 && around.grounded,
+    "clear ground route around the mountain",
+  );
+  scene.updateMatrixWorld(true);
+  const mountain = scene.getObjectByName("Mountain prayer ledges")!;
+  for (let tier = 1; tier <= 8; tier++) {
+    const ray = new T.Raycaster(
+      new T.Vector3(-36, 20, 14 + (tier - 1) * 3.5),
+      new T.Vector3(0, -1, 0),
+    );
+    const hits = ray.intersectObject(mountain);
+    assert.equal(
+      new Set(hits.map((hit) => hit.point.y)).size,
+      1,
+      "one visible walk surface per landing",
+    );
+    assert.ok(Math.abs(hits[0].point.y - tier * 1.125) < 0.01);
+  }
+  assert.deepEqual(sceneryCollisionErrors(scene, world.solids), []);
   world.dispose!();
 });
 
