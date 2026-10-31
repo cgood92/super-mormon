@@ -976,7 +976,9 @@ async function load(id: WorldId) {
         beginCaughtTransition();
         el("caught-heading").textContent = "Spotted!";
         el("caught-detail").textContent =
-          "A spy saw you. Back to the beginning.";
+          id === "teancum"
+            ? "A sentry saw Teancum or his servant. Keep both companions out of the amber sight cones, or behind stone cover."
+            : "A spy saw you. Back to the beginning.";
       },
       attachEquipment: (slot, object) => {
         avatar.sockets[slot].add(object);
