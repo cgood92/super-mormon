@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Movement playground</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #101b24;
+        color: #f1f0e8;
+        font-family: system-ui, sans-serif;
+      }
+      header {
+        padding: 22px 28px 12px;
+      }
+      h1 {
+        font-size: 26px;
+        margin: 0 0 7px;
+        letter-spacing: -0.6px;
+      }
+      p {
+        margin: 5px 0;
+        color: #bbc8cb;
+        font-size: 14px;
+      }
+      button,
+      select {
+        font: inherit;
+        background: #263c49;
+        color: white;
+        border: 1px solid #526976;
+        border-radius: 8px;
+        padding: 9px 14px;
+        cursor: pointer;
+      }
+      button.active {
+        background: #b9ecb6;
+        color: #142c24;
+        border-color: #b9ecb6;
+      }
+      .bar {
+        display: flex;
+        gap: 9px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-top: 16px;
+      }
+      .stage {
+        height: 58vh;
+        min-height: 310px;
+        position: relative;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      .labels {
+        position: absolute;
+        top: 14px;
+        inset-inline: 0;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        pointer-events: none;
+      }
+      .label {
+        padding: 0 20px;
+      }
+      .label strong {
+        display: block;
+        font-size: 18px;
+      }
+      .label span {
+        display: block;
+        color: #bdd0cd;
+        font-size: 12px;
+        margin-top: 6px;
+        max-width: 290px;
+      }
+      .metrics {
+        position: absolute;
+        bottom: 12px;
+        inset-inline: 0;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        font:
+          12px ui-monospace,
+          monospace;
+        color: #dcf0de;
+      }
+      .metrics span {
+        padding-left: 20px;
+      }
+      footer {
+        padding: 12px 28px 24px;
+        display: flex;
+        gap: 28px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .pad {
+        display: grid;
+        grid-template-columns: repeat(3, 44px);
+        gap: 4px;
+      }
+      .pad button {
+        padding: 9px;
+      }
+      #cue {
+        color: #b9ecb6;
+        font-weight: 600;
+        min-width: 200px;
+      }
+      .note {
+        max-width: 650px;
+        font-size: 13px;
+        line-height: 1.6;
+      }
+      .tag {
+        font-size: 11px;
+        color: #b9ecb6;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin-bottom: 7px;
+      }
+      @media (max-width: 700px) {
+        header {
+          padding: 14px;
+        }
+        .label {
+          padding: 0 8px;
+        }
+        .label strong {
+          font-size: 13px;
+        }
+        .label span {
+          font-size: 10px;
+        }
+        .stage {
+          height: 52vh;
+        }
+        .metrics span {
+          padding-left: 8px;
+          font-size: 10px;
+        }
+        footer {
+          padding: 12px;
+          gap: 12px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="tag">Throwaway experiment · actual game character</div>
+      <h1>Can movement feel better?</h1>
+      <p>
+        Three characters. Identical input. Compare their starts, stops, pivots,
+        and weight.
+      </p>
+      <div class="bar">
+        <button id="auto" class="active">Watch comparison</button
+        ><button id="play">Take control</button><button id="reset">Reset</button
+        ><select id="view" aria-label="Camera angle">
+          <option value="quarter">Quarter view</option>
+          <option value="side">Side view</option>
+          <option value="front">Front view</option></select
+        ><select id="pace" aria-label="Movement pace">
+          <option value="1">Run</option>
+          <option value="0.45">Walk</option>
+        </select>
+        <a href="./camera.html" style="color: #c4edbc; padding: 9px 12px"
+          >Try camera &amp; stick experiment ↗</a
+        >
+        <button id="slow">Slow motion</button><button id="pause">Pause</button>
+      </div>
+    </header>
+    <div class="stage">
+      <div class="labels">
+        <div class="label">
+          <strong>1 · Current game</strong
+          ><span>Our actual controller and animation, unchanged.</span>
+        </div>
+        <div class="label">
+          <strong>2 · Responsive weight</strong
+          ><span
+            >Stronger brakes, early pivot, deeper travel-direction lean, fuller
+            steps.</span
+          >
+        </div>
+        <div class="label">
+          <strong>3 · Softer momentum</strong
+          ><span
+            >Longer build-up, broader turns. Previous lean for comparison.</span
+          >
+        </div>
+      </div>
+      <div class="metrics"><span></span><span></span><span></span></div>
+    </div>
+    <footer>
+      <div>
+        <div id="cue">Loading characters…</div>
+        <p>WASD / arrows · Space to jump · R to reset</p>
+        <p>Or use the direction pad. Click Take control first.</p>
+      </div>
+      <div class="pad">
+        <span></span
+        ><button data-key="ArrowUp" aria-label="Move forward">↑</button
+        ><span></span
+        ><button data-key="ArrowLeft" aria-label="Move left">←</button
+        ><button data-key="Space" aria-label="Jump">↥</button
+        ><button data-key="ArrowRight" aria-label="Move right">→</button
+        ><span></span
+        ><button data-key="ArrowDown" aria-label="Move backward">↓</button>
+      </div>
+      <div class="note">
+        Try: run → let go; run → reverse; run → turn a corner. Watch the feet,
+        shoulders, and where the body faces during braking. These are candidates
+        to react to, not final tuning. No game progress is loaded or saved.
+      </div>
+    </footer>
+    <script type="module" src="./lab.ts"></script>
+  </body>
+</html>
