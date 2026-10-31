@@ -1,134 +1,14 @@
 import * as T from "three";
 import { markScenery } from "../shared/scenery";
 import { nearWarPoint, warWorld } from "../shared/war-world-kit";
+import { createPlayer, stepPlayer } from "../../physics/physics";
 import type { Point, WorldData } from "../../runtime/worlds";
 
 const p = (x: number, z: number, y = 0): Point => ({ x, y, z });
 const WALL = 5.6;
-const stages = [
-  {
-    id: "scout",
-    at: p(-24, -12, WALL),
-    objective: "Climb the western wall and scout the eastern entrance",
-    ref: "Alma 62:20–21",
-    title: "A night view from the wall",
-    body: "Moroni climbs the wall in darkness. From here he sees the Lamanite army asleep on the east, by the entrance. This city's exact plan and Moroni's climbing route are imagined.",
-  },
-  {
-    id: "report",
-    at: p(-42, 0),
-    objective: "Return to the army in the plain",
-    ref: "Alma 62:21",
-    title: "Prepare in haste",
-    body: "Moroni returns to his army and orders strong cords and ladders prepared. The soldiers will enter on the west, away from the sleeping camp.",
-  },
-  {
-    id: "rope",
-    at: p(-44, 9),
-    objective: "Collect strong rope from the supply ground",
-    ref: "Alma 62:21",
-    title: "Strong cords",
-    body: "Take the rope to the ladder-making place. The supply work is an imagined playable detail of Moroni's order.",
-  },
-  {
-    id: "tie",
-    at: p(-38, -8),
-    objective: "Carry the rope to the ladder-making place",
-    ref: "Alma 62:21",
-    title: "Bind the rungs",
-    body: "The first cord is bound across the ladder rails. Timber is still needed before the force can scale the wall.",
-  },
-  {
-    id: "timber",
-    at: p(-45, -11),
-    objective: "Collect ladder timber",
-    ref: "Alma 62:21",
-    title: "Ladder timber",
-    body: "Take the light timber back to the work place. The exact materials and assembly steps are interpretive.",
-  },
-  {
-    id: "assemble",
-    at: p(-38, -8),
-    objective: "Finish the ladder with timber and rope",
-    ref: "Alma 62:21",
-    title: "Ladders ready",
-    body: "The strong cords and ladder are ready. Carry them to the western wall, where the defenders did not camp.",
-  },
-  {
-    id: "place",
-    at: p(-37, 8),
-    objective: "Place the ladder against the western wall",
-    ref: "Alma 62:22",
-    title: "The western approach",
-    body: "Moroni's force approaches the west at night. Set the ladder here and climb the wall. The placement and route are playable interpretation.",
-  },
-  {
-    id: "top",
-    at: p(-24, 8, WALL),
-    objective: "Climb the ladder onto the wall",
-    ref: "Alma 62:22",
-    title: "On the wall",
-    body: "Moroni's men reach the wall's top on the west, well away from the sleeping army by the eastern entrance.",
-  },
-  {
-    id: "lower",
-    at: p(-24, 8, WALL),
-    objective: "Lower cords and an inner ladder into the city",
-    ref: "Alma 62:21–23",
-    title: "The descent",
-    body: "Lower the strong cords and ladder into the inside of the western wall. The army must descend before morning.",
-  },
-  {
-    id: "descend",
-    at: p(-12, 8),
-    objective: "Descend the inner ladder into the western city",
-    ref: "Alma 62:23",
-    title: "Inside the wall",
-    body: "You reach the western side of the city. Moroni's men follow down by cords and ladders in the darkness.",
-  },
-  {
-    id: "squad-west",
-    at: p(-11, 9),
-    objective: "Guide the first squad through the west lane",
-    ref: "Alma 62:23",
-    title: "The first squad",
-    body: "Guide the men into the western lane. The city streets and individual squads are imagined; the record says all the force entered before morning.",
-  },
-  {
-    id: "squad-center",
-    at: p(-5, -8),
-    objective: "Guide the second squad toward the inner court",
-    ref: "Alma 62:23",
-    title: "All within the walls",
-    body: "The second squad moves inward. The army is inside the city when morning comes.",
-  },
-  {
-    id: "morning",
-    at: p(0, 0),
-    objective: "Reach the court as morning breaks",
-    ref: "Alma 62:23–24",
-    title: "Morning in Nephihah",
-    body: "When the Lamanites wake and see Moroni's army within the walls, they are frightened and flee by the pass.",
-  },
-  {
-    id: "flight",
-    at: p(13, 0),
-    objective: "Observe the flight toward the eastern pass",
-    ref: "Alma 62:24–26",
-    title: "The city recovered",
-    body: "Many Lamanites flee. Moroni's men pursue, slay many, and surround and capture others. Moroni and Pahoran recover Nephihah without losing a Nephite soul; it is not a bloodless battle.",
-  },
-  {
-    id: "aftermath",
-    at: p(5, 11),
-    objective: "Speak with Pahoran about the prisoners",
-    ref: "Alma 62:26–29",
-    title: "A new life for prisoners",
-    body: "The Lamanite prisoners who wish to join the people of Ammon are permitted to do so, becoming free people and working the land. Nephihah has been recovered.",
-  },
-] as const;
-
-/** Alma 62:18–29. The city dimensions, house layout, supply tasks and squads are gameplay interpretations. */
+const CAMP = p(-42, 0);
+const SCOUT = p(-24, -11.2, WALL);
+/** Alma 62:18–29. Terrain, projecting stones, equipment and pressure-based flight are imagined. */
 export function buildNephihah(scene: T.Scene): WorldData {
   const land = warWorld(scene, "Nephihah · western wall crossing", true);
   const { root, solids, solid, decor, actor, tree } = land;
@@ -191,19 +71,20 @@ export function buildNephihah(scene: T.Scene): WorldData {
       "Nephihah solid cedar roof",
     );
   }
-  // A physically traversable scout ascent; Moroni's exact means of climbing is unknown.
-  for (let i = 0; i < 14; i++)
+
+  // Three projecting stones, not a public stairway. Each 1.4 m rise requires a jump.
+  for (let i = 0; i < 3; i++)
     solid(
       {
-        x: -35.25 + i * 0.76,
-        y: 0,
-        z: -12,
-        w: 0.78,
-        h: (i + 1) * 0.4,
-        d: 1.8,
+        x: -25.6,
+        y: 1.4 * (i + 1) - 0.5,
+        z: -16 + i * 2.4,
+        w: 1.8,
+        h: 0.5,
+        d: 1.6,
       },
       0xb19a74,
-      "Scouting earthen ascent terrace",
+      "Projecting scout wall stone",
     );
   for (const [x, z] of [
     [-49, -38],
@@ -212,271 +93,390 @@ export function buildNephihah(scene: T.Scene): WorldData {
     [-34, 32],
     [36, -34],
     [38, 33],
-  ] as const)
+  ])
     tree(x, z);
-  for (const [x, z] of [
-    [-42, -30],
-    [-36, -27],
-    [-47, 22],
-  ] as const)
-    solid(
-      { x, y: 0, z, w: 2.8, h: 0.9, d: 2 },
-      0x746e60,
-      "Plain campsite supply table",
+
+  const army = Array.from({ length: 6 }, (_, i) => {
+    const state = createPlayer(
+      -44 + (i % 3) * 1.7,
+      0,
+      -3 + Math.floor(i / 3) * 5,
     );
-  // The rope and wood move with Moroni; their staging meshes have explicit nonphysical intent.
-  const rope = new T.Mesh(
-    new T.TorusGeometry(0.42, 0.1, 6, 12),
-    new T.MeshStandardMaterial({ color: 0xbba67e, roughness: 1 }),
-  );
-  rope.name = "Carried strong rope coil";
-  root.add(rope);
-  markScenery(rope, {
-    kind: "decoration",
-    reason:
-      "Portable coil follows the player while carried; supplies do not obstruct the lane.",
+    const rig = actor("guard", state, `Moroni's following soldier ${i + 1}`);
+    const equipment = new T.Group();
+    equipment.name = "Army carried cords and wooden ladder";
+    rig.group.add(equipment);
+    // Equipment has no static collision: it travels with its bearer.
+    const wood = new T.MeshStandardMaterial({ color: 0x987048, roughness: 1 });
+    if (i % 2 === 0) {
+      for (const x of [-0.35, 0.35]) {
+        const rail = new T.Mesh(new T.BoxGeometry(0.1, 2.5, 0.1), wood);
+        rail.position.set(x, 1.3, -0.4);
+        equipment.add(rail);
+      }
+      for (let j = 0; j < 6; j++) {
+        const rung = new T.Mesh(new T.BoxGeometry(0.7, 0.08, 0.1), wood);
+        rung.position.set(0, 0.3 + j * 0.4, -0.4);
+        equipment.add(rung);
+      }
+    } else {
+      const coil = new T.Mesh(new T.TorusGeometry(0.35, 0.09, 6, 12), wood);
+      coil.position.set(0, 1.3, -0.4);
+      equipment.add(coil);
+    }
+    markScenery(equipment, {
+      kind: "decoration",
+      reason: "Portable equipment carried by a moving soldier.",
+    });
+    equipment.visible = false;
+    return { state, rig, equipment, trail: [] as Point[], entered: false };
   });
-  const timber = decor(
-    { x: -45, y: 0.2, z: -11, w: 0.45, h: 0.3, d: 2.6 },
-    0x987048,
-    "Portable ladder timber",
-    "Portable timber is carried by the player, not a fixed obstacle.",
-  );
-  rope.visible = timber.visible = false;
-  const sleepers = Array.from({ length: 5 }, (_, i) =>
-    actor(
-      "guard",
-      p(11 + (i % 2) * 2.6, -6 + Math.floor(i / 2) * 5),
-      `Sleeping eastern defender ${i + 1}`,
-    ),
-  );
-  sleepers.forEach((rig, i) => {
+  const defenders = Array.from({ length: 5 }, (_, i) => {
+    const state = createPlayer(10 + (i % 2) * 3, 0, -6 + Math.floor(i / 2) * 5);
+    const rig = actor("laman", state, `Sleeping eastern defender ${i + 1}`);
     rig.group.rotation.z = -1.15;
     rig.group.position.y = 0.3;
-    rig.group.rotation.y = i * 0.4;
+    const flag = decor(
+      { x: 0, y: 0, z: 0, w: 0.18, h: 0.35, d: 0.18 },
+      0xffd771,
+      "Defender to guide out",
+      "Nonphysical indicator above a moving defender.",
+    );
+    flag.visible = false;
+    return { state, rig, flag, escaped: false };
   });
-  const squads = [
-    Array.from({ length: 3 }, (_, i) =>
-      actor(
-        "guard",
-        p(-45 + i * 2, -2),
-        `West approach squad A soldier ${i + 1}`,
-      ),
-    ),
-    Array.from({ length: 3 }, (_, i) =>
-      actor(
-        "guard",
-        p(-45 + i * 2, 3),
-        `West approach squad B soldier ${i + 1}`,
-      ),
-    ),
-  ];
-  const pahoran = actor("guard", p(-41, 4), "Pahoran · companion commander");
-  const prisoner = actor(
-    "guard",
-    p(5, 12),
-    "Lamanite prisoner who joins the people of Ammon",
-  );
-  prisoner.group.visible = false;
   const marker = new T.Mesh(
     new T.OctahedronGeometry(0.42),
     new T.MeshBasicMaterial({ color: 0x60cfff, depthTest: false }),
   );
-  marker.name = "Nephihah next task beacon";
+  marker.name = "Nephihah route beacon";
   marker.renderOrder = 20;
   root.add(marker);
   markScenery(marker, {
     kind: "decoration",
-    reason: "Nonphysical task indicator.",
+    reason: "Nonphysical route indicator.",
   });
-  const climbables: NonNullable<WorldData["climbables"]> = [];
-  let index = 0,
-    pending = false,
-    ended = false,
-    carrying: "rope" | "timber" | null = null,
+  let phase: "scout" | "return" | "deploy" | "cross" | "drive" | "done" =
+    "scout";
+  let ladderZ = 8,
     time = 0,
-    outerPlaced = false,
-    innerPlaced = false,
-    entered = 0;
-  const makeLadder = (inside: boolean) => {
-    for (let i = 0; i < (inside ? 13 : 14); i++) {
-      const x = inside ? -22.75 + i * 0.7 : -35.25 + i * 0.76;
-      const top = inside ? 5.2 - i * 0.4 : (i + 1) * 0.4;
-      // Thin treads form a walkable ladder with <=0.4 m consecutive rise.
-      if (inside)
+    animationTime = 0,
+    active = true;
+  let lastTrail: Point | undefined;
+  const target = (): Point =>
+    phase === "scout"
+      ? SCOUT
+      : phase === "return"
+        ? CAMP
+        : phase === "deploy"
+          ? p(-34, 8)
+          : phase === "cross"
+            ? p(-5, ladderZ)
+            : phase === "drive"
+              ? (defenders.find((s) => !s.escaped)?.state ?? p(29, 0))
+              : p(29, 0);
+  const makeLadders = (z: number) => {
+    // Keep either descent in the broad central lane, clear of dwellings.
+    ladderZ = T.MathUtils.clamp(z, -9, 9);
+    for (const inside of [false, true]) {
+      for (let i = 0; i < 14; i++) {
+        const x = inside ? -22.85 + i * 0.76 : -35.25 + i * 0.76;
+        const top = inside ? 5.6 - i * 0.4 : (i + 1) * 0.4;
         solid(
-          { x, y: top - 0.14, z: 8, w: 0.74, h: 0.14, d: 1.7 },
+          { x, y: top - 0.14, z: ladderZ, w: 0.78, h: 0.14, d: 1.8 },
           0x9c7750,
-          "Inner strong-cord ladder rung",
+          inside
+            ? "Inner strong-cord ladder rung"
+            : "Outer strong-cord ladder rung",
         );
-      else
-        solid(
-          { x, y: top - 0.14, z: 8, w: 0.78, h: 0.14, d: 1.7 },
-          0x9c7750,
-          "Outer strong-cord ladder rung",
+      }
+      // The top rung meets the wall without a second coplanar walk surface.
+      for (const side of [-0.97, 0.97]) {
+        const start = new T.Vector3(
+          inside ? -23 : -35.6,
+          inside ? 5.8 : 0.1,
+          ladderZ + side,
         );
+        const end = new T.Vector3(
+          inside ? -12.6 : -24.7,
+          inside ? 0.1 : 5.8,
+          ladderZ + side,
+        );
+        const cord = new T.Mesh(
+          new T.CylinderGeometry(0.06, 0.06, start.distanceTo(end), 6),
+          new T.MeshStandardMaterial({ color: 0xbba67e, roughness: 1 }),
+        );
+        cord.position.copy(start).add(end).multiplyScalar(0.5);
+        cord.quaternion.setFromUnitVectors(
+          new T.Vector3(0, 1, 0),
+          end.sub(start).normalize(),
+        );
+        cord.name = "Strong ladder side cord";
+        root.add(cord);
+        markScenery(cord, {
+          kind: "decoration",
+          reason: "Side cord beside the solid wooden treads.",
+        });
+      }
     }
-    const id = inside ? "nephihah-inner-ladder" : "nephihah-outer-ladder";
-    climbables.push({
-      id,
-      x: inside ? -22.1 : -25.6,
-      z: inside ? 9.5 : 8,
-      y: 0,
-      height: 6.2,
-      radius: inside ? 0.7 : 1.2,
-    });
-    // Cords make the treads read as a ladder, not a freestanding staircase.
-    for (const z of [7.12, 8.88]) {
-      const rail = new T.Mesh(
-        new T.BoxGeometry(0.12, 0.12, 12),
-        new T.MeshStandardMaterial({ color: 0x866a4b, roughness: 1 }),
-      );
-      rail.rotation.y = Math.PI / 2;
-      rail.rotation.z = inside ? 0.4 : -0.4;
-      rail.position.set(inside ? -18.2 : -30, 2.8, z);
-      rail.name = "Strong ladder side cord";
-      root.add(rail);
-      markScenery(rail, {
-        kind: "decoration",
-        reason:
-          "Side cord follows the physical ladder rungs without an extra walk surface.",
-      });
-    }
+    army.forEach((s) => (s.equipment.visible = false));
   };
-  const advance = () => {
-    index++;
-    pending = false;
-    if (index >= stages.length) {
-      ended = true;
-      marker.visible = false;
-    }
+  const animate = (
+    dt: number,
+    rig: (typeof army)[number]["rig"],
+    state: ReturnType<typeof createPlayer>,
+  ) => {
+    rig.update(dt, state);
+    rig.group.rotation.y = state.yaw;
   };
   return {
     name: "The Taking of Nephihah",
     subtitle: "The western wall by night · Alma 62:18–29",
-    initialObjective: stages[0].objective,
+    initialObjective:
+      "Hop up the three projecting stones to scout the sleeping army",
     spawn: { ...p(-43, -18), yaw: Math.PI / 2 },
     solids,
-    climbables,
     actorParent: root,
     bounds: { minX: -53, maxX: 53, minZ: -62, maxZ: 62 },
-    goal: { ...stages[stages.length - 1].at, radius: 3 },
+    goal: { ...p(29, 0), radius: 3 },
     landmarks: [
-      { name: "Moroni and Pahoran's camp", ...p(-42, 0) },
-      { name: "Western wall and ladders", ...p(-30, 8) },
-      { name: "Eastern entrance", ...p(24, 0) },
-      { name: "Western city lanes", ...p(-12, 8) },
+      { name: "Moroni's army", ...CAMP },
+      { name: "Projecting wall stones", ...p(-26, -16) },
+      { name: "Western crossing", ...p(-30, 8) },
+      { name: "Eastern escape pass", ...p(24, 0) },
     ],
-    update(dt, player) {
-      time += Math.min(0.1, Math.max(0, dt));
-      marker.visible = !ended;
-      const target = stages[Math.min(index, stages.length - 1)].at;
-      marker.position.set(
-        target.x,
-        target.y + 2.4 + Math.sin(time * 3) * 0.15,
-        target.z,
-      );
-      rope.visible = carrying === "rope";
-      timber.visible = carrying === "timber";
-      if (carrying === "rope")
-        rope.position.set(player.x + 0.55, player.y + 1.45, player.z);
-      if (carrying === "timber")
-        timber.position.set(player.x + 0.62, player.y + 1.45, player.z);
-      if (index >= 10)
-        squads[0].forEach((rig, i) =>
-          rig.group.position.set(-15 + i * 1.8, 0, 8 + i * 0.8),
+    update(dt) {
+      if (!active || dt <= 0) return;
+      time += Math.min(0.05, dt);
+      const at = target();
+      marker.visible = phase !== "done";
+      marker.position.set(at.x, at.y + 2.5 + Math.sin(time * 3) * 0.15, at.z);
+      defenders.forEach((s) => {
+        s.flag.visible = phase === "drive" && !s.escaped;
+        s.flag.position.set(
+          s.state.x,
+          2.7 + Math.sin(time * 3) * 0.1,
+          s.state.z,
         );
-      if (index >= 11)
-        squads[1].forEach((rig, i) =>
-          rig.group.position.set(-9 + i * 1.8, 0, -8 + i * 0.8),
-        );
-      if (index >= 13)
-        sleepers.forEach((rig, i) => {
-          rig.group.rotation.z = 0;
-          rig.group.position.set(16 + i * 1.3, 0, (i - 2) * 1.7);
-        });
-      if (index >= 14) {
-        pahoran.group.position.set(5, 0, 11);
-        prisoner.group.visible = true;
-      }
+      });
     },
     adventure(hooks) {
       hooks.setAvatar("moroni");
       hooks.toast(
-        "Alma 62:18–29 · Climb and explore as Moroni. The streets, supplies, and exact ladder route are imagined.",
+        "Alma 62:18–29 · Hop up the projecting stones to scout. The city and climbing route are imagined.",
       );
       return {
         snapshot: () => ({
-          phase: ended ? "done" : stages[index].id,
-          index,
-          pending,
-          target: stages[Math.min(index, stages.length - 1)].at,
-          carrying,
-          outerPlaced,
-          innerPlaced,
-          entered,
+          phase,
+          ladderZ,
+          entered: army.filter((s) => s.entered).length,
+          target: { ...target() },
+          followers: army.map((s) => ({
+            position: { x: s.state.x, y: s.state.y, z: s.state.z },
+          })),
+          soldiers: defenders.map((s) => ({
+            position: { x: s.state.x, y: s.state.y, z: s.state.z },
+            escaped: s.escaped,
+          })),
         }),
-        movementLocked: () => pending,
-        update(_dt, player, input) {
-          if (ended)
-            return {
-              objective: "Nephihah recovered",
-              prompt: "Journey complete",
-            };
-          const stage = stages[index];
-          const near = nearWarPoint(
-            player,
-            stage.at,
-            index === 0 || index === 7 || index === 8 ? 1.8 : 2.8,
-          );
-          // A wall-top checkpoint is reached only by real vertical traversal.
-          if (near && input.interact && !pending) {
-            pending = true;
-            hooks.dialog(
-              stage.ref,
-              stage.title,
-              stage.body,
-              () => {
-                if (index === 2) carrying = "rope";
-                if (index === 3) carrying = null;
-                if (index === 4) carrying = "timber";
-                if (index === 5) carrying = null;
-                if (index === 6) {
-                  makeLadder(false);
-                  outerPlaced = true;
-                }
-                if (index === 8) {
-                  makeLadder(true);
-                  innerPlaced = true;
-                }
-                if (index === 9) entered = 1;
-                if (index === 10) entered = 2;
-                if (index === 11) entered = 3;
-                if (index === 14) hooks.complete();
-                advance();
-              },
-              {
-                focus: { x: stage.at.x, y: stage.at.y + 1, z: stage.at.z },
-                wide: 5,
-                playerGesture:
-                  index === 3 || index === 5 || index === 6 || index === 8
-                    ? "work"
-                    : "talk",
-                actors:
-                  index === 1 || index === 14
-                    ? [{ group: pahoran.group, gesture: "talk", speaker: true }]
-                    : [],
-              },
+        update(dt, player, input) {
+          if (!active || dt <= 0)
+            return { objective: "Nephihah recovered", prompt: "" };
+          dt = Math.min(dt, 0.05);
+          if (
+            phase === "scout" &&
+            nearWarPoint(player, SCOUT, 2) &&
+            player.y > 5.3
+          ) {
+            phase = "return";
+            hooks.toast(
+              "The army sleeps by the eastern entrance. Hop down and return to your men in the plain.",
             );
           }
+          if (
+            phase === "return" &&
+            nearWarPoint(player, CAMP, 4) &&
+            player.y < 0.5
+          ) {
+            phase = "deploy";
+            army.forEach((s) => {
+              s.equipment.visible = true;
+              s.trail.push({ ...player });
+            });
+            lastTrail = { ...player };
+            hooks.toast(
+              "Your men have cords and ladders. Lead them to the western wall; use {action} nearby to place the crossing.",
+            );
+          }
+          const nearWall =
+            player.x >= -38 &&
+            player.x <= -24.9 &&
+            Math.abs(player.z) < 19 &&
+            player.y < 0.6;
+          if (phase === "deploy" && nearWall && input.interact) {
+            makeLadders(player.z);
+            phase = "cross";
+            hooks.toast(
+              "Lead your men up the wooden ladder and down into the city. Keep walking; they follow your route.",
+            );
+          }
+          animationTime += dt;
+          const pose = animationTime >= 0.1;
+          if (pose) animationTime = 0;
+          if (["deploy", "cross", "drive", "done"].includes(phase)) {
+            const distance = lastTrail
+              ? Math.hypot(
+                  player.x - lastTrail.x,
+                  player.y - lastTrail.y,
+                  player.z - lastTrail.z,
+                )
+              : Infinity;
+            // Airborne samples (including a jump in place) are not walkable trail stops.
+            if (player.grounded && distance > 0.65) {
+              army.forEach((s) =>
+                s.trail.push({ x: player.x, y: player.y, z: player.z }),
+              );
+              lastTrail = { ...player };
+            }
+            army.forEach((s, i) => {
+              let at = s.trail[0];
+              if (
+                at &&
+                Math.hypot(at.x - s.state.x, at.z - s.state.z) < 0.48 &&
+                Math.abs(at.y - s.state.y) < 0.6
+              ) {
+                s.trail.shift();
+                at = s.trail[0];
+              }
+              const dx = at ? at.x - s.state.x : 0,
+                dz = at ? at.z - s.state.z : 0;
+              const d = Math.hypot(dx, dz);
+              const moving =
+                !!at && (s.trail.length > 2 + i || d > 3 + i * 0.25);
+              stepPlayer(
+                s.state,
+                {
+                  x: moving
+                    ? (-dx / Math.max(d, 0.01)) * Math.min(1, d * 2)
+                    : 0,
+                  y: moving ? (dz / Math.max(d, 0.01)) * Math.min(1, d * 2) : 0,
+                  jump:
+                    moving &&
+                    phase === "deploy" &&
+                    at.y > s.state.y + 0.5 &&
+                    s.state.grounded,
+                  jumpHeld: false,
+                },
+                dt,
+                0,
+                solids,
+              );
+              if (s.state.x > -12.5 && s.state.y < 0.2) s.entered = true;
+              if (pose) animate(0.1, s.rig, s.state);
+              s.rig.group.position.set(s.state.x, s.state.y, s.state.z);
+            });
+          }
+          if (
+            phase === "cross" &&
+            player.x > -9 &&
+            player.x < 22 &&
+            player.y < 0.6 &&
+            army.every((s) => s.entered)
+          ) {
+            phase = "drive";
+            defenders.forEach((s) => (s.rig.group.rotation.z = 0));
+            if (scene.background instanceof T.Color)
+              scene.background.set(0x9ac4ca);
+            if (scene.fog instanceof T.Fog) scene.fog.color.set(0x9ac4ca);
+            root.children.forEach((o) => {
+              if (o instanceof T.HemisphereLight) {
+                o.color.set(0xffecd0);
+                o.intensity = 2.5;
+              }
+              if (o instanceof T.DirectionalLight) {
+                o.color.set(0xffdcaa);
+                o.intensity = 2.4;
+              }
+            });
+            hooks.toast(
+              "Morning! The defenders are fleeing. Circle behind the gold-marked soldiers and drive them through the eastern gate.",
+            );
+          }
+          if (phase === "drive" || phase === "done") {
+            defenders.forEach((s, i) => {
+              const dx = s.state.x - player.x,
+                dz = s.state.z - player.z,
+                d = Math.hypot(dx, dz);
+              let vx = Math.sin(time * 1.2 + i * 2) * 0.12,
+                vz = Math.cos(time * 1.1 + i) * 0.16;
+              if (s.escaped) {
+                vx = s.state.x < 44 ? 2.4 : 0;
+                vz = 0;
+              } else if (d < 7 && d > 0.05 && player.y < 1.2) {
+                const pressure = Math.min(2.8, (7 - d) * 0.65);
+                vx += (dx / d) * pressure;
+                vz += (dz / d) * pressure;
+                // Modest gate awareness makes strays recoverable while position still controls their direction.
+                vx += 0.3;
+                vz += T.MathUtils.clamp(-s.state.z * 0.12, -0.6, 0.6);
+              }
+              const speed = Math.hypot(vx, vz);
+              stepPlayer(
+                s.state,
+                {
+                  x: -vx / 6.5,
+                  y: vz / 6.5,
+                  jump: false,
+                  jumpHeld: false,
+                  traversal: false,
+                },
+                dt,
+                0,
+                solids,
+              );
+              if (!s.escaped && s.state.x > 28 && Math.abs(s.state.z) < 5.2) {
+                s.escaped = true;
+                hooks.toast(
+                  `Through the pass · ${defenders.filter((s) => s.escaped).length}/${defenders.length}`,
+                );
+              }
+              if (pose) animate(0.1, s.rig, { ...s.state, runSpeed: speed });
+              s.rig.group.position.set(s.state.x, s.state.y, s.state.z);
+            });
+          }
+          if (phase === "drive" && defenders.every((s) => s.escaped)) {
+            phase = "done";
+            hooks.toast(
+              "Nephihah recovered. Alma 62:25–29 also records deaths and prisoners; willing prisoners later join the people of Ammon. This activity depicts the flight.",
+            );
+            hooks.complete();
+          }
+          const escaped = defenders.filter((s) => s.escaped).length;
           return {
-            objective: stage.objective,
-            prompt: pending ? "" : near ? `{action} · ${stage.objective}` : "",
-            carrying: !!carrying,
+            objective:
+              phase === "scout"
+                ? "Hop up the three projecting stones to scout the sleeping army"
+                : phase === "return"
+                  ? "Hop down and return to your army in the plain"
+                  : phase === "deploy"
+                    ? "Lead your army to the western wall"
+                    : phase === "cross"
+                      ? `Lead your army over the wall and into the city · ${army.filter((s) => s.entered).length}/6 inside`
+                      : phase === "drive"
+                        ? `Drive the defenders through the eastern gate · ${escaped}/5 out`
+                        : "Nephihah recovered",
+            prompt:
+              phase === "deploy" && nearWall
+                ? "{action} · Place cords and wooden ladders"
+                : phase === "scout"
+                  ? "{jump} · Hop between the projecting stones"
+                  : phase === "drive"
+                    ? "Circle behind stragglers; your approach steers them toward the open gate"
+                    : "",
           };
         },
         dispose() {
-          ended = true;
+          active = false;
           marker.visible = false;
         },
       };
