@@ -237,19 +237,23 @@ async function prepareAuthoredWorld(id: WorldId): Promise<PreparedWorld> {
     );
     return { buildWorld: (_, scene) => module.buildAmmonFlocks(scene) };
   }
-  const module = await deployedScene(
-    "src/game/worlds/jerusalem/jerusalem.ts",
-    () => import("../worlds/jerusalem/jerusalem"),
-  );
-  const story =
-    id === "trade" || id === "night"
-      ? await deployedScene(
-          "src/game/worlds/jerusalem/story-scenes.ts",
-          () => import("../worlds/jerusalem/story-scenes"),
-        )
-      : undefined;
-  return {
-    buildWorld: (_, scene) => module.buildJerusalem(id, scene),
-    createStoryScene: story?.createStoryScene,
-  };
+  if (id === "streets" || id === "palace" || id === "trade" || id === "night") {
+    const module = await deployedScene(
+      "src/game/worlds/jerusalem/jerusalem.ts",
+      () => import("../worlds/jerusalem/jerusalem"),
+    );
+    const story =
+      id === "trade" || id === "night"
+        ? await deployedScene(
+            "src/game/worlds/jerusalem/story-scenes.ts",
+            () => import("../worlds/jerusalem/story-scenes"),
+          )
+        : undefined;
+    return {
+      buildWorld: (_, scene) => module.buildJerusalem(id, scene),
+      createStoryScene: story?.createStoryScene,
+    };
+  }
+  const unhandled: never = id;
+  throw new Error(`Unhandled world: ${unhandled}`);
 }

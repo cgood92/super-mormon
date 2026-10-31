@@ -1,6 +1,29 @@
 import type { PlayerState, StepEvents } from "../physics/physics";
 
 type Params = Record<string, string | number | boolean>;
+type EventPayloads = {
+  level_start: { entry_reason: string };
+  play_time: { active_seconds: number };
+  level_end: { success: true; total_active_seconds: number };
+  level_exit: {
+    exit_reason: string;
+    story_phase: string;
+    total_active_seconds: number;
+  };
+  level_retry: { retry_reason: string };
+  move_used: { move_name: string };
+  camera_used: { camera_action: "rotate" | "recenter" };
+  story_step: { story_phase: string };
+  secret_found: { secret_id: string };
+  activity_used: { activity_id: string };
+  fullscreen_changed: undefined;
+};
+// A tuple union keeps event names paired with their own required payloads.
+type AnalyticsEvent = {
+  [Name in keyof EventPayloads]: EventPayloads[Name] extends undefined
+    ? [name: Name]
+    : [name: Name, params: EventPayloads[Name]];
+}[keyof EventPayloads];
 export type AnalyticsTransport = (name: string, params: Params) => void;
 const GAME_URL = "https://cgood92.github.io/super-mormon/";
 
@@ -138,7 +161,7 @@ export class GameplayAnalytics {
   private recenterHeld = false;
   private discoveries = new Set<string>();
   constructor(private readonly transport: AnalyticsTransport) {}
-  private send(name: string, params: Params = {}) {
+  private send(...[name, params]: AnalyticsEvent) {
     try {
       this.transport(name, {
         level_id: this.level ?? "hub",
