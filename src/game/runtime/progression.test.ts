@@ -85,3 +85,28 @@ test("older out-of-order saves keep completed replay access without opening gaps
   assert.equal(canEnter("palace", completed), true);
   assert.equal(nextStory(completed), "palace");
 });
+
+test("story prerequisites use chapter order even when saved completions have gaps", () => {
+  const completed = readCompleted(["ammon", "night", "palace", "trade"]);
+  const cases = [
+    { id: "streets", allowed: true, missing: null },
+    { id: "house", allowed: false, missing: "streets" },
+    { id: "ammon", allowed: true, missing: null },
+    { id: "moroni-farewell", allowed: false, missing: "streets" },
+  ] as const;
+  for (const { id, allowed, missing } of cases) {
+    assert.equal(canEnter(id, completed), allowed, id);
+    assert.equal(prerequisite(id, completed), missing, id);
+  }
+
+  completed.add("streets");
+  assert.equal(canEnter("house", completed), true);
+  assert.equal(prerequisite("moroni-farewell", completed), "house");
+  completed.add("house");
+  assert.equal(canEnter("tree", completed), true);
+  assert.equal(prerequisite("moroni-farewell", completed), "tree");
+  assert.deepEqual(
+    [...completed],
+    ["ammon", "night", "palace", "trade", "streets", "house"],
+  );
+});

@@ -86,10 +86,7 @@ export function canEnter(
   id: StoryId,
   completed: ReadonlySet<StoryId>,
 ): boolean {
-  if (completed.has(id)) return true;
-  return STORY_ORDER.slice(0, STORY_ORDER.indexOf(id)).every((prior) =>
-    completed.has(prior),
-  );
+  return prerequisite(id, completed) === null;
 }
 
 export function prerequisite(
