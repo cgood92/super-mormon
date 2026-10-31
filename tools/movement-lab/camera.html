@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Camera & stick playground</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #102733;
+        color: #f1f2df;
+        font-family: system-ui, sans-serif;
+      }
+      #stage,
+      #stage > canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      header {
+        position: absolute;
+        top: 18px;
+        left: 22px;
+        right: 22px;
+        pointer-events: none;
+      }
+      h1 {
+        margin: 0 0 5px;
+        font-size: 25px;
+        letter-spacing: -0.5px;
+      }
+      .tag {
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        font-size: 10px;
+        color: #c6efd0;
+      }
+      p {
+        font-size: 13px;
+        line-height: 1.5;
+        margin: 6px 0;
+        color: #d0e2dd;
+      }
+      .bar {
+        display: flex;
+        gap: 7px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+        pointer-events: auto;
+        max-width: 900px;
+      }
+      button,
+      select,
+      a.control {
+        font: inherit;
+        font-size: 13px;
+        color: #fff;
+        background: #193d49e8;
+        border: 1px solid #73908b;
+        border-radius: 8px;
+        padding: 9px 12px;
+        text-decoration: none;
+        cursor: pointer;
+      }
+      button.active {
+        background: #c4edbc;
+        color: #17342a;
+        border-color: #c4edbc;
+      }
+      #status {
+        position: absolute;
+        left: 22px;
+        bottom: 18px;
+        background: #102733d9;
+        padding: 9px 12px;
+        border-radius: 8px;
+        font-size: 12px;
+        pointer-events: none;
+      }
+      #map {
+        position: absolute;
+        right: 22px;
+        top: 24px;
+        width: 180px;
+        height: 180px;
+        border: 1px solid #73908b;
+        border-radius: 12px;
+        background: #102733c9;
+      }
+      #map-caption {
+        position: absolute;
+        right: 22px;
+        top: 207px;
+        font-size: 11px;
+        color: #e2e9cc;
+        width: 180px;
+        text-align: center;
+      }
+      #stick {
+        position: absolute;
+        left: 26px;
+        bottom: 77px;
+        width: 130px;
+        height: 130px;
+        border-radius: 50%;
+        border: 1px solid #bedbc2;
+        background: #193d4970;
+        touch-action: none;
+        cursor: grab;
+      }
+      #stick:before,
+      #stick:after {
+        content: "";
+        position: absolute;
+        background: #cde6cd40;
+      }
+      #stick:before {
+        left: 50%;
+        top: 12%;
+        width: 1px;
+        height: 76%;
+      }
+      #stick:after {
+        top: 50%;
+        left: 12%;
+        height: 1px;
+        width: 76%;
+      }
+      #stick i {
+        position: absolute;
+        left: calc(50% - 20px);
+        top: calc(50% - 20px);
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: 1px solid #cce6cf;
+        background: #c4edbc99;
+        pointer-events: none;
+      }
+      #look {
+        position: absolute;
+        right: 24px;
+        bottom: 86px;
+        width: 100px;
+        height: 100px;
+        border: 1px dashed #b6cec588;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        color: #e0e9dd;
+        font-size: 12px;
+        touch-action: none;
+      }
+      #jump {
+        position: absolute;
+        right: 139px;
+        bottom: 84px;
+        border-radius: 50%;
+        width: 64px;
+        height: 64px;
+        touch-action: none;
+      }
+      #help {
+        position: absolute;
+        left: 180px;
+        bottom: 88px;
+        max-width: 480px;
+        pointer-events: none;
+        text-shadow: 0 1px 5px #132b31;
+      }
+      #help strong {
+        color: #c4edbc;
+      }
+      details {
+        position: absolute;
+        right: 22px;
+        bottom: 16px;
+        max-width: 530px;
+        background: #102733ed;
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 12px;
+        z-index: 2;
+      }
+      details a {
+        color: #c4edbc;
+      }
+      details p {
+        font-size: 12px;
+      }
+      summary {
+        cursor: pointer;
+      }
+      #analog-label {
+        font-size: 12px;
+        padding: 8px;
+        background: #193d49dc;
+        border-radius: 8px;
+      }
+      #analog-label input {
+        accent-color: #c4edbc;
+      }
+      #map {
+        pointer-events: none;
+      }
+      @media (max-width: 850px) {
+        header {
+          left: 12px;
+          top: 12px;
+          right: 12px;
+        }
+        h1 {
+          font-size: 20px;
+        }
+        header > p {
+          max-width: 70%;
+        }
+        #map {
+          top: 250px;
+          right: 12px;
+          width: 90px;
+          height: 90px;
+        }
+        #map-caption {
+          top: 343px;
+          right: 12px;
+          width: 90px;
+          font-size: 9px;
+        }
+        .bar {
+          max-width: 100%;
+        }
+        button,
+        select,
+        a.control {
+          padding: 7px 8px;
+          font-size: 11px;
+        }
+        #help {
+          left: 12px;
+          bottom: 215px;
+          max-width: 260px;
+          font-size: 11px;
+        }
+        #status {
+          left: 12px;
+          bottom: 8px;
+          font-size: 10px;
+          max-width: 68%;
+        }
+        details {
+          right: 12px;
+          bottom: 45px;
+          max-width: 80%;
+          font-size: 10px;
+        }
+        #stick {
+          left: 18px;
+          bottom: 66px;
+          width: 115px;
+          height: 115px;
+        }
+        #look {
+          right: 18px;
+          bottom: 95px;
+          width: 75px;
+          height: 75px;
+        }
+        #jump {
+          right: 107px;
+          bottom: 95px;
+          width: 56px;
+          height: 56px;
+        }
+        #analog-label {
+          font-size: 11px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <header>
+      <div class="tag">Throwaway experiment · SM64-inspired camera</div>
+      <h1>Let the camera become part of the movement.</h1>
+      <p>Your chosen movement and 17° lean, with a lower trailing view.</p>
+      <div class="bar">
+        <select id="camera" aria-label="Camera behavior">
+          <option value="trailing">Mario-inspired trailing camera</option>
+          <option value="current">Current game camera</option></select
+        ><button id="circle">Demo: hold left</button
+        ><button id="straight">Demo: go straight</button
+        ><button id="reset">Reset position</button
+        ><button data-recenter>Recenter · R</button
+        ><button id="pause">Pause</button
+        ><label id="analog-label"
+          ><input type="checkbox" id="curve" checked /> Gentle analog
+          curve</label
+        ><a class="control" href="./index.html">Movement comparison ↗</a>
+      </div>
+    </header>
+    <canvas id="map" width="360" height="360"></canvas>
+    <div id="map-caption">Your path · camera path</div>
+    <div id="stick" data-stick aria-label="Analog movement stick"><i></i></div>
+    <div id="look" data-look aria-label="Drag to look">Drag to look</div>
+    <button id="jump" data-jump>Jump</button>
+    <div id="help">
+      <strong>Hold A / ← and keep holding.</strong>
+      <p>
+        Then try W / ↑. Move the round stick with your mouse or thumb for gentle
+        walking. A connected gamepad works too.
+      </p>
+      <p>WASD / arrows move · Space jumps · Q/C orbit · R recenters</p>
+    </div>
+    <div id="status">Loading…</div>
+    <details>
+      <summary>What we’re borrowing from Mario 64</summary>
+      <p>
+        Stick direction uses the camera’s horizontal reference. A curved stick
+        response makes smaller deflections gentler. This experiment trails the
+        player geometrically: sideways movement arcs around the camera; straight
+        movement pulls it along. Its distance, low angle and smoothing are our
+        tuning, not an exact Nintendo reconstruction.
+      </p>
+      <p>
+        Mario 64 has multiple camera modes and area-specific behavior; it does
+        not use one universal follow rule. Reference:
+        <a href="https://github.com/n64decomp/sm64/blob/master/src/game/mario.c"
+          >reconstructed input code</a
+        >,
+        <a
+          href="https://github.com/n64decomp/sm64/blob/master/src/game/camera.c"
+          >reconstructed camera code</a
+        >,
+        <a
+          href="https://github.com/n64decomp/sm64/blob/master/src/game/mario_actions_moving.c"
+          >movement states</a
+        >,
+        <a
+          href="https://www.nintendo.com/eu/media/downloads/games_8/emanuals/nintendo_8/Manual_Nintendo64_SuperMario64_EN.pdf"
+          >Nintendo manual</a
+        >.
+      </p>
+      <p>
+        Open-floor prototype only. No game saves are read or written. Try the
+        current-camera switch to compare; story-world camera safety remains a
+        separate integration step.
+      </p>
+    </details>
+    <script type="module" src="./camera-lab.ts"></script>
+  </body>
+</html>
