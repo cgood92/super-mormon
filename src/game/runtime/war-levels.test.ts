@@ -326,11 +326,11 @@ test("Antipas has three playable messenger races that automatically warn Lehonti
   assert.equal(raced, 3);
   assert.equal(state().phase, "done");
   assert.equal(h.done(), 1);
-  assert.match(h.dialogs.at(-1)!, /He’s not going down this time. Great job/);
-  assert.doesNotMatch(h.dialogs.at(-1)!, /invented|fictional/i);
+  assert.match(h.dialogs.at(-1)!, /warn Lehonti a third time/);
+  assert.doesNotMatch(h.dialogs.join(" "), /invented|fictional/i);
   assert.equal(
     h.dialogs.filter((body) => /warn Lehonti/i.test(body)).length,
-    2,
+    3,
   );
   world.dispose?.();
   world.dispose?.();

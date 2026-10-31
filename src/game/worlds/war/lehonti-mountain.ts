@@ -5,7 +5,11 @@ import {
   createCharacter,
   type CharacterRole,
 } from "../../characters/character";
-import { markScenery, terracedRock } from "../shared/scenery";
+import {
+  markScenery,
+  sceneryTerraceUnion,
+  terracedRock,
+} from "../shared/scenery";
 import type { Point, WorldData } from "../../runtime/worlds";
 
 const corners: [number, number][] = [
@@ -59,7 +63,7 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
     148,
     148,
   );
-  const { root, solids, solid } = land;
+  const { root, solids } = land;
   const crowdRigs: ReturnType<typeof createCharacter>[] = [];
   const crowd = (role: CharacterRole, point: Point) => {
     const rig = createCharacter(role, { quality: "crowd" });
@@ -80,13 +84,20 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
   scene.fog = new T.Fog(0xa9b6b0, 100, 220);
   // The many stepped terraces themselves form the mountain; their visible top
   // and support are the same shape. Adjacent tops differ by 0.34 m, below step height.
-  route.forEach((point, index) => {
-    solid(
-      { x: point.x, y: 0, z: point.z, w: 5.7, d: 5.7, h: point.y },
-      index % 5 === 0 ? 0x8d8066 : index % 3 === 0 ? 0x9b8e74 : 0xa3977a,
-      `Mount Antipas walkable spiral terrace ${index + 1}`,
-    );
-  });
+  sceneryTerraceUnion(
+    root,
+    solids,
+    route.map((point, index) => ({
+      x: point.x,
+      y: 0,
+      z: point.z,
+      w: 5.7,
+      d: 5.7,
+      h: point.y,
+      color: index % 5 === 0 ? 0x8d8066 : index % 3 === 0 ? 0x9b8e74 : 0xa3977a,
+    })),
+    "Mount Antipas walkable spiral terraces",
+  );
   // Three interlocking masses fill the hollow middle of the spiral. Every
   // visible ledge is below the next ring's walking height; no broad collider
   // blocks a switchback or replaces its individually supported terraces.
@@ -231,7 +242,7 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
     retries = 0,
     messengerProgress = 0,
     runnerProgress = 0;
-  const trailhead = { x: route[0].x, y: 0, z: route[0].z + 3.3 };
+  const trailhead = { x: route[0].x, y: 0, z: route[0].z + 3.3, yaw: Math.PI };
   const target = () => summit;
   function updateActors(dt: number) {
     messengers.forEach((rig, i) => {
@@ -274,7 +285,8 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
   return {
     name: "Lehonti on Mount Antipas",
     subtitle: "Race to warn Lehonti · inspired by Alma 47",
-    initialObjective: "Race the first messenger up the winding mountain trail",
+    initialObjective:
+      "Climb the mountain to warn Lehonti before the messenger arrives",
     spawn: trailhead,
     solids,
     actorParent: root,
@@ -305,7 +317,7 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
     adventure(hooks) {
       hooks.setAvatar("warning-runner");
       hooks.toast(
-        "Game invention: you are an unnamed warning runner. The three embassies, Lehonti's refusals, and later tragedy are from Alma 47.",
+        "Climb the mountain to warn Lehonti before Amalickiah’s messenger reaches his camp.",
       );
       return {
         snapshot: () => ({
@@ -357,16 +369,14 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
             if (reached && !pending) {
               pending = true;
               const stories = [
-                "First embassy: Amalickiah sends a secret messenger at night asking Lehonti to come down to the foot of Antipas. You warn Lehonti at his summit camp. Lehonti refuses. Your warning and race are invented.",
-                "Second embassy: the messenger climbs again. You warn Lehonti at his camp, and he again refuses to descend. Your warning and race are invented; the second refusal is in Alma 47:11.",
-                "Third embassy: the messenger asks a third time at the summit. You warn Lehonti once more, but he still does not come down. Your warning is invented; his third refusal is from Alma 47:11.",
+                "Good job! You arrived in time to warn Lehonti not to come down to meet Amalickiah. Lehonti refuses to leave his camp.",
+                "Good job! You arrived in time to warn Lehonti again. Amalickiah has asked a second time, but Lehonti refuses to come down.",
+                "Good job! You arrived in time to warn Lehonti a third time. He still refuses to come down to meet Amalickiah.",
               ];
               hooks.dialog(
                 `Alma 47:${race === 0 ? "10–11" : "11"}`,
                 `Message ${race + 1} · Lehonti refuses`,
-                race === 2
-                  ? "Amalickiah tried to convince Lehonti to come down the mountain. You arrived in time to warn him. He’s not going down this time. Great job."
-                  : stories[race],
+                stories[race],
                 () => {
                   race++;
                   pending = false;
@@ -387,7 +397,7 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
                     messengerProgress = 0;
                     runnerProgress = 0;
                     hooks.toast(
-                      "An imagined quick descent returns the warning runner to the trailhead for the next embassy.",
+                      `Back at the trailhead. Messenger ${race + 1} is faster—climb the mountain to warn Lehonti again.`,
                     );
                   }
                 },
@@ -404,7 +414,7 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
               );
             }
             return {
-              objective: `Race ${race + 1}/3: climb the whole spiral to Lehonti's camp (${Math.max(0, Math.ceil((segmentLength - runnerProgress) * 5))} m)`,
+              objective: `Race ${race + 1}/3: climb the mountain to warn Lehonti (${Math.max(0, Math.ceil((segmentLength - runnerProgress) * 5))} m)`,
               prompt: reached
                 ? "Lehonti hears your warning"
                 : `Messenger race · ${Math.ceil(time)} s`,

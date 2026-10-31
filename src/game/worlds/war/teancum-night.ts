@@ -2,105 +2,152 @@ import * as T from "three";
 import { createPlayer, type PlayerState } from "../../physics/physics";
 import { spyCanSeePlayer } from "../../camera/spy-vision";
 import { warWorld, nearWarPoint } from "../shared/war-world-kit";
+import { sceneryCanvasTent } from "../shared/scenery";
+import { material } from "../../rendering/art";
 import type { Point, WorldData } from "../../runtime/worlds";
 
 /** Alma 51:32–37. Patrol positions and pathfinding are an imagined night route. */
 export const TEANCUM_ROUTE: Point[] = [
-  { x: 0, y: 0, z: -55 },
-  { x: -2, y: 0, z: -47 },
-  { x: -12, y: 0, z: -26 },
-  { x: -12, y: 0, z: 7 },
-  { x: 0, y: 0, z: 27 },
-  { x: 0, y: 0, z: -48 },
+  { x: 0, y: 0, z: -165 },
+  { x: -2, y: 0, z: -144 },
+  { x: -22, y: 0, z: -78 },
+  { x: -22, y: 0, z: 21 },
+  { x: 0, y: 0, z: 96 },
+  { x: 0, y: 0, z: -144 },
 ];
 
 export function buildTeancumNight(scene: T.Scene): WorldData {
-  const land = warWorld(scene, "Teancum's night mission", true);
-  const { root, solids, solid, decor, actor, tree } = land;
-  // Tents have openings to the south. Their sides and poles are physical; the cloth is overhead decoration.
+  const land = warWorld(scene, "Teancum's night mission", true, {
+    width: 110,
+    depth: 370,
+  });
+  const { root, solids, solid, actor, tree } = land;
+  // Pointed canvas shelters are a visual reconstruction, not a historical claim.
   const tent = (x: number, z: number, w: number, d: number, royal = false) => {
-    for (const side of [-1, 1])
-      solid(
-        { x: x + (side * w) / 2, y: 0, z, w: 0.32, h: 2.7, d },
-        royal ? 0x5a6172 : 0x5d6261,
-        "Solid tent side",
-      );
-    solid(
-      { x, y: 0, z: z + d / 2, w, h: 2.7, d: 0.32 },
-      0x5e6470,
-      "Solid tent rear",
-    );
-    decor(
-      { x, y: 2.7, z, w: w + 0.7, h: 0.18, d: d + 0.7 },
-      royal ? 0x837359 : 0x7b806e,
-      "Tent cloth roof",
-      "Raised cloth above the player's head; tent sides and rear own the physical enclosure.",
+    const canvas = material(royal ? 0xb3a078 : 0x909887);
+    canvas.side = T.DoubleSide;
+    sceneryCanvasTent(
+      root,
+      solids,
+      { canvas, wood: material(0x68553d) },
+      {
+        x,
+        y: 0,
+        z,
+        width: w,
+        depth: d,
+        eaveHeight: 2.6,
+        ridgeHeight: royal ? 6.4 : 5.1,
+        doorWidth: royal ? 3.6 : 2.6,
+      },
+      royal ? "Amalickiah's royal canvas tent" : "Sleeping camp canvas tent",
     );
   };
-  tent(0, 32, 8, 9, true);
+  const royalTent = { x: 0, z: 96, width: 9, depth: 12 };
+  tent(royalTent.x, royalTent.z, royalTent.width, royalTent.depth, true);
   for (const [x, z] of [
-    [-18, -2],
-    [17, 4],
-    [-18, 23],
-    [17, 28],
+    [-32, -65],
+    [24, -56],
+    [-32, -24],
+    [24, -12],
+    [-32, 18],
+    [24, 29],
+    [-18, 67],
+    [19, 72],
+    [-18, 101],
+    [19, 107],
   ])
     tent(x, z, 5, 7);
   for (const [x, z] of [
-    [-17, -39],
-    [16, -35],
-    [-18, -18],
-    [18, -8],
-    [-18, 12],
-    [17, 46],
+    [-17, -125],
+    [16, -113],
+    [-30, -96],
+    [26, -82],
+    [-30, -45],
+    [28, -34],
+    [-30, 0],
+    [28, 14],
+    [-29, 43],
+    [28, 55],
+    [-29, 86],
+    [28, 123],
   ])
     tree(x, z);
   for (const [x, z, w, d] of [
-    [-4, -17, 4, 3],
-    [7, -4, 4, 3],
-    [-2, 6, 3, 4],
-    [9, 17, 4, 3],
+    [-8, -106, 7, 3],
+    [6, -84, 5, 3],
+    [-8, -64, 6, 3],
+    [6, -43, 5, 3],
+    [-8, -22, 6, 3],
+    [6, 0, 5, 3],
+    [-8, 22, 6, 3],
+    [6, 43, 5, 3],
+    [-8, 64, 6, 3],
+    [10, 83, 4, 3],
   ])
     solid({ x, y: 0, z, w, d, h: 1.5 }, 0x4e5c59, "Solid night cover");
   const servant = actor("guard", TEANCUM_ROUTE[1], "Teancum's servant");
   const captain = actor(
     "guard",
-    { x: 2, y: 0, z: -48, yaw: 0 },
+    { x: 2, y: 0, z: -144, yaw: 0 },
     "Nephite guard captain",
   );
   const king = actor(
     "amalickiah",
-    { x: 0, y: 0, z: 32, yaw: Math.PI },
+    { x: 0, y: 0, z: 98, yaw: 0 },
     "Sleeping Amalickiah",
+  );
+  // Rotate the whole resting model once, then fit its lowest visible surface to the bed.
+  king.group.rotation.x = -Math.PI / 2;
+  root.updateMatrixWorld(true);
+  const restingBounds = new T.Box3().setFromObject(king.group);
+  king.group.position.y += 0.2 - restingBounds.min.y;
+  const bedSize = restingBounds.getSize(new T.Vector3());
+  const bedCenter = restingBounds.getCenter(new T.Vector3());
+  solid(
+    {
+      x: bedCenter.x,
+      y: 0,
+      z: bedCenter.z,
+      w: bedSize.x + 0.3,
+      h: 0.2,
+      d: bedSize.z + 0.3,
+    },
+    0x746650,
+    "King's sleeping mat",
   );
   const sentries = [
     {
       x: 1,
-      z: -15,
+      z: -95,
       base: 0,
       phase: 0,
-      rig: actor("spy", { x: 1, y: 0, z: -15 }, "Outer sentry"),
+      rig: actor("spy", { x: 1, y: 0, z: -95 }, "Outer sentry"),
     },
     {
       x: 7,
-      z: 12,
+      z: 75,
       base: Math.PI * 0.7,
       phase: 2.1,
-      rig: actor("spy", { x: 7, y: 0, z: 12 }, "Camp edge sentry"),
+      rig: actor("spy", { x: 7, y: 0, z: 75 }, "Camp edge sentry"),
     },
+    ...[-59, -23, 15, 51].map((z, i) => ({
+      x: i % 2 ? 3 : -1,
+      z,
+      base: i % 2 ? Math.PI * 0.65 : Math.PI * 0.3,
+      phase: i * 1.7,
+      rig: actor(
+        "spy",
+        { x: i % 2 ? 3 : -1, y: 0, z },
+        `Watch line ${i + 2} sentry`,
+      ),
+    })),
   ];
-  const sleepers = [
-    actor("guard", { x: -5, y: 0, z: 26 }, "Sleeping camp guard one"),
-    actor("guard", { x: 6, y: 0, z: 27 }, "Sleeping camp guard two"),
-  ];
-  sleepers.forEach((r) => {
-    r.group.rotation.z = -0.9;
-    r.group.position.y = 0.35;
-  });
   const objectives = [
     "Meet your servant before leaving camp",
-    "Cross the outer watch behind stone and trees",
-    "Find a quiet route past the last sentry",
-    "Enter Amalickiah's sleeping tent",
+    "Cross the outer watch · use stone cover or the western grove",
+    "Pass the camp watch lines · the royal tent is to the north",
+    "Enter the royal tent and approach sleeping Amalickiah",
     "Return to your camp and alert the guards",
     "Your army stands ready",
   ];
@@ -125,7 +172,7 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
     spawn: { ...TEANCUM_ROUTE[0], yaw: 0 },
     solids,
     actorParent: root,
-    bounds: { minX: -25, maxX: 25, minZ: -62, maxZ: 53 },
+    bounds: { minX: -42, maxX: 42, minZ: -180, maxZ: 150 },
     goal: { ...TEANCUM_ROUTE[4], radius: 3 },
     initialObjective: objectives[0],
     landmarks: [
@@ -212,7 +259,8 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
                   playerPosition: player,
                   playerHeight: player.crouching ? 0.9 : 1.65,
                   solids,
-                  maxDistance: 18,
+                  maxDistance: 20,
+                  halfAngleRadians: Math.PI / 12,
                 })
               ) {
                 hooks.caught?.(() => reset(player));
@@ -221,16 +269,31 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
               }
             }
           }
+          // Watch lines are navigation, never invisible interaction gates. Taking a
+          // different path must still unlock the bedside action inside the tent.
+          if (!pending && stage >= 1 && stage <= 2) {
+            if (player.z >= 80) stage = 3;
+            else if (player.z >= -78) stage = 2;
+          }
           const target = TEANCUM_ROUTE[Math.min(stage + 1, 5)];
-          const close = nearWarPoint(player, target, stage === 3 ? 3.5 : 3);
-          if (!pending && !finished && close && input.interact) {
+          const close =
+            stage === 3
+              ? nearWarPoint(
+                  player,
+                  { x: king.group.position.x, y: 0, z: king.group.position.z },
+                  4.5,
+                ) &&
+                Math.abs(player.x - royalTent.x) < royalTent.width / 2 - 0.4 &&
+                Math.abs(player.z - royalTent.z) < royalTent.depth / 2 - 0.4
+              : nearWarPoint(player, target, 3);
+          const actionable = stage === 0 || stage === 3 || stage === 4;
+          if (!pending && !finished && actionable && close && input.interact) {
             pending = true;
             const next = () => {
               pending = false;
               stage++;
               if (stage === 4) {
                 king.group.visible = false;
-                sleepers.forEach((r) => (r.group.visible = false));
               }
               if (stage === 5) {
                 finished = true;
@@ -281,8 +344,8 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
           return {
             objective: objectives[stage],
             prompt:
-              close && !pending && !finished
-                ? `{action} · ${objectives[stage]}`
+              actionable && close && !pending && !finished
+                ? `{action} · ${stage === 3 ? "Use javelin · Amalickiah" : objectives[stage]}`
                 : "",
           };
         },

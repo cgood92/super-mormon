@@ -68,6 +68,128 @@ export function sceneryBox(
   markScenery(mesh, { kind: "solid", solids: [shape] });
   return mesh;
 }
+/** The exposed union of level-bottomed terraces, with one render owner per face.
+ * Collision retains the same input dimensions; hidden overlapping walls never render.
+ */
+export function sceneryTerraceUnion(
+  parent: T.Group,
+  solids: Solid[],
+  terraces: (Solid & { color: number })[],
+  name: string,
+): T.Mesh {
+  const xs = [
+    ...new Set(terraces.flatMap((s) => [s.x - s.w / 2, s.x + s.w / 2])),
+  ].sort((a, b) => a - b);
+  const zs = [
+    ...new Set(terraces.flatMap((s) => [s.z - s.d / 2, s.z + s.d / 2])),
+  ].sort((a, b) => a - b);
+  const base = Math.min(...terraces.map((s) => s.y));
+  const owners = xs.slice(1).map((x1, i) =>
+    zs.slice(1).map((z1, j) => {
+      const x = (xs[i] + x1) / 2,
+        z = (zs[j] + z1) / 2;
+      return terraces
+        .filter(
+          (s) =>
+            x > s.x - s.w / 2 &&
+            x < s.x + s.w / 2 &&
+            z > s.z - s.d / 2 &&
+            z < s.z + s.d / 2,
+        )
+        .sort((a, b) => b.y + b.h - a.y - a.h)[0];
+    }),
+  );
+  const vertices: number[] = [],
+    colors: number[] = [];
+  const face = (points: number[][], color: number) => {
+    const tint = new T.Color(color);
+    for (const index of [0, 1, 2, 0, 2, 3]) {
+      vertices.push(...points[index]);
+      colors.push(tint.r, tint.g, tint.b);
+    }
+  };
+  const top = (i: number, j: number) => {
+    const s = owners[i]?.[j];
+    return s ? s.y + s.h : base;
+  };
+  for (let i = 0; i < xs.length - 1; i++)
+    for (let j = 0; j < zs.length - 1; j++) {
+      const owner = owners[i][j];
+      if (!owner) continue;
+      const x0 = xs[i],
+        x1 = xs[i + 1],
+        z0 = zs[j],
+        z1 = zs[j + 1],
+        y = top(i, j);
+      face(
+        [
+          [x0, y, z0],
+          [x0, y, z1],
+          [x1, y, z1],
+          [x1, y, z0],
+        ],
+        owner.color,
+      );
+      let low = top(i - 1, j);
+      if (low < y)
+        face(
+          [
+            [x0, low, z0],
+            [x0, low, z1],
+            [x0, y, z1],
+            [x0, y, z0],
+          ],
+          owner.color,
+        );
+      low = top(i + 1, j);
+      if (low < y)
+        face(
+          [
+            [x1, low, z1],
+            [x1, low, z0],
+            [x1, y, z0],
+            [x1, y, z1],
+          ],
+          owner.color,
+        );
+      low = top(i, j - 1);
+      if (low < y)
+        face(
+          [
+            [x1, low, z0],
+            [x0, low, z0],
+            [x0, y, z0],
+            [x1, y, z0],
+          ],
+          owner.color,
+        );
+      low = top(i, j + 1);
+      if (low < y)
+        face(
+          [
+            [x0, low, z1],
+            [x1, low, z1],
+            [x1, y, z1],
+            [x0, y, z1],
+          ],
+          owner.color,
+        );
+    }
+  const geometry = new T.BufferGeometry();
+  geometry.setAttribute("position", new T.Float32BufferAttribute(vertices, 3));
+  geometry.setAttribute("color", new T.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+  const mesh = new T.Mesh(
+    geometry,
+    new T.MeshStandardMaterial({ vertexColors: true, roughness: 1 }),
+  );
+  mesh.name = name;
+  mesh.receiveShadow = true;
+  parent.add(mesh);
+  solids.push(...terraces);
+  markScenery(mesh, { kind: "solid", solids: terraces });
+  return mesh;
+}
 /** A round column with one shared diameter/height source and fitted body collision. */
 export function sceneryColumn(
   parent: T.Group,
