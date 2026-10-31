@@ -261,3 +261,90 @@ test("broken bow: summit practice, automatic crafting, ordered counsel and retur
   runtime.dispose();
   world.dispose?.();
 });
+
+test("broken bow: wandering and startled animals keep their whole body on summit support", () => {
+  const world = buildBrokenBow(new T.Scene());
+  const player = createPlayer(0, 8, 46);
+  const runtime = world.adventure!({
+    setAvatar: () => {},
+    toast: () => {},
+    complete: () => {},
+    dialog: (_ref, _title, _body, next) => next(),
+  });
+  const state = () =>
+    runtime.snapshot() as {
+      phase: string;
+      target: { x: number; y: number; z: number };
+      animals: { position: T.Vector3; taken: boolean }[];
+    };
+  function checkSupport() {
+    for (const animal of state().animals) {
+      if (animal.taken) continue;
+      for (const dx of [-0.7, 0, 0.7])
+        for (const dz of [-0.7, 0, 0.7]) {
+          const { x, y, z } = animal.position;
+          assert.ok(
+            world.solids.some(
+              (solid) =>
+                Math.abs(solid.y + solid.h - (y - 0.9)) < 0.001 &&
+                Math.abs(x + dx - solid.x) <= solid.w / 2 + 1e-9 &&
+                Math.abs(z + dz - solid.z) <= solid.d / 2 + 1e-9,
+            ),
+            `Animal at ${x},${y},${z} has unsupported footprint ${dx},${dz}`,
+          );
+        }
+    }
+  }
+  try {
+    const ranges = state().animals.map(() => ({
+      minX: Infinity,
+      maxX: -Infinity,
+      minZ: Infinity,
+      maxZ: -Infinity,
+    }));
+    for (let i = 0; i < 3600; i++) {
+      runtime.update(0.1, player, idle);
+      checkSupport();
+      state().animals.forEach((animal, index) => {
+        const range = ranges[index];
+        range.minX = Math.min(range.minX, animal.position.x);
+        range.maxX = Math.max(range.maxX, animal.position.x);
+        range.minZ = Math.min(range.minZ, animal.position.z);
+        range.maxZ = Math.max(range.maxZ, animal.position.z);
+      });
+    }
+    for (const range of ranges) {
+      assert.ok(
+        range.maxX - range.minX > 1,
+        "each animal wanders across its ledge",
+      );
+      assert.ok(
+        range.maxZ - range.minZ > 1,
+        "animals do not stick to the back edge",
+      );
+    }
+    for (let shot = 0; shot < 3; shot++) {
+      runtime.update(1, player, { ...idle, interactHeld: true });
+      runtime.update(1 / 60, player, idle);
+    }
+    runtime.update(0.85, player, idle);
+    for (const phase of ["wood", "arrow", "counsel", "guide"]) {
+      assert.equal(state().phase, phase);
+      Object.assign(player, state().target);
+      runtime.update(1 / 60, player, { ...idle, interact: true });
+    }
+    assert.equal(state().phase, "hunt");
+    for (let i = 0; i < 3600; i++) {
+      const animal = state().animals[Math.floor(i / 30) % 3];
+      Object.assign(
+        player,
+        i % 120 < 90 ? animal.position : { x: 0, y: 0, z: -22 },
+      );
+      runtime.update(0.1, player, idle);
+      checkSupport();
+    }
+  } finally {
+    runtime.dispose();
+    world.dispose?.();
+  }
+});

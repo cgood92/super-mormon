@@ -90,18 +90,13 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
     );
   // Three touching ledges share no area. Staggered fronts and backs break the
   // tabletop outline while preserving the central practice/hunting route.
-  for (const ledge of [
+  const huntingLedges = [
     { x: -8.25, z: 48.5, w: 6.5, d: 7 },
     { x: 0, z: 48, w: 10, d: 8 },
     { x: 8.25, z: 48.3, w: 6.5, d: 8 },
-  ])
-    sceneryBox(
-      root,
-      solids,
-      stone,
-      { ...ledge, y: 0, h: 8 },
-      "Practice and hunting summit ledge",
-    );
+  ].map((ledge) => ({ ...ledge, y: 0, h: 8 }));
+  for (const ledge of huntingLedges)
+    sceneryBox(root, solids, stone, ledge, "Practice and hunting summit ledge");
   // A fitted, lower rock apron masks the tall front face while keeping the
   // broad hunting surface owned by the summit itself. Its top is 0.9m lower,
   // so the overlap cannot introduce a coplanar walk surface.
@@ -276,10 +271,13 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
   const animals = Array.from({ length: 3 }, (_, i) => {
     const model = createHuntingAnimal(i === 1 ? "gazelle" : "ibex");
     root.add(model.group);
+    const ledge = huntingLedges[i];
+    model.group.position.set(ledge.x, ledge.y + ledge.h, ledge.z);
     return {
       id: `animal-${i}`,
       model,
-      position: new T.Vector3(-10 + i * 10, 8.9, 49 + i * 2),
+      position: new T.Vector3(ledge.x, ledge.y + ledge.h + 0.9, ledge.z),
+      ledge,
       previous: new T.Vector3(),
       radius: 0.72,
       taken: false,
@@ -561,16 +559,30 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
                 -dt * 2.5,
                 dt * 2.5,
               );
+              // Use the same ledge dimensions as rendering and collision. Both
+              // wandering and alert escape offsets must keep the whole animal
+              // on its support, including the turning head and animated feet.
+              const margin = 1.15;
+              const ground = a.ledge.y + a.ledge.h;
               a.position.set(
                 T.MathUtils.clamp(
-                  -11 + i * 10 + Math.sin(time * 0.23 + i) * 2.8 + a.escape,
-                  -14,
-                  14,
+                  a.ledge.x +
+                    Math.sin(time * 0.23 + i) *
+                      Math.min(2.8, a.ledge.w / 2 - margin) +
+                    a.escape,
+                  a.ledge.x - a.ledge.w / 2 + margin,
+                  a.ledge.x + a.ledge.w / 2 - margin,
                 ),
-                8.9,
-                49 + i * 2 + Math.cos(time * 0.19 + i) * 1.3,
+                ground + 0.9,
+                T.MathUtils.clamp(
+                  a.ledge.z +
+                    Math.cos(time * 0.19 + i) *
+                      Math.min(1.3, a.ledge.d / 2 - margin),
+                  a.ledge.z - a.ledge.d / 2 + margin,
+                  a.ledge.z + a.ledge.d / 2 - margin,
+                ),
               );
-              a.model.group.position.set(a.position.x, 8, a.position.z);
+              a.model.group.position.set(a.position.x, ground, a.position.z);
               a.model.group.rotation.y =
                 Math.cos(time * 0.23 + i) > 0 ? Math.PI / 2 : -Math.PI / 2;
               a.model.animate(time, a.alert > 0 ? 2.8 : 0.65);
