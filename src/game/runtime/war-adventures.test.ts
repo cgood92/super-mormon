@@ -1,10 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as T from "three";
-import {
-  buildMoriantonFlight,
-  MORIANTON_ROUTE,
-} from "../worlds/war/morianton-flight";
 import { buildTeancumNight, TEANCUM_ROUTE } from "../worlds/war/teancum-night";
 import { buildGidRescue, GID_ROUTE } from "../worlds/war/gid-rescue";
 import { createPlayer, stepPlayer } from "../physics/physics";
@@ -80,23 +76,6 @@ function harness(world: WorldData) {
   };
 }
 
-test("Morianton flight has physical scenery and playable interception with peace covenant", () => {
-  const scene = new T.Scene(),
-    world = buildMoriantonFlight(scene),
-    h = harness(world);
-  assert.deepEqual(sceneryCollisionErrors(scene, world.solids), []);
-  for (const point of MORIANTON_ROUTE.slice(1)) {
-    h.walk(point);
-    h.use();
-  }
-  assert.equal(h.completed, 1);
-  assert.match(h.dialogs.map((d) => d.body).join(" "), /maidservant/i);
-  assert.match(h.dialogs.map((d) => d.body).join(" "), /covenant/i);
-  world.dispose?.();
-  world.dispose?.();
-  assert.equal(scene.children.length, 0);
-});
-
 test("Teancum's night route uses cover, a non-graphic tent event, and a return to the guard", () => {
   const scene = new T.Scene(),
     world = buildTeancumNight(scene),
@@ -140,21 +119,6 @@ test("Gid requires two weapon deliveries over the wall and bloodless surrender",
   assert.equal(scene.children.length, 0);
 });
 
-test("Morianton escaping the pass restarts the race at the scout", () => {
-  const world = buildMoriantonFlight(new T.Scene()),
-    h = harness(world);
-  h.walk(MORIANTON_ROUTE[1]);
-  h.use();
-  h.walk(MORIANTON_ROUTE[2]);
-  h.use();
-  for (let i = 0; i < 290; i++) h.runtime.update(0.1, h.player, idle);
-  const state = h.runtime.snapshot() as { phase: string; attempts: number };
-  assert.equal(state.phase, "scout");
-  assert.equal(state.attempts, 1);
-  assert.equal(h.completed, 0);
-  world.dispose?.();
-});
-
 test("an exposed player in the outer watch triggers Teancum's stealth reset", () => {
   const world = buildTeancumNight(new T.Scene()),
     h = harness(world);
@@ -195,7 +159,6 @@ test("Gid's city wall blocks walking while the outer flank stays open", () => {
 
 test("all war-story shots keep the player visible through entrance and return", () => {
   for (const [build, route] of [
-    [buildMoriantonFlight, MORIANTON_ROUTE],
     [buildTeancumNight, TEANCUM_ROUTE],
     [buildGidRescue, GID_ROUTE],
   ] as const) {

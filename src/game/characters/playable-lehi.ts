@@ -152,6 +152,7 @@ export function createSculptedCharacterRig(
     "right-brow",
     "lehi-headband",
     "character-headwear",
+    "teancum-face-wrap",
     "moroni-headband",
     "character-ear-left",
     "character-ear-right",
@@ -173,6 +174,8 @@ export function createSculptedCharacterRig(
     const label = side === 0 ? "left" : "right";
     attach(`moroni-${label}-pauldron`, armPivots[side]);
     attach(`moroni-${label}-bracer`, armPivots[side]);
+    attach(`patrol-${label}-bracer`, armPivots[side]);
+    attach(`teancum-${label}-bracer`, armPivots[side]);
     attach(`moroni-${label}-greave`, kneePivots[side]);
     attach(`moroni-${label}-greave-trim`, kneePivots[side]);
     attach(`moroni-${label}-hip-lame`, legPivots[side]);
