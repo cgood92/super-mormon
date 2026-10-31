@@ -1,0 +1,26 @@
+# Movement and camera feel
+
+The game uses the movement and camera behavior approved in the October 31 playtests. Ground acceleration/braking/reversal/cornering are 22/38/52/45, with a maximum ground speed of 6.5. Ordinary facing turns toward input while momentum finishes braking. Character lean follows world travel rather than the actor's heading, reaching about 17° at full speed, and relaxes smoothly at rest. Special poses retain their own movement and animation rules.
+
+The follow camera preserves its previous horizontal eye as the movement reference, producing an arc on sustained sideways input and trailing behind forward movement. It uses a lower view, a modest speed-dependent pullback and look-ahead. Manual orbit, stepped camera buttons, zoom and recenter remain available. Authored scenes own the camera while active; follow resumes using the visible eye and eases back to distance. Obstructions are checked both along the sightline and over the eye's movement; an embedded or occluded starting view recovers to a clear view.
+
+Analog movement strength is squared after the input deadzone while retaining direction. Keyboard input stays full strength. The shared controls support keyboard, gamepad, calibrated N64 profiles and touch.
+
+The throwaway playgrounds were removed after promotion so the game has one physics solver, character motion driver and follow camera. Their original source and research measurements remain in commit 392be6c. The existing developer character visual QA page remains available for rendered costume checks.
+
+## Research (2026-10-31)
+
+The user's reference is [Super Mario 64, this browser port](https://notan127.github.io/SM64-PC-Port-WebGL/). The port's [repository](https://github.com/notan127/SM64-PC-Port-WebGL) publishes the playable bundle. For readable implementation evidence, consult the independently reconstructed [n64decomp/sm64 code](https://github.com/n64decomp/sm64), rather than assuming the bundle matches a particular upstream revision.
+
+- [`mario.c`, `update_mario_joystick_inputs`](https://github.com/n64decomp/sm64/blob/master/src/game/mario.c): intended direction includes camera yaw; stick magnitude is squared before becoming intended movement magnitude.
+- [`mario_actions_moving.c`, `update_walking_speed`, turning/braking actions](https://github.com/n64decomp/sm64/blob/master/src/game/mario_actions_moving.c): speed approaches a target, facing changes at a bounded rate, and sharp reversals/braking use distinct action states. The prototype retains our chosen controller, not these exact constants or actions.
+- [`camera.c`, `update_default_camera`, `pan_ahead_of_player`](https://github.com/n64decomp/sm64/blob/master/src/game/camera.c): default camera position is updated using the previous camera-to-player geometry. Focus/panning and movement-reference yaw are separate concerns. Camera modes, floor height and obstruction handling change the result across areas; a single constant automatic-behind rule does not describe all of SM64.
+- [Nintendo's Super Mario 64 manual](https://www.nintendo.com/eu/media/downloads/games_8/emanuals/nintendo_8/Manual_Nintendo64_SuperMario64_EN.pdf): analog movement and C-button control of the camera are player-facing features.
+
+## Scope
+
+This is an independently tuned approximation of the feel, not a Nintendo code or asset port. Story chronology, progress and scene contents are unchanged. Normal gallery/story entry, collision, special moves, authored camera transitions, clothing and hidden-page behavior must be verified when changing these systems.
+
+## Verification
+
+The production integration passed all 665 tests, the production build, changed-file formatting and independent review. Browser checks covered gallery walking and painting entry, Jerusalem story entry, house walls/corners on a phone, and the mountain's jump route. Static rendered QA covers full-speed hero/NPC Lehi turns and reversals alongside Nephi crawl/stand seams. Hidden-page verification showed unchanged rendered-frame and simulation-time counters. Repeated banked-turn tests prevent detached shoes, and high-speed costume checks retain covered cuffs while preserving the open coat front.

@@ -666,3 +666,78 @@ test("NPC crawl gaze remains a world direction while the body turns", async () =
     actor.dispose();
   }
 });
+
+test("stopped sole contacts release after a position reset or a turn in place", () => {
+  const actor = createPlayableLehi();
+  for (let frame = 0; frame < 30; frame++) actor.update(1 / 60, standing);
+  for (const state of [
+    { ...standing, x: 12, z: -8 },
+    { ...standing, x: 12, z: -8, yaw: Math.PI },
+  ]) {
+    const fresh = createPlayableLehi();
+    for (let frame = 0; frame < 120; frame++) {
+      actor.update(1 / 60, state);
+      fresh.update(1 / 60, state);
+    }
+    actor.group.updateMatrixWorld(true);
+    fresh.group.updateMatrixWorld(true);
+    for (const name of ["left-sandal", "right-sandal"]) {
+      const actual = actor.group
+        .getObjectByName(name)!
+        .getWorldPosition(new T.Vector3());
+      const expected = fresh.group
+        .getObjectByName(name)!
+        .getWorldPosition(new T.Vector3());
+      assert.ok(
+        actual.distanceTo(expected) < 0.05,
+        `${name} stayed pinned after reset/turn: ${actual.distanceTo(expected)}`,
+      );
+    }
+    fresh.dispose();
+  }
+  actor.dispose();
+});
+
+test("hero and NPC Lehi shoes remain attached through repeated banked turns and settling", async () => {
+  const { createSculptedCharacterRig } = await import("./playable-lehi.ts");
+  for (const quality of ["hero", "npc"] as const) {
+    const actor = createSculptedCharacterRig("lehi", { quality });
+    const feet = ["left-foot", "right-foot"].map((name) =>
+      actor.group.getObjectByName(name)!,
+    );
+    let x = 0;
+    let z = 0;
+    let maximumOffset = 0;
+    for (let frame = 0; frame < 720; frame++) {
+      const yaw = (frame / 60) * 2;
+      const vx = Math.sin(yaw - 0.5) * 6.5;
+      const vz = Math.cos(yaw - 0.5) * 6.5;
+      x += vx / 60;
+      z += vz / 60;
+      actor.update(1 / 60, {
+        ...standing,
+        x,
+        z,
+        vx,
+        vz,
+        yaw,
+        runSpeed: 6.5,
+        move: "run",
+      });
+      for (const foot of feet)
+        maximumOffset = Math.max(maximumOffset, Math.abs(foot.position.x));
+    }
+    assert.ok(
+      maximumOffset < 0.18,
+      `${quality} shoe detached while turning: ${maximumOffset}`,
+    );
+    for (let frame = 0; frame < 120; frame++)
+      actor.update(1 / 60, { ...standing, x, z, yaw: (719 / 60) * 2 });
+    for (const foot of feet)
+      assert.ok(
+        Math.abs(foot.position.x) < 0.03,
+        `${quality} shoe stayed detached after settling: ${foot.position.x}`,
+      );
+    actor.dispose();
+  }
+});

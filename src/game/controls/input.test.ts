@@ -172,7 +172,11 @@ test("gamepad analog axes, button edges and camera stick are exposed", () => {
   try {
     const input = new Input(target);
     const first = input.latest();
-    assert.ok(first.x > 0.4 && first.y > 0.7);
+    const x = (0.5 - 0.14) / 0.86,
+      y = (0.8 - 0.14) / 0.86;
+    const strength = Math.hypot(x, y);
+    assert.ok(Math.abs(first.x - x * strength) < 1e-8);
+    assert.ok(Math.abs(first.y - y * strength) < 1e-8);
     assert.ok(first.cameraX > 0.008 && first.cameraY > 0.005);
     assert.equal(first.jump, true);
     assert.equal(input.latest().jump, false);

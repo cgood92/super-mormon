@@ -23,13 +23,13 @@ const MODES: Record<
   CameraMode,
   { distance: number; elevation: number; targetHeight: number }
 > = {
-  hub: { distance: 7.4, elevation: 0.53, targetHeight: 1.1 },
+  hub: { distance: 7.2, elevation: 0.2, targetHeight: 1 },
   conference: { distance: 9.5, elevation: 0.22, targetHeight: 2 },
-  streets: { distance: 7, elevation: 0.53, targetHeight: 1.1 },
-  house: { distance: 6.2, elevation: 0.52, targetHeight: 1.1 },
-  palace: { distance: 7, elevation: 0.52, targetHeight: 1.1 },
-  trade: { distance: 7, elevation: 0.53, targetHeight: 1.1 },
-  night: { distance: 7, elevation: 0.52, targetHeight: 1.1 },
+  streets: { distance: 7.2, elevation: 0.2, targetHeight: 1 },
+  house: { distance: 6.2, elevation: 0.2, targetHeight: 1 },
+  palace: { distance: 7, elevation: 0.2, targetHeight: 1 },
+  trade: { distance: 7.2, elevation: 0.2, targetHeight: 1 },
+  night: { distance: 7, elevation: 0.2, targetHeight: 1 },
 };
 
 const ZOOM_DISTANCES = [0.6, 1, 1.4] as const;
@@ -130,23 +130,23 @@ export function resolveCameraPosition(
 }
 
 export class FollowCamera {
-  /** Camera-relative movement yaw: 0 points toward world +Z. */
+  /** Movement frame before the small look-ahead pan, measured toward the player. */
   yaw = 0;
   pitch = MODES.hub.elevation;
   private target = new T.Vector3();
-  private manualCooldown = 0;
-  private stableHeadingTime = 0;
-  private previousHeading = 0;
+  private lead = new T.Vector3();
+  private lastEye = new T.Vector3();
   private smoothDistance = MODES.hub.distance;
+  private speedPullback = 0;
   private orbitTarget: number | null = null;
-  /** Fraction of the requested camera distance blocked by nearby geometry. */
+  private recenterTime = 0;
+  private restoreTime = 0;
   obstructionAmount = 0;
   get obstructed(): boolean {
     return this.obstructionAmount > 0.001;
   }
   private zoomLevel = 1;
   private initialized = false;
-  private recentering = false;
 
   constructor(readonly camera: T.PerspectiveCamera) {}
 
@@ -158,11 +158,8 @@ export class FollowCamera {
     const preset = MODES[mode];
     this.yaw = yawOverride;
     this.pitch = preset.elevation;
-    this.manualCooldown = 0;
-    this.stableHeadingTime = 0;
-    this.previousHeading = player.yaw;
-    this.recentering = false;
     this.orbitTarget = null;
+    this.recenterTime = this.restoreTime = this.speedPullback = 0;
     this.obstructionAmount = 0;
     this.zoomLevel = 1;
     this.smoothDistance = preset.distance;
@@ -171,8 +168,10 @@ export class FollowCamera {
       player.y + (player.crouching ? 0.58 : preset.targetHeight),
       player.z,
     );
+    this.lead.set(0, 0, 0);
     this.camera.position.copy(this.desired(this.target, preset.distance));
     this.camera.lookAt(this.target);
+    this.lastEye.copy(this.camera.position);
     this.initialized = true;
   }
 
@@ -186,6 +185,31 @@ export class FollowCamera {
     if (!this.initialized) this.reset(player, player.yaw, mode);
     dt = clamp(dt, 0, 0.1);
     const preset = MODES[mode];
+    const previous = this.camera.position.clone();
+    const externallyMoved = previous.distanceToSquared(this.lastEye) > 0.0025;
+    this.target.x = player.x;
+    this.target.z = player.z;
+    const wantedHeight =
+      player.y + (player.crouching ? 0.58 : preset.targetHeight);
+    this.target.y +=
+      (wantedHeight - this.target.y) *
+      ease(player.grounded === false ? 3 : 9, dt);
+    // Keeping the prior eye as the geometric pivot is what makes held sideways
+    // input trace an arc, while forward input pulls the camera behind the player.
+    const dx = this.target.x - previous.x,
+      dz = this.target.z - previous.z;
+    if (Math.hypot(dx, dz) > 0.1) this.yaw = Math.atan2(dx, dz);
+    if (externallyMoved) {
+      this.smoothDistance = previous.distanceTo(this.target);
+      this.pitch = clamp(
+        Math.atan2(previous.y - this.target.y, Math.hypot(dx, dz)),
+        0.08,
+        1.12,
+      );
+      this.restoreTime = 1;
+      this.orbitTarget = null;
+      this.lead.set(0, 0, 0);
+    }
     if (orbit.zoom)
       this.zoomLevel = clamp(this.zoomLevel + Math.sign(orbit.zoom), 0, 2);
     if (Math.abs(orbit.orbitX) + Math.abs(orbit.orbitY) > 0.0001) {
@@ -195,12 +219,8 @@ export class FollowCamera {
         this.orbitTarget = null;
         this.yaw += orbit.orbitX;
       }
-      this.pitch = clamp(this.pitch + orbit.orbitY, 0.13, 1.12);
-      this.manualCooldown = 2.5;
-      this.stableHeadingTime = 0;
-      this.recentering = false;
-    } else {
-      this.manualCooldown = Math.max(0, this.manualCooldown - dt);
+      this.pitch = clamp(this.pitch + orbit.orbitY, 0.08, 1.12);
+      this.recenterTime = this.restoreTime = 0;
     }
     if (this.orbitTarget !== null) {
       this.yaw += angleDiff(this.orbitTarget, this.yaw) * ease(16, dt);
@@ -209,80 +229,122 @@ export class FollowCamera {
         this.orbitTarget = null;
       }
     }
-    const headingChange = Math.abs(angleDiff(player.yaw, this.previousHeading));
-    this.previousHeading = player.yaw;
-    this.stableHeadingTime =
-      (player.runSpeed ?? 0) > 2.4 && headingChange < 0.045
-        ? Math.min(2, this.stableHeadingTime + dt)
-        : 0;
     if (orbit.recenter) {
       this.orbitTarget = null;
-      this.manualCooldown = 0;
-      this.stableHeadingTime = 2;
-      this.recentering = true;
+      this.recenterTime = 0.8;
     }
-    // Locomotion is camera-relative. Following a sustained sideward input would
-    // feed the camera's turn back into player heading and make both spiral.
-    const nearlyForward = Math.abs(angleDiff(player.yaw, this.yaw)) < 0.25;
-    if (
-      this.recentering ||
-      (this.manualCooldown <= 0 &&
-        this.stableHeadingTime > 0.9 &&
-        nearlyForward)
-    ) {
-      this.yaw +=
-        angleDiff(player.yaw, this.yaw) *
-        ease(this.recentering ? 5.5 : 0.5, dt);
-      this.pitch += (preset.elevation - this.pitch) * ease(1.3, dt);
-      if (Math.abs(angleDiff(player.yaw, this.yaw)) < 0.015)
-        this.recentering = false;
+    if (this.recenterTime > 0) {
+      this.yaw += angleDiff(player.yaw, this.yaw) * ease(7, dt);
+      this.pitch += (preset.elevation - this.pitch) * ease(5, dt);
+      this.recenterTime = Math.max(0, this.recenterTime - dt);
     }
-    const wantedTarget = new T.Vector3(
-      player.x,
-      player.y + (player.crouching ? 0.58 : preset.targetHeight),
-      player.z,
-    );
-    this.target.lerp(wantedTarget, ease(10, dt));
-    const desired = this.desired(
-      this.target,
-      preset.distance * ZOOM_DISTANCES[this.zoomLevel],
-    );
-    const safe = resolveCameraPosition(this.target, desired, solids);
+    if (this.restoreTime > 0) {
+      this.pitch += (preset.elevation - this.pitch) * ease(4, dt);
+      this.restoreTime = Math.max(0, this.restoreTime - dt);
+    }
+    this.speedPullback +=
+      (Math.min(1, (player.runSpeed ?? 0) / 6.5) * 0.7 - this.speedPullback) *
+      ease(2, dt);
+    const requestedDistance =
+      (preset.distance + this.speedPullback) * ZOOM_DISTANCES[this.zoomLevel];
+    const requested = this.desired(this.target, requestedDistance);
+    const safe = resolveCameraPosition(this.target, requested, solids, 0.22);
     const safeDistance = safe.distanceTo(this.target);
-    const requestedDistance = preset.distance * ZOOM_DISTANCES[this.zoomLevel];
-    const blockedDistance = requestedDistance - safeDistance;
-    this.obstructionAmount =
-      blockedDistance > 0.001
-        ? clamp(blockedDistance / requestedDistance, 0, 1)
-        : 0;
-    // Wall avoidance must clamp immediately; user zoom eases in either direction.
+    this.obstructionAmount = clamp(
+      (requestedDistance - safeDistance) / requestedDistance,
+      0,
+      1,
+    );
     this.smoothDistance =
-      this.obstructed && safeDistance < this.smoothDistance
+      safeDistance < this.smoothDistance && this.obstructed
         ? safeDistance
         : this.smoothDistance +
           (safeDistance - this.smoothDistance) * ease(11, dt);
-    // The eased distance can still extend beyond a nearby wall when zooming in
-    // while orbiting. Cast the actual final position before placing the camera.
-    const easedPosition = this.desired(this.target, this.smoothDistance);
-    const finalSafe = resolveCameraPosition(this.target, easedPosition, solids);
-    const finalDistance = finalSafe.distanceTo(this.target);
-    if (this.smoothDistance - finalDistance > 0.001) {
-      this.obstructionAmount = Math.max(
-        this.obstructionAmount,
-        (this.smoothDistance - finalDistance) / this.smoothDistance,
-      );
-      this.smoothDistance = finalDistance;
+    const candidate = resolveCameraPosition(
+      this.target,
+      this.desired(this.target, this.smoothDistance),
+      solids,
+      0.22,
+    );
+    const pointClear = (eye: T.Vector3) =>
+      cameraSegmentClear(eye, eye, solids, 0.2);
+    const visible = (eye: T.Vector3) =>
+      pointClear(eye) && cameraSegmentClear(this.target, eye, solids, 0.18);
+    let final = candidate;
+    const recovering = !visible(previous);
+    if (
+      !visible(candidate) ||
+      (!recovering && !cameraSegmentClear(previous, candidate, solids, 0.2))
+    ) {
+      // Search reachable clear views before retaining the old eye. A camera that
+      // starts embedded (or has a prop move into it) recovers directly to safety.
+      let replacement: T.Vector3 | undefined;
+      for (const lift of [0, 1, 2, 4, 8]) {
+        for (const turn of [0, 0.25, -0.25, 0.5, -0.5, 1, -1, Math.PI]) {
+          const trial = this.desired(
+            this.target,
+            this.smoothDistance,
+            this.yaw + turn,
+          );
+          trial.y += lift;
+          const clipped = resolveCameraPosition(
+            this.target,
+            trial,
+            solids,
+            0.22,
+          );
+          if (
+            visible(clipped) &&
+            (recovering || cameraSegmentClear(previous, clipped, solids, 0.2))
+          ) {
+            replacement = clipped;
+            break;
+          }
+        }
+        if (replacement) break;
+      }
+      if (replacement) final = replacement;
+      else if (visible(previous)) final = previous;
+      else if (visible(candidate)) final = candidate;
+      else final = previous;
     }
-    this.camera.position.copy(finalSafe);
-    this.camera.lookAt(this.target);
+    if (final.distanceToSquared(candidate) > 0.0001) {
+      this.pitch = Math.atan2(
+        final.y - this.target.y,
+        Math.hypot(final.x - this.target.x, final.z - this.target.z),
+      );
+      this.restoreTime = 1;
+    }
+    this.camera.position.copy(final);
+    this.smoothDistance = final.distanceTo(this.target);
+    const finalDx = this.target.x - final.x,
+      finalDz = this.target.z - final.z;
+    if (Math.hypot(finalDx, finalDz) > 0.1)
+      this.yaw = Math.atan2(finalDx, finalDz);
+    const leadSpeed = Math.min(1, (player.runSpeed ?? 0) / 6.5) * 0.29;
+    const desiredLead = new T.Vector3(
+      Math.sin(player.yaw) * leadSpeed,
+      0,
+      Math.cos(player.yaw) * leadSpeed,
+    );
+    this.lead.lerp(desiredLead, ease(5, dt));
+    const focus = this.target.clone().add(this.lead);
+    this.camera.lookAt(
+      cameraSegmentClear(final, focus, solids, 0.05) ? focus : this.target,
+    );
+    this.lastEye.copy(final);
   }
 
-  private desired(target: T.Vector3, distance: number): T.Vector3 {
+  private desired(
+    target: T.Vector3,
+    distance: number,
+    yaw = this.yaw,
+  ): T.Vector3 {
     const planar = Math.cos(this.pitch) * distance;
     return new T.Vector3(
-      target.x - Math.sin(this.yaw) * planar,
+      target.x - Math.sin(yaw) * planar,
       target.y + Math.sin(this.pitch) * distance,
-      target.z - Math.cos(this.yaw) * planar,
+      target.z - Math.cos(yaw) * planar,
     );
   }
 }

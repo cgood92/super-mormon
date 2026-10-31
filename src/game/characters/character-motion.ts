@@ -49,6 +49,8 @@ export function createMotionDriver(role: CharacterRole): {
   let previousX = 0;
   let previousZ = 0;
   let previousForwardSpeed = 0;
+  let previousVx = 0;
+  let previousVz = 0;
   let forwardLean = 0;
   let turnBank = 0;
   let lastAirVy = 0;
@@ -64,13 +66,21 @@ export function createMotionDriver(role: CharacterRole): {
       group.position.set(state.x, state.y, state.z);
       if (firstUpdate) {
         renderedYaw = state.yaw;
+        previousVx = state.vx;
+        previousVz = state.vz;
         previousX = state.x - state.vx * dt;
         previousZ = state.z - state.vz * dt;
         previousForwardSpeed =
           Math.sin(state.yaw) * state.vx + Math.cos(state.yaw) * state.vz;
         firstUpdate = false;
       }
-      renderedYaw += angleDiff(state.yaw, renderedYaw) * damp(14, dt);
+      const previousYaw = renderedYaw;
+      renderedYaw += angleDiff(state.yaw, renderedYaw) * damp(23, dt);
+      // Keep the existing tilt in world space while the actor turns beneath it.
+      const yawStep = renderedYaw - previousYaw;
+      const oldLean = forwardLean;
+      forwardLean = oldLean * Math.cos(yawStep) - turnBank * Math.sin(yawStep);
+      turnBank = oldLean * Math.sin(yawStep) + turnBank * Math.cos(yawStep);
       // Heading belongs to the parent; body rotations are local pose only.
       // This keeps crawl pitch, flips, limbs, and offsets aligned to travel.
       group.rotation.y = renderedYaw;
@@ -82,11 +92,10 @@ export function createMotionDriver(role: CharacterRole): {
       const localLateral =
         Math.cos(renderedYaw) * state.vx - Math.sin(renderedYaw) * state.vz;
       const headingError = angleDiff(state.yaw, renderedYaw);
-      const bankTarget = Math.max(
+      let bankTarget = Math.max(
         -0.16,
         Math.min(0.16, -localLateral * 0.022 - headingError * 0.08),
       );
-      turnBank += (bankTarget - turnBank) * damp(11, dt);
       const forwardAcceleration =
         dt > 0
           ? Math.max(
@@ -95,12 +104,36 @@ export function createMotionDriver(role: CharacterRole): {
             )
           : 0;
       previousForwardSpeed = localForward;
-      const leanTarget = Math.max(
+      let leanTarget = Math.max(
         -0.075,
         Math.min(0.13, localForward * 0.016 + forwardAcceleration * 0.003),
       );
-      forwardLean += (leanTarget - forwardLean) * damp(8, dt);
-      const fullStrideAngle = 0.21 + speed * 0.12;
+      if (state.grounded) {
+        // Acceleration is measured in world space before projecting it into
+        // the rendered heading: turning alone must not invent braking.
+        const ax = dt > 0 ? (state.vx - previousVx) / dt : 0;
+        const az = dt > 0 ? (state.vz - previousVz) / dt : 0;
+        const moving = Math.min(1, state.runSpeed / 1.5);
+        const anticipation = (acceleration: number) =>
+          Math.max(-0.055, Math.min(0.055, acceleration * 0.002)) * moving;
+        leanTarget =
+          localForward * 0.045 +
+          anticipation(Math.sin(renderedYaw) * ax + Math.cos(renderedYaw) * az);
+        bankTarget =
+          -localLateral * 0.045 -
+          anticipation(Math.cos(renderedYaw) * ax - Math.sin(renderedYaw) * az);
+        const limit = Math.min(
+          1,
+          0.35 / Math.max(Math.hypot(leanTarget, bankTarget), 0.0001),
+        );
+        leanTarget *= limit;
+        bankTarget *= limit;
+      }
+      previousVx = state.vx;
+      previousVz = state.vz;
+      turnBank += (bankTarget - turnBank) * damp(14, dt);
+      forwardLean += (leanTarget - forwardLean) * damp(12, dt);
+      const fullStrideAngle = 0.23 + speed * 0.18;
       const strideAmplitude = fullStrideAngle * Math.min(1, gaitBlend * 3);
       if (state.grounded) {
         const traveled = Math.hypot(state.x - previousX, state.z - previousZ);
@@ -140,7 +173,7 @@ export function createMotionDriver(role: CharacterRole): {
           legs[i].rotation.x = stance
             ? strideAmplitude * (2 * progress - 1)
             : strideAmplitude * (1 - 2 * returnStep);
-          knees[i].rotation.x = 0.025 * gaitBlend + swing * 0.3 * gaitBlend;
+          knees[i].rotation.x = 0.025 * gaitBlend + swing * 0.52 * gaitBlend;
         } else {
           legs[i].rotation.x =
             i === 0
@@ -177,8 +210,8 @@ export function createMotionDriver(role: CharacterRole): {
           stanceAnchors[i] = null;
         }
       }
-      arms[0].rotation.x = state.grounded ? -stride * 0.78 - 0.08 : -0.42;
-      arms[1].rotation.x = state.grounded ? stride * 0.78 - 0.08 : -0.26;
+      arms[0].rotation.x = state.grounded ? -stride * 1.1 - 0.13 : -0.42;
+      arms[1].rotation.x = state.grounded ? stride * 1.1 - 0.13 : -0.26;
       legs[0].rotation.z = 0;
       legs[1].rotation.z = 0;
       arms[0].rotation.z = armored ? -0.2 : 0.12;
@@ -231,6 +264,8 @@ export function createMotionDriver(role: CharacterRole): {
         legs[1].rotation.x = -Math.sin(stroke * 5) * 0.23;
         knees[0].rotation.x = knees[1].rotation.x = 0.25;
       } else if (move === "crawl") {
+        forwardLean = 0;
+        turnBank = 0;
         // Rotate a full-size body onto hands and knees, rather than shrinking
         // an upright walk. Diagonal supports alternate with distance traveled.
         body.scale.set(1, 0.84, 1);

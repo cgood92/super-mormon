@@ -106,7 +106,6 @@ test("a timed ordinary walk reaches the hidden water with gaze detection active"
   // Observe the first head scan from the sheltered start. All waits advance both physics and patrols.
   for (let i = 0; i < 51; i++) tick();
   const waited = new Set<number>();
-  let waiting = 0;
   for (let routeIndex = 1; routeIndex < WATERS_ROUTE.length; routeIndex++) {
     const target = WATERS_ROUTE[routeIndex];
     let frames = 0;
@@ -116,19 +115,46 @@ test("a timed ordinary walk reaches the hidden water with gaze detection active"
     ) {
       // The last city corner and forest entrance are safe observation positions.
       if (routeIndex === 4 && !waited.has(4)) {
-        waiting = 3.5;
+        // Wait for the second spy to look east, away from this west-side crossing.
+        // Observe the rendered head scan rather than relying on arrival time.
+        let observationFrames = 0;
+        while (
+          (runtime.snapshot() as { spies: { headYaw: number }[] }).spies[1]
+            .headYaw > 2.9 &&
+          observationFrames++ < 300
+        ) {
+          tick();
+          assert.equal(detections, 0, "seen while observing the city crossing");
+        }
+        assert.ok(observationFrames < 300, "city spy never looked away");
         waited.add(4);
       }
       if (routeIndex === 7 && !waited.has(7)) {
-        waiting = 7;
+        // Let the forest spy complete its eastward scan, then cross while it
+        // turns west. We pass its east side first and its north side afterward.
+        let observationFrames = 0;
+        const headYaw = () =>
+          (runtime.snapshot() as { spies: { headYaw: number }[] }).spies[2]
+            .headYaw;
+        while (headYaw() < 1.4 && observationFrames++ < 300) {
+          tick();
+          assert.equal(detections, 0, "seen while observing the forest scan");
+        }
+        while (headYaw() > 1 && observationFrames++ < 300) {
+          tick();
+          assert.equal(
+            detections,
+            0,
+            "seen while waiting for the forest crossing",
+          );
+        }
+        assert.ok(observationFrames < 300, "forest spy never looked away");
         waited.add(7);
       }
       const dx = target.x - player.x,
         dz = target.z - player.z,
-        n = Math.hypot(dx, dz),
-        moving = waiting <= 0;
-      waiting -= 0.05;
-      tick(moving ? -dx / n : 0, moving ? dz / n : 0);
+        n = Math.hypot(dx, dz);
+      tick(-dx / n, dz / n);
       assert.equal(detections, 0, `seen on route segment ${routeIndex}`);
     }
     assert.ok(frames < 1000, `stalled on route segment ${routeIndex}`);

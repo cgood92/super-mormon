@@ -171,6 +171,19 @@ test("tent roof remains walkable and its fitted support follows the rendered can
       solids,
     );
   go(walking, solids, x + 1.4, z);
+  // The descending side can briefly be airborne between fitted roof tiers.
+  // Release and let the player land before checking stable support.
+  for (let frame = 0; frame < 30; frame++) {
+    stepPlayer(
+      walking,
+      { x: 0, y: 0, jump: false, jumpHeld: false },
+      1 / 60,
+      0,
+      solids,
+    );
+    assert.ok(walking.y > 2.5, "roof traversal dropped inside shelter");
+  }
+  assert.ok(Math.hypot(walking.x - x - 1.4, walking.z - z) < 0.2);
   assert.ok(
     walking.grounded && walking.y > 2.5,
     "roof traversal dropped inside shelter",

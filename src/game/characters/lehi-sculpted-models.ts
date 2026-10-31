@@ -2500,7 +2500,9 @@ function makeSculpted(
       let d = ellipsoid(x, y, z, cx, 0.071, 0.105, 0.145, 0.058, 0.23);
       d = smoothUnion(
         d,
-        capsule(x, y, z, cx, 0.17, -0.045, cx, 0.095, 0.13, 0.087),
+        // A short visible ankle cuff clears the closed rear coat during
+        // the full running knee bend; toe and sole fields stay unchanged.
+        capsule(x, y, z, cx, 0.105, -0.025, cx, 0.095, 0.13, 0.07),
         0.045,
       );
       if (index === 0 || index === 3)

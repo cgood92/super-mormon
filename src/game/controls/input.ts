@@ -357,13 +357,16 @@ export class Input {
         : Math.abs(stick(gamepad?.axes[1] ?? 0)) > 0
           ? -stick(gamepad!.axes[1])
           : ky;
-    const scale = Math.max(1, Math.hypot(rawX, rawY));
+    const magnitude = Math.hypot(rawX, rawY);
+    const scale = Math.max(1, magnitude);
+    // Square radial strength after deadzone removal, preserving stick direction.
+    const response = Math.min(1, magnitude);
     const orbit = Math.max(0, Math.min(dt, 0.05)) * 1.8;
     const keyOrbitX =
       Number(this.keys.has("KeyC")) - Number(this.keys.has("KeyQ"));
     const result: InputState = {
-      x: rawX / scale,
-      y: rawY / scale,
+      x: (rawX / scale) * response,
+      y: (rawY / scale) * response,
       jump: this.edges.has("jump"),
       jumpHeld:
         this.keys.has("Space") || this.touchButtons.has("jump") || buttons.jump,
