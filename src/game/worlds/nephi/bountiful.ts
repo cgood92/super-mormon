@@ -156,6 +156,8 @@ export function buildBountiful(scene: T.Scene): WorldData {
   }
   // Imagined mountain terrain: generous landings, but each exposed rock face
   // exceeds a walking step. One union owns the surface, including its summit.
+  // Keep the eastern rock face west of x=-30: the ore approach and its
+  // camera need open ground on all sides of the outcrop at (-22, 18).
   sceneryTerraceUnion(
     root,
     solids,
@@ -163,7 +165,7 @@ export function buildBountiful(scene: T.Scene): WorldData {
       x: -36 + [0, -1.4, 0.8, -0.6, 1.1, -0.8, 0.4, 0][i],
       y: 0,
       z: 15 + i * 3.5,
-      w: [23, 21, 20, 18, 17, 15, 13, 11][i],
+      w: [12, 14, 10, 12, 9, 12, 10, 11][i],
       h: (i + 1) * 1.125,
       d: i === 7 ? 8 : 6,
       color: [0xa7a27c, 0xb1a781, 0xa69d76, 0xb3a482][i % 4],
