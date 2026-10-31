@@ -147,6 +147,8 @@ test("rally and fourth approach shots keep the player visible on phone and deskt
       world = build(scene),
       h = harness(world);
     if (build === buildLehontiMountain) {
+      for (let frame = 0; frame < 161; frame++)
+        h.runtime.update(0.1, h.player, idle);
       for (let i = 0; i < 3; i++) {
         const state = h.runtime.snapshot() as { target: Point };
         Object.assign(h.player, state.target);
@@ -272,6 +274,8 @@ test("Antipas has three playable messenger races that automatically warn Lehonti
       messengerProgress: number;
       runnerProgress: number;
     };
+  for (let frame = 0; frame < 161; frame++)
+    h.runtime.update(0.1, h.player, idle);
   let raced = 0;
   for (let i = 0; i < 6 && state().phase !== "done"; i++) {
     const before = state();
@@ -580,6 +584,8 @@ test("Antipas messenger runs facing the trail with moving legs and terrace-suppo
   const scene = new T.Scene(),
     world = buildLehontiMountain(scene),
     h = harness(world);
+  for (let frame = 0; frame < 161; frame++)
+    h.runtime.update(0.1, h.player, idle);
   const messenger = scene.getObjectByName("Actual embassy messenger 1")!;
   const leg = messenger.getObjectByName("left-leg")!;
   let minLeg = Infinity,
