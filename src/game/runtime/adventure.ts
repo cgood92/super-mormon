@@ -12,6 +12,8 @@ export type AdventureInput = {
   crouch?: boolean;
 };
 export type AdventureHooks = {
+  /** Current player actor for authored opening shots. */
+  avatar?: T.Object3D;
   /** Current rendered camera aspect; authored shots can fit portrait screens. */
   viewAspect?: () => number;
   dialog: (
@@ -41,6 +43,7 @@ export type AdventureRuntime = {
     carrying?: boolean;
     holdingBanner?: boolean;
     wave?: boolean;
+    pointing?: boolean;
     aiming?: boolean;
     draw?: number;
     holdingBow?: boolean;

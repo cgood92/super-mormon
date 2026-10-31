@@ -1,3 +1,4 @@
+import { createLehiOpening } from "./lehi-opening";
 import { markScenery, sceneryBox, terracedRock } from "../shared/scenery";
 import * as THREE from "three";
 import type { WorldData, Solid } from "../../runtime/worlds";
@@ -376,6 +377,12 @@ export function buildJerusalem(
             ? "Offer the family’s treasures, then find refuge in the cave"
             : "Find Laban in the city and follow Zoram to the palace treasury",
     spawn: { x: 0, y: 0, z: id === "night" ? 44 : 25, yaw: Math.PI },
+    actorParent: group,
+    adventure:
+      id === "streets"
+        ? (hooks) =>
+            createLehiOpening(group, solids, { x: 0, y: 0, z: 25 }, home, hooks)
+        : undefined,
     story: {
       laban,
       treasury: { x: 14, y: 0, z: -21 },

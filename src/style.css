@@ -1460,3 +1460,49 @@ canvas {
   transform-origin: left;
   transform: scaleX(var(--draw, 0));
 }
+
+/* Lehi's opening uses the same live world with a quiet film presentation. */
+.story-opening::before,
+.story-opening::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: clamp(30px, 7vh, 64px);
+  background: #13110f;
+  z-index: 5;
+  pointer-events: none;
+}
+.story-opening::before {
+  top: 0;
+}
+.story-opening::after {
+  bottom: 0;
+}
+.story-opening .objective {
+  top: auto;
+  bottom: max(10vh, env(safe-area-inset-bottom));
+  max-width: min(720px, 88vw);
+  width: max-content;
+  white-space: normal;
+  text-align: center;
+  font-size: clamp(16px, 2.2vw, 21px);
+  line-height: 1.5;
+  color: #fff8e7;
+  background: rgba(25, 20, 15, 0.9);
+  border: 1px solid rgba(235, 207, 158, 0.3);
+  z-index: 6;
+}
+.story-opening .objective-dot,
+.story-opening .touch-controls,
+.story-opening .desktop-controls,
+.story-opening .collect-count,
+.story-opening .toast,
+.story-opening .orientation-hint,
+.story-opening .world-title,
+.story-opening #seal-count {
+  visibility: hidden;
+}
+.story-opening .hud {
+  z-index: 7;
+}
