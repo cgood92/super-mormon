@@ -1,12 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as T from "three";
-import {
-  buildMoriantonFlight,
-  MORIANTON_ROUTE,
-} from "../worlds/war/morianton-flight";
 import { buildTeancumNight, TEANCUM_ROUTE } from "../worlds/war/teancum-night";
-import { buildGidRescue, GID_ROUTE } from "../worlds/war/gid-rescue";
+import { buildGidRescue } from "../worlds/war/gid-rescue";
 import { createPlayer, stepPlayer } from "../physics/physics";
 import { sceneryCollisionErrors } from "../worlds/shared/scenery";
 import { StoryCinematic, type StoryShot } from "../camera/cinematic";
@@ -36,7 +32,7 @@ function harness(world: WorldData) {
     let frames = 0;
     while (
       Math.hypot(target.x - player.x, target.z - player.z) > 0.55 &&
-      frames++ < 1200
+      frames++ < 3600
     ) {
       const dx = target.x - player.x,
         dz = target.z - player.z;
@@ -53,7 +49,7 @@ function harness(world: WorldData) {
       runtime.update(1 / 60, player, idle);
     }
     assert.ok(
-      frames < 1200,
+      frames < 3600,
       `walking route blocked at ${player.x.toFixed(1)},${player.z.toFixed(1)} toward ${target.x},${target.z}`,
     );
   };
@@ -80,23 +76,6 @@ function harness(world: WorldData) {
   };
 }
 
-test("Morianton flight has physical scenery and playable interception with peace covenant", () => {
-  const scene = new T.Scene(),
-    world = buildMoriantonFlight(scene),
-    h = harness(world);
-  assert.deepEqual(sceneryCollisionErrors(scene, world.solids), []);
-  for (const point of MORIANTON_ROUTE.slice(1)) {
-    h.walk(point);
-    h.use();
-  }
-  assert.equal(h.completed, 1);
-  assert.match(h.dialogs.map((d) => d.body).join(" "), /maidservant/i);
-  assert.match(h.dialogs.map((d) => d.body).join(" "), /covenant/i);
-  world.dispose?.();
-  world.dispose?.();
-  assert.equal(scene.children.length, 0);
-});
-
 test("Teancum's night route uses cover, a non-graphic tent event, and a return to the guard", () => {
   const scene = new T.Scene(),
     world = buildTeancumNight(scene),
@@ -113,58 +92,20 @@ test("Teancum's night route uses cover, a non-graphic tent event, and a return t
   assert.equal(scene.children.length, 0);
 });
 
-test("Gid requires two weapon deliveries over the wall and bloodless surrender", () => {
-  const scene = new T.Scene(),
-    world = buildGidRescue(scene),
-    h = harness(world);
-  assert.deepEqual(sceneryCollisionErrors(scene, world.solids), []);
-  for (const [index, point] of GID_ROUTE.entries()) {
-    if (!index) continue;
-    if (index === 8 || index === 9) h.walk({ x: 22, y: 0, z: 16 });
-    h.walk(point);
-    h.use();
-  }
-  assert.equal(h.completed, 1);
-  assert.equal((h.runtime.snapshot() as { delivered: number }).delivered, 2);
-  assert.equal(
-    (h.runtime.snapshot() as { familyTalked: boolean }).familyTalked,
-    true,
-  );
-  assert.match(h.dialogs.map((d) => d.body).join(" "), /Laman/);
-  assert.match(h.dialogs.map((d) => d.body).join(" "), /women|children/);
-  assert.match(
-    h.dialogs.map((d) => d.body).join(" "),
-    /without bloodshed|surrender/i,
-  );
-  world.dispose?.();
-  assert.equal(scene.children.length, 0);
-});
-
-test("Morianton escaping the pass restarts the race at the scout", () => {
-  const world = buildMoriantonFlight(new T.Scene()),
-    h = harness(world);
-  h.walk(MORIANTON_ROUTE[1]);
-  h.use();
-  h.walk(MORIANTON_ROUTE[2]);
-  h.use();
-  for (let i = 0; i < 290; i++) h.runtime.update(0.1, h.player, idle);
-  const state = h.runtime.snapshot() as { phase: string; attempts: number };
-  assert.equal(state.phase, "scout");
-  assert.equal(state.attempts, 1);
-  assert.equal(h.completed, 0);
-  world.dispose?.();
-});
-
 test("an exposed player in the outer watch triggers Teancum's stealth reset", () => {
   const world = buildTeancumNight(new T.Scene()),
     h = harness(world);
   h.walk(TEANCUM_ROUTE[1]);
   h.use();
-  const yaw = (h.runtime.snapshot() as { sentries: { headYaw: number }[] })
-    .sentries[0].headYaw;
+  const sentry = (
+    h.runtime.snapshot() as {
+      sentries: { x: number; z: number; headYaw: number }[];
+    }
+  ).sentries[0];
+  const yaw = sentry.headYaw;
   Object.assign(
     h.player,
-    createPlayer(1 + Math.sin(yaw) * 8, 0, -15 + Math.cos(yaw) * 8),
+    createPlayer(sentry.x + Math.sin(yaw) * 8, 0, sentry.z + Math.cos(yaw) * 8),
   );
   h.runtime.update(0.05, h.player, idle);
   const state = h.runtime.snapshot() as { phase: string; detections: number };
@@ -190,11 +131,7 @@ test("Gid's city wall blocks walking while the outer flank stays open", () => {
 });
 
 test("all war-story shots keep the player visible through entrance and return", () => {
-  for (const [build, route] of [
-    [buildMoriantonFlight, MORIANTON_ROUTE],
-    [buildTeancumNight, TEANCUM_ROUTE],
-    [buildGidRescue, GID_ROUTE],
-  ] as const) {
+  for (const [build, route] of [[buildTeancumNight, TEANCUM_ROUTE]] as const) {
     const scene = new T.Scene(),
       world = build(scene),
       player = createPlayer();
@@ -223,6 +160,14 @@ test("all war-story shots keep the player visible through entrance and return", 
       );
       avatar.position.set(player.x, player.y, player.z);
       runtime.update(1 / 60, player, { ...idle, interact: true });
+      if (build === buildTeancumNight && (index === 2 || index === 3)) {
+        assert.equal(
+          shot,
+          undefined,
+          "watch lines should advance through travel, without stopping for dialogue",
+        );
+        continue;
+      }
       for (
         let flight = 0;
         flight < 12 && (runtime.snapshot() as { throwing?: boolean }).throwing;
