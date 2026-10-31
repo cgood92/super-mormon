@@ -1,8 +1,13 @@
 import * as T from "three";
-import { createPlayer, type PlayerState } from "../../physics/physics";
+import {
+  createPlayer,
+  stepPlayer,
+  type PlayerState,
+} from "../../physics/physics";
 import { spyCanSeePlayer } from "../../camera/spy-vision";
 import { warWorld, nearWarPoint } from "../shared/war-world-kit";
-import { sceneryCanvasTent } from "../shared/scenery";
+import { sceneryCanvasTent, markScenery } from "../shared/scenery";
+import { planStoryCamera, StoryMeshObstacles } from "../../camera/cinematic";
 import { material } from "../../rendering/art";
 import type { Point, WorldData } from "../../runtime/worlds";
 
@@ -116,6 +121,15 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
     0x746650,
     "King's sleeping mat",
   );
+  // Opaque fitted screens create readable, physical hiding routes beside the
+  // flank watch posts. Their single shared dimensions own rendering/collision.
+  for (const x of [-20, 20])
+    for (const z of [-95, 51])
+      solid(
+        { x, y: 0, z, w: 1.2, d: 24, h: 2 },
+        0x4e5c59,
+        "Flank watch stone screen",
+      );
   const sentries = [
     {
       x: 1,
@@ -143,9 +157,56 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
       ),
     })),
   ];
+  for (const side of [-1, 1]) {
+    for (const [x, z] of [
+      [18 * side, -95],
+      [18 * side, 51],
+      [38 * side, -23],
+    ]) {
+      const base = (side * Math.PI) / 2;
+      sentries.push({
+        x,
+        z,
+        base,
+        phase: z === -23 ? 1.7 : 0.5,
+        rig: actor(
+          "spy",
+          { x, y: 0, z, yaw: base },
+          `${side < 0 ? "Western" : "Eastern"} flank sentry ${z}`,
+        ),
+      });
+    }
+  }
+  const sightWedges = sentries.map((s) => {
+    const geometry = new T.BufferGeometry();
+    const half = Math.tan(Math.PI / 12) * 6;
+    geometry.setAttribute(
+      "position",
+      new T.Float32BufferAttribute([0, 0, 0, -half, 0, 6, half, 0, 6], 3),
+    );
+    const wedge = new T.Mesh(
+      geometry,
+      new T.MeshBasicMaterial({
+        color: 0xe9ae63,
+        transparent: true,
+        opacity: 0.24,
+        depthWrite: false,
+        side: T.DoubleSide,
+      }),
+    );
+    wedge.name = "Sentry sight direction cue";
+    wedge.position.set(s.x, 0.035, s.z);
+    markScenery(wedge, {
+      kind: "decoration",
+      reason:
+        "Transparent gameplay direction cue, not a physical surface or a complete range boundary.",
+    });
+    root.add(wedge);
+    return wedge;
+  });
   const objectives = [
-    "Meet your servant before leaving camp",
-    "Cross the outer watch · use stone cover or the western grove",
+    "Leave camp with your servant · keep both of you out of sight",
+    "Cross the outer watch · use stone screens and watch both flanks",
     "Pass the camp watch lines · the royal tent is to the north",
     "Enter the royal tent and approach sleeping Amalickiah",
     "Return to your camp and alert the guards",
@@ -185,6 +246,20 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
       hooks.toast(
         "Move at night with your servant. Watch the sentries' turning heads; stone cover hides you.",
       );
+      let introTime = 0;
+      let plannedBeat = -1,
+        plannedAspect = 0;
+      let cinematicCamera:
+        { position: T.Vector3; focus: T.Vector3; cut: boolean } | undefined;
+      const cameraObstacles = new StoryMeshObstacles(root, [
+        { group: king.group },
+        { group: servant.group },
+        { group: captain.group },
+        ...sentries.map((s) => ({ group: s.rig.group })),
+      ]);
+      let companion = createPlayer(servantX, 0, servantZ);
+      let trail: Point[] = [];
+      let lastTrail: Point = { ...TEANCUM_ROUTE[0] };
       const reset = (player: PlayerState) => {
         detections++;
         stage = 0;
@@ -192,18 +267,31 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
         time = 0;
         servantX = TEANCUM_ROUTE[1].x;
         servantZ = TEANCUM_ROUTE[1].z;
+        king.group.visible = true;
+        companion = createPlayer(servantX, 0, servantZ);
+        trail = [];
+        lastTrail = { ...TEANCUM_ROUTE[0] };
         servant.update(0, { ...createPlayer(servantX, 0, servantZ), yaw: 0 });
         Object.assign(
           player,
           createPlayer(TEANCUM_ROUTE[0].x, 0, TEANCUM_ROUTE[0].z),
         );
         hooks.toast(
-          "A sentry saw you. Return to your servant and try a different path.",
+          "A sentry caught one of you. Both return safely to camp; try a different path.",
         );
       };
       return {
         snapshot: () => ({
-          phase: phases[stage],
+          phase: introTime < 12 ? "intro" : phases[stage],
+          movieBeat:
+            introTime < 4
+              ? "sleeping-king"
+              : introTime < 8
+                ? "watchful-guards"
+                : introTime < 12
+                  ? "companions"
+                  : undefined,
+          servant: { x: companion.x, y: companion.y, z: companion.z },
           time,
           detections,
           route: TEANCUM_ROUTE,
@@ -213,34 +301,113 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
             headYaw: s.base + Math.sin(time * 0.7 + s.phase) * 1.0,
           })),
         }),
-        movementLocked: () => pending,
+        movementLocked: () => pending || introTime < 12,
+        camera: () => cinematicCamera,
         update(dt, player, input) {
           dt = Math.max(0, Math.min(dt, 0.1));
+          if (introTime < 12) {
+            introTime = Math.min(12, introTime + dt);
+            const beat = introTime < 4 ? 0 : introTime < 8 ? 1 : 2;
+            const anchor =
+              beat === 0
+                ? king.group
+                : beat === 1
+                  ? sentries[0].rig.group
+                  : servant.group;
+            const aspect = hooks.viewAspect?.() ?? 16 / 9;
+            if (beat !== plannedBeat || aspect !== plannedAspect) {
+              plannedBeat = beat;
+              plannedAspect = aspect;
+              const camera = new T.PerspectiveCamera(58, aspect, 0.08, 320);
+              camera.position
+                .copy(anchor.position)
+                .add(new T.Vector3(4, 3, -5));
+              camera.lookAt(anchor.position);
+              const plan = planStoryCamera(
+                camera,
+                {
+                  cutaway: true,
+                  actors: [{ group: anchor }],
+                  wide: beat === 0 ? 3 : 5,
+                },
+                solids,
+                cameraObstacles,
+              );
+              cinematicCamera = {
+                position: plan.wide,
+                focus: plan.focus,
+                cut: true,
+              };
+            }
+            if (introTime >= 12) cinematicCamera = undefined;
+            return {
+              objective:
+                beat === 0
+                  ? "Amalickiah sleeps after the day's fighting · Alma 51:32–34"
+                  : beat === 1
+                    ? "Keep both companions unseen · a sentry's sight means capture and a restart"
+                    : "Teancum and his servant go forth by night · Alma 51:33",
+              prompt: "",
+            };
+          }
           if (!pending && !finished) time += dt;
           if (stage >= 1 && stage <= 4 && !pending) {
-            const dx = player.x - 1.2 - servantX;
-            const dz = player.z - 1.8 - servantZ;
-            const distance = Math.hypot(dx, dz);
-            const stride = Math.min(distance, dt * 5.4);
-            if (distance > 0.01) {
-              servantX += (dx / distance) * stride;
-              servantZ += (dz / distance) * stride;
+            // Follow the player's actual route, rather than cutting diagonally across tents.
+            if (
+              dt > 0 &&
+              (Math.hypot(player.x - lastTrail.x, player.z - lastTrail.z) >=
+                0.3 ||
+                Math.abs(player.y - lastTrail.y) >= 0.25)
+            ) {
+              trail.push({ x: player.x, y: player.y, z: player.z });
+              lastTrail = { x: player.x, y: player.y, z: player.z };
             }
-            servant.update(dt, {
-              ...createPlayer(servantX, 0, servantZ),
-              yaw: Math.atan2(dx, dz),
-              vx: distance
-                ? ((dx / distance) * stride) / Math.max(dt, 0.001)
-                : 0,
-              vz: distance
-                ? ((dz / distance) * stride) / Math.max(dt, 0.001)
-                : 0,
-              runSpeed: stride / Math.max(dt, 0.001),
-              move: distance > 0.2 ? "run" : "idle",
-            });
+            while (
+              trail.length > 1 &&
+              Math.hypot(trail[0].x - companion.x, trail[0].z - companion.z) <
+                0.4 &&
+              Math.abs(trail[0].y - companion.y) < 0.65
+            )
+              trail.shift();
+            const target = trail[0];
+            const dx = target ? target.x - companion.x : 0;
+            const dz = target ? target.z - companion.z : 0;
+            const distance = Math.hypot(dx, dz);
+            const follow =
+              trail.length > 1 ||
+              Math.hypot(player.x - companion.x, player.z - companion.z) > 1.8;
+            companion.crouching = player.crouching;
+            stepPlayer(
+              companion,
+              {
+                x:
+                  follow && distance > 0.15
+                    ? (-dx / distance) * Math.min(1, distance / 0.7)
+                    : 0,
+                y:
+                  follow && distance > 0.15
+                    ? (dz / distance) * Math.min(1, distance / 0.7)
+                    : 0,
+                jump:
+                  !!target &&
+                  target.y > companion.y + 0.25 &&
+                  companion.grounded,
+                jumpHeld:
+                  !!target &&
+                  (target.y > companion.y + 0.1 || !companion.grounded),
+                crouch: player.crouching,
+              },
+              dt,
+              0,
+              solids,
+            );
+            servantX = companion.x;
+            servantZ = companion.z;
+            servant.update(dt, companion);
           }
-          for (const s of sentries) {
+          for (const [index, s] of sentries.entries()) {
             const yaw = s.base + Math.sin(time * 0.7 + s.phase) * 1.0;
+            sightWedges[index].rotation.y = yaw;
             s.rig.update(dt, {
               ...createPlayer(s.x, 0, s.z),
               yaw: s.base,
@@ -248,21 +415,24 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
               lookPitch: 0,
             });
           }
-          if (stage >= 1 && stage <= 3 && !pending) {
+          if (stage >= 1 && stage <= 4 && !pending) {
             for (const s of sentries) {
               // Player-facing visual gaze and sight-line share the same yaw; cover is physical.
               if (
-                spyCanSeePlayer({
-                  eye: { x: s.x, y: 1.48, z: s.z },
-                  headYaw: s.base + Math.sin(time * 0.7 + s.phase) * 1.0,
-                  headPitch: 0,
-                  playerPosition: player,
-                  playerHeight: player.crouching ? 0.9 : 1.65,
-                  solids,
-                  maxDistance: 20,
-                  halfAngleRadians: Math.PI / 12,
-                })
+                [player, companion].some((subject) =>
+                  spyCanSeePlayer({
+                    eye: { x: s.x, y: 1.48, z: s.z },
+                    headYaw: s.base + Math.sin(time * 0.7 + s.phase) * 1.0,
+                    headPitch: 0,
+                    playerPosition: subject,
+                    playerHeight: subject.crouching ? 0.9 : 1.65,
+                    solids,
+                    maxDistance: 20,
+                    halfAngleRadians: Math.PI / 12,
+                  }),
+                )
               ) {
+                pending = true;
                 hooks.caught?.(() => reset(player));
                 if (!hooks.caught) reset(player);
                 return { objective: "A sentry spotted you", prompt: "" };
@@ -277,7 +447,9 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
           }
           const target = TEANCUM_ROUTE[Math.min(stage + 1, 5)];
           const close =
-            stage === 3
+            (stage !== 3 || nearWarPoint(companion, TEANCUM_ROUTE[4], 9)) &&
+            (stage !== 4 || nearWarPoint(companion, TEANCUM_ROUTE[5], 4)) &&
+            (stage === 3
               ? nearWarPoint(
                   player,
                   { x: king.group.position.x, y: 0, z: king.group.position.z },
@@ -285,7 +457,7 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
                 ) &&
                 Math.abs(player.x - royalTent.x) < royalTent.width / 2 - 0.4 &&
                 Math.abs(player.z - royalTent.z) < royalTent.depth / 2 - 0.4
-              : nearWarPoint(player, target, 3);
+              : nearWarPoint(player, target, 3));
           const actionable = stage === 0 || stage === 3 || stage === 4;
           if (!pending && !finished && actionable && close && input.interact) {
             pending = true;

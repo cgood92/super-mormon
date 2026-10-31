@@ -28,6 +28,8 @@ function harness(world: WorldData) {
       reset();
     },
   });
+  if (world.name === "Teancum's Night Mission")
+    for (let i = 0; i < 121; i++) runtime.update(0.1, player, idle);
   const walk = (target: Point) => {
     let frames = 0;
     while (
@@ -54,6 +56,18 @@ function harness(world: WorldData) {
     );
   };
   const use = () => {
+    if (world.name === "Teancum's Night Mission") {
+      for (let i = 0; i < 1000; i++) {
+        const state = runtime.snapshot() as {
+          servant: { x: number; z: number };
+        };
+        if (
+          Math.hypot(state.servant.x - player.x, state.servant.z - player.z) < 2
+        )
+          break;
+        runtime.update(0.1, player, idle);
+      }
+    }
     runtime.update(1 / 60, player, { ...idle, interact: true });
     for (let i = 0; i < 35; i++) {
       const state = runtime.snapshot() as {
@@ -82,10 +96,31 @@ test("Teancum's night route uses cover, a non-graphic tent event, and a return t
     h = harness(world);
   assert.deepEqual(sceneryCollisionErrors(scene, world.solids), []);
   for (const point of TEANCUM_ROUTE.slice(1)) {
+    if (point === TEANCUM_ROUTE[5]) {
+      h.walk({ x: 0, y: 0, z: 87 });
+      h.walk({ x: -22, y: 0, z: 68 });
+      h.walk({ x: -22, y: 0, z: -130 });
+    }
     h.walk(point);
     h.use();
   }
   assert.equal(h.completed, 1);
+  const ending = h.runtime.snapshot() as {
+    detections: number;
+    servant: { x: number; z: number };
+    sentries: unknown[];
+  };
+  assert.equal(
+    ending.detections,
+    0,
+    "both companions must finish the actual walked route unseen",
+  );
+  assert.ok(Math.hypot(ending.servant.x, ending.servant.z + 144) < 4);
+  assert.equal(
+    ending.sentries.length,
+    12,
+    "bound the full-width watch population",
+  );
   assert.match(h.dialogs.map((d) => d.body).join(" "), /Amalickiah/);
   assert.match(h.dialogs.map((d) => d.body).join(" "), /readiness|alert/i);
   world.dispose?.();
@@ -147,6 +182,7 @@ test("all war-story shots keep the player visible through entrance and return", 
         shot = captured;
       },
     });
+    for (let i = 0; i < 121; i++) runtime.update(0.1, player, idle);
     for (let index = 1; index < route.length; index++) {
       for (
         let wait = 0;
@@ -154,11 +190,46 @@ test("all war-story shots keep the player visible through entrance and return", 
         wait++
       )
         runtime.update(0.1, player, idle);
+      if (index === 5) {
+        for (const point of [
+          { x: 0, z: 87 },
+          { x: -22, z: 68 },
+          { x: -22, z: -130 },
+        ]) {
+          Object.assign(player, createPlayer(point.x, 0, point.z));
+          for (let i = 0; i < 1500; i++) {
+            runtime.update(0.1, player, idle);
+            const state = runtime.snapshot() as {
+              servant: { x: number; z: number };
+            };
+            if (
+              Math.hypot(
+                state.servant.x - player.x,
+                state.servant.z - player.z,
+              ) < 2
+            )
+              break;
+          }
+        }
+      }
       Object.assign(
         player,
         createPlayer(route[index].x, route[index].y, route[index].z),
       );
       avatar.position.set(player.x, player.y, player.z);
+      if (index >= 4) {
+        for (let i = 0; i < 1500; i++) {
+          runtime.update(0.1, player, idle);
+          const state = runtime.snapshot() as {
+            servant: { x: number; z: number };
+          };
+          if (
+            Math.hypot(state.servant.x - player.x, state.servant.z - player.z) <
+            2
+          )
+            break;
+        }
+      }
       runtime.update(1 / 60, player, { ...idle, interact: true });
       if (build === buildTeancumNight && (index === 2 || index === 3)) {
         assert.equal(

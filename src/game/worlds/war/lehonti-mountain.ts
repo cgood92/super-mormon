@@ -1,4 +1,9 @@
 import * as T from "three";
+import {
+  planStoryCamera,
+  StoryMeshObstacles,
+  type StoryActor,
+} from "../../camera/cinematic";
 import { adventureLandscape, withinTask } from "../shared/adventure-landscape";
 import { material } from "../../rendering/art";
 import {
@@ -199,9 +204,10 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
   summitGuards.forEach((guard, i) => {
     guard.group.name = `Lehonti guard ${i + 1}`;
   });
-  const amalickiah = land.actor("amalickiah", route[route.length - 9]);
-  amalickiah.group.name = "Amalickiah climbs nearly to the camp";
-  amalickiah.group.visible = false;
+  const valley = { x: 30, y: 0, z: 36 };
+  const amalickiah = land.actor("amalickiah", valley);
+  amalickiah.group.name = "Amalickiah sends a secret embassy from the valley";
+  amalickiah.group.visible = true;
   const messengers = [0, 1, 2].map((i) => {
     const rig = crowd("guard", route[0]);
     rig.group.name = `Actual embassy messenger ${i + 1}`;
@@ -235,7 +241,8 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
     reason:
       "Small pennants above the solid summit terraces; they do not support the player.",
   });
-  let phase: "race" | "done" = "race";
+  let phase: "opening" | "race" | "done" = "opening";
+  let openingTime = 0;
   let race = 0,
     pending = false,
     time = 0,
@@ -246,7 +253,7 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
   const target = () => summit;
   function updateActors(dt: number) {
     messengers.forEach((rig, i) => {
-      rig.group.visible = phase === "race" && i === race;
+      rig.group.visible = phase !== "done" && i === race;
       if (i === race && phase === "race") {
         const p = locationAt(messengerProgress);
         const ahead = locationAt(
@@ -286,7 +293,7 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
     name: "Lehonti on Mount Antipas",
     subtitle: "Race to warn Lehonti · inspired by Alma 47",
     initialObjective:
-      "Climb the mountain to warn Lehonti before the messenger arrives",
+      "Watch Lehonti’s summit camp and Amalickiah’s secret embassy",
     spawn: trailhead,
     solids,
     actorParent: root,
@@ -317,10 +324,67 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
     adventure(hooks) {
       hooks.setAvatar("warning-runner");
       hooks.toast(
-        "Climb the mountain to warn Lehonti before Amalickiah’s messenger reaches his camp.",
+        "Alma 47:7–11 · The warning runner and timed races are imagined.",
       );
+      let cinematicCamera:
+        { position: T.Vector3; focus: T.Vector3; cut: boolean } | undefined;
+      let lastAspect = 0;
+      let lastBeat = -1;
+      const runnerAnchor = new T.Group();
+      runnerAnchor.position.set(trailhead.x, trailhead.y, trailhead.z);
+      const cameraActors: StoryActor[] = [
+        lehonti,
+        amalickiah,
+        ...summitGuards,
+        ...messengers,
+      ].map((rig) => ({ group: rig.group }));
+      const playerActor = root.getObjectByName("warning-runner-character");
+      if (playerActor) cameraActors.push({ group: playerActor });
+      const meshObstacles = new StoryMeshObstacles(root, cameraActors);
+      function frameOpening() {
+        const beat = openingTime < 5 ? 0 : openingTime < 10 ? 1 : 2;
+        const anchor =
+          beat === 0
+            ? lehonti.group
+            : beat === 1
+              ? amalickiah.group
+              : runnerAnchor;
+        const camera = new T.PerspectiveCamera(
+          58,
+          hooks.viewAspect?.() ?? 16 / 9,
+          0.08,
+          320,
+        );
+        camera.position.copy(anchor.position).add(new T.Vector3(7, 5, 9));
+        camera.lookAt(anchor.position);
+        const plan = planStoryCamera(
+          camera,
+          {
+            cutaway: true,
+            actors: [{ group: anchor }],
+            wide: beat === 0 ? 7 : 6,
+          },
+          solids,
+          meshObstacles,
+        );
+        cinematicCamera = { position: plan.wide, focus: plan.focus, cut: true };
+        lastBeat = beat;
+        lastAspect = hooks.viewAspect?.() ?? 16 / 9;
+      }
+      frameOpening();
       return {
+        movementLocked: () => phase === "opening" || pending,
+        camera: () => cinematicCamera,
         snapshot: () => ({
+          openingTime,
+          openingBeat:
+            phase === "opening"
+              ? openingTime < 5
+                ? "summit"
+                : openingTime < 10
+                  ? "embassy"
+                  : "warning"
+              : undefined,
           phase,
           race: race + 1,
           target: target(),
@@ -334,6 +398,64 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
           pending,
         }),
         update(dt, player) {
+          if (phase === "opening") {
+            const delta = Math.min(0.1, Math.max(0, dt));
+            openingTime += delta;
+            const beat = openingTime < 5 ? 0 : openingTime < 10 ? 1 : 2;
+            if (
+              beat !== lastBeat ||
+              lastAspect !== (hooks.viewAspect?.() ?? 16 / 9)
+            ) {
+              frameOpening();
+            }
+            amalickiah.update(delta, {
+              ...valley,
+              vx: 0,
+              vy: 0,
+              vz: 0,
+              yaw: Math.atan2(route[0].x - valley.x, route[0].z - valley.z),
+              grounded: true,
+              runSpeed: 0,
+              pointing: beat === 1 && openingTime < 8.8,
+              lookYaw: Math.sin(openingTime * 0.7) * 0.12,
+            });
+            lehonti.update(delta, {
+              ...summit,
+              vx: 0,
+              vy: 0,
+              vz: 0,
+              yaw: Math.PI / 2,
+              grounded: true,
+              runSpeed: 0,
+              lookYaw: Math.sin(openingTime * 0.5) * 0.16,
+            });
+            if (openingTime >= 16) {
+              phase = "race";
+              cinematicCamera = undefined;
+              Object.assign(player, {
+                ...trailhead,
+                vx: 0,
+                vy: 0,
+                vz: 0,
+                grounded: true,
+              });
+              hooks.toast(
+                "Run! Follow the blue trail and warn Lehonti before the messenger reaches his summit camp.",
+              );
+            }
+            return {
+              objective:
+                beat === 0
+                  ? "Lehonti and his people hold the summit of Mount Antipas. They refuse to fight the Nephites."
+                  : beat === 1
+                    ? "In the valley, Amalickiah plots to take command. His secret messenger asks Lehonti to come down."
+                    : "It is a trap. In this imagined warning race, reach Lehonti before the messenger. Follow the blue trail!",
+              prompt:
+                phase === "opening"
+                  ? "Alma 47:7–11 · Opening scene"
+                  : "Race to the summit",
+            };
+          }
           if (phase === "done")
             return {
               objective: "Lehonti's story remembered",
@@ -425,7 +547,9 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
             prompt: "Journey complete",
           };
         },
-        dispose() {},
+        dispose() {
+          cinematicCamera = undefined;
+        },
       };
     },
     dispose: () => {
