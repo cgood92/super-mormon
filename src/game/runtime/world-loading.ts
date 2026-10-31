@@ -1,3 +1,4 @@
+import { explorationWorld } from "./exploration";
 import { deployedScene } from "./scene-import";
 import type * as T from "three";
 import type { WorldId, WorldData } from "./worlds";
@@ -12,6 +13,15 @@ type PreparedWorld = {
 
 // Load code first, then let the caller atomically replace the active scene.
 export async function prepareWorld(id: WorldId): Promise<PreparedWorld> {
+  const prepared = await prepareAuthoredWorld(id);
+  return {
+    ...prepared,
+    buildWorld: (worldId, scene) =>
+      explorationWorld(worldId, scene, prepared.buildWorld(worldId, scene)),
+  };
+}
+
+async function prepareAuthoredWorld(id: WorldId): Promise<PreparedWorld> {
   if (id === "jared-expedition") {
     const module = await deployedScene(
       "src/game/worlds/final/jared-expedition.ts",
