@@ -3,7 +3,13 @@ import test from "node:test";
 import { readFileSync } from "node:fs";
 
 test("runtime starts without eagerly importing story or world builders", () => {
-  const main = readFileSync("src/main.ts", "utf8");
+  const main = [
+    "src/main.ts",
+    "src/game/runtime/game.ts",
+    "src/game/runtime/world-session.ts",
+  ]
+    .map((file) => readFileSync(file, "utf8"))
+    .join("\n");
   assert.doesNotMatch(main, /^import \{ create(?:Story|TreeOfLife)Scene \}/m);
   assert.doesNotMatch(main, /^import \{ buildWorld/m);
 });
@@ -31,13 +37,14 @@ test("preparing a world leaves the active scene untouched until its builder is c
 });
 
 test("initial load failures expose a retry action without resuming an absent world", () => {
-  const main = readFileSync("src/main.ts", "utf8");
+  const shell = readFileSync("src/game/ui/game-shell.ts", "utf8");
+  const main = readFileSync("src/game/runtime/game.ts", "utf8");
   assert.ok(
-    main.includes('id="load-retry"'),
+    shell.includes('id="load-retry"'),
     "failure UI needs a real retry button",
   );
   assert.ok(
-    main.includes('el("load-retry").onclick = () => void load(id)'),
+    main.includes('el("load-retry").onclick = () => void this.load(id)'),
     "retry must start a fresh load",
   );
   assert.ok(
