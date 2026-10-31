@@ -1,3 +1,4 @@
+import { recordExplorationEntry } from "./game/runtime/exploration";
 import {
   GameplayAnalytics,
   activeFrameSeconds,
@@ -1027,6 +1028,11 @@ async function load(id: WorldId) {
           : "painting",
       input.device,
     );
+  if (recordExplorationEntry(id, completed)) {
+    saveProgress();
+    el("seal-count").textContent =
+      `Stories ${completed.size} / ${STORY_ORDER.length}`;
+  }
   renderQuality.reset();
   resize();
   diagnostics.recordScene(id);
