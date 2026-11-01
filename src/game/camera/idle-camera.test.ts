@@ -41,3 +41,33 @@ test("manual camera positioning stays put until movement resumes", () => {
   for (let i = 0; i < 60; i++) follow.update(1 / 60, player, []);
   assert.ok(follow.yaw > yaw + 0.5);
 });
+
+test("running adds a gentle heading turn beyond the geometric trailing pivot", () => {
+  const { follow, player } = rig();
+  const p = { ...player, runSpeed: 6.5, grounded: true };
+  for (let frame = 0; frame < 60; frame++) {
+    p.x += p.runSpeed / 60;
+    const geometricYaw = Math.atan2(
+      p.x - follow.camera.position.x,
+      p.z - follow.camera.position.z,
+    );
+    follow.update(1 / 60, p, []);
+    const extraTurn = follow.yaw - geometricYaw;
+    assert.ok(
+      extraTurn > 0.001 && extraTurn < 0.006,
+      `moving camera correction ${extraTurn}`,
+    );
+  }
+});
+
+test("manual orbit controls take priority over moving heading assistance", () => {
+  const { follow, player } = rig();
+  const p = { ...player, runSpeed: 6.5, grounded: true };
+  p.x += p.runSpeed / 60;
+  const geometricYaw = Math.atan2(
+    p.x - follow.camera.position.x,
+    p.z - follow.camera.position.z,
+  );
+  follow.update(1 / 60, p, [], { orbitX: -0.1, orbitY: 0, recenter: false });
+  assert.ok(Math.abs(follow.yaw - (geometricYaw - 0.1)) < 1e-8);
+});

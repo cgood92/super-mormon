@@ -21,11 +21,15 @@ test("held side input circles the trailing camera while forward input pulls it a
       Math.cos(follow.yaw - previousYaw),
     );
     previousYaw = follow.yaw;
+    assert.ok(
+      camera.position.distanceTo(start) < 3.6,
+      "moving assistance should keep the eye within half the base orbit distance of the circle center",
+    );
   }
   assert.ok(turn > Math.PI * 2, `held left turned only ${turn} radians`);
   assert.ok(
-    camera.position.distanceTo(start) < 2,
-    "camera should remain near the circle center",
+    camera.position.distanceTo(start) < 3.6,
+    "camera should remain near the circle center with gentle moving assistance",
   );
   const straight = createPlayer();
   follow.reset(straight);

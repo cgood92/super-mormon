@@ -426,16 +426,23 @@ export class FollowCamera {
       this.recenterTime = Math.max(0, this.recenterTime - dt);
     }
     if (
-      (player.runSpeed ?? 0) < 0.05 &&
+      player.grounded !== false &&
       !this.manualIdleView &&
       this.orbitTarget === null &&
       this.recenterTime === 0 &&
       !externallyMoved
     ) {
-      // SM64 default goal-yaw steps: 0x100 neutral, 0x20 with held stick,
-      // at 30 Hz. Physical eye collision remains authoritative.
-      const rate =
-        ((orbit.movementIntent ? 5.2734375 : 42.1875) * Math.PI) / 180;
+      // Keep the moving correction lighter than idle centering so sustained
+      // sideways input still arcs around the camera. Physical eye collision
+      // remains authoritative. Idle rates derive from SM64's 30 Hz goal steps.
+      const speed = player.runSpeed ?? 0;
+      const degreesPerSecond =
+        speed >= 0.05
+          ? 12 * clamp(speed / 6.5, 0.35, 1)
+          : orbit.movementIntent
+            ? 5.2734375
+            : 42.1875;
+      const rate = (degreesPerSecond * Math.PI) / 180;
       this.yaw += clamp(angleDiff(player.yaw, this.yaw), -rate * dt, rate * dt);
     }
     if (this.restoreTime > 0) {
