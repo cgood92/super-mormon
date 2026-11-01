@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import * as T from "three";
-import { FollowCamera, resolveCameraPosition } from "./camera.ts";
+import {
+  FollowCamera,
+  resolveCameraPosition,
+  cameraSegmentClear,
+} from "./camera.ts";
 import { createCharacter } from "../characters/character.ts";
 
 test("conference keeps a wide overview alongside the low story camera", () => {
@@ -151,20 +155,19 @@ test("far zoom still stops in front of a wall", () => {
   );
 });
 
-test("wall obstruction clamps immediately and clears as space opens", () => {
+test("sightline obstruction leaves chosen zoom unchanged", () => {
   const camera = new T.PerspectiveCamera(65, 1, 0.08, 100);
   const follow = new FollowCamera(camera);
   const p = { x: 0, y: 0, z: 0, yaw: 0, runSpeed: 0 };
   const wall = { x: 0, y: 0, z: -2.4, w: 3, h: 6, d: 0.5 };
   follow.reset(p);
+  const previous = camera.position.clone();
   follow.update(1 / 60, p, [wall]);
-  assert.ok(follow.obstructed);
-  assert.ok(follow.obstructionAmount > 0);
-  assert.ok(camera.position.z > -2, "camera crossed wall while easing");
-  follow.update(1 / 60, p, []);
   assert.equal(follow.obstructed, false);
   assert.equal(follow.obstructionAmount, 0);
-  assert.ok(camera.position.z > -7, "camera should ease back outward");
+  assert.ok(camera.position.distanceTo(previous) < 0.001);
+  follow.update(1 / 60, p, []);
+  assert.ok(camera.position.distanceTo(previous) < 0.001);
 });
 
 test("eased zoom stays outside walls while the camera orbits", () => {
@@ -172,18 +175,21 @@ test("eased zoom stays outside walls while the camera orbits", () => {
   const follow = new FollowCamera(camera);
   const p = { x: 0, y: 0, z: 0, yaw: 0, runSpeed: 0 };
   const wall = { x: -2, y: 0, z: -5.5, w: 2, h: 8, d: 0.8 };
-  const target = new T.Vector3(0, 1, 0);
   follow.reset(p);
   for (let frame = 0; frame < 30; frame++) {
+    const previous = camera.position.clone();
     follow.update(1 / 60, p, [wall], {
       orbitX: frame === 0 ? Math.PI / 2 : 0,
       orbitY: 0,
       recenter: false,
       zoom: frame === 0 ? -1 : 0,
     });
-    const safe = resolveCameraPosition(target, camera.position, [wall]);
     assert.ok(
-      safe.distanceTo(camera.position) < 0.001,
+      cameraSegmentClear(camera.position, camera.position, [wall], 0.2),
+      `camera volume entered wall on orbit frame ${frame}`,
+    );
+    assert.ok(
+      cameraSegmentClear(previous, camera.position, [wall], 0.2),
       `camera crossed wall on orbit frame ${frame}`,
     );
   }

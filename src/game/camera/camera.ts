@@ -129,6 +129,108 @@ export function resolveCameraPosition(
     .addScaledVector(ray, clamp(nearest - 0.12 / distance, 0.12, 1));
 }
 
+/** Recover an eye embedded by a spawn, authored cut, or moving prop locally. */
+function recoverCameraEye(eye: T.Vector3, solids: readonly Solid[]): T.Vector3 {
+  const radius = 0.22;
+  if (cameraSegmentClear(eye, eye, solids, radius)) return eye.clone();
+  let nearest: T.Vector3 | undefined;
+  for (const axis of [0, 1, 2]) {
+    for (const direction of [-1, 1]) {
+      const trial = eye.clone();
+      // Each pass moves monotonically beyond an overlapping solid on this axis.
+      for (let pass = 0; pass <= solids.length; pass++) {
+        const overlap = solids.find(
+          (solid) => !cameraSegmentClear(trial, trial, [solid], radius),
+        );
+        if (!overlap) break;
+        const center =
+          axis === 0
+            ? overlap.x
+            : axis === 1
+              ? overlap.y + overlap.h / 2
+              : overlap.z;
+        const size =
+          axis === 0 ? overlap.w : axis === 1 ? overlap.h : overlap.d;
+        trial.setComponent(
+          axis,
+          center + direction * (size / 2 + radius + 0.001),
+        );
+      }
+      if (
+        cameraSegmentClear(trial, trial, solids, radius) &&
+        (!nearest ||
+          trial.distanceToSquared(eye) < nearest.distanceToSquared(eye))
+      )
+        nearest = trial;
+    }
+  }
+  return nearest ?? eye.clone();
+}
+
+/** Clamp only physical eye travel; scenery may occlude the player freely. */
+function moveCameraEye(
+  previous: T.Vector3,
+  requested: T.Vector3,
+  solids: readonly Solid[],
+): T.Vector3 {
+  const start = recoverCameraEye(previous, solids);
+  if (cameraSegmentClear(start, requested, solids, 0.22)) return requested;
+  let clear = 0,
+    blocked = 1;
+  for (let iteration = 0; iteration < 24; iteration++) {
+    const fraction = (clear + blocked) / 2;
+    const trial = start.clone().lerp(requested, fraction);
+    if (cameraSegmentClear(start, trial, solids, 0.22)) clear = fraction;
+    else blocked = fraction;
+  }
+  return start.lerp(requested, clear);
+}
+
+/** A local two-corner route around the first physical eye blocker. */
+function cameraEyeDetour(
+  previous: T.Vector3,
+  requested: T.Vector3,
+  solids: readonly Solid[],
+): T.Vector3[] {
+  const delta = requested.clone().sub(previous);
+  const forward = Math.abs(delta.x) > Math.abs(delta.z) ? 0 : 2;
+  const side = forward === 0 ? 2 : 0;
+  let blocker: Solid | undefined;
+  let nearest = Infinity;
+  for (const solid of solids) {
+    if (cameraSegmentClear(previous, requested, [solid], 0.22)) continue;
+    const hit = moveCameraEye(previous, requested, [solid]);
+    const distance = hit.distanceToSquared(previous);
+    if (distance < nearest) {
+      nearest = distance;
+      blocker = solid;
+    }
+  }
+  if (!blocker || Math.abs(delta.getComponent(forward)) < 0.0001) return [];
+  const center = side === 0 ? blocker.x : blocker.z;
+  const size = side === 0 ? blocker.w : blocker.d;
+  const direction = previous.getComponent(side) < center ? -1 : 1;
+  const around = center + direction * (size / 2 + 0.27);
+  // Broad walls remain barriers; this is a short sidestep around a local prop.
+  if (Math.abs(around - previous.getComponent(side)) > 3) return [];
+  const first = previous.clone().setComponent(side, around);
+  const exitCenter = forward === 0 ? blocker.x : blocker.z;
+  const exitSize = forward === 0 ? blocker.w : blocker.d;
+  const second = first
+    .clone()
+    .setComponent(
+      forward,
+      exitCenter +
+        Math.sign(delta.getComponent(forward)) * (exitSize / 2 + 0.27),
+    );
+  if (
+    !cameraSegmentClear(previous, first, solids, 0.22) ||
+    !cameraSegmentClear(first, second, solids, 0.22)
+  )
+    return [];
+  return [first, second];
+}
+
 export class FollowCamera {
   /** Movement frame before the small look-ahead pan, measured toward the player. */
   yaw = 0;
@@ -138,6 +240,8 @@ export class FollowCamera {
   private lastEye = new T.Vector3();
   private smoothDistance = MODES.hub.distance;
   private speedPullback = 0;
+  private eyeDetour: T.Vector3[] = [];
+  private finishingDetour = false;
   private orbitTarget: number | null = null;
   private recenterTime = 0;
   private restoreTime = 0;
@@ -159,6 +263,8 @@ export class FollowCamera {
     this.yaw = yawOverride;
     this.pitch = preset.elevation;
     this.orbitTarget = null;
+    this.eyeDetour = [];
+    this.finishingDetour = false;
     this.recenterTime = this.restoreTime = this.speedPullback = 0;
     this.obstructionAmount = 0;
     this.zoomLevel = 1;
@@ -187,6 +293,10 @@ export class FollowCamera {
     const preset = MODES[mode];
     const previous = this.camera.position.clone();
     const externallyMoved = previous.distanceToSquared(this.lastEye) > 0.0025;
+    const playerTravel = Math.hypot(
+      player.x - this.target.x,
+      player.z - this.target.z,
+    );
     this.target.x = player.x;
     this.target.z = player.z;
     const wantedHeight =
@@ -200,6 +310,8 @@ export class FollowCamera {
       dz = this.target.z - previous.z;
     if (Math.hypot(dx, dz) > 0.1) this.yaw = Math.atan2(dx, dz);
     if (externallyMoved) {
+      this.eyeDetour = [];
+      this.finishingDetour = false;
       this.smoothDistance = previous.distanceTo(this.target);
       this.pitch = clamp(
         Math.atan2(previous.y - this.target.y, Math.hypot(dx, dz)),
@@ -213,6 +325,8 @@ export class FollowCamera {
     if (orbit.zoom)
       this.zoomLevel = clamp(this.zoomLevel + Math.sign(orbit.zoom), 0, 2);
     if (Math.abs(orbit.orbitX) + Math.abs(orbit.orbitY) > 0.0001) {
+      this.eyeDetour = [];
+      this.finishingDetour = false;
       if (Math.abs(orbit.orbitX) > 0.45)
         this.orbitTarget = (this.orbitTarget ?? this.yaw) + orbit.orbitX;
       else {
@@ -230,6 +344,8 @@ export class FollowCamera {
       }
     }
     if (orbit.recenter) {
+      this.eyeDetour = [];
+      this.finishingDetour = false;
       this.orbitTarget = null;
       this.recenterTime = 0.8;
     }
@@ -247,76 +363,37 @@ export class FollowCamera {
       ease(2, dt);
     const requestedDistance =
       (preset.distance + this.speedPullback) * ZOOM_DISTANCES[this.zoomLevel];
-    const requested = this.desired(this.target, requestedDistance);
-    const safe = resolveCameraPosition(this.target, requested, solids, 0.22);
-    const safeDistance = safe.distanceTo(this.target);
+    this.smoothDistance +=
+      (requestedDistance - this.smoothDistance) * ease(11, dt);
+    const candidate = this.desired(this.target, this.smoothDistance);
+    const directClear = cameraSegmentClear(previous, candidate, solids, 0.22);
+    if (directClear) this.eyeDetour = [];
+    else if (!this.eyeDetour.length && playerTravel > 0.0001) {
+      this.eyeDetour = cameraEyeDetour(previous, candidate, solids);
+      if (this.eyeDetour.length) this.finishingDetour = true;
+    }
+    while (
+      this.eyeDetour.length &&
+      previous.distanceTo(this.eyeDetour[0]) < 0.02
+    )
+      this.eyeDetour.shift();
+    let motionGoal = this.eyeDetour[0] ?? candidate;
+    if (this.finishingDetour) {
+      const distance = previous.distanceTo(motionGoal);
+      motionGoal = previous
+        .clone()
+        .lerp(motionGoal, Math.min(1, (12 * dt) / Math.max(distance, 0.001)));
+    }
+    const final = moveCameraEye(previous, motionGoal, solids);
+    if (!this.eyeDetour.length && final.distanceTo(candidate) < 0.001)
+      this.finishingDetour = false;
     this.obstructionAmount = clamp(
-      (requestedDistance - safeDistance) / requestedDistance,
+      final.distanceTo(candidate) /
+        Math.max(0.001, previous.distanceTo(candidate)),
       0,
       1,
     );
-    this.smoothDistance =
-      safeDistance < this.smoothDistance && this.obstructed
-        ? safeDistance
-        : this.smoothDistance +
-          (safeDistance - this.smoothDistance) * ease(11, dt);
-    const candidate = resolveCameraPosition(
-      this.target,
-      this.desired(this.target, this.smoothDistance),
-      solids,
-      0.22,
-    );
-    const pointClear = (eye: T.Vector3) =>
-      cameraSegmentClear(eye, eye, solids, 0.2);
-    const visible = (eye: T.Vector3) =>
-      pointClear(eye) && cameraSegmentClear(this.target, eye, solids, 0.18);
-    let final = candidate;
-    const recovering = !visible(previous);
-    if (
-      !visible(candidate) ||
-      (!recovering && !cameraSegmentClear(previous, candidate, solids, 0.2))
-    ) {
-      // Search reachable clear views before retaining the old eye. A camera that
-      // starts embedded (or has a prop move into it) recovers directly to safety.
-      let replacement: T.Vector3 | undefined;
-      for (const lift of [0, 1, 2, 4, 8]) {
-        for (const turn of [0, 0.25, -0.25, 0.5, -0.5, 1, -1, Math.PI]) {
-          const trial = this.desired(
-            this.target,
-            this.smoothDistance,
-            this.yaw + turn,
-          );
-          trial.y += lift;
-          const clipped = resolveCameraPosition(
-            this.target,
-            trial,
-            solids,
-            0.22,
-          );
-          if (
-            visible(clipped) &&
-            (recovering || cameraSegmentClear(previous, clipped, solids, 0.2))
-          ) {
-            replacement = clipped;
-            break;
-          }
-        }
-        if (replacement) break;
-      }
-      if (replacement) final = replacement;
-      else if (visible(previous)) final = previous;
-      else if (visible(candidate)) final = candidate;
-      else final = previous;
-    }
-    if (final.distanceToSquared(candidate) > 0.0001) {
-      this.pitch = Math.atan2(
-        final.y - this.target.y,
-        Math.hypot(final.x - this.target.x, final.z - this.target.z),
-      );
-      this.restoreTime = 1;
-    }
     this.camera.position.copy(final);
-    this.smoothDistance = final.distanceTo(this.target);
     const finalDx = this.target.x - final.x,
       finalDz = this.target.z - final.z;
     if (Math.hypot(finalDx, finalDz) > 0.1)
@@ -329,9 +406,7 @@ export class FollowCamera {
     );
     this.lead.lerp(desiredLead, ease(5, dt));
     const focus = this.target.clone().add(this.lead);
-    this.camera.lookAt(
-      cameraSegmentClear(final, focus, solids, 0.05) ? focus : this.target,
-    );
+    this.camera.lookAt(focus);
     this.lastEye.copy(final);
   }
 

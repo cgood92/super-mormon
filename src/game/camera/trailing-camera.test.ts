@@ -62,14 +62,11 @@ test("a nearby wall cannot trap a trailing camera after the wall moves into its 
     cameraSegmentClear(camera.position, camera.position, [wall], 0.18),
     "recover embedded eye",
   );
+  const recovered = camera.position.clone();
+  follow.update(1 / 60, p, [wall]);
   assert.ok(
-    cameraSegmentClear(
-      new T.Vector3(p.x, p.y + 1, p.z),
-      camera.position,
-      [wall],
-      0.16,
-    ),
-    "keep player sightline clear",
+    cameraSegmentClear(recovered, camera.position, [wall], 0.18),
+    "recovered eye must continue moving without crossing the wall",
   );
   follow.update(1 / 60, p, []);
   assert.equal(follow.obstructed, false);
@@ -95,15 +92,6 @@ test("trailing camera motion stays clear while orbiting around a solid corner", 
     assert.ok(
       cameraSegmentClear(previous, camera.position, [wall], 0.16),
       `swept eye clear frame ${i}`,
-    );
-    assert.ok(
-      cameraSegmentClear(
-        new T.Vector3(p.x, p.y + 1, p.z),
-        camera.position,
-        [wall],
-        0.16,
-      ),
-      `sightline clear frame ${i}`,
     );
   }
 });
