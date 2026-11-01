@@ -1155,18 +1155,24 @@ function makeSculpted(
   if (index === 2 && hasOuterCoat) {
     // The coat's opening reveals a narrow, actual front panel. The rest of the
     // old full-length white skirt was buried inside the coat and could escape
-    // through its side during a turn. This surface ends beneath the shirt.
+    // through its side during a turn. The upper edge must enter the torso,
+    // beyond its rounded waist: ending at the waist height leaves a visible
+    // open slot between the flat insert and the receding shirt surface.
     add(
       surface(16, 20, (u, v) => {
         const y = T.MathUtils.lerp(
           role === "moroni" ? 0.69 : (cast?.hem ?? 0.24),
-          0.82,
+          0.98,
           v,
         );
         const width =
           role === "moroni"
             ? T.MathUtils.lerp(0.024, 0.055, v)
-            : T.MathUtils.lerp(0.09, 0.135, v);
+            : T.MathUtils.lerp(
+                T.MathUtils.lerp(0.09, 0.135, v),
+                (body?.skirtWaist ?? 0.31) * 0.95,
+                T.MathUtils.smoothstep(y, 0.65, 0.85),
+              );
         const x = (u * 2 - 1) * width;
         const t = T.MathUtils.clamp(
           (y - (cast?.hem ?? 0.24)) / (1.08 - (cast?.hem ?? 0.24)),
