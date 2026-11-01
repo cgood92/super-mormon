@@ -99,7 +99,17 @@ test("Teancum's night route uses cover, a non-graphic tent event, and a return t
     if (point === TEANCUM_ROUTE[5]) {
       h.walk({ x: 0, y: 0, z: 87 });
       h.walk({ x: -22, y: 0, z: 68 });
+      h.walk({ x: -22, y: 0, z: 5 });
+      h.walk({ x: -12, y: 0, z: 5 });
+      h.walk({ x: -12, y: 0, z: -48 });
+      h.walk({ x: -22, y: 0, z: -48 });
       h.walk({ x: -22, y: 0, z: -130 });
+    }
+    if (point === TEANCUM_ROUTE[3]) {
+      h.walk({ x: -22, y: 0, z: -48 });
+      h.walk({ x: -12, y: 0, z: -48 });
+      h.walk({ x: -12, y: 0, z: 5 });
+      h.walk({ x: -22, y: 0, z: 5 });
     }
     h.walk(point);
     h.use();
@@ -190,26 +200,37 @@ test("all war-story shots keep the player visible through entrance and return", 
         wait++
       )
         runtime.update(0.1, player, idle);
-      if (index === 5) {
-        for (const point of [
-          { x: 0, z: 87 },
-          { x: -22, z: 68 },
-          { x: -22, z: -130 },
-        ]) {
-          Object.assign(player, createPlayer(point.x, 0, point.z));
-          for (let i = 0; i < 1500; i++) {
-            runtime.update(0.1, player, idle);
-            const state = runtime.snapshot() as {
-              servant: { x: number; z: number };
-            };
-            if (
-              Math.hypot(
-                state.servant.x - player.x,
-                state.servant.z - player.z,
-              ) < 2
-            )
-              break;
-          }
+      const detour =
+        index === 3
+          ? [
+              { x: -22, z: -48 },
+              { x: -12, z: -48 },
+              { x: -12, z: 5 },
+              { x: -22, z: 5 },
+            ]
+          : index === 5
+            ? [
+                { x: 0, z: 87 },
+                { x: -22, z: 68 },
+                { x: -22, z: 5 },
+                { x: -12, z: 5 },
+                { x: -12, z: -48 },
+                { x: -22, z: -48 },
+                { x: -22, z: -130 },
+              ]
+            : [];
+      for (const point of detour) {
+        Object.assign(player, createPlayer(point.x, 0, point.z));
+        for (let i = 0; i < 1500; i++) {
+          runtime.update(0.1, player, idle);
+          const state = runtime.snapshot() as {
+            servant: { x: number; z: number };
+          };
+          if (
+            Math.hypot(state.servant.x - player.x, state.servant.z - player.z) <
+            2
+          )
+            break;
         }
       }
       Object.assign(
