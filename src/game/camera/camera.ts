@@ -498,7 +498,37 @@ export class FollowCamera {
         .clone()
         .lerp(motionGoal, Math.min(1, (12 * dt) / Math.max(distance, 0.001)));
     }
-    const final = moveCameraEye(previous, motionGoal, solids);
+    let final = moveCameraEye(previous, motionGoal, solids);
+    // A balcony slab can separate the eye from a player who jumped into an
+    // open stairwell. Once the player and full-size follow eye are below it,
+    // cut to that clear lower-floor view rather than remaining above the slab.
+    // This is a floor-change recovery, never a response to a column sightline.
+    if (
+      previous.y - player.y > 6 &&
+      candidate.y < previous.y - 1.5 &&
+      !directClear &&
+      cameraSegmentClear(candidate, candidate, solids, 0.28) &&
+      cameraSegmentClear(
+        new T.Vector3(player.x, player.y + preset.targetHeight, player.z),
+        candidate,
+        solids,
+        0.05,
+      ) &&
+      solids.some(
+        (solid) =>
+          solid.h <= 1.5 &&
+          solid.w >= 3 &&
+          solid.d >= 3 &&
+          previous.y >= solid.y + solid.h + 0.2 &&
+          player.y + 1.8 < solid.y &&
+          candidate.y < solid.y - 0.28 &&
+          !cameraSegmentClear(previous, candidate, [solid], 0.22),
+      )
+    ) {
+      final = candidate;
+      this.eyeDetour = [];
+      this.finishingDetour = false;
+    }
     if (!this.eyeDetour.length && final.distanceTo(candidate) < 0.001)
       this.finishingDetour = false;
     this.obstructionAmount = clamp(
