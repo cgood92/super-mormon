@@ -378,6 +378,71 @@ export function buildJerusalem(
             : "Find Laban in the city and follow Zoram to the palace treasury",
     spawn: { x: 0, y: 0, z: id === "night" ? 44 : 25, yaw: Math.PI },
     actorParent: group,
+    cameraRooms: [
+      {
+        id: "palace-west-passage",
+        // Room boundaries meet at the x=-12 doorway plane. Collision still
+        // keeps the eye clear of its solid wall sections.
+        bounds: { minX: -17.5, maxX: -12, minZ: -28, maxZ: -9 },
+        distance: 3,
+        elevation: 0.25,
+        targetHeight: 1,
+        entryEyes: [
+          { x: -15, y: 2.1, z: -12 },
+          { x: -15, y: 2.1, z: -14 },
+        ],
+        exitEyes: [
+          { x: -15, y: 2.1, z: -6.5 },
+          { x: -10, y: 2.1, z: -14 },
+        ],
+      },
+      {
+        id: "palace-audience",
+        // Shared wall-center planes avoid an unzoned gap through either door.
+        bounds: { minX: -12, maxX: 8, minZ: -28, maxZ: -9.4 },
+        distance: 5,
+        elevation: 0.28,
+        targetHeight: 1,
+        entryEyes: [
+          { x: -10, y: 2.2, z: -14 },
+          { x: 0, y: 2.3, z: -12.5 },
+          { x: 6, y: 2.2, z: -14 },
+        ],
+        exitEyes: [
+          { x: -15, y: 2.1, z: -14 },
+          { x: 0, y: 2.3, z: -6.5 },
+          { x: 11, y: 2.2, z: -14 },
+        ],
+      },
+      {
+        id: "palace-treasury-entry",
+        // The vestibule and treasury meet at the physical z=-18 doorway.
+        bounds: { minX: 8, maxX: 17.4, minZ: -18, maxZ: -9.4 },
+        distance: 5,
+        elevation: 0.28,
+        targetHeight: 1,
+        entryEyes: [
+          { x: 11, y: 2.2, z: -14 },
+          { x: 14, y: 2.2, z: -15.5 },
+          { x: 14, y: 2.2, z: -12 },
+        ],
+        exitEyes: [
+          { x: 6, y: 2.2, z: -14 },
+          { x: 14, y: 2.2, z: -20.5 },
+          { x: 14, y: 2.2, z: -6.5 },
+        ],
+      },
+      {
+        id: "palace-treasury",
+        // Camera handoff stays in the x=[12,16] opening through the partition.
+        bounds: { minX: 8, maxX: 17.4, minZ: -28, maxZ: -18 },
+        distance: 5,
+        elevation: 0.28,
+        targetHeight: 1,
+        entryEyes: [{ x: 14, y: 2.2, z: -20.5 }],
+        exitEyes: [{ x: 14, y: 2.2, z: -15.5 }],
+      },
+    ],
     adventure:
       id === "streets"
         ? (hooks) =>

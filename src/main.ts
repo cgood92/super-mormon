@@ -50,6 +50,8 @@ import {
   adventureCameraYaw,
 } from "./game/camera/adventure-camera";
 import { FollowCamera } from "./game/camera/camera";
+import { selectCameraRoom } from "./game/camera/camera-rooms";
+import { CameraRelativeInput } from "./game/camera/camera-relative-input";
 import type { WorldData, WorldId } from "./game/runtime/worlds";
 import {
   sceneEntry,
@@ -126,6 +128,7 @@ renderer.outputColorSpace = T.SRGBColorSpace;
 el("viewport").append(renderer.domElement);
 const camera = new T.PerspectiveCamera(58, 1, 0.08, 320),
   follow = new FollowCamera(camera),
+  cameraRelativeInput = new CameraRelativeInput(),
   input = new Input(document);
 const analytics = new GameplayAnalytics(
   browserAnalytics(
@@ -810,6 +813,7 @@ async function load(id: WorldId) {
   (world.actorParent ?? scene).add(avatar.group);
   avatar.update(0, player);
   follow.reset(player, player.yaw, cameraModeForWorld(id));
+  cameraRelativeInput.reset();
   levelTime = 0;
   guardsActive = id === "streets";
   caughtGrace = 3;
@@ -1226,6 +1230,7 @@ function resetCaughtCheckpoint() {
   avatar.update(0, player);
   treeScene?.respawn(player);
   follow.reset(player, player.yaw, cameraModeForWorld(worldId));
+  cameraRelativeInput.reset();
   for (const object of carryObjects) if (object.held) resetCarryObject(object);
   caughtGrace = 3.4;
 }
@@ -1279,6 +1284,11 @@ function update(dt: number, activeElapsed = dt) {
     }
   }
   const state = input.latest(dt);
+  if (adventure?.camera?.()) cameraRelativeInput.reset();
+  const movementYaw = cameraRelativeInput.yaw(
+    state,
+    adventureCameraYaw(adventure?.camera?.(), follow.yaw),
+  );
   if (!started) {
     splashTime += dt;
     if (splashTime >= 2.6 || state.jump || state.interact) startGame();
@@ -1354,7 +1364,7 @@ function update(dt: number, activeElapsed = dt) {
       ? { ...state, x: 0, y: 0, jump: false, jumpHeld: false }
       : state,
     dt,
-    adventureCameraYaw(adventure?.camera?.(), follow.yaw),
+    movementYaw,
     world.solids,
     world.climbables,
     world.swimRegions,
@@ -1478,6 +1488,7 @@ function update(dt: number, activeElapsed = dt) {
       state.recenter,
       dt,
     );
+    const previousRoom = follow.roomId;
     follow.update(
       dt,
       player,
@@ -1487,9 +1498,13 @@ function update(dt: number, activeElapsed = dt) {
         orbitY: state.cameraY,
         recenter: state.recenter,
         zoom: state.cameraZoom,
+        movementIntent: Math.hypot(state.x, state.y) > 0.05,
       },
       cameraModeForWorld(worldId),
+      selectCameraRoom(world.cameraRooms ?? [], player, follow.roomId),
     );
+    if (previousRoom !== follow.roomId)
+      cameraRelativeInput.hold(state, movementYaw);
   }
   if (adventureCamera) {
     applyAdventureCamera(camera, adventureCamera, world.solids, dt);
@@ -1933,6 +1948,7 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has("playtest"))
         player: { ...player },
         cameraYaw: follow.yaw,
         cameraObstructed: follow.obstructed,
+        cameraRoom: follow.roomId,
         story: storyScene?.snapshot(),
         vision: treeScene?.snapshot(),
         cinematic: cinematic?.snapshot() ?? { active: false },

@@ -1,5 +1,6 @@
 import * as T from "three";
 import type { Solid } from "../physics/physics";
+import type { CameraRoom } from "./camera-rooms";
 
 export type CameraPlayer = {
   x: number;
@@ -15,6 +16,7 @@ export type CameraOrbit = {
   orbitY: number;
   recenter: boolean;
   zoom?: number;
+  movementIntent?: boolean;
 };
 export type CameraMode =
   "hub" | "conference" | "streets" | "house" | "palace" | "trade" | "night";
@@ -235,6 +237,10 @@ export class FollowCamera {
   /** Movement frame before the small look-ahead pan, measured toward the player. */
   yaw = 0;
   pitch = MODES.hub.elevation;
+  private room: CameraRoom | undefined;
+  get roomId(): string | undefined {
+    return this.room?.id;
+  }
   private target = new T.Vector3();
   private lead = new T.Vector3();
   private lastEye = new T.Vector3();
@@ -243,6 +249,7 @@ export class FollowCamera {
   private eyeDetour: T.Vector3[] = [];
   private finishingDetour = false;
   private orbitTarget: number | null = null;
+  private manualIdleView = false;
   private recenterTime = 0;
   private restoreTime = 0;
   obstructionAmount = 0;
@@ -260,6 +267,8 @@ export class FollowCamera {
     mode: CameraMode = "hub",
   ): void {
     const preset = MODES[mode];
+    this.manualIdleView = false;
+    this.room = undefined;
     this.yaw = yawOverride;
     this.pitch = preset.elevation;
     this.orbitTarget = null;
@@ -287,11 +296,70 @@ export class FollowCamera {
     solids: readonly Solid[],
     orbit: CameraOrbit = { orbitX: 0, orbitY: 0, recenter: false },
     mode: CameraMode = "hub",
+    room?: CameraRoom,
   ): void {
     if (!this.initialized) this.reset(player, player.yaw, mode);
     dt = clamp(dt, 0, 0.1);
-    const preset = MODES[mode];
-    const previous = this.camera.position.clone();
+    const preset = room ?? MODES[mode];
+    let previous = this.camera.position.clone();
+    const roomChanged = room?.id !== this.room?.id;
+    if (roomChanged) {
+      const anchors = room?.entryEyes ?? this.room?.exitEyes ?? [];
+      const focus = new T.Vector3(
+        player.x,
+        player.y + preset.targetHeight,
+        player.z,
+      );
+      const safe = anchors
+        .map((p) => new T.Vector3(p.x, p.y, p.z))
+        .filter(
+          (eye) =>
+            cameraSegmentClear(eye, eye, solids) &&
+            cameraSegmentClear(focus, eye, solids, 0.05),
+        );
+      // Recovery when loading inside a room or when a prop blocks its door shot.
+      // Search only on a room transition; normal play never hunts for visibility.
+      if (!safe.length && room) {
+        for (const distance of [3, 1.5])
+          for (let i = 0; i < 8; i++) {
+            const yaw = player.yaw + (i * Math.PI) / 4;
+            const eye = new T.Vector3(
+              clamp(
+                focus.x - Math.sin(yaw) * distance,
+                room.bounds.minX + 0.55,
+                room.bounds.maxX - 0.55,
+              ),
+              focus.y + 1.2,
+              clamp(
+                focus.z - Math.cos(yaw) * distance,
+                room.bounds.minZ + 0.55,
+                room.bounds.maxZ - 0.55,
+              ),
+            );
+            if (
+              cameraSegmentClear(eye, eye, solids) &&
+              cameraSegmentClear(focus, eye, solids, 0.05)
+            )
+              safe.push(eye);
+          }
+      }
+      safe.sort(
+        (a, b) => a.distanceToSquared(focus) - b.distanceToSquared(focus),
+      );
+      // An authored doorway transition may cut across a wall. Ordinary following
+      // still sweeps physical eye travel and never zooms for sightline occlusion.
+      if (safe[0]) previous = safe[0];
+      this.camera.position.copy(previous);
+      this.lastEye.copy(previous);
+      this.room = room;
+      this.pitch = preset.elevation;
+      this.smoothDistance = preset.distance;
+      this.speedPullback = 0;
+      this.eyeDetour = [];
+      this.finishingDetour = false;
+      this.orbitTarget = null;
+      this.lead.set(0, 0, 0);
+    }
     const externallyMoved = previous.distanceToSquared(this.lastEye) > 0.0025;
     const playerTravel = Math.hypot(
       player.x - this.target.x,
@@ -322,9 +390,11 @@ export class FollowCamera {
       this.orbitTarget = null;
       this.lead.set(0, 0, 0);
     }
+    if ((player.runSpeed ?? 0) > 0.2) this.manualIdleView = false;
     if (orbit.zoom)
       this.zoomLevel = clamp(this.zoomLevel + Math.sign(orbit.zoom), 0, 2);
     if (Math.abs(orbit.orbitX) + Math.abs(orbit.orbitY) > 0.0001) {
+      this.manualIdleView = true;
       this.eyeDetour = [];
       this.finishingDetour = false;
       if (Math.abs(orbit.orbitX) > 0.45)
@@ -344,6 +414,7 @@ export class FollowCamera {
       }
     }
     if (orbit.recenter) {
+      this.manualIdleView = false;
       this.eyeDetour = [];
       this.finishingDetour = false;
       this.orbitTarget = null;
@@ -353,6 +424,19 @@ export class FollowCamera {
       this.yaw += angleDiff(player.yaw, this.yaw) * ease(7, dt);
       this.pitch += (preset.elevation - this.pitch) * ease(5, dt);
       this.recenterTime = Math.max(0, this.recenterTime - dt);
+    }
+    if (
+      (player.runSpeed ?? 0) < 0.05 &&
+      !this.manualIdleView &&
+      this.orbitTarget === null &&
+      this.recenterTime === 0 &&
+      !externallyMoved
+    ) {
+      // SM64 default goal-yaw steps: 0x100 neutral, 0x20 with held stick,
+      // at 30 Hz. Physical eye collision remains authoritative.
+      const rate =
+        ((orbit.movementIntent ? 5.2734375 : 42.1875) * Math.PI) / 180;
+      this.yaw += clamp(angleDiff(player.yaw, this.yaw), -rate * dt, rate * dt);
     }
     if (this.restoreTime > 0) {
       this.pitch += (preset.elevation - this.pitch) * ease(4, dt);
@@ -366,10 +450,33 @@ export class FollowCamera {
     this.smoothDistance +=
       (requestedDistance - this.smoothDistance) * ease(11, dt);
     const candidate = this.desired(this.target, this.smoothDistance);
+    if (room) {
+      candidate.x = clamp(
+        candidate.x,
+        room.bounds.minX + 0.55,
+        room.bounds.maxX - 0.55,
+      );
+      candidate.z = clamp(
+        candidate.z,
+        room.bounds.minZ + 0.55,
+        room.bounds.maxZ - 0.55,
+      );
+    }
     const directClear = cameraSegmentClear(previous, candidate, solids, 0.22);
     if (directClear) this.eyeDetour = [];
     else if (!this.eyeDetour.length && playerTravel > 0.0001) {
       this.eyeDetour = cameraEyeDetour(previous, candidate, solids);
+      if (
+        room &&
+        this.eyeDetour.some(
+          (eye) =>
+            eye.x < room.bounds.minX + 0.55 ||
+            eye.x > room.bounds.maxX - 0.55 ||
+            eye.z < room.bounds.minZ + 0.55 ||
+            eye.z > room.bounds.maxZ - 0.55,
+        )
+      )
+        this.eyeDetour = [];
       if (this.eyeDetour.length) this.finishingDetour = true;
     }
     while (
