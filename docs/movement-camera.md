@@ -34,4 +34,4 @@ Conference Center column traversal is checked separately from sightline visibili
 
 Palace camera acceptance also covers normal keyboard walking from the city spawn around the west entrance, through the audience hall and both treasury chambers, and back outside, on desktop and portrait phone views. Focused checks cover stationary yaw rates, manual idle positioning, blocked transition anchors and movement continuity across camera cuts.
 
-The room/stationary-camera iteration passed the full 700-test suite, the production build, and 71 final focused camera/room checks including the additional blocked-anchor and integrated return-route regressions. Independent review approved the final changes.
+The room/stationary-camera iteration passed the full 700-test suite, the production build, and 70 final focused camera/room checks including the additional blocked-anchor and integrated return-route regressions. Independent review approved the final changes.
