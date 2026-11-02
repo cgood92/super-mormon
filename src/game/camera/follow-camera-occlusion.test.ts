@@ -37,7 +37,10 @@ for (const moving of [false, true]) {
 test("walking behind a column preserves the unobstructed trailing geometry when the eye path is clear", () => {
   const actual = rig(),
     reference = rig();
-  for (let frame = 0; frame < 120; frame++) {
+  // The closer default framing reaches this column earlier. Keep the fixture
+  // within the interval where the eye's swept path is physically clear, which
+  // is the behavior this test is isolating.
+  for (let frame = 0; frame < 35; frame++) {
     const p = { ...player, z: frame / 40, runSpeed: 1.5 };
     const previous = actual.camera.position.clone();
     reference.follow.update(1 / 60, p, []);
@@ -100,6 +103,9 @@ test("the conference spawn camera follows past its physical column without freez
   const follow = new FollowCamera(camera);
   const obstacle = { x: 0, y: 0, z: 43, w: 1.5, h: 10.9, d: 1.5 };
   follow.reset(p, p.yaw, "conference");
+  // The closer default can begin inside this deliberately nearby column.
+  // Recover once before asserting subsequent swept motion.
+  follow.update(1 / 60, p, [obstacle], undefined, "conference");
   for (let frame = 0; frame < 300; frame++) {
     p.z = Math.max(15.545, p.z - 6.5 / 60);
     const previous = camera.position.clone();

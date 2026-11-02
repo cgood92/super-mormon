@@ -360,10 +360,7 @@ export class Gameplay {
         ),
       );
       if (previousRoom !== this.view.follow.roomId)
-        this.cameraRelativeInput.hold(
-          state,
-          this.movementYaw,
-        );
+        this.cameraRelativeInput.hold(state, this.movementYaw);
     }
     if (adventureCamera) {
       applyAdventureCamera(
