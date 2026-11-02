@@ -131,3 +131,30 @@ for (const floor of [12, 24]) {
     }
   });
 }
+
+test("a completed balcony drop immediately moves a stale upper-floor eye to the lower floor", () => {
+  const world = gallery(new T.Scene());
+  try {
+    const player = createPlayer(-56, 12, 25);
+    player.yaw = 0;
+    const camera = new T.PerspectiveCamera(58, 16 / 9, 0.08, 320);
+    const follow = new FollowCamera(camera);
+    follow.reset(player, player.yaw, "conference");
+
+    // This is the state just after physics resolves a drop through the open stairwell.
+    player.y = 0;
+    player.grounded = true;
+    follow.update(1 / 60, player, world.solids, undefined, "conference");
+
+    assert.ok(
+      camera.position.y < player.y + 5,
+      `camera stayed upstairs at ${camera.position.y}; player ${player.y}`,
+    );
+    assert.ok(
+      cameraSegmentClear(camera.position, camera.position, world.solids, 0.22),
+      "recovered eye must be physically clear",
+    );
+  } finally {
+    world.dispose?.();
+  }
+});

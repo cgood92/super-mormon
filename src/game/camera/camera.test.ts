@@ -8,15 +8,52 @@ import {
 } from "./camera.ts";
 import { createCharacter } from "../characters/character.ts";
 
-test("conference keeps a wide overview alongside the low story camera", () => {
+test("conference keeps a lower broad view at the closer default framing", () => {
   const camera = new T.PerspectiveCamera(58, 1, 0.08, 320);
   const follow = new FollowCamera(camera);
   const player = { x: 0, y: 0, z: 0, yaw: Math.PI, grounded: true };
   follow.reset(player, player.yaw, "conference");
   assert.ok(follow.pitch < 0.3);
-  assert.ok(camera.position.distanceTo(new T.Vector3(0, 2, 0)) > 9);
+  const distance = camera.position.distanceTo(new T.Vector3(0, 2, 0));
+  assert.ok(distance > 7 && distance < 8, `conference distance ${distance}`);
   follow.reset(player, player.yaw, "streets");
   assert.equal(follow.pitch, 0.2);
+});
+
+test("the default camera starts closer while C-Down retains a wider view", () => {
+  const camera = new T.PerspectiveCamera(58, 1, 0.08, 320);
+  const follow = new FollowCamera(camera);
+  const player = { x: 0, y: 0, z: 0, yaw: 0, grounded: true };
+  follow.reset(player, player.yaw, "conference");
+  const defaultDistance = camera.position.distanceTo(new T.Vector3(0, 2, 0));
+  assert.ok(
+    defaultDistance < 8,
+    `default conference distance ${defaultDistance}`,
+  );
+  follow.update(
+    1 / 60,
+    player,
+    [],
+    {
+      orbitX: 0,
+      orbitY: 0,
+      recenter: false,
+      zoom: 1,
+    },
+    "conference",
+  );
+  for (let frame = 0; frame < 180; frame++)
+    follow.update(
+      1 / 60,
+      player,
+      [],
+      { orbitX: 0, orbitY: 0, recenter: false },
+      "conference",
+    );
+  assert.ok(
+    camera.position.distanceTo(new T.Vector3(0, 2, 0)) > defaultDistance + 2,
+    "C-Down should restore a noticeably wider view",
+  );
 });
 
 test("camera ray stops in front of solid walls without clipping through them", () => {
@@ -60,10 +97,10 @@ test("follow camera responds to manual orbit and recenters behind player", () =>
 test("world cameras frame the character from a low trailing exploration distance", () => {
   const p = { x: 0, y: 0, z: 0, yaw: 0, grounded: true, runSpeed: 0 };
   for (const [mode, minimum] of [
-    ["hub", 7.1],
-    ["streets", 7.1],
-    ["house", 6.0],
-    ["palace", 6.9],
+    ["hub", 5.4],
+    ["streets", 5.4],
+    ["house", 4.6],
+    ["palace", 5.2],
   ] as const) {
     const camera = new T.PerspectiveCamera(58, 1, 0.08, 150);
     const follow = new FollowCamera(camera);
@@ -123,12 +160,12 @@ test("camera zoom clamps at its closest and farthest preset and resets to defaul
   follow.reset(p);
   for (let i = 0; i < 10; i++) follow.update(1 / 60, p, [], orbit(-1));
   for (let i = 0; i < 60; i++) follow.update(1 / 60, p, [], orbit(0));
-  assert.ok(Math.abs(camera.position.distanceTo(target) - 7.2 * 0.6) < 0.05);
+  assert.ok(Math.abs(camera.position.distanceTo(target) - 7.2 * 0.58) < 0.05);
   for (let i = 0; i < 10; i++) follow.update(1 / 60, p, [], orbit(1));
   for (let i = 0; i < 180; i++) follow.update(1 / 60, p, [], orbit(0));
-  assert.ok(Math.abs(camera.position.distanceTo(target) - 7.2 * 1.4) < 0.05);
+  assert.ok(Math.abs(camera.position.distanceTo(target) - 7.2 * 1.18) < 0.05);
   follow.reset(p);
-  assert.ok(Math.abs(camera.position.distanceTo(target) - 7.2) < 0.001);
+  assert.ok(Math.abs(camera.position.distanceTo(target) - 7.2 * 0.76) < 0.001);
 });
 
 test("far zoom still stops in front of a wall", () => {

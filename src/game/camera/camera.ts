@@ -34,7 +34,8 @@ const MODES: Record<
   night: { distance: 7, elevation: 0.2, targetHeight: 1 },
 };
 
-const ZOOM_DISTANCES = [0.6, 1, 1.4] as const;
+// Mario's normal exploration view is close; C-Down remains the wide option.
+const ZOOM_DISTANCES = [0.58, 0.76, 1.18] as const;
 
 const clamp = (v: number, min: number, max: number) =>
   Math.max(min, Math.min(max, v));
@@ -277,14 +278,14 @@ export class FollowCamera {
     this.recenterTime = this.restoreTime = this.speedPullback = 0;
     this.obstructionAmount = 0;
     this.zoomLevel = 1;
-    this.smoothDistance = preset.distance;
+    this.smoothDistance = preset.distance * ZOOM_DISTANCES[this.zoomLevel];
     this.target.set(
       player.x,
       player.y + (player.crouching ? 0.58 : preset.targetHeight),
       player.z,
     );
     this.lead.set(0, 0, 0);
-    this.camera.position.copy(this.desired(this.target, preset.distance));
+    this.camera.position.copy(this.desired(this.target, this.smoothDistance));
     this.camera.lookAt(this.target);
     this.lastEye.copy(this.camera.position);
     this.initialized = true;
@@ -499,6 +500,30 @@ export class FollowCamera {
         .lerp(motionGoal, Math.min(1, (12 * dt) / Math.max(distance, 0.001)));
     }
     let final = moveCameraEye(previous, motionGoal, solids);
+    const instantTarget = new T.Vector3(
+      player.x,
+      player.y + (player.crouching ? 0.58 : preset.targetHeight),
+      player.z,
+    );
+    const lowerFloorEye = this.desired(
+      instantTarget,
+      (preset.distance + this.speedPullback) * ZOOM_DISTANCES[this.zoomLevel],
+    );
+    // Vertical target easing is useful for ordinary steps, but it can retain a
+    // former upper-floor height after a player drops through an open well.
+    // Put both focus and eye on the lower floor as a single safe transition.
+    if (
+      player.grounded !== false &&
+      previous.y - player.y > 6 &&
+      final.y - player.y > 6 &&
+      cameraSegmentClear(lowerFloorEye, lowerFloorEye, solids, 0.28) &&
+      cameraSegmentClear(instantTarget, lowerFloorEye, solids, 0.05)
+    ) {
+      this.target.copy(instantTarget);
+      final = lowerFloorEye;
+      this.eyeDetour = [];
+      this.finishingDetour = false;
+    }
     // A balcony slab can separate the eye from a player who jumped into an
     // open stairwell. Once the player and full-size follow eye are below it,
     // cut to that clear lower-floor view rather than remaining above the slab.
