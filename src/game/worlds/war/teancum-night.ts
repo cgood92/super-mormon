@@ -6,7 +6,11 @@ import {
 } from "../../physics/physics";
 import { spyCanSeePlayer } from "../../camera/spy-vision";
 import { warWorld, nearWarPoint } from "../shared/war-world-kit";
-import { sceneryCanvasTent, markScenery } from "../shared/scenery";
+import {
+  sceneryCanvasTent,
+  sceneryTerraceUnion,
+  markScenery,
+} from "../shared/scenery";
 import { planStoryCamera, StoryMeshObstacles } from "../../camera/cinematic";
 import { material } from "../../rendering/art";
 import type { Point, WorldData } from "../../runtime/worlds";
@@ -21,12 +25,32 @@ export const TEANCUM_ROUTE: Point[] = [
   { x: 0, y: 0, z: -144 },
 ];
 
+// One range and angle source for the visible danger cue and actual sight.
+const SENTRY_RANGE = 20;
+const SENTRY_HALF_ANGLE = Math.PI / 12;
+
 export function buildTeancumNight(scene: T.Scene): WorldData {
   const land = warWorld(scene, "Teancum's night mission", true, {
     width: 110,
     depth: 370,
   });
   const { root, solids, solid, actor, tree } = land;
+  // Invented rocky pass: sheer inner faces close the flanking bypass, with
+  // exposed upper terraces built from the same dimensions as their support.
+  // One union mesh per side keeps repeated tiers cheap and removes hidden faces.
+  for (const side of [-1, 1])
+    sceneryTerraceUnion(
+      root,
+      solids,
+      [
+        { x: side * 39, y: 0, z: -125, w: 30, d: 110, h: 14, color: 0x465754 },
+        { x: side * 39, y: 0, z: -25, w: 30, d: 90, h: 18, color: 0x4b5c59 },
+        { x: side * 39, y: 0, z: 85, w: 30, d: 130, h: 15, color: 0x465754 },
+        { x: side * 47, y: 0, z: -15, w: 16, d: 330, h: 23, color: 0x3c4b4c },
+      ],
+      `${side < 0 ? "Western" : "Eastern"} mountain boundary`,
+    );
+
   // Pointed canvas shelters are a visual reconstruction, not a historical claim.
   const tent = (x: number, z: number, w: number, d: number, royal = false) => {
     const canvas = material(royal ? 0xb3a078 : 0x909887);
@@ -51,12 +75,12 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
   const royalTent = { x: 0, z: 96, width: 9, depth: 12 };
   tent(royalTent.x, royalTent.z, royalTent.width, royalTent.depth, true);
   for (const [x, z] of [
-    [-32, -65],
-    [24, -56],
-    [-32, -24],
-    [24, -12],
-    [-32, 18],
-    [24, 29],
+    [-15, -65],
+    [15, -56],
+    [-15, -24],
+    [15, -12],
+    [-15, 18],
+    [15, 29],
     [-18, 67],
     [19, 72],
     [-18, 101],
@@ -66,16 +90,16 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
   for (const [x, z] of [
     [-17, -125],
     [16, -113],
-    [-30, -96],
-    [26, -82],
-    [-30, -45],
-    [28, -34],
-    [-30, 0],
-    [28, 14],
-    [-29, 43],
-    [28, 55],
-    [-29, 86],
-    [28, 123],
+    [-21, -96],
+    [21, -82],
+    [-21, -45],
+    [21, -34],
+    [-21, 0],
+    [21, 14],
+    [-21, 43],
+    [21, 55],
+    [-21, 86],
+    [21, 123],
   ])
     tree(x, z);
   for (const [x, z, w, d] of [
@@ -161,7 +185,7 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
     for (const [x, z] of [
       [18 * side, -95],
       [18 * side, 51],
-      [38 * side, -23],
+      [18 * side, -23],
     ]) {
       const base = (side * Math.PI) / 2;
       sentries.push({
@@ -179,10 +203,13 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
   }
   const sightWedges = sentries.map((s) => {
     const geometry = new T.BufferGeometry();
-    const half = Math.tan(Math.PI / 12) * 6;
+    const half = Math.tan(SENTRY_HALF_ANGLE) * SENTRY_RANGE;
     geometry.setAttribute(
       "position",
-      new T.Float32BufferAttribute([0, 0, 0, -half, 0, 6, half, 0, 6], 3),
+      new T.Float32BufferAttribute(
+        [0, 0, 0, -half, 0, SENTRY_RANGE, half, 0, SENTRY_RANGE],
+        3,
+      ),
     );
     const wedge = new T.Mesh(
       geometry,
@@ -199,7 +226,7 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
     markScenery(wedge, {
       kind: "decoration",
       reason:
-        "Transparent gameplay direction cue, not a physical surface or a complete range boundary.",
+        "Transparent full-range sentry sight cue; cover can block sight within it.",
     });
     root.add(wedge);
     return wedge;
@@ -233,7 +260,7 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
     spawn: { ...TEANCUM_ROUTE[0], yaw: 0 },
     solids,
     actorParent: root,
-    bounds: { minX: -42, maxX: 42, minZ: -180, maxZ: 150 },
+    bounds: { minX: -24, maxX: 24, minZ: -180, maxZ: 150 },
     goal: { ...TEANCUM_ROUTE[4], radius: 3 },
     initialObjective: objectives[0],
     landmarks: [
@@ -244,7 +271,7 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
     adventure(hooks) {
       hooks.setAvatar("teancum");
       hooks.toast(
-        "Move at night with your servant. Watch the sentries' turning heads; stone cover hides you.",
+        "Keep both companions out of the full-length amber sight cones. Stone cover blocks sight; time your passage through the mountain pass.",
       );
       let introTime = 0;
       let plannedBeat = -1,
@@ -346,7 +373,7 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
                   ? "Amalickiah sleeps after the day's fighting · Alma 51:32–34"
                   : beat === 1
                     ? "Keep both companions unseen · a sentry's sight means capture and a restart"
-                    : "Teancum and his servant go forth by night · Alma 51:33",
+                    : "Keep both companions out of the amber sight cones · stone cover blocks sight",
               prompt: "",
             };
           }
@@ -418,24 +445,32 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
           if (stage >= 1 && stage <= 4 && !pending) {
             for (const s of sentries) {
               // Player-facing visual gaze and sight-line share the same yaw; cover is physical.
-              if (
-                [player, companion].some((subject) =>
-                  spyCanSeePlayer({
-                    eye: { x: s.x, y: 1.48, z: s.z },
-                    headYaw: s.base + Math.sin(time * 0.7 + s.phase) * 1.0,
-                    headPitch: 0,
-                    playerPosition: subject,
-                    playerHeight: subject.crouching ? 0.9 : 1.65,
-                    solids,
-                    maxDistance: 20,
-                    halfAngleRadians: Math.PI / 12,
-                  }),
-                )
-              ) {
+              const spotted = [player, companion].find((subject) =>
+                spyCanSeePlayer({
+                  eye: { x: s.x, y: 1.48, z: s.z },
+                  headYaw: s.base + Math.sin(time * 0.7 + s.phase) * 1.0,
+                  headPitch: 0,
+                  playerPosition: subject,
+                  playerHeight: subject.crouching ? 0.9 : 1.65,
+                  solids,
+                  maxDistance: SENTRY_RANGE,
+                  halfAngleRadians: SENTRY_HALF_ANGLE,
+                  // The ground cue describes the subject's position. Do not
+                  // catch a shoulder protruding beyond its visible edge.
+                  playerRadius: 0,
+                }),
+              );
+              if (spotted) {
                 pending = true;
                 hooks.caught?.(() => reset(player));
                 if (!hooks.caught) reset(player);
-                return { objective: "A sentry spotted you", prompt: "" };
+                return {
+                  objective:
+                    spotted === player
+                      ? "A sentry spotted Teancum"
+                      : "A sentry spotted your servant",
+                  prompt: "",
+                };
               }
             }
           }

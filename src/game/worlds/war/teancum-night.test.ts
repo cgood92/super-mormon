@@ -24,6 +24,10 @@ function escort(
 const toTent = [
   { x: -22, z: -130 },
   { x: -22, z: -78 },
+  { x: -22, z: -48 },
+  { x: -12, z: -48 },
+  { x: -12, z: 5 },
+  { x: -22, z: 5 },
   { x: -22, z: 21 },
   { x: 0, z: 87 },
   { x: 0, z: 94 },
@@ -31,6 +35,10 @@ const toTent = [
 const toCamp = [
   { x: 0, z: 87 },
   { x: -22, z: 68 },
+  { x: -22, z: 5 },
+  { x: -12, z: 5 },
+  { x: -12, z: -48 },
+  { x: -22, z: -48 },
   { x: -22, z: -130 },
   { x: -2, z: -144 },
 ];
@@ -157,7 +165,7 @@ test("the extended approach and far camp have one floor with physical landing su
   for (const [x, z] of [
     [-21.3, -170],
     [-21.3, 20],
-    [36.3, 140],
+    [21.3, 140],
   ]) {
     const player = createPlayer(x, 7, z);
     for (let i = 0; i < 120; i++)
@@ -323,7 +331,7 @@ test("the companion replays a player's real jump over cover", () => {
 });
 
 test("straight runs along either map border meet a watch line", () => {
-  for (const edge of [-41, 41]) {
+  for (const edge of [-23, 23]) {
     const world = buildTeancumNight(new T.Scene());
     let caught = 0;
     const runtime = world.adventure!({
@@ -376,4 +384,135 @@ test("straight runs along either map border meet a watch line", () => {
     );
     world.dispose?.();
   }
+});
+
+test("visible sight cones cover captures at full range and at turning edges", () => {
+  // These clear points are in the outer sentry's real 20-unit sight, beyond
+  // the former six-unit cue. A ground ray must hit a cone at every capture.
+  for (const point of [
+    { x: 1, z: -80, elapsed: 0 },
+    { x: 4.7, z: -81, elapsed: 0 },
+    { x: -2.7, z: -81, elapsed: 0 },
+    { x: 10, z: -83, elapsed: 1 },
+  ]) {
+    const scene = new T.Scene();
+    const world = buildTeancumNight(scene);
+    let catches = 0;
+    const runtime = world.adventure!({
+      setAvatar() {},
+      toast() {},
+      complete() {},
+      dialog(_r, _t, _b, next) {
+        next();
+      },
+      caught() {
+        catches++;
+      },
+    });
+    const player = createPlayer(-2, 0, -144);
+    for (let i = 0; i < 121; i++) runtime.update(0.1, player, idle);
+    for (let i = 0; i < point.elapsed * 10; i++)
+      runtime.update(0.1, player, idle);
+    runtime.update(0, player, { ...idle, interact: true });
+    Object.assign(player, createPlayer(point.x, 0, point.z));
+    runtime.update(0, player, idle);
+    assert.equal(catches, 1, `expected capture at ${JSON.stringify(point)}`);
+    scene.updateMatrixWorld(true);
+    const ray = new T.Raycaster(
+      new T.Vector3(point.x, 0.2, point.z),
+      new T.Vector3(0, -1, 0),
+    );
+    const cones: T.Object3D[] = [];
+    scene.traverse((o) => {
+      if (o.name === "Sentry sight direction cue") cones.push(o);
+    });
+    assert.ok(
+      ray.intersectObjects(cones).length,
+      `capture outside visible cone at ${JSON.stringify(point)}`,
+    );
+    world.dispose?.();
+  }
+});
+
+test("solid mountain sides close the wide bypasses throughout the mission", () => {
+  const world = buildTeancumNight(new T.Scene());
+  for (const z of [-165, -120, -60, -23, 25, 65, 130]) {
+    for (const side of [-1, 1]) {
+      const player = createPlayer(side * 23, 0, z);
+      for (let i = 0; i < 240; i++)
+        stepPlayer(
+          player,
+          { x: -side, y: 0, jump: i === 45, jumpHeld: i >= 45 && i < 65 },
+          1 / 60,
+          0,
+          world.solids,
+        );
+      assert.ok(Math.abs(player.x) < 24, `escaped side at ${player.x},${z}`);
+      assert.ok(player.grounded, "side approach must retain landing support");
+    }
+  }
+  world.dispose?.();
+});
+
+test("a standing companion outside the cone edge or beyond its range stays unseen", () => {
+  const world = buildTeancumNight(new T.Scene());
+  let catches = 0;
+  const runtime = world.adventure!({
+    setAvatar() {},
+    toast() {},
+    complete() {},
+    dialog(_r, _t, _b, next) {
+      next();
+    },
+    caught() {
+      catches++;
+    },
+  });
+  const player = createPlayer(-2, 0, -144);
+  for (let i = 0; i < 121; i++) runtime.update(0.1, player, idle);
+  runtime.update(0, player, { ...idle, interact: true });
+  for (const point of [
+    { x: 5, z: -81 },
+    { x: 1, z: -74.5 },
+  ]) {
+    Object.assign(player, createPlayer(point.x, 0, point.z));
+    runtime.update(0, player, idle);
+    assert.equal(catches, 0, `invisible capture at ${JSON.stringify(point)}`);
+  }
+  world.dispose?.();
+});
+
+test("mountain terrace tops have one visible surface and matching landing support", () => {
+  const scene = new T.Scene();
+  const world = buildTeancumNight(scene);
+  scene.updateMatrixWorld(true);
+  for (const side of [-1, 1]) {
+    for (const [z, top] of [
+      [-160.3, 14],
+      [-40.3, 18],
+      [100.3, 15],
+    ]) {
+      const x = side * 26.2;
+      const player = createPlayer(x, top + 5, z);
+      for (let i = 0; i < 120; i++)
+        stepPlayer(
+          player,
+          { x: 0, y: 0, jump: false, jumpHeld: false },
+          1 / 60,
+          0,
+          world.solids,
+        );
+      assert.equal(player.y, top);
+      assert.ok(player.grounded);
+      const ray = new T.Raycaster(
+        new T.Vector3(x, top + 2, z),
+        new T.Vector3(0, -1, 0),
+      );
+      const hits = ray
+        .intersectObjects(scene.children, true)
+        .filter((h) => Math.abs(h.point.y - top) < 0.01);
+      assert.equal(hits.length, 1, `duplicate mountain surface at ${x},${z}`);
+    }
+  }
+  world.dispose?.();
 });
