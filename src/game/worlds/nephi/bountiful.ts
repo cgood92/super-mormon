@@ -369,7 +369,7 @@ export function buildBountiful(scene: T.Scene): WorldData {
     name: "Bountiful",
     initialObjective: "Climb the mountain trail and pray",
     subtitle: "Build with faith • 1 Nephi 17–18 • Imagined vessel design",
-    spawn: point(-27, 9),
+    spawn: { ...point(-27, 9), yaw: 0 },
     solids,
     climbables,
     actorParent: root,

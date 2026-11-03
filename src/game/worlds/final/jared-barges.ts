@@ -244,7 +244,7 @@ export function buildJaredBarges(scene: T.Scene): WorldData {
   return {
     name: "The Barge Builders",
     subtitle: "Ether 2:16–25 · Imagined construction at the shore",
-    spawn: p(-34, 0),
+    spawn: { ...p(-34, 0), yaw: Math.PI / 2 },
     solids,
     actorParent: root,
     bounds: { minX: -43, maxX: 40, minZ: -35, maxZ: 35 },

@@ -254,7 +254,7 @@ export function buildJaredExpedition(scene: T.Scene): WorldData {
   return {
     name: "Jared's Wilderness Journey",
     subtitle: "Ether 1–2 · A much earlier people, told by Moroni",
-    spawn: p(-38, 0),
+    spawn: { ...p(-38, 0), yaw: Math.PI / 2 },
     solids,
     actorParent: root,
     bounds: { minX: -45, maxX: 43, minZ: -32, maxZ: 32 },

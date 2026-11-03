@@ -95,6 +95,11 @@ test("temple approach and city outskirts are physically reachable; varied crowd 
       `route blocked at ${p.x},${p.z} toward ${x},${z}`,
     );
   };
+  assert.equal(
+    world.spawn.yaw,
+    0,
+    "arrival heading faces north along temple approach toward the city",
+  );
   assert.ok(world.spawn.z < -75, "arrival passes temple before city search");
   walk(14, -27);
   walk(0, -27);
