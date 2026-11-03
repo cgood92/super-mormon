@@ -158,3 +158,116 @@ test("a completed balcony drop immediately moves a stale upper-floor eye to the 
     world.dispose?.();
   }
 });
+
+test("entering the auditorium lowers camera under balcony and follows player without getting stuck", () => {
+  const world = gallery(new T.Scene());
+  try {
+    const player = createPlayer(0, 0, 2);
+    player.yaw = Math.PI;
+    const camera = new T.PerspectiveCamera(58, 16 / 9, 0.08, 320);
+    const follow = new FollowCamera(camera);
+    follow.reset(player, player.yaw, "conference");
+
+    for (let frame = 0; frame < 180; frame++) {
+      player.z -= 0.2;
+      // Raked center aisle profile
+      if (player.z <= -6.4 && player.z >= -13.6) {
+        const i = Math.min(7, Math.floor((-6.4 - player.z) / 0.9));
+        player.y = (i + 1) * 0.3;
+      } else if (player.z < -13.6 && player.z >= -20) {
+        player.y = 2.4;
+      } else if (player.z < -20 && player.z >= -46) {
+        player.y = Math.max(0, 2.4 - (-20 - player.z) * 0.04);
+      } else if (player.z < -46) {
+        player.y = 0;
+      }
+
+      follow.update(1 / 60, player, world.solids, undefined, "conference");
+
+      assert.ok(
+        cameraSegmentClear(camera.position, camera.position, world.solids, 0.18),
+        `embedded eye at frame ${frame}, pos=(${camera.position.x}, ${camera.position.y}, ${camera.position.z})`,
+      );
+
+      // Under the balcony (z <= -10), camera must be safely under the ceiling (y < 4.45)
+      // and cannot falsely signal obstruction or trigger Q/C camera cue flashing.
+      if (player.z <= -6 && camera.position.z <= -4) {
+        assert.equal(
+          follow.obstructed,
+          false,
+          `camera marked obstructed at frame ${frame}, pos=(${camera.position.x}, ${camera.position.y}, ${camera.position.z})`,
+        );
+      }
+      if (player.z <= -15 && camera.position.z <= -8) {
+        assert.ok(
+          camera.position.y <= 4.45,
+          `camera too high under balcony: y=${camera.position.y}`,
+        );
+      }
+    }
+
+    // Player reached z = -34; camera must have followed into the auditorium
+    assert.ok(
+      camera.position.z < -20,
+      `camera got stuck outside auditorium: cam.z=${camera.position.z}`,
+    );
+    const dist = camera.position.distanceTo(
+      new T.Vector3(player.x, player.y + 1, player.z),
+    );
+    assert.ok(
+      dist < 12,
+      `camera must stay close to player, was ${dist}m away`,
+    );
+  } finally {
+    world.dispose?.();
+  }
+});
+
+test("walking straight into the auditorium while holding forward does not veer sideways or flash Q/C", () => {
+  const world = gallery(new T.Scene());
+  try {
+    const player = createPlayer(0, 0, 4);
+    player.yaw = Math.PI;
+    const camera = new T.PerspectiveCamera(58, 16 / 9, 0.08, 320);
+    const follow = new FollowCamera(camera);
+    follow.reset(player, player.yaw, "conference");
+
+    for (let frame = 0; frame < 240; frame++) {
+      const input = { x: 0, y: 1, jump: false, jumpHeld: false };
+      stepPlayer(player, input, 1 / 60, follow.yaw, world.solids);
+      follow.update(
+        1 / 60,
+        player,
+        world.solids,
+        {
+          orbitX: 0,
+          orbitY: 0,
+          recenter: false,
+          zoom: 0,
+          movementIntent: true,
+        },
+        "conference",
+      );
+
+      // Once the player has entered the auditorium aisle (z <= -1.0), camera must not be obstructed
+      // and player must not drift sideways into the chairs (x should stay close to 0).
+      if (player.z <= -1.0) {
+        assert.equal(
+          follow.obstructed,
+          false,
+          `camera obstructed in auditorium aisle at frame ${frame}`,
+        );
+        assert.ok(
+          Math.abs(player.x) < 0.5,
+          `player drifted sideways in auditorium aisle: x=${player.x}`,
+        );
+        assert.ok(
+          Math.abs(follow.yaw - Math.PI) < 0.05,
+          `camera yaw drifted: ${((follow.yaw * 180) / Math.PI).toFixed(1)}°`,
+        );
+      }
+    }
+  } finally {
+    world.dispose?.();
+  }
+});

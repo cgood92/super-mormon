@@ -44,6 +44,85 @@ const angleDiff = (a: number, b: number) =>
 const ease = (speed: number, dt: number) =>
   1 - Math.exp(-speed * Math.min(Math.max(dt, 0), 0.1));
 
+/**
+ * SM64 Lakitu ceiling awareness: find the lowest overhead solid whose XZ
+ * footprint crosses the target-to-eye segment.  Returns Infinity when the
+ * path is under open sky.  Only solids whose bottom face (s.y) is above
+ * `minY` are considered, so ground-floor slabs and lower furniture are
+ * ignored.  The proposed `eye.y` must reach into the solid's vertical
+ * range for it to count — a slab far overhead that the camera would never
+ * touch is not a ceiling constraint.  Works on every level — balconies at
+ * y=4.8, y=16.8, y=28.8, doorway transoms, or any future low overhang.
+ */
+function ceilingAbovePath(
+  target: T.Vector3,
+  eye: T.Vector3,
+  solids: readonly Solid[],
+  minY: number,
+  radius = 0.28,
+): number {
+  let minCeil = Infinity;
+  // The camera's proposed maximum height — solids entirely above this
+  // cannot be hit and are not a useful ceiling constraint.
+  const maxCamY = Math.max(target.y, eye.y) + radius;
+  // Quick bounding-box envelope of the XZ segment, padded by radius.
+  const segMinX = Math.min(target.x, eye.x) - radius;
+  const segMaxX = Math.max(target.x, eye.x) + radius;
+  const segMinZ = Math.min(target.z, eye.z) - radius;
+  const segMaxZ = Math.max(target.z, eye.z) + radius;
+  const dx = eye.x - target.x;
+  const dz = eye.z - target.z;
+
+  for (let i = 0; i < solids.length; i++) {
+    const s = solids[i];
+    if (s.y < minY || s.y >= minCeil) continue;
+    // Skip thin stair treads and narrow rails — only substantial overhead
+    // geometry (ceilings, balconies, transoms, bridges) constrains the camera.
+    if (s.h <= 0.35 && (s.d < 1.0 || s.w < 1.0)) continue;
+    if (s.w < 0.5 && s.h < 0.5) continue;
+    // Skip solids whose bottom face is above the proposed camera height —
+    // they are too high to act as a ceiling for the current follow arc.
+    if (s.y > maxCamY) continue;
+    // Broad-phase rejection against segment envelope.
+    if (
+      s.x + s.w / 2 < segMinX ||
+      s.x - s.w / 2 > segMaxX ||
+      s.z + s.d / 2 < segMinZ ||
+      s.z - s.d / 2 > segMaxZ
+    )
+      continue;
+    // 2-D slab intersection: does the XZ segment cross the padded AABB?
+    const sMinX = s.x - s.w / 2 - radius;
+    const sMaxX = s.x + s.w / 2 + radius;
+    const sMinZ = s.z - s.d / 2 - radius;
+    const sMaxZ = s.z + s.d / 2 + radius;
+    let tmin = 0,
+      tmax = 1;
+    if (Math.abs(dx) < 1e-8) {
+      if (target.x < sMinX || target.x > sMaxX) continue;
+    } else {
+      let t1 = (sMinX - target.x) / dx;
+      let t2 = (sMaxX - target.x) / dx;
+      if (t1 > t2) [t1, t2] = [t2, t1];
+      tmin = Math.max(tmin, t1);
+      tmax = Math.min(tmax, t2);
+      if (tmin > tmax) continue;
+    }
+    if (Math.abs(dz) < 1e-8) {
+      if (target.z < sMinZ || target.z > sMaxZ) continue;
+    } else {
+      let t1 = (sMinZ - target.z) / dz;
+      let t2 = (sMaxZ - target.z) / dz;
+      if (t1 > t2) [t1, t2] = [t2, t1];
+      tmin = Math.max(tmin, t1);
+      tmax = Math.min(tmax, t2);
+      if (tmin > tmax) continue;
+    }
+    minCeil = s.y;
+  }
+  return minCeil;
+}
+
 /** Swept camera volume; unlike target-ray clamping, a blocked route is rejected. */
 export function cameraSegmentClear(
   start: T.Vector3,
@@ -201,6 +280,7 @@ function cameraEyeDetour(
   let blocker: Solid | undefined;
   let nearest = Infinity;
   for (const solid of solids) {
+    if (solid.y >= requested.y - 0.2 || (solid.w > 3 && solid.d > 3)) continue;
     if (cameraSegmentClear(previous, requested, [solid], 0.22)) continue;
     const hit = moveCameraEye(previous, requested, [solid]);
     const distance = hit.distanceToSquared(previous);
@@ -377,7 +457,9 @@ export class FollowCamera {
     // input trace an arc, while forward input pulls the camera behind the player.
     const dx = this.target.x - previous.x,
       dz = this.target.z - previous.z;
-    if (Math.hypot(dx, dz) > 0.1) this.yaw = Math.atan2(dx, dz);
+    if (!this.eyeDetour.length && !this.finishingDetour) {
+      if (Math.hypot(dx, dz) > 0.1) this.yaw = Math.atan2(dx, dz);
+    }
     if (externallyMoved) {
       this.eyeDetour = [];
       this.finishingDetour = false;
@@ -457,7 +539,58 @@ export class FollowCamera {
       (preset.distance + this.speedPullback) * ZOOM_DISTANCES[this.zoomLevel];
     this.smoothDistance +=
       (requestedDistance - this.smoothDistance) * ease(11, dt);
+    // SM64 Lakitu behavior: lower the camera under low ceilings (balconies,
+    // transoms, overhangs) instead of flying into them.  Probe the current
+    // desired eye position and, if a ceiling is in the way, flatten pitch so
+    // the eye stays safely underneath.  Works on all three conference levels
+    // and any future world with low overhead geometry.
+    let ceilingY = Infinity;
+    {
+      const planar = Math.cos(preset.elevation) * this.smoothDistance;
+      const naturalEye = new T.Vector3(
+        this.target.x - Math.sin(this.yaw) * planar,
+        this.target.y + Math.sin(preset.elevation) * this.smoothDistance,
+        this.target.z - Math.cos(this.yaw) * planar,
+      );
+      ceilingY = ceilingAbovePath(
+        this.target,
+        naturalEye,
+        solids,
+        player.y + (player.crouching ? 1.0 : 1.75),
+      );
+      if (ceilingY < Infinity) {
+        const maxEyeY = ceilingY - 0.28;
+        const maxPitch = Math.asin(
+          clamp(
+            (maxEyeY - this.target.y) / Math.max(0.1, this.smoothDistance),
+            0.02,
+            preset.elevation,
+          ),
+        );
+        if (this.pitch > maxPitch) {
+          // Pull down quickly so the camera never enters the ceiling.
+          this.pitch += (maxPitch - this.pitch) * ease(12, dt);
+          if (this.pitch > maxPitch + 0.01) this.pitch = maxPitch + 0.01;
+        } else if (this.pitch < maxPitch - 0.005) {
+          // Under a ceiling, smoothly track any ceiling rise or floor drop.
+          this.pitch += (maxPitch - this.pitch) * ease(6, dt);
+        }
+      } else if (
+        this.pitch < preset.elevation - 0.01 &&
+        !this.manualIdleView &&
+        this.orbitTarget === null &&
+        this.recenterTime === 0 &&
+        this.restoreTime === 0
+      ) {
+        // Open sky above: gently restore the preset elevation angle.
+        this.pitch += (preset.elevation - this.pitch) * ease(4, dt);
+      }
+    }
     const candidate = this.desired(this.target, this.smoothDistance);
+    // Safety clamp: ensure candidate.y stays below any detected ceiling.
+    if (ceilingY < Infinity) {
+      candidate.y = Math.min(candidate.y, ceilingY - 0.28);
+    }
     if (room) {
       candidate.x = clamp(
         candidate.x,
@@ -554,19 +687,26 @@ export class FollowCamera {
       this.eyeDetour = [];
       this.finishingDetour = false;
     }
-    if (!this.eyeDetour.length && final.distanceTo(candidate) < 0.001)
-      this.finishingDetour = false;
-    this.obstructionAmount = clamp(
-      final.distanceTo(candidate) /
-        Math.max(0.001, previous.distanceTo(candidate)),
-      0,
-      1,
-    );
+    if (directClear && !this.eyeDetour.length) {
+      if (final.distanceTo(candidate) < 0.2) this.finishingDetour = false;
+      this.obstructionAmount = 0;
+    } else {
+      if (!this.eyeDetour.length && final.distanceTo(candidate) < 0.15)
+        this.finishingDetour = false;
+      this.obstructionAmount = clamp(
+        final.distanceTo(candidate) /
+          Math.max(0.001, previous.distanceTo(candidate)),
+        0,
+        1,
+      );
+    }
     this.camera.position.copy(final);
-    const finalDx = this.target.x - final.x,
-      finalDz = this.target.z - final.z;
-    if (Math.hypot(finalDx, finalDz) > 0.1)
-      this.yaw = Math.atan2(finalDx, finalDz);
+    if (!this.eyeDetour.length && !this.finishingDetour) {
+      const finalDx = this.target.x - final.x,
+        finalDz = this.target.z - final.z;
+      if (Math.hypot(finalDx, finalDz) > 0.1)
+        this.yaw = Math.atan2(finalDx, finalDz);
+    }
     const leadSpeed = Math.min(1, (player.runSpeed ?? 0) / 6.5) * 0.29;
     const desiredLead = new T.Vector3(
       Math.sin(player.yaw) * leadSpeed,

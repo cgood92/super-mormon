@@ -378,9 +378,12 @@ export function buildJerusalem(
             : "Find Laban in the city and follow Zoram to the palace treasury",
     spawn: { x: 0, y: 0, z: id === "night" ? 44 : 25, yaw: Math.PI },
     actorParent: group,
-    cameraRooms: [
-      {
-        id: "palace-west-passage",
+    cameraRooms:
+      id === "streets"
+        ? undefined
+        : [
+            {
+              id: "palace-west-passage",
         // Room boundaries meet at the x=-12 doorway plane. Collision still
         // keeps the eye clear of its solid wall sections.
         bounds: { minX: -17.5, maxX: -12, minZ: -28, maxZ: -9 },
