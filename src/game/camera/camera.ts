@@ -158,7 +158,7 @@ export function cameraSegmentClear(
         if (enter > exit) return false;
       }
     }
-    return exit >= 0 && enter <= 1;
+    return exit > 1e-5 && enter < 1 - 1e-5 && enter <= exit;
   });
 }
 
@@ -312,6 +312,83 @@ function cameraEyeDetour(
   )
     return [];
   return [first, second];
+}
+
+/** A clear corner waypoint around a solid building corner when direct follow is blocked. */
+function cameraCornerWaypoint(
+  previous: T.Vector3,
+  candidate: T.Vector3,
+  target: T.Vector3,
+  solids: readonly Solid[],
+  radius = 0.22,
+): T.Vector3 | undefined {
+  let blocker: Solid | undefined;
+  let nearest = Infinity;
+  for (const solid of solids) {
+    if (solid.y >= candidate.y - 0.2) continue;
+    if (cameraSegmentClear(previous, candidate, [solid], radius)) continue;
+    const hit = moveCameraEye(previous, candidate, [solid]);
+    const distance = hit.distanceToSquared(previous);
+    if (distance < nearest) {
+      nearest = distance;
+      blocker = solid;
+    }
+  }
+  if (!blocker) return undefined;
+
+  const corners = [
+    {
+      x: blocker.x - blocker.w / 2,
+      z: blocker.z - blocker.d / 2,
+      dirX: -1,
+      dirZ: -1,
+    },
+    {
+      x: blocker.x + blocker.w / 2,
+      z: blocker.z - blocker.d / 2,
+      dirX: 1,
+      dirZ: -1,
+    },
+    {
+      x: blocker.x - blocker.w / 2,
+      z: blocker.z + blocker.d / 2,
+      dirX: -1,
+      dirZ: 1,
+    },
+    {
+      x: blocker.x + blocker.w / 2,
+      z: blocker.z + blocker.d / 2,
+      dirX: 1,
+      dirZ: 1,
+    },
+  ];
+
+  let bestWaypoint: T.Vector3 | undefined;
+  let bestScore = Infinity;
+
+  const margin = radius + 0.14;
+  for (const c of corners) {
+    const wp = new T.Vector3(
+      c.x + c.dirX * margin,
+      previous.y,
+      c.z + c.dirZ * margin,
+    );
+
+    if (!cameraSegmentClear(wp, wp, solids, radius)) continue;
+    if (!cameraSegmentClear(previous, wp, solids, radius)) continue;
+
+    const clearToCandidate = cameraSegmentClear(wp, candidate, solids, radius);
+    const clearToTarget = cameraSegmentClear(wp, target, solids, 0.15);
+    if (!clearToCandidate && !clearToTarget) continue;
+
+    const totalDist = previous.distanceTo(wp) + wp.distanceTo(candidate);
+    if (totalDist < bestScore) {
+      bestScore = totalDist;
+      bestWaypoint = wp;
+    }
+  }
+
+  return bestWaypoint;
 }
 
 export class FollowCamera {
@@ -519,12 +596,16 @@ export class FollowCamera {
       // sideways input still arcs around the camera. Physical eye collision
       // remains authoritative. Idle rates derive from SM64's 30 Hz goal steps.
       const speed = player.runSpeed ?? 0;
-      const degreesPerSecond =
+      const baseDps =
         speed >= 0.05
           ? 12 * clamp(speed / 6.5, 0.35, 1)
           : orbit.movementIntent
             ? 5.2734375
             : 42.1875;
+      const degreesPerSecond =
+        this.eyeDetour.length || this.finishingDetour
+          ? Math.max(baseDps, 45)
+          : baseDps;
       const rate = (degreesPerSecond * Math.PI) / 180;
       this.yaw += clamp(angleDiff(player.yaw, this.yaw), -rate * dt, rate * dt);
     }
@@ -607,6 +688,15 @@ export class FollowCamera {
     if (directClear) this.eyeDetour = [];
     else if (!this.eyeDetour.length && playerTravel > 0.0001) {
       this.eyeDetour = cameraEyeDetour(previous, candidate, solids);
+      if (!this.eyeDetour.length) {
+        const cornerWp = cameraCornerWaypoint(
+          previous,
+          candidate,
+          this.target,
+          solids,
+        );
+        if (cornerWp) this.eyeDetour = [cornerWp];
+      }
       if (
         room &&
         this.eyeDetour.some(
