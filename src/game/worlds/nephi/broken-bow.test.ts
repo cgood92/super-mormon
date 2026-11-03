@@ -7,7 +7,13 @@ import { sceneryCollisionErrors } from "../shared/scenery";
 const idle = { interact: false, interactHeld: false, x: 0, y: 0 };
 test("broken bow: summit practice, automatic crafting, ordered counsel and return", () => {
   const world = buildBrokenBow(new T.Scene()),
-    player = createPlayer(0, 0, -22);
+    player = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
+  player.yaw = world.spawn.yaw!;
+  assert.equal(
+    world.spawn.yaw,
+    0,
+    "spawn heading faces north toward camp and mountain trail",
+  );
   let completed = 0;
   const texts: string[] = [];
   const runtime = world.adventure!({

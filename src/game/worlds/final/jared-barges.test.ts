@@ -17,6 +17,11 @@ test("barges has semantic scenery and cannot complete by idle interaction", () =
       done++;
     },
   });
+  assert.equal(
+    w.spawn.yaw,
+    Math.PI / 2,
+    "barge builders spawn faces east along the shore towards work bays",
+  );
   const p = { ...w.spawn, yaw: 0 };
   for (let i = 0; i < 100; i++)
     r.update(100, p as any, { x: 0, y: 0, interact: true, interactHeld: true });

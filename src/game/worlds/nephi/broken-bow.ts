@@ -400,7 +400,7 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
     subtitle:
       "Provide for the family • 1 Nephi 16:18–32 • Imagined Arabian wildlife",
     initialObjective: "Climb the mountain for target practice",
-    spawn: p(0, -22),
+    spawn: { ...p(0, -22), yaw: 0 },
     solids,
     actorParent: root,
     bounds: { minX: -55, maxX: 55, minZ: -45, maxZ: 65 },

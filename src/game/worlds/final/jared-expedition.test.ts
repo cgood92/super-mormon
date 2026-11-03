@@ -17,6 +17,11 @@ test("expedition has semantic scenery and cannot complete by idle interaction", 
       done++;
     },
   });
+  assert.equal(
+    w.spawn.yaw,
+    Math.PI / 2,
+    "expedition spawn faces east along canyon route",
+  );
   const p = { ...w.spawn, yaw: 0 };
   for (let i = 0; i < 100; i++)
     r.update(100, p as any, { x: 0, y: 0, interact: true, interactHeld: true });
