@@ -301,7 +301,14 @@ test("streets and palace modes entering Laban's palace south doorway keep line o
           follow.yaw,
           world.solids,
         );
-        follow.update(1 / 60, player, world.solids, undefined, "hub", undefined);
+        follow.update(
+          1 / 60,
+          player,
+          world.solids,
+          undefined,
+          "hub",
+          undefined,
+        );
         assert.ok(
           cameraSegmentClear(
             camera.position,
@@ -313,14 +320,20 @@ test("streets and palace modes entering Laban's palace south doorway keep line o
         );
         // Ensure no 180-degree flip occurs (angular difference from North PI is small)
         const yawDiff = Math.abs(
-          Math.atan2(Math.sin(follow.yaw - Math.PI), Math.cos(follow.yaw - Math.PI)),
+          Math.atan2(
+            Math.sin(follow.yaw - Math.PI),
+            Math.cos(follow.yaw - Math.PI),
+          ),
         );
         assert.ok(
           yawDiff < 0.35,
           `${mode}: follow.yaw reversed control orientation: ${(follow.yaw * 180) / Math.PI}°`,
         );
       }
-      assert.ok(player.z < -12, `${mode}: player should be inside palace: z=${player.z}`);
+      assert.ok(
+        player.z < -12,
+        `${mode}: player should be inside palace: z=${player.z}`,
+      );
       assert.ok(
         camera.position.z < -7.5,
         `${mode}: camera must stay with player inside palace: cam.z=${camera.position.z}`,
@@ -335,7 +348,14 @@ test("streets and palace modes entering Laban's palace south doorway keep line o
           follow.yaw,
           world.solids,
         );
-        follow.update(1 / 60, player, world.solids, undefined, "hub", undefined);
+        follow.update(
+          1 / 60,
+          player,
+          world.solids,
+          undefined,
+          "hub",
+          undefined,
+        );
         assert.ok(
           cameraSegmentClear(
             camera.position,
@@ -356,4 +376,3 @@ test("streets and palace modes entering Laban's palace south doorway keep line o
     }
   }
 });
-

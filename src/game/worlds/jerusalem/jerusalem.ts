@@ -510,4 +510,3 @@ export const JERUSALEM_PALACE_ROOMS: readonly CameraRoom[] = [
     exitEyes: [{ x: 14, y: 2.2, z: -15.5 }],
   },
 ];
-

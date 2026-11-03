@@ -185,7 +185,12 @@ test("entering the auditorium lowers camera under balcony and follows player wit
       follow.update(1 / 60, player, world.solids, undefined, "conference");
 
       assert.ok(
-        cameraSegmentClear(camera.position, camera.position, world.solids, 0.18),
+        cameraSegmentClear(
+          camera.position,
+          camera.position,
+          world.solids,
+          0.18,
+        ),
         `embedded eye at frame ${frame}, pos=(${camera.position.x}, ${camera.position.y}, ${camera.position.z})`,
       );
 
@@ -214,10 +219,7 @@ test("entering the auditorium lowers camera under balcony and follows player wit
     const dist = camera.position.distanceTo(
       new T.Vector3(player.x, player.y + 1, player.z),
     );
-    assert.ok(
-      dist < 12,
-      `camera must stay close to player, was ${dist}m away`,
-    );
+    assert.ok(dist < 12, `camera must stay close to player, was ${dist}m away`);
   } finally {
     world.dispose?.();
   }

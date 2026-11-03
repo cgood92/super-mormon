@@ -120,10 +120,7 @@ test("in Jerusalem streets, camera smoothly navigates the western house corner p
       );
     }
 
-    assert.ok(
-      player.z < 26.0,
-      `player cleared corner: z=${player.z}`,
-    );
+    assert.ok(player.z < 26.0, `player cleared corner: z=${player.z}`);
 
     // Turn east into the street running past the date palm tree
     for (let frame = 0; frame < 180; frame++) {

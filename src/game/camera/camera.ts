@@ -341,7 +341,18 @@ function findClearViewpoint(
   maxCeilY = Infinity,
 ): { eye: T.Vector3; yaw: number; dist: number } | undefined {
   const angleOffsets = [
-    0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05, 1.4, -1.4, 1.8, -1.8, Math.PI,
+    0,
+    0.35,
+    -0.35,
+    0.7,
+    -0.7,
+    1.05,
+    -1.05,
+    1.4,
+    -1.4,
+    1.8,
+    -1.8,
+    Math.PI,
   ];
   const distances = [
     baseDistance,
@@ -352,8 +363,7 @@ function findClearViewpoint(
   ];
 
   let best:
-    | { eye: T.Vector3; yaw: number; dist: number; score: number }
-    | undefined;
+    { eye: T.Vector3; yaw: number; dist: number; score: number } | undefined;
 
   for (const deltaYaw of angleOffsets) {
     const yaw = currentYaw + deltaYaw;
