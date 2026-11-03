@@ -281,3 +281,69 @@ test("room following frames an actual palace doorway route out and back on deskt
     }
   }
 });
+
+test("streets mode entering Laban's palace south doorway keeps line of sight without wall stranding or control reversal", () => {
+  const world = buildJerusalem("streets", new T.Scene());
+  try {
+    const player = createPlayer(0, 0, -5);
+    player.yaw = Math.PI;
+    const camera = new T.PerspectiveCamera(58, 16 / 9, 0.08, 200);
+    const follow = new FollowCamera(camera);
+    follow.reset(player, player.yaw);
+
+    // Walk north into the palace to z = -14
+    for (let step = 0; step < 90; step++) {
+      stepPlayer(
+        player,
+        { x: 0, y: 1, jump: false, jumpHeld: false },
+        1 / 60,
+        follow.yaw,
+        world.solids,
+      );
+      follow.update(1 / 60, player, world.solids, undefined, "hub", undefined);
+      assert.ok(
+        cameraSegmentClear(
+          camera.position,
+          camera.position,
+          world.solids,
+          0.18,
+        ),
+        `embedded eye at step ${step}: ${camera.position.toArray()}`,
+      );
+    }
+    assert.ok(player.z < -12, `player should be inside palace: z=${player.z}`);
+    assert.ok(
+      camera.position.z < -7.5,
+      `camera must stay with player inside palace: cam.z=${camera.position.z}`,
+    );
+
+    // Turn west behind the palace south wall
+    for (let step = 0; step < 60; step++) {
+      stepPlayer(
+        player,
+        { x: -1, y: 0, jump: false, jumpHeld: false },
+        1 / 60,
+        follow.yaw,
+        world.solids,
+      );
+      follow.update(1 / 60, player, world.solids, undefined, "hub", undefined);
+      assert.ok(
+        cameraSegmentClear(
+          camera.position,
+          camera.position,
+          world.solids,
+          0.18,
+        ),
+        `embedded eye while turning west: ${camera.position.toArray()}`,
+      );
+    }
+    assert.ok(player.x < -4, `player turned west: x=${player.x}`);
+    assert.ok(
+      camera.position.z < -8.5,
+      `camera must remain inside palace with player: cam.z=${camera.position.z}`,
+    );
+  } finally {
+    world.dispose?.();
+  }
+});
+

@@ -314,6 +314,94 @@ function cameraEyeDetour(
   return [first, second];
 }
 
+/** True when a substantial wall (not a thin column or prop) occludes the sightline. */
+function isWallOccluded(
+  target: T.Vector3,
+  eye: T.Vector3,
+  solids: readonly Solid[],
+  radius = 0.15,
+): boolean {
+  return solids.some((solid) => {
+    // Narrow columns and local props (both w and d <= 2.0m) do not count as occluding walls
+    if (solid.w <= 2.0 && solid.d <= 2.0) return false;
+    // Overhead lintels / transoms above standing clearance do not occlude horizontal sightlines
+    if (solid.y >= target.y + 1.2) return false;
+    return !cameraSegmentClear(target, eye, [solid], radius);
+  });
+}
+
+/** Search for the best clear viewpoint on the player's side of an occluding wall. */
+function findClearViewpoint(
+  target: T.Vector3,
+  currentYaw: number,
+  baseDistance: number,
+  elevation: number,
+  solids: readonly Solid[],
+  room?: CameraRoom,
+  maxCeilY = Infinity,
+): { eye: T.Vector3; yaw: number; dist: number } | undefined {
+  const angleOffsets = [
+    0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05, 1.4, -1.4, 1.8, -1.8, Math.PI,
+  ];
+  const distances = [
+    baseDistance,
+    baseDistance * 0.85,
+    baseDistance * 0.7,
+    3.5,
+    2.5,
+  ];
+
+  let best:
+    | { eye: T.Vector3; yaw: number; dist: number; score: number }
+    | undefined;
+
+  for (const deltaYaw of angleOffsets) {
+    const yaw = currentYaw + deltaYaw;
+    const planar = Math.cos(elevation);
+
+    for (const dist of distances) {
+      let eyeY = target.y + Math.sin(elevation) * dist;
+      if (maxCeilY < Infinity) eyeY = Math.min(eyeY, maxCeilY - 0.28);
+
+      let eyeX = target.x - Math.sin(yaw) * planar * dist;
+      let eyeZ = target.z - Math.cos(yaw) * planar * dist;
+      if (room) {
+        eyeX = clamp(eyeX, room.bounds.minX + 0.55, room.bounds.maxX - 0.55);
+        eyeZ = clamp(eyeZ, room.bounds.minZ + 0.55, room.bounds.maxZ - 0.55);
+      }
+
+      const naturalEye = new T.Vector3(eyeX, eyeY, eyeZ);
+      const safeEye = resolveCameraPosition(target, naturalEye, solids, 0.22);
+      if (maxCeilY < Infinity) safeEye.y = Math.min(safeEye.y, maxCeilY - 0.28);
+      if (room) {
+        safeEye.x = clamp(
+          safeEye.x,
+          room.bounds.minX + 0.55,
+          room.bounds.maxX - 0.55,
+        );
+        safeEye.z = clamp(
+          safeEye.z,
+          room.bounds.minZ + 0.55,
+          room.bounds.maxZ - 0.55,
+        );
+      }
+
+      const actualDist = safeEye.distanceTo(target);
+      if (actualDist < 1.8) continue;
+
+      if (!cameraSegmentClear(safeEye, safeEye, solids, 0.2)) continue;
+      if (isWallOccluded(target, safeEye, solids, 0.15)) continue;
+
+      const score = actualDist * 2 - Math.abs(deltaYaw);
+      if (!best || score > best.score) {
+        best = { eye: safeEye, yaw, dist: actualDist, score };
+      }
+    }
+  }
+
+  return best;
+}
+
 /** A clear corner waypoint around a solid building corner when direct follow is blocked. */
 function cameraCornerWaypoint(
   previous: T.Vector3,
@@ -620,6 +708,27 @@ export class FollowCamera {
       (preset.distance + this.speedPullback) * ZOOM_DISTANCES[this.zoomLevel];
     this.smoothDistance +=
       (requestedDistance - this.smoothDistance) * ease(11, dt);
+
+    // SM64 / Lakitu spring arm: when navigating, raycast from character target along the camera boom.
+    // If a solid wall, building or barrier lies along the boom, shorten the tether
+    // so the camera stays on the character's side of the wall.
+    // Narrow columns (w <= 2 && d <= 2) and high lintels are excluded to prevent jitter.
+    if (playerTravel > 0.0001 || (player.runSpeed ?? 0) > 0.1) {
+      const boomEye = this.desired(this.target, this.smoothDistance);
+      const wallSolids = solids.filter(
+        (s) => (s.w > 2.0 || s.d > 2.0) && s.y < this.target.y + 1.2,
+      );
+      const safeBoomEye = resolveCameraPosition(
+        this.target,
+        boomEye,
+        wallSolids,
+        0.22,
+      );
+      const clearBoomDist = safeBoomEye.distanceTo(this.target);
+      if (clearBoomDist < this.smoothDistance - 0.05) {
+        this.smoothDistance = Math.max(1.8, clearBoomDist);
+      }
+    }
     // SM64 Lakitu behavior: lower the camera under low ceilings (balconies,
     // transoms, overhangs) instead of flying into them.  Probe the current
     // desired eye position and, if a ceiling is in the way, flatten pitch so
@@ -776,6 +885,37 @@ export class FollowCamera {
       final = candidate;
       this.eyeDetour = [];
       this.finishingDetour = false;
+    }
+    // SM64 / Lakitu rule: when moving, a solid wall must never separate the player from the camera.
+    // Thin columns (w <= 2 && d <= 2) are permitted to briefly cross sightlines without
+    // zooming, but broad walls and buildings (w > 2 || d > 2) trigger clear-viewpoint recovery.
+    if (
+      playerTravel > 0.0001 &&
+      !this.eyeDetour.length &&
+      !this.finishingDetour &&
+      isWallOccluded(this.target, final, solids)
+    ) {
+      const recovered = findClearViewpoint(
+        this.target,
+        this.yaw,
+        preset.distance,
+        this.pitch,
+        solids,
+        room,
+        ceilingY,
+      );
+      if (
+        recovered &&
+        (room ||
+          cameraSegmentClear(previous, recovered.eye, solids, 0.18) ||
+          previous.distanceTo(this.target) > 5.5)
+      ) {
+        final = recovered.eye;
+        this.yaw = recovered.yaw;
+        this.smoothDistance = recovered.dist;
+        this.eyeDetour = [];
+        this.finishingDetour = false;
+      }
     }
     if (directClear && !this.eyeDetour.length) {
       if (final.distanceTo(candidate) < 0.2) this.finishingDetour = false;
