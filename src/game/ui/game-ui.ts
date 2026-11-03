@@ -20,6 +20,7 @@ export interface GameUICallbacks {
   isSoundOn(): boolean;
   toggleSound(): void;
   invalidate(): void;
+  setFullscreenPreference?(wants: boolean): void;
 }
 
 /** Owns game menus, device-specific hints, and controller setup. */
@@ -204,8 +205,13 @@ export class GameUI {
             ? "Leave full screen"
             : "Full screen",
           run: () => {
-            if (document.fullscreenElement) void document.exitFullscreen();
-            else void this.requestFullScreen();
+            if (document.fullscreenElement) {
+              this.callbacks.setFullscreenPreference?.(false);
+              void document.exitFullscreen();
+            } else {
+              this.callbacks.setFullscreenPreference?.(true);
+              void this.requestFullScreen();
+            }
           },
           secondary: true,
         },
@@ -328,6 +334,7 @@ export class GameUI {
   }
 
   async requestFullScreen() {
+    this.callbacks.setFullscreenPreference?.(true);
     try {
       if (!document.fullscreenElement) await this.app.requestFullscreen();
       await (
