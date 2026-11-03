@@ -13,7 +13,18 @@ test("story returns land safely in front of every painting with a walkable exit"
     const direction = portal.facing === "east" ? -1 : 1;
     assert.equal(spawn.x, portal.x + (side ? direction * 3 : 0));
     assert.equal(spawn.z, portal.z + (side ? 0 : 3));
-    assert.equal(spawn.yaw, side ? (direction * Math.PI) / 2 : 0);
+    assert.equal(
+      spawn.yaw,
+      Math.atan2(portal.x - spawn.x, portal.z - spawn.z),
+    );
+    const forwardX = Math.sin(spawn.yaw);
+    const forwardZ = Math.cos(spawn.yaw);
+    const toPortalX = portal.x - spawn.x;
+    const toPortalZ = portal.z - spawn.z;
+    assert.ok(
+      forwardX * toPortalX + forwardZ * toPortalZ > 2.5,
+      `${portal.id}: spawn must face toward its painting`,
+    );
     const player = createPlayer(spawn.x, spawn.y, spawn.z);
     for (let frame = 0; frame < 90; frame++) {
       stepPlayer(

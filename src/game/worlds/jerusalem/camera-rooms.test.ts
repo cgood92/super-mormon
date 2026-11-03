@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import * as T from "three";
-import { buildJerusalem } from "./jerusalem.ts";
+import { buildJerusalem, JERUSALEM_PALACE_ROOMS } from "./jerusalem.ts";
 import { createPlayer, stepPlayer } from "../../physics/physics.ts";
 import { FollowCamera, cameraSegmentClear } from "../../camera/camera.ts";
 import { StoryMeshObstacles } from "../../camera/cinematic.ts";
@@ -10,7 +10,7 @@ import { selectCameraRoom } from "../../camera/camera-rooms.ts";
 test("palace room anchors occupy clear volumes and see their actual doorways", () => {
   const world = buildJerusalem("palace", new T.Scene());
   try {
-    assert.equal(world.cameraRooms?.length, 4);
+    assert.equal(JERUSALEM_PALACE_ROOMS.length, 4);
     const geometry = new StoryMeshObstacles(world.actorParent, []);
     const doors: Record<
       string,
@@ -55,7 +55,7 @@ test("palace room anchors occupy clear volumes and see their actual doorways", (
         exit: [[14, -17.5]],
       },
     };
-    for (const room of world.cameraRooms!) {
+    for (const room of JERUSALEM_PALACE_ROOMS) {
       const door = doors[room.id];
       assert.ok(door, `unrecognized palace room ${room.id}`);
       for (const kind of ["entry", "exit"] as const) {
@@ -92,7 +92,7 @@ test("palace room anchors occupy clear volumes and see their actual doorways", (
 test("a player can walk from the city spawn around the west corner through the palace rooms", () => {
   const world = buildJerusalem("palace", new T.Scene());
   try {
-    assert.ok(world.cameraRooms?.length);
+    assert.ok(JERUSALEM_PALACE_ROOMS.length);
     const player = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
     let active: string | undefined;
     const visited = new Set<string>();
@@ -133,7 +133,7 @@ test("a player can walk from the city spawn around the west corner through the p
           0,
           world.solids,
         );
-        active = selectCameraRoom(world.cameraRooms!, player, active)?.id;
+        active = selectCameraRoom(JERUSALEM_PALACE_ROOMS, player, active)?.id;
         if (visited.size)
           assert.ok(
             active,
@@ -215,7 +215,7 @@ test("room following frames an actual palace doorway route out and back on deskt
             0,
             world.solids,
           );
-          const room = selectCameraRoom(world.cameraRooms!, player, active);
+          const room = selectCameraRoom(JERUSALEM_PALACE_ROOMS, player, active);
           const changed = room?.id !== active;
           const previous = camera.position.clone();
           follow.update(1 / 60, player, world.solids, undefined, "hub", room);
@@ -282,68 +282,78 @@ test("room following frames an actual palace doorway route out and back on deskt
   }
 });
 
-test("streets mode entering Laban's palace south doorway keeps line of sight without wall stranding or control reversal", () => {
-  const world = buildJerusalem("streets", new T.Scene());
-  try {
-    const player = createPlayer(0, 0, -5);
-    player.yaw = Math.PI;
-    const camera = new T.PerspectiveCamera(58, 16 / 9, 0.08, 200);
-    const follow = new FollowCamera(camera);
-    follow.reset(player, player.yaw);
+test("streets and palace modes entering Laban's palace south doorway keep line of sight without wall stranding or control reversal", () => {
+  for (const mode of ["streets", "palace", "trade", "night"] as const) {
+    const world = buildJerusalem(mode, new T.Scene());
+    try {
+      const player = createPlayer(0, 0, -5);
+      player.yaw = Math.PI;
+      const camera = new T.PerspectiveCamera(58, 16 / 9, 0.08, 200);
+      const follow = new FollowCamera(camera);
+      follow.reset(player, player.yaw);
 
-    // Walk north into the palace to z = -14
-    for (let step = 0; step < 90; step++) {
-      stepPlayer(
-        player,
-        { x: 0, y: 1, jump: false, jumpHeld: false },
-        1 / 60,
-        follow.yaw,
-        world.solids,
-      );
-      follow.update(1 / 60, player, world.solids, undefined, "hub", undefined);
-      assert.ok(
-        cameraSegmentClear(
-          camera.position,
-          camera.position,
+      // Walk north into the palace to z = -14
+      for (let step = 0; step < 90; step++) {
+        stepPlayer(
+          player,
+          { x: 0, y: 1, jump: false, jumpHeld: false },
+          1 / 60,
+          follow.yaw,
           world.solids,
-          0.18,
-        ),
-        `embedded eye at step ${step}: ${camera.position.toArray()}`,
+        );
+        follow.update(1 / 60, player, world.solids, undefined, "hub", undefined);
+        assert.ok(
+          cameraSegmentClear(
+            camera.position,
+            camera.position,
+            world.solids,
+            0.18,
+          ),
+          `${mode}: embedded eye at step ${step}: ${camera.position.toArray()}`,
+        );
+        // Ensure no 180-degree flip occurs (angular difference from North PI is small)
+        const yawDiff = Math.abs(
+          Math.atan2(Math.sin(follow.yaw - Math.PI), Math.cos(follow.yaw - Math.PI)),
+        );
+        assert.ok(
+          yawDiff < 0.35,
+          `${mode}: follow.yaw reversed control orientation: ${(follow.yaw * 180) / Math.PI}°`,
+        );
+      }
+      assert.ok(player.z < -12, `${mode}: player should be inside palace: z=${player.z}`);
+      assert.ok(
+        camera.position.z < -7.5,
+        `${mode}: camera must stay with player inside palace: cam.z=${camera.position.z}`,
       );
-    }
-    assert.ok(player.z < -12, `player should be inside palace: z=${player.z}`);
-    assert.ok(
-      camera.position.z < -7.5,
-      `camera must stay with player inside palace: cam.z=${camera.position.z}`,
-    );
 
-    // Turn west behind the palace south wall
-    for (let step = 0; step < 60; step++) {
-      stepPlayer(
-        player,
-        { x: -1, y: 0, jump: false, jumpHeld: false },
-        1 / 60,
-        follow.yaw,
-        world.solids,
-      );
-      follow.update(1 / 60, player, world.solids, undefined, "hub", undefined);
-      assert.ok(
-        cameraSegmentClear(
-          camera.position,
-          camera.position,
+      // Turn west behind the palace south wall
+      for (let step = 0; step < 60; step++) {
+        stepPlayer(
+          player,
+          { x: -1, y: 0, jump: false, jumpHeld: false },
+          1 / 60,
+          follow.yaw,
           world.solids,
-          0.18,
-        ),
-        `embedded eye while turning west: ${camera.position.toArray()}`,
+        );
+        follow.update(1 / 60, player, world.solids, undefined, "hub", undefined);
+        assert.ok(
+          cameraSegmentClear(
+            camera.position,
+            camera.position,
+            world.solids,
+            0.18,
+          ),
+          `${mode}: embedded eye while turning west: ${camera.position.toArray()}`,
+        );
+      }
+      assert.ok(player.x < -4, `${mode}: player turned west: x=${player.x}`);
+      assert.ok(
+        camera.position.z < -8.5,
+        `${mode}: camera must remain inside palace with player: cam.z=${camera.position.z}`,
       );
+    } finally {
+      world.dispose?.();
     }
-    assert.ok(player.x < -4, `player turned west: x=${player.x}`);
-    assert.ok(
-      camera.position.z < -8.5,
-      `camera must remain inside palace with player: cam.z=${camera.position.z}`,
-    );
-  } finally {
-    world.dispose?.();
   }
 });
 
