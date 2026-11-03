@@ -54,10 +54,12 @@ export function galleryReturnSpawn(
   if (!portal) return world.spawn;
   const side = portal.facing === "east" || portal.facing === "west";
   const direction = portal.facing === "east" ? -1 : 1;
+  const spawnX = portal.x + (side ? direction * 3 : 0);
+  const spawnZ = portal.z + (side ? 0 : 3);
   return {
-    x: portal.x + (side ? direction * 3 : 0),
+    x: spawnX,
     y: (portal.y ?? 0.59) - 0.59,
-    z: portal.z + (side ? 0 : 3),
-    yaw: side ? (direction * Math.PI) / 2 : 0,
+    z: spawnZ,
+    yaw: Math.atan2(portal.x - spawnX, portal.z - spawnZ),
   };
 }

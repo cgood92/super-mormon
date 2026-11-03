@@ -51,8 +51,8 @@ test("diagonal braking has the same bounded deceleration as straight braking", (
   const speedBefore = Math.hypot(p.vx, p.vz);
   stepPlayer(p, idle, 1 / 60, 0, []);
   const brakingRate = (speedBefore - Math.hypot(p.vx, p.vz)) * 60;
-  assert.ok(brakingRate <= 26.5, `diagonal braking rate was ${brakingRate}`);
-  assert.ok(brakingRate > 15);
+  assert.ok(brakingRate <= 38.5, `diagonal braking rate was ${brakingRate}`);
+  assert.ok(brakingRate > 37.5);
 });
 
 const castRoles: CharacterRole[] = [
@@ -83,7 +83,7 @@ const standing: CharacterState = {
   runSpeed: 0,
 };
 
-test("running starts with a blended stride and leans into a turn", () => {
+test("running starts with a blended stride and leans toward travel through a turn", () => {
   const actor = createCharacter("nephi");
   actor.update(1 / 60, standing);
   const body = actor.group.children[0];
@@ -107,7 +107,14 @@ test("running starts with a blended stride and leans into a turn", () => {
       runSpeed: 6.5,
       move: "run",
     });
-  assert.ok(body.rotation.z < -0.025, `turn did not bank: ${body.rotation.z}`);
+  actor.group.updateMatrixWorld(true);
+  const travelTilt = new T.Vector3(0, 1, 0).transformDirection(
+    body.matrixWorld,
+  );
+  assert.ok(
+    travelTilt.x > 0.15,
+    `turn did not lean toward travel: ${travelTilt.x}`,
+  );
   actor.dispose();
 });
 

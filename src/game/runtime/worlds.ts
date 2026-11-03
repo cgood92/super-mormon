@@ -77,6 +77,7 @@ export type Solid = {
 };
 export type Point = { x: number; y: number; z: number; yaw?: number };
 export type WorldData = {
+  cameraRooms?: readonly import("../camera/camera-rooms").CameraRoom[];
   swimRegions?: import("../physics/physics").SwimRegion[];
   name: string;
   subtitle: string;

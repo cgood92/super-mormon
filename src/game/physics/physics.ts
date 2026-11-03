@@ -84,10 +84,10 @@ const CROUCH_HEIGHT = 0.9;
 const STEP_HEIGHT = 0.43;
 const EPS = 0.0001;
 const SPEED = 6.5;
-const ACCEL = 26;
-const FRICTION = 26;
-const REVERSE_ACCEL = 32;
-const CORNER_ACCEL = 40;
+const ACCEL = 22;
+const FRICTION = 38;
+const REVERSE_ACCEL = 52;
+const CORNER_ACCEL = 45;
 const GRAVITY = 27;
 const JUMP = 9.2;
 
@@ -583,6 +583,8 @@ export function stepPlayer(
       HEIGHT,
     );
     player.crouching = standingBlocked || (player.grounded && !!input.crouch);
+    // A stationary backflip launches opposite the facing before input steering.
+    const launchYaw = player.yaw;
     const targetSpeed = player.crouching ? SPEED * 0.43 : SPEED;
     const targetVx = worldX * targetSpeed,
       targetVz = worldZ * targetSpeed;
@@ -614,7 +616,21 @@ export function stepPlayer(
       player.vz += deltaVz * fraction;
     }
     player.runSpeed = Math.hypot(player.vx, player.vz);
-    if (player.runSpeed > 0.12) player.yaw = Math.atan2(player.vx, player.vz);
+    if (
+      length > 0.05 &&
+      player.airMoveLock <= 0 &&
+      player.move !== "groundPound" &&
+      player.move !== "poundLand"
+    ) {
+      const targetYaw = Math.atan2(worldX, worldZ);
+      const difference = Math.atan2(
+        Math.sin(targetYaw - player.yaw),
+        Math.cos(targetYaw - player.yaw),
+      );
+      player.yaw += Math.max(-18 * subdt, Math.min(18 * subdt, difference));
+    } else if (player.runSpeed > 0.12) {
+      player.yaw = Math.atan2(player.vx, player.vz);
+    }
     if (player.grounded) player.coyoteTime = 0.11;
 
     if (
@@ -650,8 +666,8 @@ export function stepPlayer(
         player.airMoveLock = 0.65;
       }
       if (move === "backflip") {
-        player.vx = -Math.sin(player.yaw) * 4;
-        player.vz = -Math.cos(player.yaw) * 4;
+        player.vx = -Math.sin(launchYaw) * 4;
+        player.vz = -Math.cos(launchYaw) * 4;
         player.airMoveLock = 0.2;
       }
       if (move === "sideflip") {
@@ -688,6 +704,8 @@ export function stepPlayer(
     if (
       !player.grounded &&
       player.vy < -0.4 &&
+      // Small stair/roof descents should land, not grab nearby furniture.
+      player.y - supportHeight(player, solids) > STEP_HEIGHT &&
       !player.ledge &&
       player.move !== "groundPound" &&
       input.traversal !== false &&

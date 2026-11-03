@@ -45,8 +45,15 @@ test("jump height responds to holding the button", () => {
 test("jump buffer fires on landing and coyote time permits a late jump", () => {
   const ledge: Solid = { x: 0, y: 0, z: 0, w: 2, h: 2, d: 2 };
   const player = createPlayer(0, 2, 0);
-  tick(player, { ...still, x: -1 }, [ledge], 20);
+  tick(player, still, [ledge]);
+  assert.equal(player.grounded, true);
+  for (let frame = 0; frame < 90 && player.grounded; frame++)
+    tick(player, { ...still, x: -1 }, [ledge]);
   assert.equal(player.grounded, false);
+  assert.ok(
+    player.coyoteTime > 0,
+    "departing the ledge must open a coyote window",
+  );
   tick(player, { ...still, jump: true, jumpHeld: true }, [ledge]);
   assert.ok(player.vy > 0);
   const falling = createPlayer(0, 0.35, 0);

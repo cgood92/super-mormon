@@ -18,6 +18,8 @@ import {
   applyAdventureCamera,
   adventureCameraYaw,
 } from "../camera/adventure-camera";
+import { selectCameraRoom } from "../camera/camera-rooms";
+import { CameraRelativeInput } from "../camera/camera-relative-input";
 import { cameraModeForWorld } from "./scene-entry";
 import { conferenceLocation } from "../worlds/conference/conference-location";
 import { canJumpIntoPainting } from "../worlds/conference/gallery-entry";
@@ -61,6 +63,8 @@ export class Gameplay {
   caughtGrace = 0;
   organSeated = false;
   hubLocation = "";
+  private readonly cameraRelativeInput = new CameraRelativeInput();
+  private movementYaw = 0;
   constructor(
     private readonly session: WorldSession,
     private readonly discoveries: Discoveries,
@@ -76,6 +80,7 @@ export class Gameplay {
     this.caughtGrace = 3;
     this.organSeated = false;
     this.hubLocation = "";
+    this.cameraRelativeInput.reset();
   }
   updateObjective = () => {
     const text =
@@ -167,16 +172,21 @@ export class Gameplay {
       move: this.session.player.move,
       climbId: this.session.player.climbId,
     };
+    if (this.session.adventure?.camera?.()) this.cameraRelativeInput.reset();
+    this.movementYaw = this.cameraRelativeInput.yaw(
+      state,
+      adventureCameraYaw(
+        this.session.adventure?.camera?.(),
+        this.view.follow.yaw,
+      ),
+    );
     const events = stepPlayer(
       this.session.player,
       movementLocked
         ? { ...state, x: 0, y: 0, jump: false, jumpHeld: false }
         : state,
       dt,
-      adventureCameraYaw(
-        this.session.adventure?.camera?.(),
-        this.view.follow.yaw,
-      ),
+      this.movementYaw,
       this.session.world.solids,
       this.session.world.climbables,
       this.session.world.swimRegions,
@@ -330,6 +340,7 @@ export class Gameplay {
         state.recenter,
         dt,
       );
+      const previousRoom = this.view.follow.roomId;
       this.view.follow.update(
         dt,
         this.session.player,
@@ -339,9 +350,17 @@ export class Gameplay {
           orbitY: state.cameraY,
           recenter: state.recenter,
           zoom: state.cameraZoom,
+          movementIntent: Math.hypot(state.x, state.y) > 0.05,
         },
         cameraModeForWorld(this.session.worldId),
+        selectCameraRoom(
+          this.session.world.cameraRooms ?? [],
+          this.session.player,
+          this.view.follow.roomId,
+        ),
       );
+      if (previousRoom !== this.view.follow.roomId)
+        this.cameraRelativeInput.hold(state, this.movementYaw);
     }
     if (adventureCamera) {
       applyAdventureCamera(

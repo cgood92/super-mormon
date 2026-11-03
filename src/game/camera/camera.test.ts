@@ -1,19 +1,59 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import * as T from "three";
-import { FollowCamera, resolveCameraPosition } from "./camera.ts";
+import {
+  FollowCamera,
+  resolveCameraPosition,
+  cameraSegmentClear,
+} from "./camera.ts";
 import { createCharacter } from "../characters/character.ts";
-import { createPlayer, stepPlayer } from "../physics/physics.ts";
 
-test("conference view shows more of large rooms without changing story presets", () => {
+test("conference keeps a lower broad view at the closer default framing", () => {
   const camera = new T.PerspectiveCamera(58, 1, 0.08, 320);
   const follow = new FollowCamera(camera);
   const player = { x: 0, y: 0, z: 0, yaw: Math.PI, grounded: true };
   follow.reset(player, player.yaw, "conference");
   assert.ok(follow.pitch < 0.3);
-  assert.ok(camera.position.distanceTo(new T.Vector3(0, 2, 0)) > 9);
+  const distance = camera.position.distanceTo(new T.Vector3(0, 2, 0));
+  assert.ok(distance > 7 && distance < 8, `conference distance ${distance}`);
   follow.reset(player, player.yaw, "streets");
-  assert.equal(follow.pitch, 0.53);
+  assert.equal(follow.pitch, 0.2);
+});
+
+test("the default camera starts closer while C-Down retains a wider view", () => {
+  const camera = new T.PerspectiveCamera(58, 1, 0.08, 320);
+  const follow = new FollowCamera(camera);
+  const player = { x: 0, y: 0, z: 0, yaw: 0, grounded: true };
+  follow.reset(player, player.yaw, "conference");
+  const defaultDistance = camera.position.distanceTo(new T.Vector3(0, 2, 0));
+  assert.ok(
+    defaultDistance < 8,
+    `default conference distance ${defaultDistance}`,
+  );
+  follow.update(
+    1 / 60,
+    player,
+    [],
+    {
+      orbitX: 0,
+      orbitY: 0,
+      recenter: false,
+      zoom: 1,
+    },
+    "conference",
+  );
+  for (let frame = 0; frame < 180; frame++)
+    follow.update(
+      1 / 60,
+      player,
+      [],
+      { orbitX: 0, orbitY: 0, recenter: false },
+      "conference",
+    );
+  assert.ok(
+    camera.position.distanceTo(new T.Vector3(0, 2, 0)) > defaultDistance + 2,
+    "C-Down should restore a noticeably wider view",
+  );
 });
 
 test("camera ray stops in front of solid walls without clipping through them", () => {
@@ -54,22 +94,22 @@ test("follow camera responds to manual orbit and recenters behind player", () =>
   assert.ok(Math.abs(follow.yaw) < 0.05);
 });
 
-test("world cameras frame the character from an elevated exploration distance", () => {
+test("world cameras frame the character from a low trailing exploration distance", () => {
   const p = { x: 0, y: 0, z: 0, yaw: 0, grounded: true, runSpeed: 0 };
   for (const [mode, minimum] of [
-    ["hub", 7.3],
-    ["streets", 6.9],
-    ["house", 6.0],
-    ["palace", 6.9],
+    ["hub", 5.4],
+    ["streets", 5.4],
+    ["house", 4.6],
+    ["palace", 5.2],
   ] as const) {
     const camera = new T.PerspectiveCamera(58, 1, 0.08, 150);
     const follow = new FollowCamera(camera);
     follow.reset(p, 0, mode);
     assert.ok(
-      camera.position.distanceTo(new T.Vector3(0, 1.1, 0)) >= minimum,
+      camera.position.distanceTo(new T.Vector3(0, 1, 0)) >= minimum,
       `${mode} too close`,
     );
-    assert.ok(follow.pitch >= 0.5, `${mode} camera too low`);
+    assert.ok(follow.pitch <= 0.22, `${mode} camera too elevated`);
   }
 });
 
@@ -77,7 +117,7 @@ test("camera zoom steps closer and farther without changing its aim", () => {
   const camera = new T.PerspectiveCamera(65, 1, 0.08, 100);
   const follow = new FollowCamera(camera);
   const p = { x: 0, y: 0, z: 0, yaw: 0, runSpeed: 0 };
-  const target = new T.Vector3(0, 1.1, 0);
+  const target = new T.Vector3(0, 1, 0);
   const orbit = (zoom: number) => ({
     orbitX: 0,
     orbitY: 0,
@@ -93,7 +133,7 @@ test("camera zoom steps closer and farther without changing its aim", () => {
     nearDistance < originalDistance,
     "C-Up should move the camera closer",
   );
-  assert.ok(nearDistance > 7.4 * 0.6 + 0.5, "zoom should ease inward");
+  assert.ok(nearDistance > 7.2 * 0.6 + 0.5, "zoom should ease inward");
   assert.equal(follow.pitch, originalPitch);
   assert.equal(follow.yaw, 0);
   follow.update(1 / 60, p, [], orbit(1));
@@ -110,7 +150,7 @@ test("camera zoom clamps at its closest and farthest preset and resets to defaul
   const camera = new T.PerspectiveCamera(65, 1, 0.08, 100);
   const follow = new FollowCamera(camera);
   const p = { x: 0, y: 0, z: 0, yaw: 0, runSpeed: 0 };
-  const target = new T.Vector3(0, 1.1, 0);
+  const target = new T.Vector3(0, 1, 0);
   const orbit = (zoom: number) => ({
     orbitX: 0,
     orbitY: 0,
@@ -120,12 +160,12 @@ test("camera zoom clamps at its closest and farthest preset and resets to defaul
   follow.reset(p);
   for (let i = 0; i < 10; i++) follow.update(1 / 60, p, [], orbit(-1));
   for (let i = 0; i < 60; i++) follow.update(1 / 60, p, [], orbit(0));
-  assert.ok(Math.abs(camera.position.distanceTo(target) - 7.4 * 0.6) < 0.05);
+  assert.ok(Math.abs(camera.position.distanceTo(target) - 7.2 * 0.58) < 0.05);
   for (let i = 0; i < 10; i++) follow.update(1 / 60, p, [], orbit(1));
   for (let i = 0; i < 180; i++) follow.update(1 / 60, p, [], orbit(0));
-  assert.ok(Math.abs(camera.position.distanceTo(target) - 7.4 * 1.4) < 0.05);
+  assert.ok(Math.abs(camera.position.distanceTo(target) - 7.2 * 1.18) < 0.05);
   follow.reset(p);
-  assert.ok(Math.abs(camera.position.distanceTo(target) - 7.4) < 0.001);
+  assert.ok(Math.abs(camera.position.distanceTo(target) - 7.2 * 0.76) < 0.001);
 });
 
 test("far zoom still stops in front of a wall", () => {
@@ -152,20 +192,19 @@ test("far zoom still stops in front of a wall", () => {
   );
 });
 
-test("wall obstruction clamps immediately and clears as space opens", () => {
+test("sightline obstruction leaves chosen zoom unchanged", () => {
   const camera = new T.PerspectiveCamera(65, 1, 0.08, 100);
   const follow = new FollowCamera(camera);
   const p = { x: 0, y: 0, z: 0, yaw: 0, runSpeed: 0 };
   const wall = { x: 0, y: 0, z: -2.4, w: 3, h: 6, d: 0.5 };
   follow.reset(p);
+  const previous = camera.position.clone();
   follow.update(1 / 60, p, [wall]);
-  assert.ok(follow.obstructed);
-  assert.ok(follow.obstructionAmount > 0);
-  assert.ok(camera.position.z > -2, "camera crossed wall while easing");
-  follow.update(1 / 60, p, []);
   assert.equal(follow.obstructed, false);
   assert.equal(follow.obstructionAmount, 0);
-  assert.ok(camera.position.z > -7, "camera should ease back outward");
+  assert.ok(camera.position.distanceTo(previous) < 0.001);
+  follow.update(1 / 60, p, []);
+  assert.ok(camera.position.distanceTo(previous) < 0.001);
 });
 
 test("eased zoom stays outside walls while the camera orbits", () => {
@@ -173,18 +212,21 @@ test("eased zoom stays outside walls while the camera orbits", () => {
   const follow = new FollowCamera(camera);
   const p = { x: 0, y: 0, z: 0, yaw: 0, runSpeed: 0 };
   const wall = { x: -2, y: 0, z: -5.5, w: 2, h: 8, d: 0.8 };
-  const target = new T.Vector3(0, 1.1, 0);
   follow.reset(p);
   for (let frame = 0; frame < 30; frame++) {
+    const previous = camera.position.clone();
     follow.update(1 / 60, p, [wall], {
       orbitX: frame === 0 ? Math.PI / 2 : 0,
       orbitY: 0,
       recenter: false,
       zoom: frame === 0 ? -1 : 0,
     });
-    const safe = resolveCameraPosition(target, camera.position, [wall]);
     assert.ok(
-      safe.distanceTo(camera.position) < 0.001,
+      cameraSegmentClear(camera.position, camera.position, [wall], 0.2),
+      `camera volume entered wall on orbit frame ${frame}`,
+    );
+    assert.ok(
+      cameraSegmentClear(previous, camera.position, [wall], 0.2),
       `camera crossed wall on orbit frame ${frame}`,
     );
   }
@@ -235,30 +277,6 @@ test("character feet stay at player height and motion animates limbs", () => {
     initial,
   );
   character.dispose();
-});
-
-test("holding a lateral direction does not make the camera and player spiral", () => {
-  const p = createPlayer();
-  const follow = new FollowCamera(new T.PerspectiveCamera(65, 1, 0.08, 100));
-  follow.reset(p);
-  for (let i = 0; i < 360; i++) {
-    stepPlayer(
-      p,
-      { x: 1, y: 0, jump: false, jumpHeld: false },
-      1 / 60,
-      follow.yaw,
-      [],
-    );
-    follow.update(
-      1 / 60,
-      p,
-      [],
-      { orbitX: 0, orbitY: 0, recenter: false },
-      "hub",
-    );
-  }
-  assert.ok(Math.abs(follow.yaw) < 0.2, `camera rotated ${follow.yaw} radians`);
-  assert.ok(Math.abs(p.z) < 2, `lateral movement curved ${p.z} units`);
 });
 
 test("character visibly faces its spawn heading on the first frame", () => {

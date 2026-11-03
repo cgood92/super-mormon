@@ -796,7 +796,8 @@ export function gallery(scene: THREE.Scene): WorldData {
       elders.update(dt, player);
     },
     subtitle: "Explore three floors, the auditorium and roof gardens",
-    spawn: { x: 0, y: 0, z: 36, yaw: Math.PI },
+    // Start beside the central column so the low trailing view opens clearly.
+    spawn: { x: 4, y: 0, z: 36, yaw: Math.PI },
     landmarks: [
       ...christus.landmarks,
       { name: "Movement studio", x: -74, y: 0, z: 35 },

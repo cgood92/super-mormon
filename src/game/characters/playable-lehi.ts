@@ -309,6 +309,14 @@ export function createSculptedCharacterRig(
   );
   footMeshes.forEach((mesh) => mesh.geometry.computeBoundingBox());
   const worldFootBox = new T.Box3();
+  const contactAnchors: ({ point: T.Vector3; yaw: number } | null)[] = [
+    null,
+    null,
+  ];
+  const soleCenter = new T.Vector3();
+  const soleCorrection = new T.Vector3();
+  const soleLocalOrigin = new T.Vector3();
+  const soleParentInverse = new T.Matrix4();
   const gripParentRotation = new T.Quaternion();
   const gripWorldRotation = new T.Quaternion();
   let clothWasMoving = true;
@@ -355,9 +363,13 @@ export function createSculptedCharacterRig(
         kneePivots[i].rotation.copy(driverKnees[i].rotation);
         footPivots[i].rotation.copy(driverFeet[i].rotation);
         footPivots[i].scale.setScalar(crawling ? 0.65 : 1);
-        footPivots[i].position.z = crawling ? -0.14 : 0;
-        footPivots[i].position.y =
-          height(0.1) - height(0.37) + (driverFeet[i].position.y + 0.28);
+        // Sole corrections are transient offsets, including X when banked.
+        // Restore the complete authored pivot before solving this frame.
+        footPivots[i].position.set(
+          0,
+          height(0.1) - height(0.37) + (driverFeet[i].position.y + 0.28),
+          crawling ? -0.14 : 0,
+        );
       }
       if (crawling || wasCrawling) {
         model.group.updateWorldMatrix(true, true);
@@ -445,18 +457,50 @@ export function createSculptedCharacterRig(
         (!state.move || state.move === "run" || state.move === "idle");
       if (groundedWalk) {
         model.group.updateWorldMatrix(true, true);
-        for (let i = 0; i < 2; i++)
-          if (driverKnees[i].rotation.x < 0.08) {
-            worldFootBox
-              .copy(footMeshes[i].geometry.boundingBox!)
-              .applyMatrix4(footMeshes[i].matrixWorld);
-            const worldYPerLocalY =
-              footPivots[i].parent!.matrixWorld.elements[5];
-            if (Math.abs(worldYPerLocalY) > 0.1)
-              footPivots[i].position.y +=
-                (state.y - worldFootBox.min.y) / worldYPerLocalY;
+        for (let i = 0; i < 2; i++) {
+          worldFootBox
+            .copy(footMeshes[i].geometry.boundingBox!)
+            .applyMatrix4(footMeshes[i].matrixWorld);
+          const stance = driverKnees[i].rotation.x < 0.08;
+          worldFootBox.getCenter(soleCenter);
+          let anchor = contactAnchors[i];
+          if (
+            anchor &&
+            (Math.hypot(
+              anchor.point.x - soleCenter.x,
+              anchor.point.z - soleCenter.z,
+            ) > 0.12 ||
+              Math.abs(
+                Math.atan2(
+                  Math.sin(group.rotation.y - anchor.yaw),
+                  Math.cos(group.rotation.y - anchor.yaw),
+                ),
+              ) > 0.12)
+          )
+            anchor = contactAnchors[i] = null;
+          // Once stopped, keep the last planted sole fixed while body lean and
+          // stride ease out. Walking anchors remain owned by the motion driver.
+          soleCorrection.set(0, 0, 0);
+          if (stance && anchor && state.runSpeed < 0.25) {
+            soleCorrection.x = anchor.point.x - soleCenter.x;
+            soleCorrection.z = anchor.point.z - soleCenter.z;
           }
-      }
+          soleCorrection.y = stance
+            ? state.y - worldFootBox.min.y
+            : Math.max(0, state.y - worldFootBox.min.y);
+          soleParentInverse.copy(footPivots[i].parent!.matrixWorld).invert();
+          soleLocalOrigin.set(0, 0, 0).applyMatrix4(soleParentInverse);
+          soleCorrection.applyMatrix4(soleParentInverse).sub(soleLocalOrigin);
+          footPivots[i].position.add(soleCorrection);
+          if (stance) {
+            if (!anchor || state.runSpeed >= 0.25)
+              contactAnchors[i] = {
+                point: soleCenter.clone(),
+                yaw: group.rotation.y,
+              };
+          } else contactAnchors[i] = null;
+        }
+      } else contactAnchors.fill(null);
       // Only the outer coat gathers for a crawl. Ordinary walking keeps its
       // authored geometry; no independently lagging inner/outer cloth fields.
       const clothMoving = crawling;

@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex" />
+    <title>Front robe seam QA</title>
+    <style>
+      body {
+        margin: 0;
+        background: #d9d9d0;
+        font: 14px system-ui;
+      }
+      #labels {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+        pointer-events: none;
+      }
+      span {
+        padding: 12px;
+        color: #172e35;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="labels"></div>
+    <script type="module" src="./front-robe.ts"></script>
+  </body>
+</html>
