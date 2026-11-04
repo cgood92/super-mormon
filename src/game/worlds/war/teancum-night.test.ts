@@ -391,7 +391,10 @@ test("the companion jumps to match the player without getting trapped in an infi
   }
 
   assert.ok(servantJumps >= 1, `companion jumped ${servantJumps} times`);
-  assert.ok(servantJumps <= 3, `companion jump loop detected: ${servantJumps} jumps`);
+  assert.ok(
+    servantJumps <= 3,
+    `companion jump loop detected: ${servantJumps} jumps`,
+  );
   const finalCompanion = (runtime.snapshot() as any).servant;
   assert.equal(finalCompanion.y, 0, "companion settles on the ground");
   world.dispose?.();
