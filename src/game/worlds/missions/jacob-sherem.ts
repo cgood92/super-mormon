@@ -161,7 +161,7 @@ export function buildJacobSherem(scene: T.Scene): WorldData {
     subtitle: "Find a voice in the city • Jacob 7 • Imagined settlement",
     initialObjective:
       "Find Sherem among the people in the city and its outskirts.",
-    spawn: { x: 14, y: 0, z: -84 },
+    spawn: { x: 14, y: 0, z: -84, yaw: 0 },
     solids,
     actorParent: root,
     bounds: { minX: -80, maxX: 80, minZ: -88, maxZ: 85 },
