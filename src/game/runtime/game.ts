@@ -1,4 +1,14 @@
 import { playSoundEffect, type SoundKind } from "../audio/sound-effects";
+import {
+  readSoundPreference,
+  writeSoundPreference,
+} from "../audio/sound-settings";
+import {
+  isMobileScreen,
+  readFullscreenPreference,
+  shouldPromptFullscreenResume,
+  writeFullscreenPreference,
+} from "../ui/mobile-fullscreen";
 import { recordExplorationEntry } from "./exploration";
 import { GameplayAnalytics, browserAnalytics } from "./analytics";
 import { StoryPresentation } from "../ui/story-presentation";
@@ -55,6 +65,11 @@ export class Game {
     isSoundOn: () => this.soundOn,
     toggleSound: () => {
       this.soundOn = !this.soundOn;
+      if (!this.soundOn) this.session.world?.organ?.stop();
+      writeSoundPreference(this.soundOn);
+    },
+    setFullscreenPreference: (wants) => {
+      this.setWantsFullscreen(wants);
     },
     invalidate: () => {
       this.view.renderDirty = true;
@@ -84,6 +99,7 @@ export class Game {
       caught: () => this.recovery.begin(),
       isTransitioning: () => this.transition,
       playOrgan: () => {
+        if (!this.soundOn) return;
         this.audio ??= new AudioContext();
         this.session.world.organ!.start(this.audio);
       },
@@ -112,14 +128,21 @@ export class Game {
   private transition = false;
   private splashTime = 0;
   private audio: AudioContext | undefined;
-  private soundOn = true;
+  private soundOn = readSoundPreference();
+  private wantsFullscreen = readFullscreenPreference();
+  private isFullscreenResumeModalOpen = false;
+  private pendingFullscreenResume = false;
   private loadGeneration = 0;
   private completionSceneSeen = false;
   constructor() {
     this.analytics.setFullscreen(document.fullscreenElement !== null);
-    document.addEventListener("fullscreenchange", () =>
-      this.analytics.setFullscreen(document.fullscreenElement !== null),
-    );
+    document.addEventListener("fullscreenchange", () => {
+      const isFullscreen = document.fullscreenElement !== null;
+      this.analytics.setFullscreen(isFullscreen);
+      if (isFullscreen) {
+        this.setWantsFullscreen(true);
+      }
+    });
     window.addEventListener("resize", () => this.view.resize());
     this.view.resize();
     this.ui.refreshControlHints();
@@ -149,6 +172,7 @@ export class Game {
           "page_resume",
           this.input.device,
         );
+      this.checkFullscreenResume();
     });
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {
@@ -156,7 +180,10 @@ export class Game {
         this.session.world?.organ?.stop();
         this.view.suspend();
         if (this.started && !this.ui.paused) this.ui.pause();
-      } else this.view.resume();
+      } else {
+        this.view.resume();
+        this.checkFullscreenResume();
+      }
     });
     this.view.start({
       update: this.update,
@@ -325,9 +352,7 @@ export class Game {
     this.analytics.start(this.session.worldId, "initial", this.input.device);
     el("title-screen").hidden = true;
     this.input.reset();
-    const mobileScreen = matchMedia(
-      "(max-width: 800px), (pointer: coarse) and (max-height: 600px)",
-    ).matches;
+    const mobileScreen = isMobileScreen(undefined, this.input.device);
     if (mobileScreen)
       this.ui.modal(
         "READY TO EXPLORE",
@@ -337,14 +362,23 @@ export class Game {
           {
             label: "Enter Full Screen (recommended)",
             run: () => {
+              this.setWantsFullscreen(true);
               void this.ui.requestFullScreen();
             },
           },
-          { label: "Continue", run: () => {}, secondary: true },
+          {
+            label: "Continue",
+            run: () => {
+              this.setWantsFullscreen(false);
+            },
+            secondary: true,
+          },
         ],
       );
-    else if (document.fullscreenElement || navigator.userActivation?.isActive)
+    else if (document.fullscreenElement || navigator.userActivation?.isActive) {
+      this.setWantsFullscreen(true);
       void this.ui.requestFullScreen();
+    }
     this.ui.message(
       this.session.worldId === "hub"
         ? "Run toward a painting, then press {jump}. {pause} → Moves for practice."
@@ -439,7 +473,67 @@ export class Game {
     this.gameplay.updateObjective();
     if (this.started)
       this.ui.message(entryMessage(id, this.session.world, this.completed), 4);
+    if (this.started && !document.hidden) {
+      this.checkFullscreenResume();
+    }
   };
+
+  private setWantsFullscreen(value: boolean) {
+    this.wantsFullscreen = value;
+    writeFullscreenPreference(value);
+  }
+
+  private checkFullscreenResume() {
+    if (
+      shouldPromptFullscreenResume({
+        started: this.started,
+        transition: this.transition,
+        cinematic: this.presentation.active,
+        promptOpen: this.isFullscreenResumeModalOpen,
+        wantsFullscreen: this.wantsFullscreen,
+        isFullscreen: document.fullscreenElement !== null,
+        isMobile: isMobileScreen(undefined, this.input.device),
+      })
+    ) {
+      this.promptFullscreenResume();
+    } else if (
+      this.started &&
+      !this.transition &&
+      this.presentation.active &&
+      this.wantsFullscreen &&
+      !document.fullscreenElement &&
+      isMobileScreen(undefined, this.input.device)
+    ) {
+      this.pendingFullscreenResume = true;
+    }
+  }
+
+  private promptFullscreenResume() {
+    this.isFullscreenResumeModalOpen = true;
+    this.ui.modal(
+      "READY TO EXPLORE",
+      "Return to full screen?",
+      "Play full screen and sideways for the best view.",
+      [
+        {
+          label: "Resume Full Screen (recommended)",
+          run: () => {
+            this.isFullscreenResumeModalOpen = false;
+            this.setWantsFullscreen(true);
+            void this.ui.requestFullScreen();
+          },
+        },
+        {
+          label: "Continue",
+          run: () => {
+            this.isFullscreenResumeModalOpen = false;
+            this.setWantsFullscreen(false);
+          },
+          secondary: true,
+        },
+      ],
+    );
+  }
 
   private update = (dt: number, activeElapsed = dt) => {
     this.ui.refreshControlHints();
@@ -468,6 +562,10 @@ export class Game {
     if (this.presentation.active) {
       this.presentation.update(dt, state);
       return;
+    }
+    if (this.pendingFullscreenResume) {
+      this.pendingFullscreenResume = false;
+      this.checkFullscreenResume();
     }
     if (this.ui.paused) {
       this.ui.navigateMenu(state, dt);

@@ -1,0 +1,953 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Character Roster · Super Mormon</title>
+    <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
+    <meta name="robots" content="noindex" />
+    <style>
+      :root {
+        --bg: #e7e2d7;
+        --card-bg: #f8f4eb;
+        --card-border: #d4ccbd;
+        --text: #28362b;
+        --text-muted: #5e6d62;
+        --accent: #37533f;
+        --accent-hover: #263d2d;
+        --accent-light: #e2ede5;
+        --tag-bg: #e5ded2;
+        --danger: #b33927;
+        --warning: #b87a28;
+        --success: #2e7d32;
+        --radius: 12px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.5 system-ui,
+          -apple-system,
+          sans-serif;
+        overflow-x: hidden;
+      }
+      body.bg-magenta {
+        --bg: #ff007f;
+        --card-bg: #ff2a98;
+        --card-border: #cc0066;
+        --text: #ffffff;
+        --text-muted: #ffccdf;
+        --tag-bg: #d9006c;
+      }
+      body.bg-dark {
+        --bg: #141715;
+        --card-bg: #1f2521;
+        --card-border: #2c352f;
+        --text: #e1e7e3;
+        --text-muted: #8b9b90;
+        --tag-bg: #2b342e;
+      }
+      body.bg-white {
+        --bg: #f0f0f0;
+        --card-bg: #ffffff;
+        --card-border: #dcdcdc;
+        --text: #1a1a1a;
+        --text-muted: #666666;
+        --tag-bg: #eaeaea;
+      }
+
+      /* Fixed full-screen canvas for grid scissor rendering */
+      #grid-canvas {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 3;
+      }
+
+      header {
+        position: relative;
+        z-index: 10;
+        padding: 24px 32px 16px;
+        background: rgba(231, 226, 215, 0.94);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--card-border);
+      }
+      body.bg-dark header {
+        background: rgba(20, 23, 21, 0.94);
+      }
+      body.bg-magenta header {
+        background: rgba(255, 0, 127, 0.94);
+      }
+      body.bg-white header {
+        background: rgba(240, 240, 240, 0.94);
+      }
+
+      .header-title-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+      h1 {
+        margin: 0;
+        font:
+          700 28px Georgia,
+          serif;
+        letter-spacing: -0.01em;
+      }
+      .subtitle {
+        margin: 4px 0 0;
+        color: var(--text-muted);
+        font-size: 13px;
+      }
+
+      /* Control Toolbars */
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+      }
+      .toolbar-group {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(255, 255, 255, 0.6);
+        padding: 4px 8px;
+        border-radius: 8px;
+        border: 1px solid var(--card-border);
+      }
+      body.bg-dark .toolbar-group {
+        background: rgba(255, 255, 255, 0.05);
+      }
+      label {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      select,
+      input,
+      button {
+        font: inherit;
+        color: inherit;
+        background: #fff;
+        border: 1px solid #bcc7ba;
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 13px;
+        outline: none;
+        transition:
+          border-color 0.15s,
+          background-color 0.15s;
+      }
+      body.bg-dark select,
+      body.bg-dark input,
+      body.bg-dark button {
+        background: #28302b;
+        border-color: #3e4a42;
+      }
+      button {
+        cursor: pointer;
+        font-weight: 500;
+      }
+      button:hover {
+        background: #f0f4f1;
+        border-color: var(--accent);
+      }
+      body.bg-dark button:hover {
+        background: #344038;
+      }
+      button.active {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+
+      .btn-icon {
+        padding: 6px 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+      }
+
+      .search-box {
+        position: relative;
+        min-width: 200px;
+      }
+      .search-box input {
+        width: 100%;
+        padding-left: 28px;
+      }
+      .search-icon {
+        position: absolute;
+        left: 8px;
+        top: 50%;
+        transform: translateY(-50%);
+        opacity: 0.5;
+        pointer-events: none;
+      }
+
+      /* Secondary Summary Bar */
+      .summary-bar {
+        position: relative;
+        z-index: 5;
+        background: var(--bg);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 32px;
+        font-size: 13px;
+        color: var(--text-muted);
+        border-bottom: 1px solid var(--card-border);
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        background: var(--tag-bg);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+      }
+      .badge-success {
+        background: #e8f5e9;
+        color: var(--success);
+      }
+      .badge-warning {
+        background: #fff3e0;
+        color: var(--warning);
+      }
+
+      /* Cards Grid */
+      #grid {
+        position: relative;
+        z-index: 2;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 20px;
+        padding: 24px 32px 48px;
+      }
+      @media (max-width: 1300px) {
+        #grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+      @media (max-width: 900px) {
+        #grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        header {
+          padding: 16px;
+        }
+        #grid {
+          padding: 16px;
+        }
+      }
+      @media (max-width: 580px) {
+        #grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      article.character-card {
+        position: relative;
+        border-radius: var(--radius);
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+        transition:
+          transform 0.2s,
+          box-shadow 0.2s,
+          border-color 0.2s;
+      }
+      article.character-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+        border-color: #aab7a6;
+      }
+
+      .card-header {
+        position: relative;
+        z-index: 4;
+        padding: 14px 18px 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      .card-title-group h2 {
+        margin: 0;
+        font:
+          600 20px Georgia,
+          serif;
+        line-height: 1.2;
+      }
+      .card-role-key {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 2px;
+      }
+
+      /* 3D Viewport in Card */
+      .view-container {
+        position: relative;
+        height: 290px;
+        touch-action: none;
+        cursor: grab;
+      }
+      .view-container:active {
+        cursor: grabbing;
+      }
+      .view-hints {
+        position: absolute;
+        z-index: 4;
+        bottom: 8px;
+        left: 8px;
+        right: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        pointer-events: none;
+        font-size: 11px;
+        color: var(--text-muted);
+        opacity: 0.75;
+      }
+      .view-controls-overlay {
+        position: absolute;
+        z-index: 4;
+        top: 8px;
+        right: 8px;
+        display: flex;
+        gap: 4px;
+        opacity: 0;
+        transition: opacity 0.2s;
+        pointer-events: auto;
+      }
+      .view-container:hover .view-controls-overlay {
+        opacity: 1;
+      }
+      .view-btn {
+        background: rgba(255, 255, 255, 0.85);
+        border: 1px solid rgba(0, 0, 0, 0.15);
+        border-radius: 4px;
+        padding: 4px 6px;
+        font-size: 11px;
+        cursor: pointer;
+      }
+      body.bg-dark .view-btn {
+        background: rgba(40, 48, 43, 0.85);
+        border-color: rgba(255, 255, 255, 0.15);
+      }
+
+      .card-content {
+        position: relative;
+        z-index: 4;
+        padding: 12px 18px 16px;
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        gap: 10px;
+      }
+      .card-description {
+        margin: 0;
+        font-size: 13px;
+        color: var(--text-muted);
+        flex: 1;
+      }
+      .card-scripture {
+        font-size: 11px;
+        font-style: italic;
+        color: var(--text-muted);
+      }
+      .card-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 8px;
+        border-top: 1px solid var(--card-border);
+      }
+      .card-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+      }
+
+      /* Inspector Modal */
+      #inspector-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        display: none;
+        background: rgba(0, 0, 0, 0.65);
+        backdrop-filter: blur(8px);
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      #inspector-modal.open {
+        display: flex;
+      }
+      .inspector-window {
+        width: 100%;
+        max-width: 1200px;
+        height: 90vh;
+        background: var(--card-bg);
+        border-radius: 16px;
+        box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+        display: grid;
+        grid-template-columns: 1fr 360px;
+        overflow: hidden;
+        border: 1px solid var(--card-border);
+      }
+      @media (max-width: 900px) {
+        .inspector-window {
+          grid-template-columns: 1fr;
+          grid-template-rows: 1fr 1fr;
+          height: 95vh;
+        }
+      }
+      .inspector-viewport {
+        position: relative;
+        background: radial-gradient(circle at center, #f5f0e4 0%, #dbd4c4 100%);
+        touch-action: none;
+        cursor: grab;
+      }
+      body.bg-dark .inspector-viewport {
+        background: radial-gradient(circle at center, #242c27 0%, #121614 100%);
+      }
+      body.bg-magenta .inspector-viewport {
+        background: radial-gradient(circle at center, #ff2a98 0%, #cc0066 100%);
+      }
+      .inspector-viewport:active {
+        cursor: grabbing;
+      }
+      .inspector-canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      .inspector-sidebar {
+        padding: 24px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        background: var(--card-bg);
+        border-left: 1px solid var(--card-border);
+      }
+      .inspector-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+      }
+      .inspector-close-btn {
+        background: none;
+        border: none;
+        font-size: 24px;
+        line-height: 1;
+        cursor: pointer;
+        padding: 4px;
+      }
+
+      .panel-section {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .panel-section-title {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        padding-bottom: 4px;
+        border-bottom: 1px solid var(--card-border);
+      }
+
+      .layer-toggle {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 13px;
+        padding: 4px 0;
+      }
+      .layer-toggle input {
+        cursor: pointer;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+      }
+      .stat-item {
+        background: var(--tag-bg);
+        padding: 8px;
+        border-radius: 6px;
+      }
+      .stat-label {
+        font-size: 10px;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+      .stat-val {
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .timeline-slider {
+        width: 100%;
+        cursor: pointer;
+      }
+      .timeline-controls {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .diagnostics-box {
+        padding: 10px;
+        border-radius: 8px;
+        font-size: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .diag-clean {
+        background: #e8f5e9;
+        color: #2e7d32;
+        border: 1px solid #c8e6c9;
+      }
+      .diag-warn {
+        background: #fff3e0;
+        color: #b87a28;
+        border: 1px solid #ffe0b2;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Single fixed Three.js canvas for all grid viewports -->
+    <canvas id="grid-canvas"></canvas>
+
+    <header>
+      <div class="header-title-row">
+        <div>
+          <h1>Character Roster</h1>
+          <p class="subtitle">
+            Book of Mormon 3D character cast · Interactive orbit, live animation
+            cycles, carrying props, and clothing gap diagnostics.
+          </p>
+        </div>
+        <div class="toolbar-group">
+          <label
+            >Contrast
+            <select id="bg-theme">
+              <option value="default">Parchment</option>
+              <option value="magenta">Gap Finder (Hot Magenta)</option>
+              <option value="dark">Dark Slate</option>
+              <option value="white">Studio White</option>
+            </select></label
+          >
+          <label
+            >Display
+            <select id="render-mode">
+              <option value="shaded">Shaded (PBR)</option>
+              <option value="wireframe">Wireframe</option>
+              <option value="shaded-wire">Shaded + Wireframe</option>
+              <option value="silhouette">Silhouette Profile</option>
+              <option value="xray">X-Ray Outer Mantle</option>
+            </select></label
+          >
+        </div>
+      </div>
+
+      <!-- Main Filter and Action Controls -->
+      <div class="toolbar">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input
+            type="search"
+            id="search-input"
+            placeholder="Search characters, roles, traits…"
+          />
+        </div>
+
+        <div class="toolbar-group">
+          <label
+            >Faction
+            <select id="faction-filter">
+              <option value="all">All Factions (41)</option>
+              <option value="Jerusalem & Wilderness">
+                Jerusalem & Wilderness (14)
+              </option>
+              <option value="Promised Land & Teachers">
+                Promised Land & Teachers (5)
+              </option>
+              <option value="Missions & Kings">Missions & Kings (2)</option>
+              <option value="War Chapters">War Chapters (10)</option>
+              <option value="Prophets & Signs">Prophets & Signs (2)</option>
+              <option value="Final Records & Jaredites">
+                Final Records & Jaredites (7)
+              </option>
+              <option value="Contemporary">Contemporary (1)</option>
+            </select></label
+          >
+        </div>
+
+        <div class="toolbar-group">
+          <label
+            >Archetype
+            <select id="archetype-filter">
+              <option value="all">All Roles</option>
+              <option value="Prophets & Patriarchs">
+                Prophets & Patriarchs
+              </option>
+              <option value="Warriors & Soldiers">Warriors & Soldiers</option>
+              <option value="Women of Faith">Women of Faith</option>
+              <option value="Youth & Children">Youth & Children</option>
+              <option value="Leaders & Rulers">Leaders & Rulers</option>
+              <option value="Dissenters & Adversaries">
+                Dissenters & Adversaries
+              </option>
+              <option value="Artisans & Citizens">Artisans & Citizens</option>
+            </select></label
+          >
+        </div>
+
+        <div class="toolbar-group">
+          <label
+            >Quality
+            <select id="quality-selector">
+              <option value="hero">Hero (Full Detail)</option>
+              <option value="npc">NPC (World Fidelity)</option>
+              <option value="crowd">Crowd (Optimized)</option>
+            </select></label
+          >
+        </div>
+
+        <div class="toolbar-group">
+          <label
+            >Motion
+            <select id="motion-selector">
+              <option value="run">Running (Active Cycle)</option>
+              <option value="kneel">Kneeling (Prayer Pose)</option>
+              <option value="jump">Jumping (Airborne Arc)</option>
+              <option value="carry">Carrying Objects</option>
+              <option value="crawl">Crawling (Hands & Knees)</option>
+              <option value="idle">Standing / Idle</option>
+              <option value="wave">Waving</option>
+              <option value="point">Pointing Command</option>
+              <option value="dance">Dancing</option>
+              <option value="groundPound">Ground Pound</option>
+            </select></label
+          >
+        </div>
+
+        <div class="toolbar-group" id="carry-prop-group">
+          <label
+            >Carried Prop
+            <select id="carried-prop">
+              <option value="plates">Gold Plates & Rings</option>
+              <option value="jar">Terracotta Water Jar</option>
+              <option value="crate">Timber Supplies Crate</option>
+              <option value="pack">Traveler's Sack</option>
+              <option value="banner">Title of Liberty Banner</option>
+            </select></label
+          >
+        </div>
+
+        <div class="toolbar-group">
+          <label>Camera</label>
+          <button id="cam-front" title="Front view">Front</button>
+          <button id="cam-quarter" title="Three-quarter angle">3/4</button>
+          <button id="cam-side" title="Side view">Side</button>
+          <button id="cam-back" title="Back view">Back</button>
+          <button id="cam-low" title="Low angle to inspect hem & shoes">
+            Low Hem
+          </button>
+          <button id="cam-high" title="High angle to inspect shoulders">
+            High
+          </button>
+        </div>
+
+        <div class="toolbar-group">
+          <label
+            title="When checked, dragging or zooming one card moves all cards together"
+          >
+            <input type="checkbox" id="sync-orbit" />
+            Sync All Cards
+          </label>
+        </div>
+
+        <div class="toolbar-group">
+          <button
+            id="play-pause-btn"
+            class="btn-icon"
+            title="Toggle animation playback"
+          >
+            <span id="play-pause-icon">⏸</span> Pause
+          </button>
+          <label
+            >Speed
+            <select id="playback-speed">
+              <option value="0.1">0.1x Slow-Mo</option>
+              <option value="0.25">0.25x</option>
+              <option value="0.5">0.5x</option>
+              <option value="1.0" selected>1.0x Normal</option>
+              <option value="1.5">1.5x</option>
+            </select></label
+          >
+        </div>
+
+        <div class="toolbar-group">
+          <label
+            title="Simulates continuous sharp turns with velocity lag to test cloth draping"
+          >
+            <input type="checkbox" id="reversal-lag" />
+            Turn Reversals
+          </label>
+        </div>
+
+        <button
+          id="run-all-diag-btn"
+          title="Inspect geometry for all 41 characters"
+        >
+          ⚡ Run Seam Diagnostics
+        </button>
+      </div>
+    </header>
+
+    <div class="summary-bar">
+      <div>
+        <strong id="counter-display">Showing 41 characters</strong>
+        <span style="margin: 0 8px">·</span>
+        <span>Drag any character to orbit (Yaw & Pitch) · Scroll to zoom</span>
+      </div>
+      <div>
+        <span class="badge badge-success">WebGL ACES Filmic</span>
+        <span class="badge" id="overall-status-badge">41 / 41 Validated</span>
+      </div>
+    </div>
+
+    <!-- Cards Grid Container -->
+    <main id="grid"></main>
+
+    <!-- Deep-Dive Single Character Inspector Modal -->
+    <div id="inspector-modal" role="dialog" aria-modal="true">
+      <div class="inspector-window">
+        <!-- 3D Viewport on Left -->
+        <div class="inspector-viewport" id="inspector-viewport">
+          <div
+            class="view-hints"
+            style="
+              position: absolute;
+              top: 12px;
+              left: 16px;
+              color: var(--text-muted);
+              font-size: 12px;
+            "
+          >
+            <span
+              >Left-click drag: Orbit · Right-click drag: Pan · Wheel:
+              Zoom</span
+            >
+          </div>
+          <div
+            class="view-controls-overlay"
+            style="opacity: 1; top: 12px; right: 16px"
+          >
+            <button class="view-btn" id="modal-cam-front">Front</button>
+            <button class="view-btn" id="modal-cam-quarter">3/4</button>
+            <button class="view-btn" id="modal-cam-side">Side</button>
+            <button class="view-btn" id="modal-cam-back">Back</button>
+            <button class="view-btn" id="modal-cam-face">Face</button>
+            <button class="view-btn" id="modal-cam-feet">Shoes</button>
+            <button class="view-btn" id="modal-cam-reset">Reset</button>
+          </div>
+        </div>
+
+        <!-- Sidebar on Right -->
+        <div class="inspector-sidebar">
+          <div class="inspector-header">
+            <div>
+              <h2
+                id="modal-char-name"
+                style="
+                  margin: 0;
+                  font:
+                    700 24px Georgia,
+                    serif;
+                "
+              >
+                Character Name
+              </h2>
+              <div
+                id="modal-char-role"
+                style="
+                  font-family: monospace;
+                  font-size: 12px;
+                  color: var(--text-muted);
+                "
+              >
+                role-id
+              </div>
+            </div>
+            <button
+              class="inspector-close-btn"
+              id="modal-close-btn"
+              title="Close (Esc)"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div class="panel-section">
+            <div class="panel-section-title">Description & Lore</div>
+            <p
+              id="modal-char-desc"
+              style="margin: 0; font-size: 13px; color: var(--text-muted)"
+            ></p>
+            <div
+              id="modal-char-scripture"
+              style="font-size: 11px; font-style: italic"
+            ></div>
+          </div>
+
+          <div class="panel-section">
+            <div class="panel-section-title">Animation Scrubber</div>
+            <div class="timeline-controls">
+              <button id="modal-step-prev" class="view-btn">◀ Frame</button>
+              <button id="modal-play-toggle" class="view-btn">⏸ Pause</button>
+              <button id="modal-step-next" class="view-btn">Frame ▶</button>
+              <span
+                id="modal-time-label"
+                style="font-size: 11px; font-family: monospace"
+                >0.00s</span
+              >
+            </div>
+            <input
+              type="range"
+              id="modal-scrubber"
+              class="timeline-slider"
+              min="0"
+              max="1"
+              step="0.01"
+              value="0"
+            />
+          </div>
+
+          <div class="panel-section">
+            <div class="panel-section-title">
+              Layer Visibility & Clothing Fit
+            </div>
+            <label class="layer-toggle">
+              <span>Outer Coat / Mantle</span>
+              <input type="checkbox" id="layer-coat" checked />
+            </label>
+            <label class="layer-toggle">
+              <span>Front Tunic / Robe</span>
+              <input type="checkbox" id="layer-tunic" checked />
+            </label>
+            <label class="layer-toggle">
+              <span>Torso & Sleeves</span>
+              <input type="checkbox" id="layer-shirt" checked />
+            </label>
+            <label class="layer-toggle">
+              <span>Trousers / Legs</span>
+              <input type="checkbox" id="layer-trousers" checked />
+            </label>
+            <label class="layer-toggle">
+              <span>Footwear / Sandals</span>
+              <input type="checkbox" id="layer-sandals" checked />
+            </label>
+            <label class="layer-toggle">
+              <span>Head, Hair & Beard</span>
+              <input type="checkbox" id="layer-head" checked />
+            </label>
+            <label class="layer-toggle">
+              <span>Carried Prop</span>
+              <input type="checkbox" id="layer-prop" checked />
+            </label>
+          </div>
+
+          <div class="panel-section">
+            <div class="panel-section-title">Lighting & Examination</div>
+            <label style="display: flex; flex-direction: column; gap: 4px">
+              <span>Light Rotation (Azimuth)</span>
+              <input
+                type="range"
+                id="modal-light-rot"
+                min="0"
+                max="6.28"
+                step="0.05"
+                value="0.8"
+              />
+            </label>
+            <label style="display: flex; flex-direction: column; gap: 4px">
+              <span>Light Intensity</span>
+              <input
+                type="range"
+                id="modal-light-int"
+                min="0.5"
+                max="5.0"
+                step="0.1"
+                value="2.6"
+              />
+            </label>
+          </div>
+
+          <div class="panel-section">
+            <div class="panel-section-title">Geometry & Diagnostic Report</div>
+            <div class="stats-grid">
+              <div class="stat-item">
+                <div class="stat-label">Vertices</div>
+                <div class="stat-val" id="modal-stat-verts">0</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-label">Triangles</div>
+                <div class="stat-val" id="modal-stat-tris">0</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-label">Meshes</div>
+                <div class="stat-val" id="modal-stat-meshes">0</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-label">Height</div>
+                <div class="stat-val" id="modal-stat-height">0.00m</div>
+              </div>
+            </div>
+            <div id="modal-diag-box" class="diagnostics-box diag-clean">
+              <strong id="modal-diag-title">✓ Shoes Closed & Manifold</strong>
+              <div id="modal-diag-details">
+                Normals valid, no unclosed edges detected.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/tools/cast/cast.ts"></script>
+  </body>
+</html>

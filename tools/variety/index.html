@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Character Variety Lab · Super Mormon</title>
+    <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
+    <meta name="robots" content="noindex" />
+    <style>
+      :root {
+        --bg: #ece7db;
+        --card-bg: #faf7f0;
+        --card-border: #d4ccbd;
+        --text: #28362b;
+        --text-muted: #5e6d62;
+        --accent: #2e6044;
+        --accent-hover: #224933;
+        --accent-light: #e1ede5;
+        --tag-bg: #e6ded2;
+        --gold: #b38e44;
+        --gold-bg: #fff8e7;
+        --star-active: #d97706;
+        --radius: 12px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px/1.5 system-ui,
+          -apple-system,
+          sans-serif;
+        overflow-x: hidden;
+      }
+      body.bg-dark {
+        --bg: #141715;
+        --card-bg: #1f2521;
+        --card-border: #2c352f;
+        --text: #e1e7e3;
+        --text-muted: #8b9b90;
+        --tag-bg: #2b342e;
+        --gold-bg: #2d2618;
+      }
+      body.bg-white {
+        --bg: #f4f4f4;
+        --card-bg: #ffffff;
+        --card-border: #dcdcdc;
+        --text: #1a1a1a;
+        --text-muted: #666666;
+        --tag-bg: #eaeaea;
+        --gold-bg: #fef9ed;
+      }
+      body.bg-green {
+        --bg: #00b140;
+        --card-bg: #ffffff;
+        --card-border: #008f33;
+        --text: #1a1a1a;
+        --text-muted: #444444;
+        --tag-bg: #e0f2e5;
+      }
+
+      /* Fullscreen transparent scissor canvas */
+      #grid-canvas {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 3;
+      }
+
+      header {
+        position: relative;
+        z-index: 10;
+        padding: 24px 32px 14px;
+        background: rgba(236, 231, 219, 0.94);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--card-border);
+      }
+      body.bg-dark header {
+        background: rgba(20, 23, 21, 0.94);
+      }
+      body.bg-white header {
+        background: rgba(244, 244, 244, 0.94);
+      }
+
+      .header-title-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+      h1 {
+        margin: 0;
+        font:
+          700 28px Georgia,
+          serif;
+        letter-spacing: -0.01em;
+      }
+      .subtitle {
+        margin: 4px 0 0;
+        color: var(--text-muted);
+        font-size: 13px;
+        max-width: 820px;
+      }
+
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+      }
+      .toolbar-group {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(255, 255, 255, 0.6);
+        padding: 4px 10px;
+        border-radius: 8px;
+        border: 1px solid var(--card-border);
+      }
+      body.bg-dark .toolbar-group {
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      label {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+      }
+      select,
+      input,
+      button {
+        font: inherit;
+        color: inherit;
+        background: #fff;
+        border: 1px solid #bcc7ba;
+        border-radius: 6px;
+        padding: 6px 12px;
+        font-size: 13px;
+        outline: none;
+      }
+      body.bg-dark select,
+      body.bg-dark input,
+      body.bg-dark button {
+        background: #28302b;
+        border-color: #3e4a42;
+      }
+
+      /* Tabs Bar */
+      .tabs-bar {
+        position: relative;
+        z-index: 10;
+        display: flex;
+        gap: 6px;
+        padding: 10px 32px;
+        background: var(--bg);
+        border-bottom: 1px solid var(--card-border);
+        overflow-x: auto;
+      }
+      .tab-btn {
+        background: rgba(255, 255, 255, 0.7);
+        border: 1px solid var(--card-border);
+        border-radius: 20px;
+        padding: 6px 14px;
+        font-weight: 500;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: all 0.15s ease;
+      }
+      body.bg-dark .tab-btn {
+        background: rgba(255, 255, 255, 0.06);
+      }
+      .tab-btn:hover {
+        background: var(--accent-light);
+        border-color: var(--accent);
+      }
+      .tab-btn.active {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+      }
+
+      /* Grid of 3D Cards */
+      #grid {
+        position: relative;
+        z-index: 2;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 20px;
+        padding: 24px 32px 100px;
+      }
+      @media (max-width: 1400px) {
+        #grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+      @media (max-width: 980px) {
+        #grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        header,
+        .tabs-bar,
+        #grid {
+          padding-left: 16px;
+          padding-right: 16px;
+        }
+      }
+      @media (max-width: 620px) {
+        #grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      article.variety-card {
+        border-radius: var(--radius);
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+        transition:
+          transform 0.2s,
+          box-shadow 0.2s,
+          border-color 0.2s;
+      }
+      article.variety-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+        border-color: #aab7a6;
+      }
+
+      .card-header {
+        position: relative;
+        z-index: 4;
+        padding: 14px 18px 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      .card-meta-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 4px;
+      }
+      .badge {
+        display: inline-block;
+        padding: 2px 7px;
+        border-radius: 10px;
+        background: var(--tag-bg);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+      }
+      .badge-number {
+        background: var(--gold-bg);
+        color: var(--gold);
+        border: 1px solid rgba(179, 142, 68, 0.3);
+      }
+
+      .card-title-group h2 {
+        margin: 0;
+        font:
+          600 17px Georgia,
+          serif;
+        line-height: 1.25;
+      }
+      .card-subtitle {
+        font-size: 11.5px;
+        color: var(--text-muted);
+        margin-top: 3px;
+      }
+
+      /* Pick / Star Button */
+      .btn-pick {
+        background: #fff;
+        border: 1px solid #d4ccbd;
+        border-radius: 16px;
+        padding: 4px 10px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+      }
+      body.bg-dark .btn-pick {
+        background: #252e27;
+        border-color: #3e4a42;
+      }
+      .btn-pick:hover {
+        border-color: var(--star-active);
+        color: var(--star-active);
+      }
+      .btn-pick.picked {
+        background: var(--gold-bg);
+        border-color: var(--star-active);
+        color: var(--star-active);
+        box-shadow: 0 0 6px rgba(217, 119, 6, 0.25);
+      }
+      .btn-pick.picked span {
+        color: var(--star-active);
+      }
+
+      /* Viewport in Card */
+      .view-container {
+        position: relative;
+        height: 290px;
+        touch-action: none;
+        cursor: grab;
+      }
+      .view-container:active {
+        cursor: grabbing;
+      }
+      .view-hints {
+        position: absolute;
+        z-index: 4;
+        bottom: 8px;
+        left: 8px;
+        right: 8px;
+        display: flex;
+        justify-content: space-between;
+        pointer-events: none;
+        font-size: 11px;
+        color: var(--text-muted);
+        opacity: 0.75;
+      }
+      .view-controls-overlay {
+        position: absolute;
+        z-index: 4;
+        top: 8px;
+        right: 8px;
+        display: flex;
+        gap: 4px;
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+      .view-container:hover .view-controls-overlay {
+        opacity: 1;
+      }
+      .view-btn {
+        background: rgba(255, 255, 255, 0.88);
+        border: 1px solid rgba(0, 0, 0, 0.15);
+        border-radius: 4px;
+        padding: 3px 8px;
+        font-size: 11px;
+        cursor: pointer;
+      }
+      body.bg-dark .view-btn {
+        background: rgba(40, 48, 43, 0.88);
+        border-color: rgba(255, 255, 255, 0.15);
+      }
+
+      .card-content {
+        position: relative;
+        z-index: 4;
+        padding: 12px 18px 16px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+      .card-description {
+        margin: 0;
+        font-size: 12.5px;
+        color: var(--text-muted);
+        line-height: 1.45;
+      }
+
+      /* Persistent Bottom Selection Drawer */
+      #selections-drawer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 100;
+        background: rgba(30, 42, 34, 0.95);
+        backdrop-filter: blur(12px);
+        color: #ffffff;
+        padding: 12px 32px;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.25);
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+        border-top: 1px solid rgba(255, 255, 255, 0.15);
+      }
+      #selections-drawer.visible {
+        display: flex;
+      }
+      .selections-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        flex: 1;
+      }
+      .selections-title {
+        font-weight: 700;
+        font-size: 13px;
+        color: #ffd580;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        white-space: nowrap;
+      }
+      #selections-list {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .pick-pill {
+        background: rgba(255, 255, 255, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 14px;
+        padding: 3px 10px;
+        font-size: 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .btn-remove {
+        background: none;
+        border: none;
+        color: #ff9999;
+        cursor: pointer;
+        padding: 0;
+        font-size: 12px;
+      }
+      .btn-copy-picks {
+        background: #ffd580;
+        color: #222;
+        border: none;
+        border-radius: 8px;
+        padding: 8px 16px;
+        font-weight: 700;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background 0.15s ease;
+      }
+      .btn-copy-picks:hover {
+        background: #ffe3a8;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Single full-screen canvas for high-performance scissor rendering -->
+    <canvas id="grid-canvas"></canvas>
+
+    <header>
+      <div class="header-title-row">
+        <div>
+          <h1>Character Variety Lab</h1>
+          <p class="subtitle">
+            Exploring visual diversity for the 3D cast: 12 distinct hairstyles,
+            8 beard styles, 8 robe & clothing cuts, body builds, and redesigned
+            feminine silhouettes. Click <strong>★ Pick</strong> on your
+            favorites to build your selection list.
+          </p>
+        </div>
+        <div class="toolbar">
+          <div class="toolbar-group">
+            <label for="contrast-select">Theme</label>
+            <select id="contrast-select">
+              <option value="">Parchment</option>
+              <option value="bg-dark">Dark Slate</option>
+              <option value="bg-white">Pure White</option>
+              <option value="bg-green">Green Screen</option>
+            </select>
+          </div>
+          <div class="toolbar-group">
+            <label>
+              <input type="checkbox" id="toggle-spin" checked />
+              Turntable Spin
+            </label>
+          </div>
+          <div class="toolbar-group">
+            <input
+              type="text"
+              id="search-input"
+              placeholder="Search styles..."
+            />
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Category Filter Tabs -->
+    <nav class="tabs-bar">
+      <button class="tab-btn active" data-category="all">
+        All Styles (34)
+      </button>
+      <button class="tab-btn" data-category="hair">12 Hairstyles</button>
+      <button class="tab-btn" data-category="beard">8 Beard Styles</button>
+      <button class="tab-btn" data-category="robe">8 Robe & Outfit Cuts</button>
+      <button class="tab-btn" data-category="feminine">
+        Feminine Redesign (5)
+      </button>
+      <button class="tab-btn" data-category="body">Body Builds (4)</button>
+      <button class="tab-btn" data-category="comparison">
+        Before / After Comparison (3)
+      </button>
+    </nav>
+
+    <!-- Main Grid -->
+    <main id="grid"></main>
+
+    <!-- Persistent Bottom Selections Bar -->
+    <div id="selections-drawer">
+      <div class="selections-left">
+        <span class="selections-title">★ Your Selected Favorites:</span>
+        <div id="selections-list"></div>
+      </div>
+      <button id="copy-picks-btn" class="btn-copy-picks">
+        Copy My Selections
+      </button>
+    </div>
+
+    <script type="module" src="/tools/variety/variety.ts"></script>
+  </body>
+</html>

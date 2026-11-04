@@ -8,6 +8,9 @@ export default defineConfig({
       input: {
         game: "index.html",
         cast: "tools/cast/index.html",
+        roster: "roster.html",
+        variety: "variety.html",
+        mormon: "mormon.html",
       },
       output: {
         codeSplitting: {

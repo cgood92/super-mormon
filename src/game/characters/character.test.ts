@@ -59,6 +59,16 @@ test("crouch and crawl visibly fit beneath a 0.9 high opening", () => {
   character.dispose();
 });
 
+test("kneel visibly lowers the character and keeps folded limbs above the floor", () => {
+  const character = createCharacter("nephi");
+  character.update(1 / 60, { ...standing, move: "kneel" });
+  const kneelBox = bounds(character);
+  assert.ok(kneelBox.max.y < 1.55, `kneel reaches ${kneelBox.max.y}`);
+  assert.ok(kneelBox.max.y > 1.2, `kneel collapsed to ${kneelBox.max.y}`);
+  assert.ok(kneelBox.min.y >= -0.05, `kneel knees sink to ${kneelBox.min.y}`);
+  character.dispose();
+});
+
 test("mid-flip poses rotate around the character center and clear the floor", () => {
   const character = createCharacter("nephi");
   for (const move of ["backflip", "sideflip"] as const) {
@@ -153,7 +163,10 @@ test("Samuel has a distinct prophetic silhouette in hero, NPC, and crowd rigs", 
     assert.equal(samuel.group.name, "samuel-character");
     assert.ok(samuel.group.getObjectByName("continuous-robe-and-sleeves"));
     assert.ok(samuel.group.getObjectByName("flowing-mantle"));
-    assert.ok(samuel.group.getObjectByName("one-piece-sculpted-beard"));
+    assert.equal(
+      samuel.group.getObjectByName("one-piece-sculpted-beard"),
+      undefined,
+    );
     assert.notEqual(mantleColor(samuel), mantleColor(nephi));
     assert.notEqual(mantleColor(samuel), mantleColor(laman));
     assert.notEqual(hairColor(samuel), hairColor(nephi));

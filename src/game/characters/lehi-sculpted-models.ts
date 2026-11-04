@@ -1,5 +1,6 @@
 import { addMoroniHead } from "./moroni-head";
 import { addMoroniCommander, shapeMoroni } from "./moroni-commander";
+import { addMormonVanguard } from "./mormon-vanguard";
 import * as T from "three";
 import type { CharacterRole } from "./character-types";
 import { APPROVED_NEPHI_FACE } from "./nephi-appearance";
@@ -66,8 +67,8 @@ type CastTraits = {
   faceWidth: number;
   jaw: number;
   nose: number;
-  hairStyle: "receding" | "swept" | "waves" | "cropped" | "shawl";
-  beard: "elder" | "none" | "scruff" | "trimmed";
+  hairStyle: "receding" | "swept" | "waves" | "cropped" | "shawl" | "bun";
+  beard: "elder" | "none" | "scruff" | "trimmed" | "goatee";
   hem: number;
   width: number;
   brow: number;
@@ -174,50 +175,50 @@ const ORIGINAL_CAST_TRAITS: Readonly<
     trim: 0xa48a60,
     hair: 0x533b29,
     head: 0.309,
-    tall: 1.03,
+    tall: 1.02,
     faceWidth: 0.9,
-    jaw: 0.65,
+    jaw: 0.7,
     nose: 0.06,
     hairStyle: "waves",
     beard: "none",
-    hem: 0.25,
-    width: 0.355,
+    hem: 0.24,
+    width: 0.37,
     brow: 0.035,
     outfit: "travel",
   },
   laman: {
-    skin: 0xaf7b59,
+    skin: 0x966141,
     robe: 0xc3a081,
     coat: 0x88604d,
     trim: 0xa3835e,
     hair: 0x36271f,
     head: 0.328,
-    tall: 1.04,
+    tall: 1.05,
     faceWidth: 0.95,
-    jaw: 0.79,
+    jaw: 0.8,
     nose: 0.076,
     hairStyle: "waves",
     beard: "scruff",
-    hem: 0.25,
-    width: 0.38,
+    hem: 0.26,
+    width: 0.39,
     brow: -0.01,
     outfit: "travel",
   },
   lemuel: {
-    skin: 0xb58361,
+    skin: 0x986343,
     robe: 0xc8b28e,
     coat: 0x6f7560,
     trim: 0x9c7954,
     hair: 0x443127,
     head: 0.317,
-    tall: 1.09,
-    faceWidth: 0.88,
-    jaw: 0.7,
+    tall: 1.1,
+    faceWidth: 0.86,
+    jaw: 0.69,
     nose: 0.072,
     hairStyle: "cropped",
-    beard: "scruff",
+    beard: "goatee",
     hem: 0.23,
-    width: 0.36,
+    width: 0.345,
     brow: -0.005,
     outfit: "travel",
   },
@@ -246,14 +247,14 @@ const ORIGINAL_CAST_TRAITS: Readonly<
     trim: 0xcba45d,
     hair: 0x3e3029,
     head: 0.34,
-    tall: 1.05,
+    tall: 1.06,
     faceWidth: 0.99,
     jaw: 0.84,
     nose: 0.082,
     hairStyle: "cropped",
     beard: "trimmed",
     hem: 0.17,
-    width: 0.39,
+    width: 0.4,
     brow: 0,
     outfit: "regal",
   },
@@ -300,14 +301,14 @@ const ORIGINAL_CAST_TRAITS: Readonly<
     trim: 0x9b8262,
     hair: 0x48372b,
     head: 0.315,
-    tall: 1.1,
+    tall: 1.08,
     faceWidth: 0.86,
     jaw: 0.66,
     nose: 0.071,
     hairStyle: "cropped",
-    beard: "trimmed",
+    beard: "none",
     hem: 0.27,
-    width: 0.35,
+    width: 0.345,
     brow: 0.015,
     outfit: "travel",
   },
@@ -318,14 +319,14 @@ const ORIGINAL_CAST_TRAITS: Readonly<
     trim: 0xaa885b,
     hair: 0x4a3427,
     head: 0.35,
-    tall: 0.98,
+    tall: 0.96,
     faceWidth: 0.96,
     jaw: 0.61,
     nose: 0.05,
     hairStyle: "waves",
     beard: "none",
-    hem: 0.32,
-    width: 0.34,
+    hem: 0.33,
+    width: 0.33,
     brow: 0.05,
     outfit: "travel",
   },
@@ -346,7 +347,7 @@ export const SCULPTED_CAST_TRAITS: Readonly<
     jaw: 0.81,
     nose: 0.064,
     hairStyle: "waves",
-    beard: "scruff",
+    beard: "none",
     hair: 0x594331,
     width: 0.35,
     hem: 0.34,
@@ -356,21 +357,21 @@ export const SCULPTED_CAST_TRAITS: Readonly<
     trim: 0x8c6846,
   },
   mormon: {
-    ...ORIGINAL_CAST_TRAITS.zoram,
-    head: 0.327,
-    tall: 1.07,
-    faceWidth: 0.91,
-    jaw: 0.86,
-    nose: 0.076,
-    hairStyle: "cropped",
-    beard: "trimmed",
-    hair: 0x60574d,
-    width: 0.365,
-    hem: 0.26,
-    brow: 0.012,
-    robe: 0xd6c8ad,
-    coat: 0x6d687f,
-    trim: 0xa18a60,
+    ...ORIGINAL_CAST_TRAITS.sam,
+    head: 0.315,
+    tall: 1.1,
+    faceWidth: 0.88,
+    jaw: 0.74,
+    nose: 0.068,
+    hairStyle: "swept",
+    beard: "none",
+    hair: 0x2c2018,
+    width: 0.36,
+    hem: 0.25,
+    brow: 0.045,
+    robe: 0xd9cca9,
+    coat: 0x1f3044,
+    trim: 0xc8a25d,
   },
   ammaron: {
     ...ORIGINAL_CAST_TRAITS.lehi,
@@ -391,13 +392,14 @@ export const SCULPTED_CAST_TRAITS: Readonly<
   },
   jared: {
     ...ORIGINAL_CAST_TRAITS.laman,
+    skin: 0xc4916e,
     head: 0.33,
     tall: 1.04,
     faceWidth: 0.96,
     jaw: 0.85,
     nose: 0.07,
     hairStyle: "swept",
-    beard: "trimmed",
+    beard: "none",
     hair: 0x4a3527,
     width: 0.37,
     hem: 0.31,
@@ -414,7 +416,7 @@ export const SCULPTED_CAST_TRAITS: Readonly<
     jaw: 0.78,
     nose: 0.074,
     hairStyle: "waves",
-    beard: "elder",
+    beard: "none",
     hair: 0x503b2d,
     width: 0.375,
     hem: 0.25,
@@ -424,21 +426,21 @@ export const SCULPTED_CAST_TRAITS: Readonly<
     trim: 0x9a7850,
   },
   ether: {
-    ...ORIGINAL_CAST_TRAITS.zoram,
-    head: 0.305,
-    tall: 1.03,
-    faceWidth: 0.82,
-    jaw: 0.73,
-    nose: 0.067,
-    hairStyle: "receding",
-    beard: "scruff",
-    hair: 0x766d5e,
-    width: 0.335,
-    hem: 0.29,
-    brow: 0.02,
-    robe: 0xcabfa4,
-    coat: 0x7f6759,
-    trim: 0x747d78,
+    ...ORIGINAL_CAST_TRAITS.sam,
+    head: 0.312,
+    tall: 1.08,
+    faceWidth: 0.9,
+    jaw: 0.8,
+    nose: 0.068,
+    hairStyle: "swept",
+    beard: "none",
+    hair: 0x3a281c,
+    width: 0.36,
+    hem: 0.26,
+    brow: 0.04,
+    robe: 0xe2d6be,
+    coat: 0x39535e,
+    trim: 0x9b7a54,
   },
   "moroni-keeper": {
     ...ORIGINAL_CAST_TRAITS.nephi,
@@ -448,7 +450,7 @@ export const SCULPTED_CAST_TRAITS: Readonly<
     jaw: 0.8,
     nose: 0.071,
     hairStyle: "swept",
-    beard: "trimmed",
+    beard: "none",
     hair: 0x46352b,
     width: 0.35,
     hem: 0.28,
@@ -522,7 +524,7 @@ export const SCULPTED_CAST_TRAITS: Readonly<
   },
   morianton: {
     ...ORIGINAL_CAST_TRAITS.laman,
-    beard: "scruff",
+    beard: "goatee",
     hairStyle: "swept",
     coat: 0x482b37,
     robe: 0x39343b,
@@ -542,6 +544,7 @@ export const SCULPTED_CAST_TRAITS: Readonly<
   },
   lehonti: {
     ...ORIGINAL_CAST_TRAITS.zoram,
+    skin: 0x8f5b3b,
     beard: "trimmed",
     hairStyle: "cropped",
     coat: 0x967947,
@@ -552,6 +555,7 @@ export const SCULPTED_CAST_TRAITS: Readonly<
   },
   "lamanite-laman": {
     ...ORIGINAL_CAST_TRAITS.sam,
+    skin: 0x8e5a3a,
     beard: "scruff",
     hairStyle: "cropped",
     coat: 0x7b6f8f,
@@ -563,9 +567,10 @@ export const SCULPTED_CAST_TRAITS: Readonly<
   // specified by Helaman 13–16 or 3 Nephi 1.
   samuel: {
     ...ORIGINAL_CAST_TRAITS.zoram,
+    skin: 0x8b5738,
     hair: 0x28231f,
     hairStyle: "cropped",
-    beard: "trimmed",
+    beard: "none",
     robe: 0xc6a16f,
     coat: 0x8d503d,
     trim: 0x665f48,
@@ -580,7 +585,7 @@ export const SCULPTED_CAST_TRAITS: Readonly<
   jacob: {
     ...ORIGINAL_CAST_TRAITS.lehi,
     hair: 0x645648,
-    beard: "trimmed",
+    beard: "none",
     head: 0.32,
     faceWidth: 0.88,
     width: 0.35,
@@ -592,7 +597,7 @@ export const SCULPTED_CAST_TRAITS: Readonly<
   sherem: {
     ...ORIGINAL_CAST_TRAITS.zoram,
     hairStyle: "swept",
-    beard: "none",
+    beard: "goatee",
     coat: 0x69526f,
     robe: 0xccbaa1,
     trim: 0xa78961,
@@ -600,7 +605,7 @@ export const SCULPTED_CAST_TRAITS: Readonly<
   },
   alma: {
     ...ORIGINAL_CAST_TRAITS.sam,
-    beard: "trimmed",
+    beard: "none",
     hair: 0x514235,
     robe: 0xe5d9be,
     coat: 0x718877,
@@ -626,42 +631,44 @@ export const SCULPTED_CAST_TRAITS: Readonly<
   },
   lamoni: {
     ...ORIGINAL_CAST_TRAITS.laban,
+    skin: 0x8c5839,
     hair: 0x30291f,
     coat: 0x456e62,
     robe: 0xc7b386,
     trim: 0xbca45d,
-    beard: "trimmed",
+    beard: "none",
     faceWidth: 0.94,
   },
   maidservant: {
     ...ORIGINAL_CAST_TRAITS.sariah,
-    hairStyle: "waves",
+    hairStyle: "bun",
     outfit: "travel",
     hair: 0x49352b,
     coat: 0x86745b,
     robe: 0xe1cfaf,
     head: 0.3,
     faceWidth: 0.86,
-    width: 0.285,
-    hem: 0.2,
+    width: 0.395,
+    hem: 0.12,
     brow: 0.045,
   },
   wife: {
     ...ORIGINAL_CAST_TRAITS.sariah,
-    hairStyle: "waves",
+    hairStyle: "bun",
     outfit: "travel",
     hair: 0x49352b,
     coat: 0x9d8069,
     robe: 0xe1cfaf,
     head: 0.3,
     faceWidth: 0.86,
-    width: 0.33,
-    hem: 0.2,
+    width: 0.415,
+    hem: 0.12,
     brow: 0.045,
   },
   "lamans-wife": {
     ...ORIGINAL_CAST_TRAITS.sariah,
-    hairStyle: "waves",
+    skin: 0x9c6747,
+    hairStyle: "bun",
     outfit: "undertunic",
     hair: 0x49322b,
     robe: 0x886690,
@@ -669,12 +676,13 @@ export const SCULPTED_CAST_TRAITS: Readonly<
     trim: 0xc9a46c,
     head: 0.3,
     faceWidth: 0.87,
-    width: 0.33,
-    hem: 0.5,
+    width: 0.42,
+    hem: 0.12,
   },
   "lemuels-wife": {
     ...ORIGINAL_CAST_TRAITS.sariah,
-    hairStyle: "waves",
+    skin: 0x9e6949,
+    hairStyle: "bun",
     outfit: "undertunic",
     hair: 0x684632,
     robe: 0xba715f,
@@ -682,12 +690,13 @@ export const SCULPTED_CAST_TRAITS: Readonly<
     trim: 0xd3af70,
     head: 0.3,
     faceWidth: 0.85,
-    width: 0.32,
-    hem: 0.47,
+    width: 0.41,
+    hem: 0.12,
   },
   spy: {
     ...ORIGINAL_CAST_TRAITS.guard,
     hairStyle: "cropped",
+    beard: "goatee",
     coat: 0x51465b,
     trim: 0x776578,
     robe: 0x5c5665,
@@ -927,8 +936,22 @@ function makeSculpted(
           headTall: cast.tall,
           nose: faceProfile?.noseWidth ?? cast.nose,
           hem: cast.width,
-          shoulder: role === "maidservant" ? 0.33 : base.shoulder,
-          waist: role === "maidservant" ? 0.25 : base.waist,
+          shoulder:
+            role === "maidservant"
+              ? 0.33
+              : role === "mormon"
+                ? 0.44
+                : role === "ether"
+                  ? 0.41
+                  : base.shoulder,
+          waist:
+            role === "maidservant"
+              ? 0.25
+              : role === "mormon"
+                ? 0.26
+                : role === "ether"
+                  ? 0.29
+                  : base.waist,
           beard:
             cast.beard === "trimmed"
               ? 0.045
@@ -991,6 +1014,7 @@ function makeSculpted(
     role === "nephi-disguised" ||
     role === "ammon" ||
     role === "teancum" ||
+    role === "mormon" ||
     role === "moroni";
   // Chest and shoulders retain their breadth while the waist and garment depth
   // taper. The tunic, fitted coat and sash all sample these same dimensions.
@@ -1828,23 +1852,6 @@ function makeSculpted(
       ),
       0.027,
     );
-    if (cast)
-      for (const side of [-1, 1])
-        d = smoothUnion(
-          d,
-          ellipsoid(
-            x,
-            y,
-            z,
-            side * s.head * ((faceProfile?.faceWidth ?? cast.faceWidth) - 0.01),
-            s.headY - 0.035,
-            headZ + 0.012,
-            0.043,
-            0.07,
-            0.035,
-          ),
-          0.025,
-        );
     return d;
   };
   add(
@@ -1925,11 +1932,11 @@ function makeSculpted(
           side * s.head * 0.77,
           s.headY -
             s.head *
-              (role === "child" || role === "sam" || role === "laman"
-                ? -0.04
-                : cast?.hairStyle === "waves" || cast?.hairStyle === "shawl"
+              (!cast || role === "lehi"
+                ? 0.16
+                : cast?.hairStyle === "shawl"
                   ? 0.52
-                  : 0.16),
+                  : -0.04),
           headZ + s.head * 0.16,
           s.head * 0.17,
         ),
@@ -1986,6 +1993,25 @@ function makeSculpted(
         0.045,
       );
       d += 0.003 * Math.sin(27 * x + 13 * y) * Math.sin(24 * z);
+    }
+    if (cast?.hairStyle === "bun") {
+      // Sculpted bun/chignon at the back of the head
+      d = smoothUnion(
+        d,
+        ellipsoid(
+          x,
+          y,
+          z,
+          0,
+          s.headY + s.head * 0.32,
+          headZ - s.head * 0.82,
+          s.head * 0.34,
+          s.head * 0.32,
+          s.head * 0.3,
+        ),
+        0.045,
+      );
+      d += 0.003 * Math.sin(31 * x + 19 * y) * Math.sin(23 * z);
     }
     return d;
   };
@@ -2088,7 +2114,9 @@ function makeSculpted(
     add(
       sculpt({
         bounds: [
-          quality === "hero" ? [-0.43, 1.45, -0.42] : [-0.56, 1.35, -0.48],
+          quality === "hero"
+            ? [-0.43, 1.45, cast?.hairStyle === "bun" ? -0.48 : -0.42]
+            : [-0.56, 1.35, -0.48],
           quality === "hero"
             ? [0.43, cast ? 2.18 : 2.08, 0.37]
             : [0.56, 2.24, 0.55],
@@ -2102,7 +2130,12 @@ function makeSculpted(
     );
   }
 
-  if (role === "maidservant") {
+  if (
+    role === "maidservant" ||
+    role === "wife" ||
+    role === "lamans-wife" ||
+    role === "lemuels-wife"
+  ) {
     // One static sculpted fall of hair rests outside the back of the coat.
     // It belongs to the body, so turning the head does not swing it into fabric.
     add(
@@ -2139,6 +2172,34 @@ function makeSculpted(
 
   const beard: DistanceField = (x, y, z) => {
     if (cast && cast.beard !== "elder") {
+      if (cast.beard === "goatee") {
+        // Tapered chin goatee and curved mustache
+        const chin = capsule(
+          x,
+          y,
+          z,
+          0,
+          s.headY - s.head * 0.44,
+          faceFront - s.head * 0.05,
+          0,
+          s.headY - s.head * 0.72,
+          faceFront - s.head * 0.12,
+          s.head * 0.16,
+        );
+        const mustache = capsule(
+          x,
+          y,
+          z,
+          -s.head * 0.18,
+          s.headY - s.head * 0.33,
+          faceFront - s.head * 0.02,
+          s.head * 0.18,
+          s.headY - s.head * 0.33,
+          faceFront - s.head * 0.02,
+          s.head * 0.08,
+        );
+        return smoothUnion(chin, mustache, 0.04);
+      }
       // A close, fitted jaw shell leaves the lips and cheeks visible. Scruff
       // differs in both length and coverage from the elder's long beard.
       const depth = cast.beard === "scruff" ? 0.009 : 0.022;
@@ -2386,6 +2447,14 @@ function makeSculpted(
     belt.position.y = 1.045;
     belt.rotation.x = Math.PI / 2;
   }
+  if (
+    role === "maidservant" ||
+    role === "wife" ||
+    role === "lamans-wife" ||
+    role === "lemuels-wife"
+  ) {
+    belt.visible = false;
+  }
 
   // Small occupational tools sit on the front belt, clear of limb articulation.
   // These are imagined props, not reconstructions or sacred-object depictions.
@@ -2393,7 +2462,6 @@ function makeSculpted(
     role &&
     [
       "peace-builder",
-      "mormon",
       "ammaron",
       "jared",
       "jared-brother",
@@ -2958,6 +3026,10 @@ function makeSculpted(
     shapeMoroni(group);
   }
 
+  if (role === "mormon") {
+    addMormonVanguard(group, add, extraMaterials, quality);
+  }
+
   // Normalize only once after all silhouettes have been built.
   if (modern) {
     const belt = group.getObjectByName("leather-belt");
@@ -2968,18 +3040,59 @@ function makeSculpted(
       "modern-waistband",
     );
     waist.position.set(0, 0.87, 0);
-    const tie = add(
-      new T.BoxGeometry(0.075, 0.42, 0.025),
+
+    const knot = add(
+      new T.BoxGeometry(0.082, 0.052, 0.035),
       materials.leather,
-      "modern-tie",
+      "modern-tie-knot",
     );
-    tie.position.set(0, 1.29, 0.315);
+    knot.position.set(0, 1.25, 0.33);
+
+    // Form-fitted tie geometry following the curved chest profile so the
+    // shirt never clips through the middle of the tie.
+    const tieProfile = [
+      [1.23, 0.058, 0.334],
+      [1.15, 0.064, 0.352],
+      [1.05, 0.07, 0.358],
+      [0.95, 0.074, 0.345],
+      [0.88, 0.076, 0.32],
+      [0.84, 0.002, 0.312],
+    ];
+    const tiePositions: number[] = [];
+    const tieIndices: number[] = [];
+    for (let r = 0; r < tieProfile.length; r++) {
+      const [y, w, z] = tieProfile[r];
+      const hw = w / 2;
+      tiePositions.push(-hw, y, z + 0.008);
+      tiePositions.push(hw, y, z + 0.008);
+      tiePositions.push(-hw, y, z - 0.006);
+      tiePositions.push(hw, y, z - 0.006);
+    }
+    for (let r = 0; r < tieProfile.length - 1; r++) {
+      const b = r * 4;
+      const n = (r + 1) * 4;
+      tieIndices.push(b, b + 1, n + 1, b, n + 1, n);
+      tieIndices.push(b + 2, b, n, b + 2, n, n + 2);
+      tieIndices.push(b + 1, b + 3, n + 3, b + 1, n + 3, n + 1);
+      tieIndices.push(b + 3, b + 2, n + 2, b + 3, n + 2, n + 3);
+    }
+    tieIndices.push(0, 2, 3, 0, 3, 1);
+    const tieGeo = new T.BufferGeometry();
+    tieGeo.setAttribute(
+      "position",
+      new T.Float32BufferAttribute(tiePositions, 3),
+    );
+    tieGeo.setIndex(tieIndices);
+    tieGeo.computeVertexNormals();
+
+    add(tieGeo, materials.leather, "modern-tie");
+
     const tag = add(
-      new T.BoxGeometry(0.19, 0.1, 0.025),
+      new T.BoxGeometry(0.14, 0.065, 0.022),
       materials.leather,
       "missionary-name-tag",
     );
-    tag.position.set(0.18, 1.4, 0.3);
+    tag.position.set(0.16, 1.18, 0.325);
   }
   group.updateMatrixWorld(true);
   const bounds = new T.Box3().setFromObject(group);
