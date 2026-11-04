@@ -291,6 +291,20 @@ export function createMotionDriver(role: CharacterRole): {
         feet[0].rotation.x = feet[1].rotation.x = -0.25;
         arms[0].rotation.x = arms[1].rotation.x = -0.55;
         head.rotation.x = -0.1;
+      } else if (move === "kneel") {
+        body.scale.y = 0.84;
+        body.position.y = -0.145;
+        body.rotation.x = 0.26;
+        body.rotation.z = 0;
+        legs[0].rotation.set(-1.42, 0, 0);
+        legs[1].rotation.set(-1.42, 0, 0);
+        knees[0].rotation.set(2.4, 0, 0);
+        knees[1].rotation.set(2.4, 0, 0);
+        feet[0].rotation.set(-0.95, 0, 0);
+        feet[1].rotation.set(-0.95, 0, 0);
+        arms[0].rotation.set(-1.25, 0.14, 0.35);
+        arms[1].rotation.set(-1.25, -0.14, -0.35);
+        head.rotation.x = 0.25;
       } else if (
         move === "backflip" ||
         move === "tripleJump" ||

@@ -45,6 +45,7 @@ export type CharacterMove =
   | "idle"
   | "run"
   | "crouch"
+  | "kneel"
   | "crawl"
   | "jump"
   | "doubleJump"

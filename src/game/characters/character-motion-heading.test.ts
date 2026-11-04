@@ -23,6 +23,7 @@ const direction = (yaw: number) =>
 for (const move of [
   "idle",
   "crawl",
+  "kneel",
   "swim",
   "backflip",
   "sideflip",

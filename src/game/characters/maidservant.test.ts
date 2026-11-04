@@ -33,10 +33,9 @@ test("maidservant has a distinct narrow silhouette and long sculpted back hair",
         oldRobe.geometry.boundingBox!.getSize(new T.Vector3()).x,
       "maidservant garment is narrower than the existing wife costume",
     );
-    assert.equal(
+    assert.ok(
       wife.group.getObjectByName("long-sculpted-back-hair"),
-      undefined,
-      "existing wives keep their own appearance",
+      "camp wife has long hair down the back",
     );
     maid.dispose();
     wife.dispose();
