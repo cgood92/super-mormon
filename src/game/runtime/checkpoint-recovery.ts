@@ -98,7 +98,7 @@ export class CheckpointRecovery {
     this.session.avatar.update(0, this.session.player);
     this.session.treeScene?.respawn(this.session.player);
     this.view.follow.reset(
-      this.session.player,
+      { ...this.session.player, role: this.session.avatarRole },
       this.session.player.yaw,
       cameraModeForWorld(this.session.worldId),
     );

@@ -372,6 +372,7 @@ export function buildBountiful(scene: T.Scene): WorldData {
     spawn: { ...point(-27, 9), yaw: 0 },
     solids,
     climbables,
+    cameraRooms: ship.cameraRooms,
     actorParent: root,
     swimRegions: [
       { minX: -78, maxX: 63, minZ: -68, maxZ: -50, surfaceY: -0.35 },

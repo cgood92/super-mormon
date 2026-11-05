@@ -10,6 +10,7 @@ export type CameraPlayer = {
   grounded?: boolean;
   runSpeed?: number;
   crouching?: boolean;
+  role?: string;
 };
 export type CameraOrbit = {
   orbitX: number;
@@ -212,12 +213,24 @@ export function resolveCameraPosition(
 }
 
 /** Recover an eye embedded by a spawn, authored cut, or moving prop locally. */
-function recoverCameraEye(eye: T.Vector3, solids: readonly Solid[]): T.Vector3 {
+function recoverCameraEye(
+  eye: T.Vector3,
+  solids: readonly Solid[],
+  playerY?: number,
+): T.Vector3 {
   const radius = 0.22;
   if (cameraSegmentClear(eye, eye, solids, radius)) return eye.clone();
   let nearest: T.Vector3 | undefined;
   for (const axis of [0, 1, 2]) {
     for (const direction of [-1, 1]) {
+      // Never recover downward below the walking floor when recovering vertically
+      if (
+        axis === 1 &&
+        direction === -1 &&
+        playerY !== undefined &&
+        eye.y <= playerY + 0.5
+      )
+        continue;
       const trial = eye.clone();
       // Each pass moves monotonically beyond an overlapping solid on this axis.
       for (let pass = 0; pass <= solids.length; pass++) {
@@ -225,6 +238,16 @@ function recoverCameraEye(eye: T.Vector3, solids: readonly Solid[]): T.Vector3 {
           (solid) => !cameraSegmentClear(trial, trial, [solid], radius),
         );
         if (!overlap) break;
+        // Never push downward through a floor slab
+        if (
+          axis === 1 &&
+          direction === -1 &&
+          overlap.h <= 0.6 &&
+          trial.y >= overlap.y + overlap.h - 0.25
+        ) {
+          trial.y = -Infinity;
+          break;
+        }
         const center =
           axis === 0
             ? overlap.x
@@ -238,6 +261,8 @@ function recoverCameraEye(eye: T.Vector3, solids: readonly Solid[]): T.Vector3 {
           center + direction * (size / 2 + radius + 0.001),
         );
       }
+      if (trial.y === -Infinity) continue;
+      if (playerY !== undefined && trial.y < playerY + 0.15) continue;
       if (
         cameraSegmentClear(trial, trial, solids, radius) &&
         (!nearest ||
@@ -254,8 +279,9 @@ function moveCameraEye(
   previous: T.Vector3,
   requested: T.Vector3,
   solids: readonly Solid[],
+  playerY?: number,
 ): T.Vector3 {
-  const start = recoverCameraEye(previous, solids);
+  const start = recoverCameraEye(previous, solids, playerY);
   if (cameraSegmentClear(start, requested, solids, 0.22)) return requested;
   let clear = 0,
     blocked = 1;
@@ -273,6 +299,7 @@ function cameraEyeDetour(
   previous: T.Vector3,
   requested: T.Vector3,
   solids: readonly Solid[],
+  playerY?: number,
 ): T.Vector3[] {
   const delta = requested.clone().sub(previous);
   const forward = Math.abs(delta.x) > Math.abs(delta.z) ? 0 : 2;
@@ -282,7 +309,7 @@ function cameraEyeDetour(
   for (const solid of solids) {
     if (solid.y >= requested.y - 0.2 || (solid.w > 3 && solid.d > 3)) continue;
     if (cameraSegmentClear(previous, requested, [solid], 0.22)) continue;
-    const hit = moveCameraEye(previous, requested, [solid]);
+    const hit = moveCameraEye(previous, requested, [solid], playerY);
     const distance = hit.distanceToSquared(previous);
     if (distance < nearest) {
       nearest = distance;
@@ -322,8 +349,12 @@ function isWallOccluded(
   radius = 0.15,
 ): boolean {
   return solids.some((solid) => {
-    // Narrow columns and local props (both w and d <= 2.0m) do not count as occluding walls
-    if (solid.w <= 2.0 && solid.d <= 2.0) return false;
+    // Narrow columns (isotropic posts with w and d <= 1.8) do not count as occluding walls
+    const maxDim = Math.max(solid.w, solid.d);
+    const minDim = Math.min(solid.w, solid.d);
+    if (maxDim <= 1.8 && minDim >= 0.5 * maxDim) return false;
+    // Low props and benches (height <= 0.8) do not count as occluding walls
+    if (solid.h <= 0.8 && maxDim <= 2.5) return false;
     // Overhead lintels / transoms above standing clearance do not occlude horizontal sightlines
     if (solid.y >= target.y + 1.2) return false;
     return !cameraSegmentClear(target, eye, [solid], radius);
@@ -378,6 +409,9 @@ function findClearViewpoint(
       if (room) {
         eyeX = clamp(eyeX, room.bounds.minX + 0.55, room.bounds.maxX - 0.55);
         eyeZ = clamp(eyeZ, room.bounds.minZ + 0.55, room.bounds.maxZ - 0.55);
+        if (room.bounds.minY !== undefined && room.bounds.maxY !== undefined) {
+          eyeY = clamp(eyeY, room.bounds.minY + 0.25, room.bounds.maxY - 0.28);
+        }
       }
 
       const naturalEye = new T.Vector3(eyeX, eyeY, eyeZ);
@@ -394,6 +428,13 @@ function findClearViewpoint(
           room.bounds.minZ + 0.55,
           room.bounds.maxZ - 0.55,
         );
+        if (room.bounds.minY !== undefined && room.bounds.maxY !== undefined) {
+          safeEye.y = clamp(
+            safeEye.y,
+            room.bounds.minY + 0.25,
+            room.bounds.maxY - 0.28,
+          );
+        }
       }
 
       const actualDist = safeEye.distanceTo(target);
@@ -534,9 +575,11 @@ export class FollowCamera {
     this.obstructionAmount = 0;
     this.zoomLevel = 1;
     this.smoothDistance = preset.distance * ZOOM_DISTANCES[this.zoomLevel];
+    const isChild = player.role === "child";
+    const defaultTargetHeight = isChild ? 0.65 : preset.targetHeight;
     this.target.set(
       player.x,
-      player.y + (player.crouching ? 0.58 : preset.targetHeight),
+      player.y + (player.crouching ? 0.58 : defaultTargetHeight),
       player.z,
     );
     this.lead.set(0, 0, 0);
@@ -623,8 +666,10 @@ export class FollowCamera {
     );
     this.target.x = player.x;
     this.target.z = player.z;
+    const isChild = player.role === "child";
+    const defaultTargetHeight = isChild ? 0.65 : preset.targetHeight;
     const wantedHeight =
-      player.y + (player.crouching ? 0.58 : preset.targetHeight);
+      player.y + (player.crouching ? 0.58 : defaultTargetHeight);
     this.target.y +=
       (wantedHeight - this.target.y) *
       ease(player.grounded === false ? 3 : 9, dt);
@@ -722,12 +767,16 @@ export class FollowCamera {
     // SM64 / Lakitu spring arm: when navigating, raycast from character target along the camera boom.
     // If a solid wall, building or barrier lies along the boom, shorten the tether
     // so the camera stays on the character's side of the wall.
-    // Narrow columns (w <= 2 && d <= 2) and high lintels are excluded to prevent jitter.
+    // Slender columns (isotropic w and d <= 1.8) and low props are excluded to prevent jitter.
     if (playerTravel > 0.0001 || (player.runSpeed ?? 0) > 0.1) {
       const boomEye = this.desired(this.target, this.smoothDistance);
-      const wallSolids = solids.filter(
-        (s) => (s.w > 2.0 || s.d > 2.0) && s.y < this.target.y + 1.2,
-      );
+      const wallSolids = solids.filter((s) => {
+        const maxDim = Math.max(s.w, s.d);
+        const minDim = Math.min(s.w, s.d);
+        if (maxDim <= 1.8 && minDim >= 0.5 * maxDim) return false;
+        if (s.h <= 0.8 && maxDim <= 2.5) return false;
+        return s.y < this.target.y + 1.2;
+      });
       const safeBoomEye = resolveCameraPosition(
         this.target,
         boomEye,
@@ -756,7 +805,7 @@ export class FollowCamera {
         this.target,
         naturalEye,
         solids,
-        player.y + (player.crouching ? 1.0 : 1.75),
+        player.y + (player.crouching || isChild ? 0.9 : 1.75),
       );
       if (ceilingY < Infinity) {
         const maxEyeY = ceilingY - 0.28;
@@ -802,17 +851,25 @@ export class FollowCamera {
         room.bounds.minZ + 0.55,
         room.bounds.maxZ - 0.55,
       );
+      if (room.bounds.minY !== undefined && room.bounds.maxY !== undefined) {
+        candidate.y = clamp(
+          candidate.y,
+          room.bounds.minY + 0.25,
+          room.bounds.maxY - 0.28,
+        );
+      }
     }
     const directClear = cameraSegmentClear(previous, candidate, solids, 0.22);
     if (directClear) this.eyeDetour = [];
     else if (!this.eyeDetour.length && playerTravel > 0.0001) {
-      this.eyeDetour = cameraEyeDetour(previous, candidate, solids);
+      this.eyeDetour = cameraEyeDetour(previous, candidate, solids, player.y);
       if (!this.eyeDetour.length) {
         const cornerWp = cameraCornerWaypoint(
           previous,
           candidate,
           this.target,
           solids,
+          0.22,
         );
         if (cornerWp) this.eyeDetour = [cornerWp];
       }
@@ -823,7 +880,10 @@ export class FollowCamera {
             eye.x < room.bounds.minX + 0.55 ||
             eye.x > room.bounds.maxX - 0.55 ||
             eye.z < room.bounds.minZ + 0.55 ||
-            eye.z > room.bounds.maxZ - 0.55,
+            eye.z > room.bounds.maxZ - 0.55 ||
+            (room.bounds.minY !== undefined &&
+              eye.y < room.bounds.minY + 0.25) ||
+            (room.bounds.maxY !== undefined && eye.y > room.bounds.maxY - 0.28),
         )
       )
         this.eyeDetour = [];
@@ -841,23 +901,35 @@ export class FollowCamera {
         .clone()
         .lerp(motionGoal, Math.min(1, (12 * dt) / Math.max(distance, 0.001)));
     }
-    let final = moveCameraEye(previous, motionGoal, solids);
+    let final = moveCameraEye(previous, motionGoal, solids, player.y);
     const instantTarget = new T.Vector3(
       player.x,
-      player.y + (player.crouching ? 0.58 : preset.targetHeight),
+      player.y + (player.crouching ? 0.58 : defaultTargetHeight),
       player.z,
     );
     const lowerFloorEye = this.desired(
       instantTarget,
       (preset.distance + this.speedPullback) * ZOOM_DISTANCES[this.zoomLevel],
     );
+    // Check whether an overhead floor slab or deck separates the previous eye from the player.
+    const isSeparatedByFloor = solids.some(
+      (solid) =>
+        solid.h <= 1.5 &&
+        (solid.w >= 1.5 || solid.d >= 1.5 || solid.w * solid.d >= 2.0) &&
+        previous.y >= solid.y + solid.h - 0.1 &&
+        player.y + defaultTargetHeight < solid.y + 0.2 &&
+        !cameraSegmentClear(previous, instantTarget, [solid], 0.1),
+    );
     // Vertical target easing is useful for ordinary steps, but it can retain a
-    // former upper-floor height after a player drops through an open well.
+    // former upper-floor height after a player drops through an open well or
+    // walks down stairs beneath a deck.
     // Put both focus and eye on the lower floor as a single safe transition.
+    const verticalSeparation = previous.y - player.y;
     if (
       player.grounded !== false &&
-      previous.y - player.y > 6 &&
-      final.y - player.y > 6 &&
+      (verticalSeparation > 6 ||
+        (isSeparatedByFloor && verticalSeparation > 2.0)) &&
+      final.y - player.y > 2.0 &&
       cameraSegmentClear(lowerFloorEye, lowerFloorEye, solids, 0.28) &&
       cameraSegmentClear(instantTarget, lowerFloorEye, solids, 0.05)
     ) {
@@ -866,17 +938,18 @@ export class FollowCamera {
       this.eyeDetour = [];
       this.finishingDetour = false;
     }
-    // A balcony slab can separate the eye from a player who jumped into an
-    // open stairwell. Once the player and full-size follow eye are below it,
-    // cut to that clear lower-floor view rather than remaining above the slab.
+    // A balcony slab or deck can separate the eye from a player who jumped into an
+    // open stairwell or descended below. Once the player and follow eye are
+    // below it, cut to that clear lower-floor view rather than remaining above the slab.
     // This is a floor-change recovery, never a response to a column sightline.
     if (
-      previous.y - player.y > 6 &&
-      candidate.y < previous.y - 1.5 &&
+      (verticalSeparation > 6 ||
+        (isSeparatedByFloor && verticalSeparation > 2.0)) &&
+      candidate.y < previous.y - 1.2 &&
       !directClear &&
       cameraSegmentClear(candidate, candidate, solids, 0.28) &&
       cameraSegmentClear(
-        new T.Vector3(player.x, player.y + preset.targetHeight, player.z),
+        new T.Vector3(player.x, player.y + defaultTargetHeight, player.z),
         candidate,
         solids,
         0.05,
@@ -884,11 +957,10 @@ export class FollowCamera {
       solids.some(
         (solid) =>
           solid.h <= 1.5 &&
-          solid.w >= 3 &&
-          solid.d >= 3 &&
-          previous.y >= solid.y + solid.h + 0.2 &&
-          player.y + 1.8 < solid.y &&
-          candidate.y < solid.y - 0.28 &&
+          (solid.w >= 1.5 || solid.d >= 1.5 || solid.w * solid.d >= 2.0) &&
+          previous.y >= solid.y + solid.h - 0.1 &&
+          player.y + 1.2 < solid.y + solid.h &&
+          candidate.y < solid.y - 0.22 &&
           !cameraSegmentClear(previous, candidate, [solid], 0.22),
       )
     ) {
@@ -940,6 +1012,7 @@ export class FollowCamera {
         1,
       );
     }
+    if (player.grounded !== false) final.y = Math.max(final.y, player.y + 0.22);
     this.camera.position.copy(final);
     if (!this.eyeDetour.length && !this.finishingDetour) {
       const finalDx = this.target.x - final.x,

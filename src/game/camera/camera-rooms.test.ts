@@ -54,3 +54,37 @@ test("entering a different room core takes precedence over retaining the previou
   assert.equal(selectCameraRoom(rooms, { x: 5, z: -5 }, "missing")?.id, "hall");
   assert.equal(selectCameraRoom(rooms, { x: 30, z: 30 }, "hall"), undefined);
 });
+
+test("vertical room bounds isolate upper and lower floor spaces sharing XZ", () => {
+  const multiFloorRooms: CameraRoom[] = [
+    {
+      id: "cabin-below",
+      bounds: { minX: -5, maxX: 5, minZ: -10, maxZ: 10, minY: -0.5, maxY: 3.5 },
+      distance: 3.2,
+      elevation: 0.18,
+      targetHeight: 0.85,
+      entryEyes: [],
+      exitEyes: [],
+    },
+  ];
+  // Below deck at y=0 is inside the room
+  assert.equal(
+    selectCameraRoom(multiFloorRooms, { x: 0, y: 0, z: 0 })?.id,
+    "cabin-below",
+  );
+  // Upper deck at y=4.2 is outside the room
+  assert.equal(
+    selectCameraRoom(multiFloorRooms, { x: 0, y: 4.2, z: 0 }),
+    undefined,
+  );
+  // Active room holds across jitter but releases on the upper floor
+  assert.equal(
+    selectCameraRoom(multiFloorRooms, { x: 0, y: 3.8, z: 0 }, "cabin-below")
+      ?.id,
+    "cabin-below",
+  );
+  assert.equal(
+    selectCameraRoom(multiFloorRooms, { x: 0, y: 4.2, z: 0 }, "cabin-below"),
+    undefined,
+  );
+});

@@ -338,6 +338,7 @@ export function buildVoyage(scene: T.Scene): WorldData {
     spawn: { x: 2, y: 4.2, z: 2 },
     solids: ship.solids,
     climbables: ship.climbables,
+    cameraRooms: ship.cameraRooms,
     actorParent: ship.group,
     bounds: { minX: -8, maxX: 8, minZ: -20, maxZ: 20 },
     goal: { x: 0, y: 4.2, z: 17, radius: 2 },

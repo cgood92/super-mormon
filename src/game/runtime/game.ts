@@ -434,7 +434,7 @@ export class Game {
     this.gameplay.reset(id);
     this.discoveries.setup();
     this.view.follow.reset(
-      this.session.player,
+      { ...this.session.player, role: this.session.avatarRole },
       this.session.player.yaw,
       cameraModeForWorld(id),
     );
