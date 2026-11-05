@@ -281,3 +281,35 @@ test("climbing stops below a ceiling and still allows descent and jump detach", 
   assert.notEqual(p.move, "climb");
   assert.ok(p.vy > 0);
 });
+
+test("jump chain heights increase progressively and triple jump commits to full arc", () => {
+  const p = createPlayer();
+  frames(p, { ...idle, y: 1 }, 25);
+  const maxHeights: number[] = [];
+  for (let cycle = 0; cycle < 3; cycle++) {
+    // Jump with key tapped (released next frame)
+    stepPlayer(
+      p,
+      { ...idle, y: 1, jump: true, jumpHeld: false },
+      1 / 60,
+      0,
+      [],
+    );
+    let maxH = p.y;
+    for (let i = 0; i < 120 && !p.grounded; i++) {
+      stepPlayer(
+        p,
+        { ...idle, y: 1, jump: false, jumpHeld: false },
+        1 / 60,
+        0,
+        [],
+      );
+      maxH = Math.max(maxH, p.y);
+    }
+    maxHeights.push(maxH);
+  }
+  // Single jump cut short by jumpHeld: false
+  assert.ok(maxHeights[0] < 1.0, `single jump cut height ${maxHeights[0]}`);
+  // Triple jump commits to full arc even with jumpHeld: false
+  assert.ok(maxHeights[2] > 2.5, `triple jump commit height ${maxHeights[2]}`);
+});

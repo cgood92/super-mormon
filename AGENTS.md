@@ -4,6 +4,13 @@
 
 - The brainstorming skill is optional in this repository. For concrete playtest feedback and clear feature or bugfix requests, proceed directly with investigation, implementation and verification; do not require a brainstorming session, a new specification or a separate design approval. Ask only for information that materially blocks the work.
 
+# Super Mario 64 physics, controls, and camera parity
+
+- Mimic _Super Mario 64_ in physics, kinematics, controls, character dynamics, and camera behavior wherever possible. Reference and copy exact formulas, constants, and state transitions from the Super Mario 64 decompilation (`n64decomp/sm64`: `mario.c`, `mario_actions_airborne.c`, `mario_actions_moving.c`, `mario_step.c`, `camera.c`) at every point possible.
+- Jump mechanics must follow SM64 curves and progression: single jump ($v_y = 42\text{f} + 0.25\text{f} \cdot v_{\text{fwd}}$), double jump ($v_y = 52\text{f} + 0.25\text{f} \cdot v_{\text{fwd}}$), and triple jump ($v_y = 69\text{f}$, committing to full arc without short-hop cancellation). Apex hangtime, landing compression/crouch, airborne foot plantar flexion, and touchdown settling must match SM64 dynamics.
+- Character motion and poses must mirror the iconic SM64 states: single jump punch & high knee, double jump hands-down leap, triple jump multi-phase somersault flip (launch $\to$ accelerated tight tuck $\to$ smooth unfold), long jump forward leap, wall slide/kick deflection, drift/skid turns, and swimming strokes.
+- Camera behavior must replicate Lakitu / Mario camera dynamics: smooth trailing follow, snappy C-button orbits and 8-way directional stepping, distance presets, and floor/wall collision avoidance without clipping.
+
 # Scenery acceptance rules
 
 - Build foreground solid scenery with shared geometry-and-collision helpers in `src/game/worlds/shared/scenery.ts`. Use one dimension source for its visible surface and physical support. Register deliberate decoration/backdrops explicitly with a reason; do not turn all render meshes into enclosing AABBs.

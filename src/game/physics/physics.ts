@@ -649,16 +649,19 @@ export function stepPlayer(
         move = "tripleJump";
       player.jumpStage =
         move === "doubleJump" ? 2 : move === "tripleJump" ? 3 : 1;
+      const speedBonus = Math.min(0.8, player.runSpeed * 0.12);
       player.vy =
         move === "tripleJump"
-          ? 12.5
+          ? 11.8
           : move === "backflip"
-            ? 11
+            ? 9.6
             : move === "doubleJump"
-              ? 10.5
-              : move === "longJump"
-                ? 8
-                : JUMP;
+              ? 9.5 + speedBonus
+              : move === "sideflip"
+                ? 8.8
+                : move === "longJump"
+                  ? 7.6
+                  : 7.8 + speedBonus;
       if (move === "longJump") {
         const launchSpeed = Math.min(10, Math.max(8.5, player.runSpeed * 1.45));
         player.vx = (player.vx / player.runSpeed) * launchSpeed;
@@ -724,11 +727,19 @@ export function stepPlayer(
 
     moveHorizontal(player, "x", player.vx * subdt, solids);
     moveHorizontal(player, "z", player.vz * subdt, solids);
-    if (player.vy > 0 && !input.jumpHeld) player.vy = Math.min(player.vy, 4.1);
+    const isAcrobaticJump =
+      player.move === "tripleJump" ||
+      player.move === "backflip" ||
+      player.move === "sideflip";
+    if (player.vy > 0 && !input.jumpHeld && !isAcrobaticJump)
+      player.vy = Math.min(player.vy, 4.1);
+    const apexFloat = Math.abs(player.vy) < 1.8 && !player.grounded;
     const gravity =
-      player.vy > 0 && input.jumpHeld && player.jumpHoldTime < 0.22
+      (player.vy > 0 &&
+      (input.jumpHeld || player.move === "tripleJump") &&
+      player.jumpHoldTime < 0.22
         ? GRAVITY * 0.48
-        : GRAVITY;
+        : GRAVITY) * (apexFloat ? 0.82 : 1);
     if (player.move === "groundPound") {
       // A brief suspended tuck precedes a committed, feet-first descent.
       player.vy = player.moveTime < 0.14 ? 0 : -24;
