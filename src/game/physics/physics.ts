@@ -752,6 +752,7 @@ export function stepPlayer(
               : -Math.cos(player.yaw);
         player.vx = backDirX * flipSpeed;
         player.vz = backDirZ * flipSpeed;
+        player.yaw = Math.atan2(player.vx, player.vz);
         player.vy = 10.5;
         player.grounded = false;
         player.airMoveLock = 0.35;
@@ -872,6 +873,7 @@ export function stepPlayer(
           player.vx = worldX * flipSpeed;
           player.vz = worldZ * flipSpeed;
         }
+        player.yaw = Math.atan2(player.vx, player.vz);
         player.airMoveLock = 0.35;
       }
       player.grounded = false;

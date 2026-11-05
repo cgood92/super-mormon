@@ -56,6 +56,7 @@ export function createMotionDriver(role: CharacterRole): {
   let turnBank = 0;
   let lastAirVy = 0;
   let wasLocomoting = false;
+  let skidFacingYaw: number | undefined;
   const stanceAnchors: ({ x: number; z: number; yaw: number } | null)[] = [
     null,
     null,
@@ -76,7 +77,18 @@ export function createMotionDriver(role: CharacterRole): {
         firstUpdate = false;
       }
       const previousYaw = renderedYaw;
-      renderedYaw += angleDiff(state.yaw, renderedYaw) * damp(23, dt);
+      if (state.move === "turnSkid") {
+        const speed = Math.hypot(state.vx, state.vz);
+        if (speed > 0.2) {
+          skidFacingYaw = Math.atan2(state.vx, state.vz);
+        } else if (firstUpdate || skidFacingYaw === undefined) {
+          skidFacingYaw = state.yaw;
+        }
+        renderedYaw = skidFacingYaw;
+      } else {
+        skidFacingYaw = undefined;
+        renderedYaw += angleDiff(state.yaw, renderedYaw) * damp(23, dt);
+      }
       // Keep the existing tilt in world space while the actor turns beneath it.
       const yawStep = renderedYaw - previousYaw;
       const oldLean = forwardLean;
@@ -439,7 +451,7 @@ export function createMotionDriver(role: CharacterRole): {
       } else if (move === "sideflip") {
         // Super Mario 64 side somersault: an acrobatic mid-air cartwheel (MARIO_ANIM_SLIDEFLIP)
         const progress = Math.min(1, moveTime / 0.65);
-        const angle = -Math.PI * 2 * progress;
+        const angle = Math.PI * 2 * progress;
         const split = Math.sin(progress * Math.PI);
         forwardLean = 0;
         turnBank = 0;
