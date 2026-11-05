@@ -264,7 +264,7 @@ test("walking straight into the auditorium while holding forward does not veer s
           `player drifted sideways in auditorium aisle: x=${player.x}`,
         );
         assert.ok(
-          Math.abs(follow.yaw - Math.PI) < 0.05,
+          Math.abs(Math.abs(follow.yaw) - Math.PI) < 0.05,
           `camera yaw drifted: ${((follow.yaw * 180) / Math.PI).toFixed(1)}°`,
         );
       }

@@ -13,11 +13,11 @@ test("conference keeps a lower broad view at the closer default framing", () => 
   const follow = new FollowCamera(camera);
   const player = { x: 0, y: 0, z: 0, yaw: Math.PI, grounded: true };
   follow.reset(player, player.yaw, "conference");
-  assert.ok(follow.pitch < 0.3);
-  const distance = camera.position.distanceTo(new T.Vector3(0, 2, 0));
-  assert.ok(distance > 7 && distance < 8, `conference distance ${distance}`);
+  assert.ok(follow.pitch <= 0.16);
+  const distance = camera.position.distanceTo(new T.Vector3(0, 1.15, 0));
+  assert.ok(distance > 5 && distance < 6, `conference distance ${distance}`);
   follow.reset(player, player.yaw, "streets");
-  assert.equal(follow.pitch, 0.2);
+  assert.equal(follow.pitch, 0.15);
 });
 
 test("the default camera starts closer while C-Down retains a wider view", () => {
@@ -117,7 +117,7 @@ test("camera zoom steps closer and farther without changing its aim", () => {
   const camera = new T.PerspectiveCamera(65, 1, 0.08, 100);
   const follow = new FollowCamera(camera);
   const p = { x: 0, y: 0, z: 0, yaw: 0, runSpeed: 0 };
-  const target = new T.Vector3(0, 1, 0);
+  const target = new T.Vector3(0, 1.15, 0);
   const orbit = (zoom: number) => ({
     orbitX: 0,
     orbitY: 0,
@@ -150,7 +150,7 @@ test("camera zoom clamps at its closest and farthest preset and resets to defaul
   const camera = new T.PerspectiveCamera(65, 1, 0.08, 100);
   const follow = new FollowCamera(camera);
   const p = { x: 0, y: 0, z: 0, yaw: 0, runSpeed: 0 };
-  const target = new T.Vector3(0, 1, 0);
+  const target = new T.Vector3(0, 1.15, 0);
   const orbit = (zoom: number) => ({
     orbitX: 0,
     orbitY: 0,

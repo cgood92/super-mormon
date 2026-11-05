@@ -26,13 +26,13 @@ const MODES: Record<
   CameraMode,
   { distance: number; elevation: number; targetHeight: number }
 > = {
-  hub: { distance: 7.2, elevation: 0.2, targetHeight: 1 },
-  conference: { distance: 9.5, elevation: 0.22, targetHeight: 2 },
-  streets: { distance: 7.2, elevation: 0.2, targetHeight: 1 },
-  house: { distance: 6.2, elevation: 0.2, targetHeight: 1 },
-  palace: { distance: 7, elevation: 0.2, targetHeight: 1 },
-  trade: { distance: 7.2, elevation: 0.2, targetHeight: 1 },
-  night: { distance: 7, elevation: 0.2, targetHeight: 1 },
+  hub: { distance: 7.2, elevation: 0.15, targetHeight: 1.15 },
+  conference: { distance: 6.8, elevation: 0.15, targetHeight: 1.15 },
+  streets: { distance: 7.2, elevation: 0.15, targetHeight: 1.15 },
+  house: { distance: 6.2, elevation: 0.15, targetHeight: 1.15 },
+  palace: { distance: 7.0, elevation: 0.15, targetHeight: 1.15 },
+  trade: { distance: 7.2, elevation: 0.15, targetHeight: 1.15 },
+  night: { distance: 7.0, elevation: 0.15, targetHeight: 1.15 },
 };
 
 // Mario's normal exploration view is close; C-Down remains the wide option.

@@ -216,7 +216,7 @@ test("all character roles keep crouch and flip poses above the floor", () => {
 test("jump stage selects the airborne pose when move is omitted", () => {
   const character = createCharacter("nephi");
   character.update(1 / 60, { ...standing, grounded: false, jumpStage: 2 });
-  assert.ok(character.group.getObjectByName("left-arm")!.rotation.x < -1);
+  assert.ok(character.group.getObjectByName("left-arm")!.rotation.x > 0.2);
   character.update(1 / 60, {
     ...standing,
     grounded: false,
@@ -340,5 +340,73 @@ test("pointing figures use a forward gesture distinct from the family's wave", (
   assert.ok(Math.abs(arm.rotation.z) < 0.3);
   actor.update(1 / 60, { ...standing, move: "idle", wave: true });
   assert.ok(arm.rotation.z > 2.3);
+  actor.dispose();
+});
+
+test("Super Mario 64 style jump poses articulate limbs, feet, and somersault progression", () => {
+  const actor = createCharacter("nephi");
+  // Single jump: right punch up, left leg forward
+  actor.update(1 / 60, {
+    ...standing,
+    grounded: false,
+    move: "jump",
+    moveTime: 0.1,
+  });
+  const rightArm = actor.group.getObjectByName("right-arm")!;
+  const leftArm = actor.group.getObjectByName("left-arm")!;
+  const leftLeg = actor.group.getObjectByName("left-leg")!;
+  const rightFoot = actor.group.getObjectByName("right-foot")!;
+  assert.ok(rightArm.rotation.x < -2.0, "right arm punches high");
+  assert.ok(leftArm.rotation.x > 0.2, "left arm trailing down/back");
+  assert.ok(leftLeg.rotation.x < -0.4, "left leg raised forward");
+  assert.ok(rightFoot.rotation.x > 0.4, "toes pointed down");
+
+  // Double jump: both arms down, feet together looking up
+  actor.update(1 / 60, {
+    ...standing,
+    grounded: false,
+    vy: 5,
+    move: "doubleJump",
+    moveTime: 0.1,
+  });
+  assert.ok(rightArm.rotation.x > 0.2, "right arm down in double jump");
+  assert.ok(leftArm.rotation.x > 0.2, "left arm down in double jump");
+
+  // Triple jump: progression through launch, tuck, unfold
+  actor.update(1 / 60, {
+    ...standing,
+    grounded: false,
+    move: "tripleJump",
+    moveTime: 0.1,
+  });
+  const body = actor.group.children[0];
+  const launchAngle = body.rotation.x;
+
+  actor.update(1 / 60, {
+    ...standing,
+    grounded: false,
+    move: "tripleJump",
+    moveTime: 0.35,
+  });
+  const tuckAngle = body.rotation.x;
+  assert.ok(
+    tuckAngle > launchAngle + 1.5,
+    "somersault accelerates into tight tuck",
+  );
+
+  // After flip completes at 0.7s, character remains upright during descent
+  actor.update(1 / 60, {
+    ...standing,
+    grounded: false,
+    move: "tripleJump",
+    moveTime: 0.85,
+  });
+  assert.equal(
+    body.rotation.x,
+    0,
+    "flip finishes upright without rotating backwards",
+  );
+  assert.equal(body.position.y, 0, "body pivot settles upright");
+
   actor.dispose();
 });
