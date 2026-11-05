@@ -28,6 +28,7 @@ export function createSculptedCharacterRig(
   body.add(model.group);
 
   const driverBody = driver.group.getObjectByName("body")!;
+  const driverTorso = driver.group.getObjectByName("torso");
   const driverHead = driver.group.getObjectByName("head")!;
   const driverArms = [
     driver.group.getObjectByName("left-arm")!,
@@ -53,10 +54,11 @@ export function createSculptedCharacterRig(
   ) as T.Mesh;
   const rootBone = new T.Bone();
   rootBone.name = "torso-bone";
+  rootBone.position.set(0, height(0.85), 0);
   const armBones = [-1, 1].map((side) => {
     const bone = new T.Bone();
     bone.name = side < 0 ? "left-arm" : "right-arm";
-    bone.position.set(side * 0.385, height(1.3), 0);
+    bone.position.set(side * 0.385, height(1.3) - height(0.85), 0);
     rootBone.add(bone);
     return bone;
   });
@@ -73,9 +75,9 @@ export function createSculptedCharacterRig(
       const x = positions.getX(i),
         y = positions.getY(i);
       const armWeight =
-        T.MathUtils.smoothstep(Math.abs(x), 0.22, 0.58) *
-        (1 - T.MathUtils.smoothstep(y, 1.45, 1.61)) *
-        T.MathUtils.smoothstep(y, 0.88, 1.12);
+        T.MathUtils.smoothstep(Math.abs(x), 0.22, 0.38) *
+        (1 - T.MathUtils.smoothstep(y, height(1.45), height(1.61))) *
+        T.MathUtils.smoothstep(y, height(0.68), height(0.78));
       indices[i * 4] = 0;
       weights[i * 4] = 1 - armWeight;
       indices[i * 4 + 1] = x < 0 ? 1 : 2;
@@ -112,8 +114,8 @@ export function createSculptedCharacterRig(
 
   const head = new T.Group();
   head.name = "head";
-  head.position.set(0, height(1.49), 0);
-  model.group.add(head);
+  head.position.set(0, height(1.49) - height(0.85), 0);
+  rootBone.add(head);
   const armPivots = armBones;
   const legPivots = [-1, 1].map((side) => {
     const leg = new T.Group();
@@ -201,8 +203,8 @@ export function createSculptedCharacterRig(
     back: new T.Group(),
   };
   sockets.back.name = "back-socket";
-  sockets.back.position.set(0, 1.16, -0.29);
-  model.group.add(sockets.back);
+  sockets.back.position.set(0, 1.16 - height(0.85), -0.29);
+  rootBone.add(sockets.back);
   attach("left-trouser", legPivots[0]);
   attach("right-trouser", legPivots[1]);
   attach("left-sandal", footPivots[0]);
@@ -332,6 +334,9 @@ export function createSculptedCharacterRig(
       group.rotation.y = driver.group.rotation.y;
       body.rotation.copy(driverBody.rotation);
       body.position.y = driverBody.position.y;
+      if (driverTorso) {
+        rootBone.rotation.copy(driverTorso.rotation);
+      }
       const crawling =
         state.grounded &&
         (state.move === "crawl" ||
@@ -339,7 +344,7 @@ export function createSculptedCharacterRig(
       const crouchScale =
         state.crouching && !crawling
           ? Math.min(
-              state.move === "crawl" ? 0.49 : 0.525,
+              state.move === "crawl" ? 0.49 : 0.515,
               driverBody.scale.y / 0.84,
             )
           : driverBody.scale.y / 0.84;
@@ -349,7 +354,7 @@ export function createSculptedCharacterRig(
         actorScale * driverBody.scale.z,
       );
       head.rotation.copy(driverHead.rotation);
-      head.position.z = crawling ? 0.13 : 0;
+      head.position.set(0, height(1.49) - height(0.85), crawling ? 0.13 : 0);
       body.position.z = crawling ? (-0.77 * actorScale) / 0.825 : 0;
       if (crawling) body.position.y *= actorScale / 0.825;
       if (crawling) body.scale.setScalar(actorScale);
