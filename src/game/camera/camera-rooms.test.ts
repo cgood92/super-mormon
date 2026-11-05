@@ -79,7 +79,8 @@ test("vertical room bounds isolate upper and lower floor spaces sharing XZ", () 
   );
   // Active room holds across jitter but releases on the upper floor
   assert.equal(
-    selectCameraRoom(multiFloorRooms, { x: 0, y: 3.8, z: 0 }, "cabin-below")?.id,
+    selectCameraRoom(multiFloorRooms, { x: 0, y: 3.8, z: 0 }, "cabin-below")
+      ?.id,
     "cabin-below",
   );
   assert.equal(

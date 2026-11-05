@@ -881,7 +881,8 @@ export class FollowCamera {
             eye.x > room.bounds.maxX - 0.55 ||
             eye.z < room.bounds.minZ + 0.55 ||
             eye.z > room.bounds.maxZ - 0.55 ||
-            (room.bounds.minY !== undefined && eye.y < room.bounds.minY + 0.25) ||
+            (room.bounds.minY !== undefined &&
+              eye.y < room.bounds.minY + 0.25) ||
             (room.bounds.maxY !== undefined && eye.y > room.bounds.maxY - 0.28),
         )
       )
@@ -926,7 +927,8 @@ export class FollowCamera {
     const verticalSeparation = previous.y - player.y;
     if (
       player.grounded !== false &&
-      (verticalSeparation > 6 || (isSeparatedByFloor && verticalSeparation > 2.0)) &&
+      (verticalSeparation > 6 ||
+        (isSeparatedByFloor && verticalSeparation > 2.0)) &&
       final.y - player.y > 2.0 &&
       cameraSegmentClear(lowerFloorEye, lowerFloorEye, solids, 0.28) &&
       cameraSegmentClear(instantTarget, lowerFloorEye, solids, 0.05)
@@ -941,7 +943,8 @@ export class FollowCamera {
     // below it, cut to that clear lower-floor view rather than remaining above the slab.
     // This is a floor-change recovery, never a response to a column sightline.
     if (
-      (verticalSeparation > 6 || (isSeparatedByFloor && verticalSeparation > 2.0)) &&
+      (verticalSeparation > 6 ||
+        (isSeparatedByFloor && verticalSeparation > 2.0)) &&
       candidate.y < previous.y - 1.2 &&
       !directClear &&
       cameraSegmentClear(candidate, candidate, solids, 0.28) &&

@@ -24,7 +24,10 @@ test("underdeck camera rooms activate below deck and release on the upper deck",
   const inCommonRoom = { x: -1, y: 0, z: 15 };
   const roomAft = selectCameraRoom(ship.cameraRooms, inCommonRoom);
   assert.equal(roomAft?.id, "ship-common-room");
-  assert.ok(roomAft.distance <= 3.5, "room distance is close for indoor navigation");
+  assert.ok(
+    roomAft.distance <= 3.5,
+    "room distance is close for indoor navigation",
+  );
 
   // Below deck in fore-cabins (z=-6, y=0) activates ship-fore-cabins
   const inForeCabins = { x: 0, y: 0, z: -6 };
@@ -140,7 +143,15 @@ test("camera in underdeck cabin remains inside ship bounds and above floor durin
   const follow = new FollowCamera(camera);
 
   // Position player in center of common room below deck
-  const player = { x: -1, y: 0, z: 15, yaw: Math.PI, runSpeed: 0, grounded: true, role: "child" };
+  const player = {
+    x: -1,
+    y: 0,
+    z: 15,
+    yaw: Math.PI,
+    runSpeed: 0,
+    grounded: true,
+    role: "child",
+  };
   const room = selectCameraRoom(ship.cameraRooms, player);
   assert.equal(room?.id, "ship-common-room");
 
@@ -188,7 +199,14 @@ test("adult avatar ascending stairs from underdeck releases room camera back to 
   assert.equal(initialRoom?.id, "ship-common-room");
 
   follow.reset({ ...player, role: "nephi" }, player.yaw, "streets");
-  follow.update(1 / 60, { ...player, role: "nephi" }, ship.solids, neutral, "streets", initialRoom);
+  follow.update(
+    1 / 60,
+    { ...player, role: "nephi" },
+    ship.solids,
+    neutral,
+    "streets",
+    initialRoom,
+  );
 
   // Walk out of common room to stairs at (6, 0, -29)
   const waypoints = [
@@ -231,6 +249,8 @@ test("adult avatar ascending stairs from underdeck releases room camera back to 
   // Room camera must be released
   assert.equal(follow.roomId, undefined, "room camera released on upper deck");
   // Camera must be above deck
-  assert.ok(camera.position.y > 4.2, `camera restored above deck: cam.y=${camera.position.y}`);
+  assert.ok(
+    camera.position.y > 4.2,
+    `camera restored above deck: cam.y=${camera.position.y}`,
+  );
 });
-
