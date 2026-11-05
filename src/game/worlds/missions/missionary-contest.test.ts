@@ -147,6 +147,7 @@ test("elders follow the real Conference Center architecture to the lower landing
 
 import { missionaryActor } from "./missionary-actors";
 import * as actors from "./missionary-actors";
+import { createCharacter } from "../../characters/character";
 test("visitors have blue shirts and brown trousers without changing elders", () => {
   const root = new T.Group();
   const elder = missionaryActor(root, true);
@@ -190,4 +191,48 @@ test("companion stays beside the player through turns and avoids buildings", () 
   );
   companion.dispose();
   assert.equal(root.children.length, 0);
+});
+
+test("companion mimics player locomotion, jumps, and crouches in exact synchronization", () => {
+  const root = new T.Group();
+  const companion = actors.buildMissionaryCompanion(root, []);
+  const playerRig = createCharacter("missionary", { quality: "hero" });
+  const player = createPlayer(0, 0, 0);
+
+  for (let frame = 0; frame < 180; frame++) {
+    const jump = frame === 40 || frame === 120;
+    const crouch = frame >= 80 && frame <= 110;
+    stepPlayer(
+      player,
+      { x: 0, y: 1, jump, jumpHeld: jump, crouch },
+      1 / 60,
+      0,
+      [],
+    );
+    playerRig.update(1 / 60, { ...player });
+    companion.update(1 / 60, player);
+
+    const heroLeftLeg = playerRig.group.getObjectByName("left-leg")!;
+    const compLeftLeg = companion.group.getObjectByName("left-leg")!;
+    const heroRightLeg = playerRig.group.getObjectByName("right-leg")!;
+    const compRightLeg = companion.group.getObjectByName("right-leg")!;
+    const heroBody = playerRig.group.getObjectByName("body")!;
+    const compBody = companion.group.getObjectByName("body")!;
+
+    assert.ok(
+      Math.abs(heroLeftLeg.rotation.x - compLeftLeg.rotation.x) < 1e-4,
+      `left leg mismatch at frame ${frame}`,
+    );
+    assert.ok(
+      Math.abs(heroRightLeg.rotation.x - compRightLeg.rotation.x) < 1e-4,
+      `right leg mismatch at frame ${frame}`,
+    );
+    assert.ok(
+      Math.abs(heroBody.rotation.x - compBody.rotation.x) < 1e-4,
+      `body pitch mismatch at frame ${frame}`,
+    );
+  }
+
+  companion.dispose();
+  playerRig.dispose();
 });

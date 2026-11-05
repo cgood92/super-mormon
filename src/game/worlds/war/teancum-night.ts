@@ -287,11 +287,13 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
       let companion = createPlayer(servantX, 0, servantZ);
       let trail: Point[] = [];
       let lastTrail: Point = { ...TEANCUM_ROUTE[0] };
+      let lastJumpTarget: Point | null = null;
       const reset = (player: PlayerState) => {
         detections++;
         stage = 0;
         pending = false;
         time = 0;
+        lastJumpTarget = null;
         servantX = TEANCUM_ROUTE[1].x;
         servantZ = TEANCUM_ROUTE[1].z;
         king.group.visible = true;
@@ -390,10 +392,13 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
               lastTrail = { x: player.x, y: player.y, z: player.z };
             }
             while (
-              trail.length > 1 &&
+              trail.length > 0 &&
               Math.hypot(trail[0].x - companion.x, trail[0].z - companion.z) <
                 0.4 &&
-              Math.abs(trail[0].y - companion.y) < 0.65
+              (Math.abs(trail[0].y - companion.y) < 0.65 ||
+                !companion.grounded ||
+                companion.y >= trail[0].y ||
+                trail[0] === lastJumpTarget)
             )
               trail.shift();
             const target = trail[0];
@@ -401,9 +406,15 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
             const dz = target ? target.z - companion.z : 0;
             const distance = Math.hypot(dx, dz);
             const follow =
-              trail.length > 1 ||
+              trail.length > 0 ||
               Math.hypot(player.x - companion.x, player.z - companion.z) > 1.8;
             companion.crouching = player.crouching;
+            const shouldJump =
+              !!target &&
+              target !== lastJumpTarget &&
+              target.y > companion.y + 0.25 &&
+              companion.grounded;
+            if (shouldJump) lastJumpTarget = target;
             stepPlayer(
               companion,
               {
@@ -415,10 +426,7 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
                   follow && distance > 0.15
                     ? (dz / distance) * Math.min(1, distance / 0.7)
                     : 0,
-                jump:
-                  !!target &&
-                  target.y > companion.y + 0.25 &&
-                  companion.grounded,
+                jump: shouldJump,
                 jumpHeld:
                   !!target &&
                   (target.y > companion.y + 0.1 || !companion.grounded),

@@ -44,6 +44,7 @@ export function missionaryActor(parent: T.Group, elder = true, variant = 0) {
   let previous = 0;
   return {
     group,
+    rig,
     dispose() {
       costumeMaterials.forEach((mat) => mat.dispose());
       rig.dispose();
@@ -165,16 +166,14 @@ export function buildWanderingElders(parent: T.Group, solids: Solid[]) {
   };
 }
 
-/** The companion shares the player's movement, including jumps and immediate reversals. */
+/** The companion shares the player's movement in exact sync, copying every action. */
 export function buildMissionaryCompanion(parent: T.Group, solids: Solid[]) {
   const actor = missionaryActor(parent, true, 1);
   actor.group.name = "Player missionary companion";
-  let time = 0;
   return {
     group: actor.group,
     dispose: actor.dispose,
     update(dt: number, player: PlayerState) {
-      time += dt;
       // Try either shoulder, then diagonal/behind positions at tight doorways.
       const angles = [
         Math.PI / 2,
@@ -199,9 +198,14 @@ export function buildMissionaryCompanion(parent: T.Group, solids: Solid[]) {
               Math.abs(s.z - p.z) < s.d / 2 + 0.3,
           ),
       ) ?? { x: player.x, y: player.y, z: player.z };
+      // Locomotion rig mirrors the player in exact sync for every action.
+      actor.rig.update(dt, {
+        ...player,
+        x: player.x,
+        y: player.y,
+        z: player.z,
+      });
       actor.group.position.set(position.x, position.y, position.z);
-      actor.group.rotation.y = player.yaw;
-      actor.update(time, player.runSpeed > 0.1);
     },
   };
 }

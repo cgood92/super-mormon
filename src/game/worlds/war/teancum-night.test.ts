@@ -330,6 +330,76 @@ test("the companion replays a player's real jump over cover", () => {
   world.dispose?.();
 });
 
+test("the companion jumps to match the player without getting trapped in an infinite jump loop", () => {
+  const world = buildTeancumNight(new T.Scene());
+  const runtime = world.adventure!({
+    setAvatar() {},
+    toast() {},
+    complete() {},
+    dialog(_r, _t, _b, next) {
+      next();
+    },
+  });
+  const player = createPlayer(-2, 0, -144);
+  for (let i = 0; i < 121; i++) runtime.update(0.1, player, idle);
+  runtime.update(0, player, { ...idle, interact: true });
+
+  for (let i = 0; i < 60; i++) {
+    stepPlayer(
+      player,
+      { x: 0, y: 1, jump: false, jumpHeld: false, crouch: false },
+      1 / 60,
+      0,
+      world.solids,
+    );
+    runtime.update(1 / 60, player, idle);
+  }
+
+  for (let stage = 0; stage < 3; stage++) {
+    stepPlayer(
+      player,
+      { x: 0, y: 1, jump: true, jumpHeld: true, crouch: false },
+      1 / 60,
+      0,
+      world.solids,
+    );
+    runtime.update(1 / 60, player, idle);
+    while (!player.grounded) {
+      stepPlayer(
+        player,
+        { x: 0, y: 1, jump: false, jumpHeld: true, crouch: false },
+        1 / 60,
+        0,
+        world.solids,
+      );
+      runtime.update(1 / 60, player, idle);
+    }
+  }
+
+  let servantJumps = 0;
+  let wasAir = false;
+  for (let i = 0; i < 400; i++) {
+    stepPlayer(player, idle, 1 / 60, 0, world.solids);
+    runtime.update(1 / 60, player, idle);
+    const companion = (runtime.snapshot() as any).servant;
+    if (companion.y > 0.05 && !wasAir) {
+      servantJumps++;
+      wasAir = true;
+    } else if (companion.y <= 0.01) {
+      wasAir = false;
+    }
+  }
+
+  assert.ok(servantJumps >= 1, `companion jumped ${servantJumps} times`);
+  assert.ok(
+    servantJumps <= 3,
+    `companion jump loop detected: ${servantJumps} jumps`,
+  );
+  const finalCompanion = (runtime.snapshot() as any).servant;
+  assert.equal(finalCompanion.y, 0, "companion settles on the ground");
+  world.dispose?.();
+});
+
 test("straight runs along either map border meet a watch line", () => {
   for (const edge of [-23, 23]) {
     const world = buildTeancumNight(new T.Scene());
