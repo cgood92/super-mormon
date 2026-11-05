@@ -10,15 +10,15 @@ High-level roadmap and tasks to achieve 1:1 gameplay feel, physics, kinematic cu
   - Jump 1 ($v_y = 42\text{f} + 0.25\text{f} \cdot v_{\text{fwd}}$), Jump 2 ($v_y = 52\text{f} + 0.25\text{f} \cdot v_{\text{fwd}}$), Jump 3 ($v_y = 69\text{f}$ flat).
   - Short-hop cutoff on single/double jumps; full commitment on acrobatic triple jumps.
   - Apex hangtime gravity softening factor.
-- [ ] **Turn Skid / Drift** (`mario_actions_moving.c: act_turning_around`)
+- [x] **Turn Skid / Drift** (`mario_actions_moving.c: act_turning_around`)
   - When reversing direction ($\Delta \theta > 135^\circ$) at high speed, enter the skidding state.
   - Decelerate with friction sliding while facing the new direction before kicking off with full acceleration.
   - Skid smoke/dust particles at player feet.
-- [ ] **Long Jump Dynamics & Landing Rollout** (`mario_actions_airborne.c: act_long_jump`)
+- [x] **Long Jump Dynamics & Landing Rollout** (`mario_actions_airborne.c: act_long_jump`)
   - Crouching while running launches forward with $1.5\times$ momentum boost and low parabolic arc ($v_y = 30\text{f}$).
   - Low aerodynamic leap pose with legs kicked back.
   - Landing into forward slide rollout before popping back into running.
-- [ ] **Belly Slide, Dive & Slide-Kick** (`mario_actions_airborne.c: act_dive`, `act_slide_kick`)
+- [x] **Belly Slide, Dive & Slide-Kick** (`mario_actions_airborne.c: act_dive`, `act_slide_kick`)
   - Mid-air dive forward into a belly slide.
   - Sliding on steep grass/sand slopes accelerated by normal incline angle ($\sin(\theta) \cdot g$).
   - Slide recovery get-up transition.
@@ -98,9 +98,9 @@ High-level roadmap and tasks to achieve 1:1 gameplay feel, physics, kinematic cu
 
 ## 6. Animation, Rig & Visual Polish
 
-- [ ] **Head Gaze Tracking**
+- [x] **Head Gaze Tracking**
   - Character head turns to look at nearby NPCs, points of interest, collectible items, and dangerous drops.
-- [ ] **Step & Impact Particle FX**
+- [x] **Step & Impact Particle FX**
   - Small dust puffs on every footfall during full sprint.
   - Friction skid smoke on direction reversals.
   - Landing impact dust ring proportional to fall distance.

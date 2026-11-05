@@ -57,7 +57,12 @@ export type CharacterMove =
   | "poundLand"
   | "wallKick"
   | "ledgeHang"
-  | "climb";
+  | "climb"
+  | "turnSkid"
+  | "slideRollout"
+  | "dive"
+  | "bellySlide"
+  | "slideKick";
 export type CharacterState = {
   x: number;
   y: number;

@@ -65,6 +65,12 @@ export class Gameplay {
   hubLocation = "";
   private readonly cameraRelativeInput = new CameraRelativeInput();
   private movementYaw = 0;
+  private avatarGazeYaw = 0;
+  private avatarGazePitch = 0;
+  private stepDistance = 0;
+  private stepFoot = 1;
+  private skidParticleCooldown = 0;
+  private previousAirVy = 0;
   constructor(
     private readonly session: WorldSession,
     private readonly discoveries: Discoveries,
@@ -81,6 +87,12 @@ export class Gameplay {
     this.organSeated = false;
     this.hubLocation = "";
     this.cameraRelativeInput.reset();
+    this.avatarGazeYaw = this.session.player.yaw;
+    this.avatarGazePitch = 0;
+    this.stepDistance = 0;
+    this.stepFoot = 1;
+    this.skidParticleCooldown = 0;
+    this.previousAirVy = 0;
   }
   updateObjective = () => {
     const text =
@@ -180,6 +192,8 @@ export class Gameplay {
         this.view.follow.yaw,
       ),
     );
+    if (!this.session.player.grounded)
+      this.previousAirVy = this.session.player.vy;
     const events = stepPlayer(
       this.session.player,
       movementLocked
@@ -210,9 +224,69 @@ export class Gameplay {
     if (events.jumped) this.hooks.sound("jump");
     if (events.pounded) {
       this.session.poundImpact?.trigger(this.session.player);
+      this.session.locomotionParticles?.poundShockwave(
+        this.session.player.x,
+        this.session.player.y,
+        this.session.player.z,
+      );
       this.hooks.sound("pound");
+    } else if (events.landed) {
+      const impactSpeed = Math.abs(this.previousAirVy);
+      if (impactSpeed > 4.5) {
+        const severity = Math.min(1, (impactSpeed - 4.5) / 14);
+        this.session.locomotionParticles?.landingRing(
+          this.session.player.x,
+          this.session.player.y,
+          this.session.player.z,
+          severity,
+        );
+      }
+    }
+    if (
+      this.session.player.grounded &&
+      this.session.player.runSpeed > 4.6 &&
+      (this.session.player.move === "run" || !this.session.player.move)
+    ) {
+      this.stepDistance += this.session.player.runSpeed * dt;
+      if (this.stepDistance >= 0.85) {
+        this.stepDistance = 0;
+        this.stepFoot = -this.stepFoot;
+        const footLateral = this.stepFoot * 0.18;
+        const footX =
+          this.session.player.x +
+          Math.cos(this.session.player.yaw) * footLateral;
+        const footZ =
+          this.session.player.z -
+          Math.sin(this.session.player.yaw) * footLateral;
+        this.session.locomotionParticles?.footstep(
+          footX,
+          this.session.player.y,
+          footZ,
+        );
+      }
+    } else {
+      this.stepDistance = 0.5;
+    }
+    if (
+      this.session.player.grounded &&
+      this.session.player.move === "turnSkid"
+    ) {
+      this.skidParticleCooldown -= dt;
+      if (this.skidParticleCooldown <= 0) {
+        this.skidParticleCooldown = 0.05;
+        this.session.locomotionParticles?.skid(
+          this.session.player.x,
+          this.session.player.y,
+          this.session.player.z,
+          this.session.player.vx,
+          this.session.player.vz,
+        );
+      }
+    } else {
+      this.skidParticleCooldown = 0;
     }
     this.session.poundImpact?.update(dt);
+    this.session.locomotionParticles?.update(dt);
     const b = this.session.world.bounds;
     if (b) {
       this.session.player.x = T.MathUtils.clamp(
@@ -285,8 +359,103 @@ export class Gameplay {
     }
     this.ui.app.classList.toggle("bow-aiming", adventureAiming);
     el("bow-aim").style.setProperty("--draw", String(adventureDraw));
+
+    const px = this.session.player.x;
+    const py = this.session.player.y;
+    const pz = this.session.player.z;
+    let bestScore = 0;
+    let targetYaw = this.session.player.yaw;
+    let targetPitch = 0;
+
+    for (const extra of this.session.extras) {
+      if (!extra.group.visible) continue;
+      const dx = extra.group.position.x - px;
+      const dy = extra.group.position.y + 1.2 - (py + 1.4);
+      const dz = extra.group.position.z - pz;
+      const dist = Math.hypot(dx, dz);
+      if (dist > 0.4 && dist < 6.5) {
+        const yaw = Math.atan2(dx, dz);
+        const yawDiff = Math.abs(
+          Math.atan2(
+            Math.sin(yaw - this.session.player.yaw),
+            Math.cos(yaw - this.session.player.yaw),
+          ),
+        );
+        if (yawDiff < 1.35) {
+          const score = 1 / dist + 0.6;
+          if (score > bestScore) {
+            bestScore = score;
+            targetYaw = yaw;
+            targetPitch = Math.atan2(dy, dist);
+          }
+        }
+      }
+    }
+
+    for (const [id, mesh] of this.session.treasureMeshes) {
+      if (this.session.collected.has(id) || !mesh.visible) continue;
+      const dx = mesh.position.x - px;
+      const dy = mesh.position.y - (py + 1.4);
+      const dz = mesh.position.z - pz;
+      const dist = Math.hypot(dx, dz);
+      if (dist > 0.3 && dist < 6.0) {
+        const yaw = Math.atan2(dx, dz);
+        const yawDiff = Math.abs(
+          Math.atan2(
+            Math.sin(yaw - this.session.player.yaw),
+            Math.cos(yaw - this.session.player.yaw),
+          ),
+        );
+        if (yawDiff < 1.35) {
+          const score = 1 / dist + 0.9;
+          if (score > bestScore) {
+            bestScore = score;
+            targetYaw = yaw;
+            targetPitch = Math.atan2(dy, dist);
+          }
+        }
+      }
+    }
+
+    if (this.session.player.grounded && this.session.player.runSpeed > 0.5) {
+      const forwardDist = 1.0;
+      const aheadX = px + Math.sin(this.session.player.yaw) * forwardDist;
+      const aheadZ = pz + Math.cos(this.session.player.yaw) * forwardDist;
+      let dropY = 0;
+      for (const solid of this.session.world.solids) {
+        const top = solid.y + solid.h;
+        if (
+          top <= py + 0.001 &&
+          aheadX + 0.32 > solid.x - solid.w / 2 &&
+          aheadX - 0.32 < solid.x + solid.w / 2 &&
+          aheadZ + 0.32 > solid.z - solid.d / 2 &&
+          aheadZ - 0.32 < solid.z + solid.d / 2
+        ) {
+          dropY = Math.max(dropY, top);
+        }
+      }
+      if (py - dropY > 1.8) {
+        const score = 1.2;
+        if (score > bestScore) {
+          bestScore = score;
+          targetYaw = this.session.player.yaw;
+          targetPitch = -0.45;
+        }
+      }
+    }
+
+    const dampFactor = 1 - Math.exp(-8 * Math.min(Math.max(dt, 0), 0.1));
+    const gazeYawDiff = Math.atan2(
+      Math.sin(targetYaw - this.avatarGazeYaw),
+      Math.cos(targetYaw - this.avatarGazeYaw),
+    );
+    this.avatarGazeYaw += gazeYawDiff * dampFactor;
+    this.avatarGazePitch += (targetPitch - this.avatarGazePitch) * dampFactor;
+
     this.session.avatar.update(dt, {
       ...this.session.player,
+      lookYaw: adventureAiming ? undefined : this.avatarGazeYaw,
+      lookPitch: adventureAiming ? undefined : this.avatarGazePitch,
       crouching: this.organSeated || this.session.player.crouching,
       holdingBow,
       holdingBanner,

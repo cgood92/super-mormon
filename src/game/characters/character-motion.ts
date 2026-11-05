@@ -464,13 +464,80 @@ export function createMotionDriver(role: CharacterRole): {
         arms[0].rotation.x = arms[1].rotation.x = impact ? -0.5 : -1.35;
         head.rotation.x = -0.08;
       } else if (move === "longJump") {
-        body.rotation.x = 0.28;
+        // SM64 low aerodynamic leap pose: torso pitched forward, arms back, legs kicked back
+        body.rotation.x = 0.38;
         body.scale.z = 1.2;
         body.position.y = Math.max(body.position.y, 0.1);
-        arms[0].rotation.x = -1.15;
-        arms[1].rotation.x = -1.15;
-        legs[0].rotation.x = 0.45;
-        legs[1].rotation.x = 0.45;
+        head.rotation.set(-0.35, 0, 0);
+        arms[0].rotation.set(0.65, 0, 0.35);
+        arms[1].rotation.set(0.65, 0, -0.35);
+        legs[0].rotation.set(0.55, 0, 0);
+        legs[1].rotation.set(0.55, 0, 0);
+        knees[0].rotation.set(0.42, 0, 0);
+        knees[1].rotation.set(0.42, 0, 0);
+        feet[0].rotation.set(0.65, 0, 0);
+        feet[1].rotation.set(0.65, 0, 0);
+      } else if (move === "slideRollout") {
+        // SM64 long jump landing rollout: crouched forward slide, hands near ground
+        body.position.y = -0.04;
+        body.rotation.x = 0.32;
+        head.rotation.set(-0.25, 0, 0);
+        arms[0].rotation.set(-1.1, 0, 0.25);
+        arms[1].rotation.set(-1.1, 0, -0.25);
+        legs[0].rotation.set(-0.65, 0, 0);
+        legs[1].rotation.set(-0.45, 0, 0);
+        knees[0].rotation.set(0.95, 0, 0);
+        knees[1].rotation.set(0.85, 0, 0);
+        feet[0].rotation.set(0.1, 0, 0);
+        feet[1].rotation.set(0.1, 0, 0);
+      } else if (move === "turnSkid") {
+        // SM64 turn-around skid: body braced, knees bent, arms spread for balance, feet skidding
+        body.position.y = -0.04;
+        body.rotation.x = -0.12;
+        arms[0].rotation.set(-0.35, 0, 0.75);
+        arms[1].rotation.set(-0.35, 0, -0.75);
+        legs[0].rotation.set(-0.45, 0, 0);
+        knees[0].rotation.set(0.65, 0, 0);
+        feet[0].rotation.set(-0.15, 0, 0);
+        legs[1].rotation.set(0.35, 0, 0);
+        knees[1].rotation.set(0.45, 0, 0);
+        feet[1].rotation.set(0.1, 0, 0);
+        head.rotation.set(-0.08, 0, 0);
+      } else if (move === "dive") {
+        // SM64 aerial dive: horizontal body, arms outstretched forward, legs straight back
+        body.rotation.x = 1.35;
+        head.rotation.set(-0.5, 0, 0);
+        arms[0].rotation.set(-2.8, 0, -0.18);
+        arms[1].rotation.set(-2.8, 0, 0.18);
+        legs[0].rotation.set(0.15, 0, 0);
+        legs[1].rotation.set(0.15, 0, 0);
+        knees[0].rotation.set(0.1, 0, 0);
+        knees[1].rotation.set(0.1, 0, 0);
+        feet[0].rotation.set(0.55, 0, 0);
+        feet[1].rotation.set(0.55, 0, 0);
+      } else if (move === "bellySlide") {
+        // SM64 dive slide: sliding flat on belly, head up, arms forward
+        body.position.y = -0.04;
+        body.rotation.x = 1.42;
+        head.rotation.set(-0.55, 0, 0);
+        arms[0].rotation.set(-2.6, 0, -0.2);
+        arms[1].rotation.set(-2.6, 0, 0.2);
+        legs[0].rotation.set(0.12, 0, 0);
+        legs[1].rotation.set(0.12, 0, 0);
+        knees[0].rotation.set(0.15, 0, 0);
+        knees[1].rotation.set(0.15, 0, 0);
+      } else if (move === "slideKick") {
+        // SM64 slide kick: leaning back, one leg thrust forward, arms planted
+        body.position.y = -0.04;
+        body.rotation.x = -0.38;
+        body.rotation.z = 0.22;
+        head.rotation.set(0.2, 0, -0.15);
+        legs[1].rotation.set(-1.35, 0, 0);
+        knees[1].rotation.set(0.08, 0, 0);
+        legs[0].rotation.set(0.22, 0, 0);
+        knees[0].rotation.set(0.95, 0, 0);
+        arms[0].rotation.set(-0.45, 0, 0.6);
+        arms[1].rotation.set(-0.45, 0, -0.6);
       } else if (move === "wallKick") {
         body.rotation.x = -0.22;
         arms[0].rotation.x = -1.55;
