@@ -20,6 +20,7 @@ export function createMotionDriver(role: CharacterRole): {
     return object;
   };
   const body = node("body", group);
+  body.rotation.order = "YXZ";
   body.scale.y = 0.84;
   const head = node("head", body, 0, 1.64, 0.025);
   const cloak = node("cloak", body, 0, 1.37, -0.11);
@@ -435,13 +436,37 @@ export function createMotionDriver(role: CharacterRole): {
           arms[1].rotation.set(-0.45, 0, -0.3);
           head.rotation.set(0.08, 0, 0);
         }
-      } else if (move === "backflip" || move === "sideflip") {
+      } else if (move === "sideflip") {
+        // Super Mario 64 side somersault: an acrobatic mid-air cartwheel (MARIO_ANIM_SLIDEFLIP)
+        const progress = Math.min(1, moveTime / 0.65);
+        const angle = -Math.PI * 2 * progress;
+        const split = Math.sin(progress * Math.PI);
+        forwardLean = 0;
+        turnBank = 0;
+        // Elevated pivot keeps inverted head and torso above the ground
+        body.position.y = 0.85 * (1 - Math.cos(angle));
+        body.rotation.order = "YXZ";
+        body.rotation.y = Math.PI / 2;
+        body.rotation.x = 0;
+        body.rotation.z = angle;
+        // Acrobatic star/split in the lateral cartwheel plane (coronal plane)
+        legs[0].rotation.set(0, 0, 0.62 * split);
+        legs[1].rotation.set(0, 0, -0.62 * split);
+        knees[0].rotation.set(0.12 * (1 - split), 0, 0);
+        knees[1].rotation.set(0.12 * (1 - split), 0, 0);
+        feet[0].rotation.set(0.45 * split, 0, 0);
+        feet[1].rotation.set(0.45 * split, 0, 0);
+        // Arms wheel outward in the lateral cartwheel plane
+        arms[0].rotation.set(-0.1, 0, 2.15 * split);
+        arms[1].rotation.set(-0.1, 0, -2.15 * split);
+        head.rotation.set(-0.12, 0, 0);
+      } else if (move === "backflip") {
         const progress = Math.min(1, moveTime / 0.7);
         const angle = Math.PI * 2 * progress;
         // A raised center pivot keeps the inverted head above the ground.
         body.position.y = 0.83 * (1 - Math.cos(angle));
-        body.rotation.x = move === "sideflip" ? 0 : -angle;
-        body.rotation.z = move === "sideflip" ? angle : 0;
+        body.rotation.x = -angle;
+        body.rotation.z = 0;
         legs[0].rotation.x = -0.45;
         legs[1].rotation.x = 0.55;
         knees[0].rotation.x = 0.42;
@@ -491,18 +516,27 @@ export function createMotionDriver(role: CharacterRole): {
         feet[0].rotation.set(0.1, 0, 0);
         feet[1].rotation.set(0.1, 0, 0);
       } else if (move === "turnSkid") {
-        // SM64 turn-around skid: body braced, knees bent, arms spread for balance, feet skidding
-        body.position.y = -0.04;
-        body.rotation.x = -0.12;
-        arms[0].rotation.set(-0.35, 0, 0.75);
-        arms[1].rotation.set(-0.35, 0, -0.75);
-        legs[0].rotation.set(-0.45, 0, 0);
-        knees[0].rotation.set(0.65, 0, 0);
-        feet[0].rotation.set(-0.15, 0, 0);
-        legs[1].rotation.set(0.35, 0, 0);
-        knees[1].rotation.set(0.45, 0, 0);
-        feet[1].rotation.set(0.1, 0, 0);
-        head.rotation.set(-0.08, 0, 0);
+        // Super Mario 64 turn-around skid (MARIO_ANIM_TURNING_PART1):
+        // Hips dropped low, torso leaning heavily backward/opposite sliding momentum,
+        // lead leg braced forward digging heel in, trailing knee bent underneath, arms spread wide for balance
+        stanceAnchors[0] = null;
+        stanceAnchors[1] = null;
+        forwardLean = 0;
+        turnBank = 0;
+        body.position.y = -0.06;
+        body.rotation.set(-0.38, 0, 0);
+        // Lead leg braced forward digging heel into ground (toes dorsiflexed up)
+        legs[0].rotation.set(-0.55, 0, -0.08);
+        knees[0].rotation.set(0.24, 0, 0);
+        feet[0].rotation.set(-0.5, 0, 0);
+        // Trailing leg flexed deeply underneath hips absorbing slide momentum
+        legs[1].rotation.set(0.38, 0, 0.08);
+        knees[1].rotation.set(0.92, 0, 0);
+        feet[1].rotation.set(0.18, 0, 0);
+        // Arms spread wide in athletic counterbalance
+        arms[0].rotation.set(0.28, 0, 0.88);
+        arms[1].rotation.set(-0.55, 0, -0.88);
+        head.rotation.set(0.18, 0, 0);
       } else if (move === "dive") {
         // SM64 aerial dive: horizontal body, arms outstretched forward, legs straight back
         body.rotation.x = 1.35;

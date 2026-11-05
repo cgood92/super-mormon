@@ -164,13 +164,62 @@ test("SM64 rig poses articulate turnSkid, slideRollout, dive, bellySlide, and sl
     move: "turnSkid",
   };
 
-  // Turn skid
+  // Turn skid: body leans backward opposite slide velocity, heel digs in
   driver.update(1 / 60, baseState);
+  const body = driver.group.getObjectByName("body")!;
   const leftArm = driver.group.getObjectByName("left-arm")!;
   const rightArm = driver.group.getObjectByName("right-arm")!;
+  const leftFoot = driver.group.getObjectByName("left-foot")!;
+  const rightKnee = driver.group.getObjectByName("right-knee")!;
+
   assert.ok(
-    leftArm.rotation.z > 0.5 && rightArm.rotation.z < -0.5,
-    "arms spread for turn skid balance",
+    body.rotation.x < -0.35,
+    `body leans heavily backward opposite slide velocity: ${body.rotation.x}`,
+  );
+  assert.ok(
+    leftArm.rotation.z > 0.6 && rightArm.rotation.z < -0.6,
+    "arms spread wide for turn skid balance",
+  );
+  assert.ok(
+    leftFoot.rotation.x < -0.35,
+    `lead foot dorsiflexed digging heel into the floor: ${leftFoot.rotation.x}`,
+  );
+  assert.ok(
+    rightKnee.rotation.x > 0.7,
+    `trailing knee deeply flexed underneath: ${rightKnee.rotation.x}`,
+  );
+
+  // Sideflip: mid-air acrobatic cartwheel in coronal plane (not front/back flip)
+  driver.update(1 / 60, {
+    ...baseState,
+    grounded: false,
+    vy: 5,
+    move: "sideflip",
+    moveTime: 0.325,
+  });
+  assert.equal(
+    body.rotation.x,
+    0,
+    "sideflip has zero pitch (no front or back flip)",
+  );
+  assert.equal(
+    body.rotation.y,
+    Math.PI / 2,
+    "sideflip body turned 90 degrees sideways for coronal cartwheel",
+  );
+  assert.ok(
+    Math.abs(Math.abs(body.rotation.z) - Math.PI) < 0.2,
+    `sideflip body rolled 180 degrees into inverted cartwheel: ${body.rotation.z}`,
+  );
+  const leftLeg = driver.group.getObjectByName("left-leg")!;
+  const rightLeg = driver.group.getObjectByName("right-leg")!;
+  assert.ok(
+    leftLeg.rotation.z > 0.45 && rightLeg.rotation.z < -0.45,
+    "legs in wide acrobatic split in the lateral cartwheel plane",
+  );
+  assert.ok(
+    leftArm.rotation.z > 1.5 && rightArm.rotation.z < -1.5,
+    "arms wheeling outward in the lateral cartwheel plane",
   );
 
   // Dive
@@ -180,7 +229,6 @@ test("SM64 rig poses articulate turnSkid, slideRollout, dive, bellySlide, and sl
     vy: 0,
     move: "dive",
   });
-  const body = driver.group.getObjectByName("body")!;
   assert.ok(
     body.rotation.x > 1.0,
     "body pitched horizontal in aerodynamic Superman dive",
@@ -188,7 +236,6 @@ test("SM64 rig poses articulate turnSkid, slideRollout, dive, bellySlide, and sl
 
   // Slide kick
   driver.update(1 / 60, { ...baseState, move: "slideKick" });
-  const rightLeg = driver.group.getObjectByName("right-leg")!;
   assert.ok(
     rightLeg.rotation.x < -1.0,
     "lead leg extended forward in slide kick",

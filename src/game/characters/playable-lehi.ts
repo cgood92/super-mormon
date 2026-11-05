@@ -23,6 +23,7 @@ export function createSculptedCharacterRig(
   const actorScale = role === "child" ? 1.15 / 2 : 0.825;
   const body = new T.Group();
   body.name = "body";
+  body.rotation.order = "YXZ";
   group.add(body);
   body.add(model.group);
 

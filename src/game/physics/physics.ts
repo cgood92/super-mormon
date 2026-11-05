@@ -728,7 +728,7 @@ export function stepPlayer(
         );
       }
     } else if (player.move === "turnSkid") {
-      const skidFriction = REVERSE_ACCEL;
+      const skidFriction = 44;
       const currentSpeed = Math.hypot(player.vx, player.vz);
       const newSpeed = Math.max(0, currentSpeed - skidFriction * subdt);
       if (currentSpeed > EPS) {
@@ -737,15 +737,31 @@ export function stepPlayer(
       }
       player.runSpeed = newSpeed;
       if (player.jumpBufferTime > 0) {
-        player.vx = -player.vx * 1.1;
-        player.vz = -player.vz * 1.1;
-        player.vy = 9.5;
+        const flipSpeed = Math.min(8.8, Math.max(7.2, currentSpeed * 1.35));
+        const backDirX =
+          currentSpeed > EPS
+            ? -player.vx / currentSpeed
+            : length > 0.1
+              ? worldX
+              : -Math.sin(player.yaw);
+        const backDirZ =
+          currentSpeed > EPS
+            ? -player.vz / currentSpeed
+            : length > 0.1
+              ? worldZ
+              : -Math.cos(player.yaw);
+        player.vx = backDirX * flipSpeed;
+        player.vz = backDirZ * flipSpeed;
+        player.vy = 10.5;
         player.grounded = false;
-        player.airMoveLock = 0.25;
+        player.airMoveLock = 0.35;
         player.jumpBufferTime = 0;
         setMove(player, "sideflip");
         events.jumped = true;
-      } else if (player.runSpeed < 0.3 || player.moveTime >= 0.26) {
+      } else if (
+        (player.runSpeed < 0.35 && player.moveTime >= 0.13) ||
+        player.moveTime >= 0.28
+      ) {
         setMove(player, length > 0.1 ? "run" : "idle");
       }
     } else if (
@@ -831,7 +847,7 @@ export function stepPlayer(
             : move === "doubleJump"
               ? 10.6 + speedBonus
               : move === "sideflip"
-                ? 9.5
+                ? 10.5
                 : move === "longJump"
                   ? 8
                   : JUMP + speedBonus * 0.5;
@@ -847,9 +863,16 @@ export function stepPlayer(
         player.airMoveLock = 0.2;
       }
       if (move === "sideflip") {
-        player.vx = -player.vx * 1.1;
-        player.vz = -player.vz * 1.1;
-        player.airMoveLock = 0.25;
+        const flipSpeed = Math.min(8.8, Math.max(7.2, player.runSpeed * 1.35));
+        const dir = Math.hypot(player.vx, player.vz);
+        if (dir > EPS) {
+          player.vx = (-player.vx / dir) * flipSpeed;
+          player.vz = (-player.vz / dir) * flipSpeed;
+        } else if (length > 0.1) {
+          player.vx = worldX * flipSpeed;
+          player.vz = worldZ * flipSpeed;
+        }
+        player.airMoveLock = 0.35;
       }
       player.grounded = false;
       player.crouching = standingBlocked;
