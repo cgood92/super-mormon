@@ -654,14 +654,14 @@ export function stepPlayer(
         move === "tripleJump"
           ? 11.8
           : move === "backflip"
-            ? 9.6
+            ? 10.5
             : move === "doubleJump"
-              ? 9.5 + speedBonus
+              ? 10.6 + speedBonus
               : move === "sideflip"
-                ? 8.8
+                ? 9.5
                 : move === "longJump"
-                  ? 7.6
-                  : 7.8 + speedBonus;
+                  ? 8
+                  : JUMP + speedBonus * 0.5;
       if (move === "longJump") {
         const launchSpeed = Math.min(10, Math.max(8.5, player.runSpeed * 1.45));
         player.vx = (player.vx / player.runSpeed) * launchSpeed;
