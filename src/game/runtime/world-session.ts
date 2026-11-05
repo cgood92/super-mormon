@@ -40,6 +40,7 @@ export class WorldSession {
   world!: WorldData;
   worldId: WorldId = "hub";
   player = createPlayer();
+  avatarRole: Parameters<typeof createCharacter>[0] = "nephi";
   avatar!: Character;
   storyScene: ReturnType<typeof createStoryScene> | null = null;
   treeScene: ReturnType<typeof createTreeOfLifeScene> | null = null;
@@ -74,16 +75,15 @@ export class WorldSession {
         : this.world.spawn;
     this.player = createPlayer(spawn.x, spawn.y, spawn.z);
     this.player.yaw = spawn.yaw ?? Math.PI;
-    this.avatar = createCharacter(
+    this.avatarRole =
       id === "streets" || id === "tree"
         ? "lehi"
         : id === "palace"
           ? "laman"
           : id === "voyage"
             ? "child"
-            : "nephi",
-      { quality: "hero" },
-    );
+            : "nephi";
+    this.avatar = createCharacter(this.avatarRole, { quality: "hero" });
     (this.world.actorParent ?? this.scene).add(this.avatar.group);
     this.avatar.update(0, this.player);
     this.collected = new Set();
@@ -229,6 +229,7 @@ export class WorldSession {
     role: Parameters<typeof createCharacter>[0],
     parent: T.Object3D = this.world.actorParent ?? this.scene,
   ) {
+    this.avatarRole = role;
     this.avatar.dispose();
     this.avatar = createCharacter(role, { quality: "hero" });
     parent.add(this.avatar.group);

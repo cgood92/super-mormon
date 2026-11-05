@@ -2,12 +2,14 @@ import { sceneryBox, sceneryColumn, markScenery } from "../shared/scenery";
 import { softBoxGeometry } from "../../rendering/soft-geometry";
 import * as T from "three";
 import type { Solid, Climbable } from "../../physics/physics";
+import type { CameraRoom } from "../../camera/camera-rooms";
 
 export type Point = { x: number; y: number; z: number };
 export type ShipBuild = {
   group: T.Group;
   solids: Solid[];
   climbables: Climbable[];
+  cameraRooms: CameraRoom[];
   points: Record<
     | "deckArrival"
     | "helm"
@@ -312,10 +314,45 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
     y: y + origin.y,
     z: z + origin.z,
   });
+  const cameraRooms: CameraRoom[] = [
+    {
+      id: "ship-common-room",
+      bounds: {
+        minX: origin.x - 7.5,
+        maxX: origin.x + 4.0,
+        minZ: origin.z + 12.0,
+        maxZ: origin.z + 18.5,
+        minY: origin.y - 0.5,
+        maxY: origin.y + 3.0,
+      },
+      distance: 3.2,
+      elevation: 0.18,
+      targetHeight: 0.85,
+      entryEyes: [point(-1, 1.8, 14.5), point(0, 1.8, 16.5)],
+      exitEyes: [point(3.5, 1.8, 11), point(6, 2.2, 9)],
+    },
+    {
+      id: "ship-fore-cabins",
+      bounds: {
+        minX: origin.x - 7.5,
+        maxX: origin.x + 4.5,
+        minZ: origin.z - 18.5,
+        maxZ: origin.z + 11.5,
+        minY: origin.y - 0.5,
+        maxY: origin.y + 3.0,
+      },
+      distance: 3.0,
+      elevation: 0.18,
+      targetHeight: 0.85,
+      entryEyes: [point(0, 1.8, 9), point(0, 1.8, 2), point(0, 1.8, -6)],
+      exitEyes: [point(6, 2.2, 9), point(6, 4.0, -0.5)],
+    },
+  ];
   return {
     group,
     solids,
     climbables,
+    cameraRooms,
     points: {
       deckArrival: point(3, 4.2, 13),
       helm: point(0, 4.2, 17),

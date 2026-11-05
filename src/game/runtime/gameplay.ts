@@ -343,7 +343,7 @@ export class Gameplay {
       const previousRoom = this.view.follow.roomId;
       this.view.follow.update(
         dt,
-        this.session.player,
+        { ...this.session.player, role: this.session.avatarRole },
         this.session.world.solids,
         {
           orbitX: state.cameraX,
