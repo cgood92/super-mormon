@@ -900,11 +900,7 @@ export function buildBountiful(scene: T.Scene): WorldData {
                 );
                 climbables.push(...ship.climbables);
                 shipBuilt = true;
-                say(
-                  "A ship completed",
-                  "A ship completed.",
-                  "explore",
-                );
+                say("A ship completed", "A ship completed.", "explore");
               }
             } else if (phase === "explore" && !finished) {
               finished = true;

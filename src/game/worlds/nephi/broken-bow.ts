@@ -48,7 +48,11 @@ function mountainRockLedge(
   const pt = (t: number, j: number) => {
     const [ox, oz] = outline[((j % sides) + sides) % sides];
     const taper = profile(t);
-    return new T.Vector3(ox * shape.w * taper, shape.h * t, oz * shape.d * taper);
+    return new T.Vector3(
+      ox * shape.w * taper,
+      shape.h * t,
+      oz * shape.d * taper,
+    );
   };
   const triangle = (a: T.Vector3, b: T.Vector3, c: T.Vector3) => {
     vertices.push(...a.toArray(), ...b.toArray(), ...c.toArray());
