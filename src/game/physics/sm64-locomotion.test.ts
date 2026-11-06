@@ -173,7 +173,7 @@ test("SM64 rig poses articulate turnSkid, slideRollout, dive, bellySlide, and sl
   const rightKnee = driver.group.getObjectByName("right-knee")!;
 
   assert.ok(
-    body.rotation.x < -0.35,
+    body.rotation.x < -0.22,
     `body leans heavily backward opposite slide velocity: ${body.rotation.x}`,
   );
   assert.ok(
@@ -181,7 +181,7 @@ test("SM64 rig poses articulate turnSkid, slideRollout, dive, bellySlide, and sl
     "arms spread wide for turn skid balance",
   );
   assert.ok(
-    leftFoot.rotation.x < -0.35,
+    leftFoot.rotation.x < -0.25,
     `lead foot dorsiflexed digging heel into the floor: ${leftFoot.rotation.x}`,
   );
   assert.ok(

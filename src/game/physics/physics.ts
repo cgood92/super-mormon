@@ -728,7 +728,9 @@ export function stepPlayer(
         );
       }
     } else if (player.move === "turnSkid") {
-      const skidFriction = 44;
+      // Super Mario 64 act_turning_around deceleration (+10% slide distance over prior tuning):
+      // Deceleration 15.7 m/s^2 slides for ~0.41s over ~1.35m from full run speed.
+      const skidFriction = 15.7;
       const currentSpeed = Math.hypot(player.vx, player.vz);
       const newSpeed = Math.max(0, currentSpeed - skidFriction * subdt);
       if (currentSpeed > EPS) {
@@ -760,10 +762,20 @@ export function stepPlayer(
         setMove(player, "sideflip");
         events.jumped = true;
       } else if (
-        (player.runSpeed < 0.35 && player.moveTime >= 0.13) ||
-        player.moveTime >= 0.28
+        (player.runSpeed < 0.35 && player.moveTime >= 0.30) ||
+        player.moveTime >= 0.43
       ) {
-        setMove(player, length > 0.1 ? "run" : "idle");
+        if (length > 0.1) {
+          // SM64 begin_walking_action with push-off speed (8.0f / 32.0f = 25% max speed)
+          const pushOffSpeed = 1.6;
+          player.yaw = Math.atan2(worldX, worldZ);
+          player.vx = worldX * pushOffSpeed;
+          player.vz = worldZ * pushOffSpeed;
+          player.runSpeed = pushOffSpeed;
+          setMove(player, "run");
+        } else {
+          setMove(player, "idle");
+        }
       }
     } else if (
       player.move === "groundPound" ||

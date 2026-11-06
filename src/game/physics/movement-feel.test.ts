@@ -27,7 +27,7 @@ test("reversal faces the requested direction before momentum catches up", () => 
   stepPlayer(p, { ...idle, y: -1 }, 1 / 60, 0, []);
   assert.ok(p.vz > 5);
   assert.ok(Math.abs(Math.abs(p.yaw) - 0.3) < 0.001, `yaw ${p.yaw}`);
-  for (let i = 1; i < 9; i++) stepPlayer(p, { ...idle, y: -1 }, 1 / 60, 0, []);
+  for (let i = 1; i < 28; i++) stepPlayer(p, { ...idle, y: -1 }, 1 / 60, 0, []);
   assert.ok(p.vz < 0, `reversal still moving forward: ${p.vz}`);
 });
 test("quarter turns face intent promptly and recover their new running line", () => {
