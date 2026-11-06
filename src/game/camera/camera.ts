@@ -373,17 +373,16 @@ function findClearViewpoint(
 ): { eye: T.Vector3; yaw: number; dist: number } | undefined {
   const angleOffsets = [
     0,
-    0.35,
-    -0.35,
-    0.7,
-    -0.7,
-    1.05,
-    -1.05,
-    1.4,
-    -1.4,
-    1.8,
-    -1.8,
-    Math.PI,
+    0.25,
+    -0.25,
+    0.5,
+    -0.5,
+    0.75,
+    -0.75,
+    1.0,
+    -1.0,
+    1.25,
+    -1.25,
   ];
   const distances = [
     baseDistance,
@@ -391,6 +390,7 @@ function findClearViewpoint(
     baseDistance * 0.7,
     3.5,
     2.5,
+    1.8,
   ];
 
   let best:
@@ -443,7 +443,7 @@ function findClearViewpoint(
       if (!cameraSegmentClear(safeEye, safeEye, solids, 0.2)) continue;
       if (isWallOccluded(target, safeEye, solids, 0.15)) continue;
 
-      const score = actualDist * 2 - Math.abs(deltaYaw);
+      const score = actualDist * 1.5 - Math.abs(deltaYaw) * 5;
       if (!best || score > best.score) {
         best = { eye: safeEye, yaw, dist: actualDist, score };
       }
@@ -1053,7 +1053,7 @@ export class FollowCamera {
         1,
       );
     }
-    if (player.grounded !== false) final.y = Math.max(final.y, player.y + 0.22);
+    final.y = Math.max(final.y, player.y + 0.22);
     this.camera.position.copy(final);
     if (!this.eyeDetour.length && !this.finishingDetour) {
       const finalDx = this.target.x - final.x,

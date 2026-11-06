@@ -501,3 +501,45 @@ test("storm clouds and lightning operate during storm and clear when calmed", ()
   runtime.dispose();
   world.dispose!();
 });
+
+test("ocean water stays below the ship cabin floor across all storm conditions", () => {
+  const scene = new T.Scene(),
+    world = buildVoyage(scene),
+    p = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
+  const shipGroup = scene.getObjectByName(
+    "Ancient timber sailing vessel",
+  ) as T.Group;
+  assert.ok(shipGroup);
+  let oceanMesh: T.Mesh | undefined;
+  scene.traverse((obj) => {
+    if (
+      obj instanceof T.Mesh &&
+      obj.geometry instanceof T.PlaneGeometry &&
+      (obj.geometry.parameters as any).width === 1000
+    ) {
+      oceanMesh = obj;
+    }
+  });
+  assert.ok(oceanMesh);
+  const posAttr = oceanMesh.geometry.getAttribute(
+    "position",
+  ) as T.BufferAttribute;
+
+  for (let frame = 0; frame < 300; frame++) {
+    world.update!(0.05, p);
+    const shipWorldY = shipGroup.position.y;
+    for (let i = 0; i < posAttr.count; i++) {
+      const x = posAttr.getX(i);
+      const z = posAttr.getZ(i);
+      if (Math.abs(x) < 8.0 && Math.abs(z) < 20.0) {
+        const waterWorldY = oceanMesh.position.y + posAttr.getY(i);
+        const cabinFloorWorldY = shipWorldY;
+        assert.ok(
+          waterWorldY < cabinFloorWorldY - 0.5,
+          `ocean water rose too close to cabin floor at frame ${frame}, vertex (${x}, ${z}): waterY=${waterWorldY}, floorY=${cabinFloorWorldY}`,
+        );
+      }
+    }
+  }
+  world.dispose!();
+});

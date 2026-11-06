@@ -68,7 +68,17 @@ test("child avatar descending stairs to underdeck brings camera below deck and a
       room,
     );
 
-    // Camera eye must NEVER penetrate into or below the floor
+    // Camera must stay behind player while descending stairs, never flipping 180
+    if (player.z <= 10) {
+      assert.ok(
+        camera.position.z <= player.z + 0.5,
+        `camera flipped ahead of player at frame ${frame}: cam.z=${camera.position.z}, player.z=${player.z}`,
+      );
+      assert.ok(
+        Math.abs(follow.yaw) < 1.0,
+        `camera yaw flipped at frame ${frame}: yaw=${follow.yaw}`,
+      );
+    }
     assert.ok(
       camera.position.y >= player.y + 0.2,
       `camera dipped below player floor at frame ${frame}: cam.y=${camera.position.y}, player.y=${player.y}`,
@@ -253,4 +263,56 @@ test("adult avatar ascending stairs from underdeck releases room camera back to 
     camera.position.y > 4.2,
     `camera restored above deck: cam.y=${camera.position.y}`,
   );
+});
+
+test("approaching the stairs from below deck maintains smooth camera without jumps", () => {
+  const ship = buildShip(new T.Group(), { x: 0, y: 0, z: 0 });
+  const camera = new T.PerspectiveCamera(58, 16 / 9, 0.08, 200);
+  const follow = new FollowCamera(camera);
+
+  // Player starts in cabin passage below deck (x=0, y=0, z=11)
+  const player = createPlayer(0, 0, 11);
+  player.yaw = -Math.PI / 2; // facing east towards stairs
+  const initialRoom = selectCameraRoom(ship.cameraRooms, player);
+  assert.equal(initialRoom?.id, "ship-fore-cabins");
+
+  follow.reset({ ...player, role: "child" }, player.yaw, "streets");
+  follow.update(
+    1 / 60,
+    { ...player, role: "child" },
+    ship.solids,
+    neutral,
+    "streets",
+    initialRoom,
+  );
+
+  const prevPos = camera.position.clone();
+  // Walk east towards stairs (x from 0 to 6)
+  for (let frame = 0; frame < 120; frame++) {
+    stepPlayer(
+      player,
+      { x: -1, y: 0, jump: false, jumpHeld: false, traversal: false },
+      1 / 60,
+      0,
+      ship.solids,
+    );
+    const room = selectCameraRoom(ship.cameraRooms, player, follow.roomId);
+    follow.update(
+      1 / 60,
+      { ...player, role: "child" },
+      ship.solids,
+      neutral,
+      "streets",
+      room,
+    );
+
+    const dPos = camera.position.distanceTo(prevPos);
+    assert.ok(
+      dPos < 0.45,
+      `camera jumped drastically at frame ${frame} while approaching stairs: delta=${dPos}`,
+    );
+    prevPos.copy(camera.position);
+  }
+
+  assert.ok(player.x > 5.0, `player reached stair landing: x=${player.x}`);
 });

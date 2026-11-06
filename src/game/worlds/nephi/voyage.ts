@@ -377,11 +377,15 @@ export function buildVoyage(scene: T.Scene): WorldData {
     for (let i = 0; i < oceanPositions.count; i++) {
       const x = oceanPositions.getX(i),
         z = oceanPositions.getZ(i);
-      oceanPositions.setY(
-        i,
+      let wave =
         Math.sin(x * 0.055 + time * 1.7) * (0.22 + storm * 0.6) +
-          Math.sin(z * 0.07 + time) * (0.18 + storm * 0.35),
-      );
+        Math.sin(z * 0.07 + time) * (0.18 + storm * 0.35);
+      const distFromShip = Math.hypot(x / 9.5, z / 22.5);
+      if (distFromShip < 1.0) {
+        const hullFactor = Math.pow(distFromShip, 2);
+        wave = wave * hullFactor - (1 - hullFactor) * 2.5;
+      }
+      oceanPositions.setY(i, wave);
     }
     oceanPositions.needsUpdate = true;
     oceanGeometry.computeVertexNormals();

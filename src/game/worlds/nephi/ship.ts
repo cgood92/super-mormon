@@ -126,9 +126,9 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
       w = halfWidth(z);
     for (const [x, y] of [
       [-w, 4.15],
-      [-w * 0.88, -0.1],
-      [0, -0.55],
-      [w * 0.88, -0.1],
+      [-w * 0.88, -0.6],
+      [0, -2.2],
+      [w * 0.88, -0.6],
       [w, 4.15],
     ])
       vertices.push(x, y, z);
@@ -335,23 +335,17 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
       id: "ship-fore-cabins",
       bounds: {
         minX: origin.x - 7.5,
-        maxX: origin.x + 4.5,
+        maxX: origin.x + 7.5,
         minZ: origin.z - 18.5,
         maxZ: origin.z + 11.5,
         minY: origin.y - 0.5,
-        maxY: origin.y + 3.0,
+        maxY: origin.y + 3.6,
       },
       distance: 3.0,
       elevation: 0.18,
       targetHeight: 0.85,
-      entryEyes: [
-        point(5.5, 1.8, 11.0),
-        point(0, 1.8, 9),
-        point(0, 1.8, 2),
-        point(0, 1.8, -6),
-        point(0, 1.8, -12),
-      ],
-      exitEyes: [point(6, 2.2, 9), point(6, 4.0, -0.5)],
+      entryEyes: [],
+      exitEyes: [],
     },
   ];
   return {
