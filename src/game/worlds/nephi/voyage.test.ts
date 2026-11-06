@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as T from "three";
 import { buildVoyage, shipClearsIsland } from "./voyage";
-import { createPlayer } from "../../physics/physics";
+import { createPlayer, stepPlayer } from "../../physics/physics";
 
 test("voyage follows fourth-day release, automatic calm, Liahona and sustained steering", () => {
   const scene = new T.Scene(),
@@ -154,6 +154,41 @@ test("voyage exposes a shared moving actor parent and climbable masts", () => {
   world.update!(0.1, p);
   assert.notEqual(world.actorParent!.rotation.z, before);
   assert.ok(Math.abs(p.vx) < 0.05);
+
+  // Ship upper deck uses instanced timber planking with rich materials
+  const instancedMeshes = world.actorParent!.children.filter(
+    (c) => c instanceof T.InstancedMesh,
+  ) as T.InstancedMesh[];
+  assert.ok(instancedMeshes.length > 0, "ship has instanced timber meshes");
+  const totalInstances = instancedMeshes.reduce((sum, m) => sum + m.count, 0);
+  assert.ok(
+    totalInstances > 200,
+    `upper deck and fittings have instanced planks: ${totalInstances}`,
+  );
+
+  // Mast climbing attaches snug against the mast trunk
+  const mast = world.climbables![0];
+  const climber = createPlayer(mast.x, mast.y + 1, mast.z + 0.6);
+  climber.vy = -1;
+  stepPlayer(
+    climber,
+    { x: 0, y: -1, jump: false, jumpHeld: false },
+    1 / 60,
+    0,
+    world.solids,
+    world.climbables,
+  );
+  assert.equal(climber.move, "climb");
+  const mastDist = Math.hypot(climber.x - mast.x, climber.z - mast.z);
+  assert.ok(
+    mastDist < 0.45,
+    `climber attaches flush against mast trunk: ${mastDist}`,
+  );
+  assert.ok(
+    Math.abs(mastDist - (mast.radius + 0.16)) < 0.02,
+    `climber hugs cylinder surface: ${mastDist}`,
+  );
+
   world.dispose!();
 });
 

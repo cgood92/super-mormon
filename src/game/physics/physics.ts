@@ -583,6 +583,13 @@ export function stepPlayer(
           setMove(player, "jump");
         }
       } else {
+        const isClimbSolid = (s: Solid) =>
+          Math.abs(s.x - climb.x) <= climb.radius + 0.25 &&
+          Math.abs(s.z - climb.z) <= climb.radius + 0.25 &&
+          s.w <= climb.radius * 2 + 0.35 &&
+          s.d <= climb.radius * 2 + 0.35;
+        const obstacleSolids = solids.filter((s) => !isClimbSolid(s));
+
         const targetY = Math.max(
           climb.y + 0.25,
           Math.min(
@@ -590,7 +597,13 @@ export function stepPlayer(
             player.y + input.y * 3.2 * subdt,
           ),
         );
-        const bodyHeight = clearAt(player.x, player.y, player.z, solids, HEIGHT)
+        const bodyHeight = clearAt(
+          player.x,
+          player.y,
+          player.z,
+          obstacleSolids,
+          HEIGHT,
+        )
           ? HEIGHT
           : CROUCH_HEIGHT;
         player.crouching = bodyHeight === CROUCH_HEIGHT;
@@ -598,10 +611,25 @@ export function stepPlayer(
         const steps = Math.ceil(Math.abs(targetY - startY) / 0.05);
         for (let step = 1; step <= steps; step++) {
           const candidate = startY + ((targetY - startY) * step) / steps;
-          if (!clearAt(player.x, candidate, player.z, solids, bodyHeight))
+          if (!clearAt(player.x, candidate, player.z, obstacleSolids, bodyHeight))
             break;
           player.y = candidate;
         }
+
+        let angle = Math.atan2(player.x - climb.x, player.z - climb.z);
+        const tangentSpeed = -(
+          worldX * Math.cos(angle) -
+          worldZ * Math.sin(angle)
+        );
+        if (Math.abs(tangentSpeed) > 0.1) {
+          angle += tangentSpeed * 2.8 * subdt;
+        }
+        const attachDist = climb.radius + 0.16;
+        player.x = climb.x + Math.sin(angle) * attachDist;
+        player.z = climb.z + Math.cos(angle) * attachDist;
+        player.climbAway = { x: Math.sin(angle), z: Math.cos(angle) };
+        player.yaw = Math.atan2(-Math.sin(angle), -Math.cos(angle));
+
         player.vx = player.vy = player.vz = 0;
         player.runSpeed = 0;
         player.grounded = false;
@@ -631,7 +659,12 @@ export function stepPlayer(
           player.y < climb.y + climb.height - 0.5
         ) {
           player.climbId = climb.id;
-          player.climbAway = { x: -dx / d, z: -dz / d };
+          const angle = Math.atan2(-dx, -dz);
+          const attachDist = climb.radius + 0.16;
+          player.x = climb.x + Math.sin(angle) * attachDist;
+          player.z = climb.z + Math.cos(angle) * attachDist;
+          player.climbAway = { x: Math.sin(angle), z: Math.cos(angle) };
+          player.yaw = Math.atan2(dx, dz);
           player.vx = player.vy = player.vz = 0;
           player.runSpeed = 0;
           setMove(player, "climb");
