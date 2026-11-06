@@ -212,9 +212,19 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
   addBox(-7.8, 0, 15.4, 0.2, 3.5, 6.6, timber, true);
   addBox(4.1, 0, 15.4, 0.2, 3.5, 6.6, timber, true);
   addBox(-1.85, 0, 18.7, 12.1, 3.5, 0.2, timber, true);
-  // Benches and sleeping platforms leave the middle of the common room wide open.
-  for (const x of [-6.5, 2.5])
-    for (const z of [14.5, 17]) addBox(x, 0, z, 2, 0.48, 1.4, darkWood, true);
+  // Crafted timber beds with pale mattresses, pillows, and folded blankets in the common room.
+  for (const x of [-6.0, 2.5]) {
+    for (const z of [14.5, 17.2]) {
+      // Solid timber bed frame
+      addBox(x, 0, z, 1.45, 0.38, 2.3, darkWood, true);
+      // Pale mattress
+      addBox(x, 0.38, z, 1.3, 0.12, 2.15, paleWood, false);
+      // Raised pillow at head of bed
+      addBox(x, 0.5, z + 0.8, 1.1, 0.1, 0.45, paleWood, false);
+      // Folded blanket across lower bed
+      addBox(x, 0.42, z - 0.25, 1.32, 0.08, 1.5, darkWood, false);
+    }
+  }
   for (const z of [-12, -8, -4])
     addBox(-6.6, 0, z, 1.2, 0.5, 2.6, darkWood, true);
   // Connected fore-cabins share a clear two-metre central passage. Doorways
@@ -328,8 +338,8 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
       distance: 3.2,
       elevation: 0.18,
       targetHeight: 0.85,
-      entryEyes: [point(-1, 1.8, 14.5), point(0, 1.8, 16.5)],
-      exitEyes: [point(3.5, 1.8, 11), point(6, 2.2, 9)],
+      entryEyes: [],
+      exitEyes: [],
     },
     {
       id: "ship-fore-cabins",

@@ -184,6 +184,18 @@ export function buildVoyage(scene: T.Scene): WorldData {
     ship.group.add(wife.group);
     wife.group.position.set(i ? -3.2 : -5.0, 0, i ? -14.5 : -13.0);
   });
+  // 1 Nephi 18:17–18: Lehi and Sariah brought down upon their sick-beds because of grief and afflictions.
+  const lehi = createCharacter("lehi", { quality: "npc" });
+  lehi.group.name = "Lehi resting in sick-bed";
+  lehi.group.rotation.x = -Math.PI / 2;
+  lehi.group.position.set(-6.0, 0.85, 15.3);
+  ship.group.add(lehi.group);
+
+  const sariah = createCharacter("sariah", { quality: "npc" });
+  sariah.group.name = "Sariah resting in sick-bed";
+  sariah.group.rotation.x = -Math.PI / 2;
+  sariah.group.position.set(-6.0, 0.84, 18.0);
+  ship.group.add(sariah.group);
   const rope = new T.Mesh(
     new T.TorusGeometry(0.65, 0.065, 6, 24),
     material(0xb79d6c),
@@ -677,25 +689,27 @@ export function buildVoyage(scene: T.Scene): WorldData {
           if (phase === "brothers") {
             objective =
               "Find Laman and Lemuel below deck. Use the stairs on the right.";
-            if (near(player, brothers) || near(player, { x: -1, y: 0, z: 16 })) {
+            const atBrothers = near(player, brothers);
+            const atLegacyRoom = near(player, { x: -1, y: 0, z: 16 });
+            if (atBrothers) {
               prompt = "{action} · Ask them to release Nephi";
-              if (input.interact) {
-                phase = "release";
-                hooks.dialog(
-                  "1 Nephi 18:13–15",
-                  "The fourth day",
-                  "The storm has become terrible. Laman and Lemuel agree to release Nephi. You follow them up the stairs to the mast.",
-                  () => {},
-                  {
-                    actors: npcs.slice(0, 2).map((npc, i) => ({
-                      group: npc.group,
-                      gesture: "recoil",
-                      speaker: i === 0,
-                    })),
-                    focus: npcs[0].group,
-                  },
-                );
-              }
+            }
+            if ((atBrothers || atLegacyRoom) && input.interact) {
+              phase = "release";
+              hooks.dialog(
+                "1 Nephi 18:13–15",
+                "The fourth day",
+                "The storm has become terrible. Laman and Lemuel agree to release Nephi. You follow them up the stairs to the mast.",
+                () => {},
+                {
+                  actors: npcs.slice(0, 2).map((npc, i) => ({
+                    group: npc.group,
+                    gesture: "recoil",
+                    speaker: i === 0,
+                  })),
+                  focus: npcs[0].group,
+                },
+              );
             }
           } else if (phase === "release") {
             objective = "Follow the brothers up the stairs to Nephi.";
@@ -798,6 +812,8 @@ export function buildVoyage(scene: T.Scene): WorldData {
       npcs.forEach((n) => n.dispose());
       wives.forEach((wife) => wife.dispose());
       companion.dispose();
+      lehi.dispose();
+      sariah.dispose();
       const geometries = new Set<T.BufferGeometry>(),
         materials = new Set<T.Material>();
       root.traverse((o) => {

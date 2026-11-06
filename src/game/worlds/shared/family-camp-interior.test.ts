@@ -231,7 +231,7 @@ test("voyage wives move their limbs during the celebration and settle after rele
   const before = arms.map((arm) => arm.rotation.z);
   for (let i = 0; i < 5; i++) world.update!(0.1, p);
   assert.ok(arms.some((arm, i) => Math.abs(arm.rotation.z - before[i]) > 0.02));
-  Object.assign(p, { x: -1, y: 0, z: 16 });
+  Object.assign(p, (runtime.snapshot() as any).targets.brothers);
   runtime.update(0.1, p, { ...input, interact: true });
   for (let i = 0; i < 20; i++) world.update!(0.1, p);
   const settled = arms.map((arm) => arm.rotation.z);

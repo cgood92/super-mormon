@@ -543,3 +543,75 @@ test("ocean water stays below the ship cabin floor across all storm conditions",
   }
   world.dispose!();
 });
+
+test("Lehi and Sariah rest in beds in the common room and release prompt is only near forward cabin", () => {
+  const scene = new T.Scene(),
+    world = buildVoyage(scene);
+  scene.updateMatrixWorld(true);
+
+  // Lehi and Sariah exist in ship and lie along their sick-beds
+  const lehi = scene.getObjectByName("Lehi resting in sick-bed")!;
+  const sariah = scene.getObjectByName("Sariah resting in sick-bed")!;
+  assert.ok(lehi, "Lehi exists in voyage");
+  assert.ok(sariah, "Sariah exists in voyage");
+
+  const boxL = new T.Box3().setFromObject(lehi);
+  const sizeL = boxL.getSize(new T.Vector3());
+  assert.ok(sizeL.y < sizeL.z, "Lehi lies horizontally along bed");
+  assert.ok(
+    boxL.min.y >= 0.4 && boxL.min.y <= 0.6,
+    `Lehi rests on bed: ${boxL.min.y}`,
+  );
+
+  const boxS = new T.Box3().setFromObject(sariah);
+  const sizeS = boxS.getSize(new T.Vector3());
+  assert.ok(sizeS.y < sizeS.z, "Sariah lies horizontally along bed");
+  assert.ok(
+    boxS.min.y >= 0.4 && boxS.min.y <= 0.6,
+    `Sariah rests on bed: ${boxS.min.y}`,
+  );
+
+  // Test adventure interaction prompt location
+  const runtime = world.adventure!({
+    setAvatar: () => {},
+    toast: () => {},
+    dialog: (_r, _t, _b, next) => next(),
+    complete: () => {},
+  });
+  const p = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
+  for (let i = 0; i < 42; i++) {
+    runtime.update(0.1, p, {
+      interact: false,
+      interactHeld: false,
+      x: 0,
+      y: 0,
+    });
+  }
+
+  // Player in the aft common room at (-1, 0, 16) must NOT get the release prompt
+  p.x = -1;
+  p.y = 0;
+  p.z = 16;
+  const inCommonRoom = runtime.update(0.1, p, {
+    interact: false,
+    interactHeld: false,
+    x: 0,
+    y: 0,
+  });
+  assert.notEqual(inCommonRoom.prompt, "{action} · Ask them to release Nephi");
+
+  // Player at forward cabin at (-4, 0, -13.5) MUST get the release prompt
+  p.x = -4;
+  p.y = 0;
+  p.z = -13.5;
+  const atForwardCabin = runtime.update(0.1, p, {
+    interact: false,
+    interactHeld: false,
+    x: 0,
+    y: 0,
+  });
+  assert.equal(atForwardCabin.prompt, "{action} · Ask them to release Nephi");
+
+  runtime.dispose();
+  world.dispose!();
+});
