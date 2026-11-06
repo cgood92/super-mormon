@@ -126,9 +126,9 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
       w = halfWidth(z);
     for (const [x, y] of [
       [-w, 4.15],
-      [-w * 0.88, -0.1],
-      [0, -0.55],
-      [w * 0.88, -0.1],
+      [-w * 0.88, -0.6],
+      [0, -2.2],
+      [w * 0.88, -0.6],
       [w, 4.15],
     ])
       vertices.push(x, y, z);
@@ -193,13 +193,14 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
   // Upper deck leaves a full-height stair opening and a clear lower run-out.
   // The opening continues past the final tread so a running descent cannot grab
   // the overhead deck before the player has settled on the cabin floor.
+  // Long timber planks run across the beam, matching the lower deck construction.
   for (let z = -21; z <= 21; z++) {
     const w = halfWidth(z) - 0.18;
     if (z >= -1 && z <= 12) {
-      addBox((-w + 4.5) / 2, 3.95, z, w + 4.5, 0.25, 1, paleWood, true);
+      addBox((-w + 4.5) / 2, 3.95, z, w + 4.5, 0.25, 0.94, paleWood, true);
       if (w > 7.5)
-        addBox((w + 7.5) / 2, 3.95, z, w - 7.5, 0.25, 1, paleWood, true);
-    } else addBox(0, 3.95, z, w * 2, 0.25, 1, paleWood, true);
+        addBox((w + 7.5) / 2, 3.95, z, w - 7.5, 0.25, 0.94, paleWood, true);
+    } else addBox(0, 3.95, z, w * 2, 0.25, 0.94, paleWood, true);
   }
   // Fourteen 30cm risers work with the shared physics step height.
   for (let i = 0; i < 14; i++)
@@ -212,9 +213,19 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
   addBox(-7.8, 0, 15.4, 0.2, 3.5, 6.6, timber, true);
   addBox(4.1, 0, 15.4, 0.2, 3.5, 6.6, timber, true);
   addBox(-1.85, 0, 18.7, 12.1, 3.5, 0.2, timber, true);
-  // Benches and sleeping platforms leave the middle of the common room wide open.
-  for (const x of [-6.5, 2.5])
-    for (const z of [14.5, 17]) addBox(x, 0, z, 2, 0.48, 1.4, darkWood, true);
+  // Crafted timber beds with pale mattresses, pillows, and folded blankets in the common room.
+  for (const x of [-4.2, 2.4]) {
+    for (const z of [14.4, 17.0]) {
+      // Solid timber bed frame
+      addBox(x, 0, z, 1.45, 0.38, 2.3, darkWood, true);
+      // Pale mattress
+      addBox(x, 0.38, z, 1.3, 0.12, 2.15, paleWood, false);
+      // Raised pillow at head of bed (rests on mattress, non-coplanar)
+      addBox(x, 0.502, z + 0.8, 1.1, 0.1, 0.45, paleWood, false);
+      // Folded blanket across lower bed (rests on mattress, non-coplanar)
+      addBox(x, 0.502, z - 0.3, 1.32, 0.06, 1.5, darkWood, false);
+    }
+  }
   for (const z of [-12, -8, -4])
     addBox(-6.6, 0, z, 1.2, 0.5, 2.6, darkWood, true);
   // Connected fore-cabins share a clear two-metre central passage. Doorways
@@ -246,8 +257,7 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
     for (const side of [-1, 1]) {
       addBox(side * (w - 0.2), 0.15, z, 0.22, 4, 0.22, darkWood);
       addBox(side * (w - 0.1), 4.2, z, 0.18, 1.15, 0.18, darkWood);
-      if (!(side === 1 && z >= 11 && z <= 15))
-        addBox(side * (w - 0.1), 4.2, z, 0.24, 1.05, 2.1, timber, true);
+      addBox(side * (w - 0.1), 4.2, z, 0.24, 1.05, 2.1, timber, true);
     }
   }
   for (const z of [-19, 19])
@@ -299,7 +309,7 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
       y: origin.y + 4.2,
       z: origin.z + z,
       height: 14,
-      radius: 0.3,
+      radius: 0.25,
     });
   }
   for (const { geometry, material, matrices } of batches.values()) {
@@ -314,6 +324,14 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
     y: y + origin.y,
     z: z + origin.z,
   });
+  const underdeckViewBounds = {
+    minX: origin.x - 7.5,
+    maxX: origin.x + 7.5,
+    minZ: origin.z - 18.5,
+    maxZ: origin.z + 18.5,
+    minY: origin.y - 0.5,
+    maxY: origin.y + 3.6,
+  };
   const cameraRooms: CameraRoom[] = [
     {
       id: "ship-common-room",
@@ -325,27 +343,29 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
         minY: origin.y - 0.5,
         maxY: origin.y + 3.0,
       },
+      viewBounds: underdeckViewBounds,
       distance: 3.2,
       elevation: 0.18,
       targetHeight: 0.85,
-      entryEyes: [point(-1, 1.8, 14.5), point(0, 1.8, 16.5)],
-      exitEyes: [point(3.5, 1.8, 11), point(6, 2.2, 9)],
+      entryEyes: [],
+      exitEyes: [],
     },
     {
       id: "ship-fore-cabins",
       bounds: {
         minX: origin.x - 7.5,
-        maxX: origin.x + 4.5,
+        maxX: origin.x + 7.5,
         minZ: origin.z - 18.5,
-        maxZ: origin.z + 11.5,
+        maxZ: origin.z + 12.0,
         minY: origin.y - 0.5,
-        maxY: origin.y + 3.0,
+        maxY: origin.y + 3.6,
       },
+      viewBounds: underdeckViewBounds,
       distance: 3.0,
       elevation: 0.18,
       targetHeight: 0.85,
-      entryEyes: [point(0, 1.8, 9), point(0, 1.8, 2), point(0, 1.8, -6)],
-      exitEyes: [point(6, 2.2, 9), point(6, 4.0, -0.5)],
+      entryEyes: [],
+      exitEyes: [],
     },
   ];
   return {

@@ -372,18 +372,7 @@ function findClearViewpoint(
   maxCeilY = Infinity,
 ): { eye: T.Vector3; yaw: number; dist: number } | undefined {
   const angleOffsets = [
-    0,
-    0.35,
-    -0.35,
-    0.7,
-    -0.7,
-    1.05,
-    -1.05,
-    1.4,
-    -1.4,
-    1.8,
-    -1.8,
-    Math.PI,
+    0, 0.25, -0.25, 0.5, -0.5, 0.75, -0.75, 1.0, -1.0, 1.25, -1.25,
   ];
   const distances = [
     baseDistance,
@@ -391,6 +380,7 @@ function findClearViewpoint(
     baseDistance * 0.7,
     3.5,
     2.5,
+    1.8,
   ];
 
   let best:
@@ -406,33 +396,34 @@ function findClearViewpoint(
 
       let eyeX = target.x - Math.sin(yaw) * planar * dist;
       let eyeZ = target.z - Math.cos(yaw) * planar * dist;
-      if (room) {
-        eyeX = clamp(eyeX, room.bounds.minX + 0.55, room.bounds.maxX - 0.55);
-        eyeZ = clamp(eyeZ, room.bounds.minZ + 0.55, room.bounds.maxZ - 0.55);
-        if (room.bounds.minY !== undefined && room.bounds.maxY !== undefined) {
-          eyeY = clamp(eyeY, room.bounds.minY + 0.25, room.bounds.maxY - 0.28);
+      const roomClamp = room?.viewBounds ?? room?.bounds;
+      if (roomClamp) {
+        eyeX = clamp(eyeX, roomClamp.minX + 0.55, roomClamp.maxX - 0.55);
+        eyeZ = clamp(eyeZ, roomClamp.minZ + 0.55, roomClamp.maxZ - 0.55);
+        if (roomClamp.minY !== undefined && roomClamp.maxY !== undefined) {
+          eyeY = clamp(eyeY, roomClamp.minY + 0.25, roomClamp.maxY - 0.28);
         }
       }
 
       const naturalEye = new T.Vector3(eyeX, eyeY, eyeZ);
       const safeEye = resolveCameraPosition(target, naturalEye, solids, 0.22);
       if (maxCeilY < Infinity) safeEye.y = Math.min(safeEye.y, maxCeilY - 0.28);
-      if (room) {
+      if (roomClamp) {
         safeEye.x = clamp(
           safeEye.x,
-          room.bounds.minX + 0.55,
-          room.bounds.maxX - 0.55,
+          roomClamp.minX + 0.55,
+          roomClamp.maxX - 0.55,
         );
         safeEye.z = clamp(
           safeEye.z,
-          room.bounds.minZ + 0.55,
-          room.bounds.maxZ - 0.55,
+          roomClamp.minZ + 0.55,
+          roomClamp.maxZ - 0.55,
         );
-        if (room.bounds.minY !== undefined && room.bounds.maxY !== undefined) {
+        if (roomClamp.minY !== undefined && roomClamp.maxY !== undefined) {
           safeEye.y = clamp(
             safeEye.y,
-            room.bounds.minY + 0.25,
-            room.bounds.maxY - 0.28,
+            roomClamp.minY + 0.25,
+            roomClamp.maxY - 0.28,
           );
         }
       }
@@ -443,7 +434,7 @@ function findClearViewpoint(
       if (!cameraSegmentClear(safeEye, safeEye, solids, 0.2)) continue;
       if (isWallOccluded(target, safeEye, solids, 0.15)) continue;
 
-      const score = actualDist * 2 - Math.abs(deltaYaw);
+      const score = actualDist * 1.5 - Math.abs(deltaYaw) * 5;
       if (!best || score > best.score) {
         best = { eye: safeEye, yaw, dist: actualDist, score };
       }
@@ -609,6 +600,17 @@ export class FollowCamera {
         player.y + preset.targetHeight,
         player.z,
       );
+      const prevDir = new T.Vector3(
+        focus.x - previous.x,
+        0,
+        focus.z - previous.z,
+      );
+      if (prevDir.lengthSq() > 0.001) prevDir.normalize();
+
+      const currentClear =
+        cameraSegmentClear(previous, previous, solids, 0.22) &&
+        cameraSegmentClear(focus, previous, solids, 0.05);
+
       const safe = anchors
         .map((p) => new T.Vector3(p.x, p.y, p.z))
         .filter(
@@ -618,22 +620,31 @@ export class FollowCamera {
         );
       // Recovery when loading inside a room or when a prop blocks its door shot.
       // Search only on a room transition; normal play never hunts for visibility.
-      if (!safe.length && room) {
-        for (const distance of [3, 1.5])
+      if (!safe.length && room && !currentClear) {
+        for (const distance of [preset.distance, 2.0, 1.5])
           for (let i = 0; i < 8; i++) {
-            const yaw = player.yaw + (i * Math.PI) / 4;
+            const angleOffset =
+              i === 0
+                ? 0
+                : (i % 2 === 1 ? 1 : -1) * Math.ceil(i / 2) * (Math.PI / 4);
+            const yaw = player.yaw + angleOffset;
+            const roomClamp = room?.viewBounds ?? room?.bounds;
             const eye = new T.Vector3(
-              clamp(
-                focus.x - Math.sin(yaw) * distance,
-                room.bounds.minX + 0.55,
-                room.bounds.maxX - 0.55,
-              ),
+              roomClamp
+                ? clamp(
+                    focus.x - Math.sin(yaw) * distance,
+                    roomClamp.minX + 0.55,
+                    roomClamp.maxX - 0.55,
+                  )
+                : focus.x - Math.sin(yaw) * distance,
               focus.y + 1.2,
-              clamp(
-                focus.z - Math.cos(yaw) * distance,
-                room.bounds.minZ + 0.55,
-                room.bounds.maxZ - 0.55,
-              ),
+              roomClamp
+                ? clamp(
+                    focus.z - Math.cos(yaw) * distance,
+                    roomClamp.minZ + 0.55,
+                    roomClamp.maxZ - 0.55,
+                  )
+                : focus.z - Math.cos(yaw) * distance,
             );
             if (
               cameraSegmentClear(eye, eye, solids) &&
@@ -642,17 +653,52 @@ export class FollowCamera {
               safe.push(eye);
           }
       }
-      safe.sort(
-        (a, b) => a.distanceToSquared(focus) - b.distanceToSquared(focus),
-      );
-      // An authored doorway transition may cut across a wall. Ordinary following
-      // still sweeps physical eye travel and never zooms for sightline occlusion.
-      if (safe[0]) previous = safe[0];
-      this.camera.position.copy(previous);
-      this.lastEye.copy(previous);
+      // Never snap to a viewpoint that inverts/reverses the camera viewing direction
+      // if an aligned anchor is available.
+      const aligned = safe.filter((eye) => {
+        const candidateDir = new T.Vector3(
+          focus.x - eye.x,
+          0,
+          focus.z - eye.z,
+        ).normalize();
+        return candidateDir.dot(prevDir) >= -0.15;
+      });
+      if (aligned.length > 0) {
+        aligned.sort((a, b) => {
+          const dirA = new T.Vector3(
+            focus.x - a.x,
+            0,
+            focus.z - a.z,
+          ).normalize();
+          const dirB = new T.Vector3(
+            focus.x - b.x,
+            0,
+            focus.z - b.z,
+          ).normalize();
+          const dotA = dirA.dot(prevDir);
+          const dotB = dirB.dot(prevDir);
+          if (Math.abs(dotA - dotB) > 0.2) return dotB - dotA;
+          const distErrA = Math.abs(a.distanceTo(focus) - preset.distance);
+          const distErrB = Math.abs(b.distanceTo(focus) - preset.distance);
+          return distErrA - distErrB;
+        });
+        previous = aligned[0];
+      } else if (safe.length > 0) {
+        safe.sort(
+          (a, b) => a.distanceToSquared(focus) - b.distanceToSquared(focus),
+        );
+        previous = safe[0];
+      }
+      if (safe[0]) {
+        this.camera.position.copy(previous);
+        this.lastEye.copy(previous);
+      }
+      const hadPriorRoom = this.room !== undefined;
       this.room = room;
-      this.pitch = preset.elevation;
-      this.smoothDistance = preset.distance;
+      if (safe[0] || !hadPriorRoom) {
+        this.pitch = preset.elevation;
+        this.smoothDistance = preset.distance;
+      }
       this.speedPullback = 0;
       this.eyeDetour = [];
       this.finishingDetour = false;
@@ -840,22 +886,23 @@ export class FollowCamera {
     if (ceilingY < Infinity) {
       candidate.y = Math.min(candidate.y, ceilingY - 0.28);
     }
-    if (room) {
+    const roomClamp = room?.viewBounds ?? room?.bounds;
+    if (roomClamp) {
       candidate.x = clamp(
         candidate.x,
-        room.bounds.minX + 0.55,
-        room.bounds.maxX - 0.55,
+        roomClamp.minX + 0.55,
+        roomClamp.maxX - 0.55,
       );
       candidate.z = clamp(
         candidate.z,
-        room.bounds.minZ + 0.55,
-        room.bounds.maxZ - 0.55,
+        roomClamp.minZ + 0.55,
+        roomClamp.maxZ - 0.55,
       );
-      if (room.bounds.minY !== undefined && room.bounds.maxY !== undefined) {
+      if (roomClamp.minY !== undefined && roomClamp.maxY !== undefined) {
         candidate.y = clamp(
           candidate.y,
-          room.bounds.minY + 0.25,
-          room.bounds.maxY - 0.28,
+          roomClamp.minY + 0.25,
+          roomClamp.maxY - 0.28,
         );
       }
     }
@@ -874,16 +921,15 @@ export class FollowCamera {
         if (cornerWp) this.eyeDetour = [cornerWp];
       }
       if (
-        room &&
+        roomClamp &&
         this.eyeDetour.some(
           (eye) =>
-            eye.x < room.bounds.minX + 0.55 ||
-            eye.x > room.bounds.maxX - 0.55 ||
-            eye.z < room.bounds.minZ + 0.55 ||
-            eye.z > room.bounds.maxZ - 0.55 ||
-            (room.bounds.minY !== undefined &&
-              eye.y < room.bounds.minY + 0.25) ||
-            (room.bounds.maxY !== undefined && eye.y > room.bounds.maxY - 0.28),
+            eye.x < roomClamp.minX + 0.55 ||
+            eye.x > roomClamp.maxX - 0.55 ||
+            eye.z < roomClamp.minZ + 0.55 ||
+            eye.z > roomClamp.maxZ - 0.55 ||
+            (roomClamp.minY !== undefined && eye.y < roomClamp.minY + 0.25) ||
+            (roomClamp.maxY !== undefined && eye.y > roomClamp.maxY - 0.28),
         )
       )
         this.eyeDetour = [];
@@ -1012,7 +1058,7 @@ export class FollowCamera {
         1,
       );
     }
-    if (player.grounded !== false) final.y = Math.max(final.y, player.y + 0.22);
+    final.y = Math.max(final.y, player.y + 0.22);
     this.camera.position.copy(final);
     if (!this.eyeDetour.length && !this.finishingDetour) {
       const finalDx = this.target.x - final.x,

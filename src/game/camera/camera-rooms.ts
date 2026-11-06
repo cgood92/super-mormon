@@ -8,6 +8,14 @@ export type CameraRoom = {
     minY?: number;
     maxY?: number;
   };
+  viewBounds?: {
+    minX: number;
+    maxX: number;
+    minZ: number;
+    maxZ: number;
+    minY?: number;
+    maxY?: number;
+  };
   distance: number;
   elevation: number;
   targetHeight: number;

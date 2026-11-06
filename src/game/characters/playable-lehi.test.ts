@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import * as T from "three";
 import { buildSculptedLehi } from "./lehi-sculpted-models.ts";
-import { createPlayableLehi } from "./playable-lehi.ts";
+import {
+  createPlayableLehi,
+  createSculptedCharacterRig,
+} from "./playable-lehi.ts";
 import type { CharacterState } from "./character.ts";
 
 const standing: CharacterState = {
@@ -740,4 +743,40 @@ test("hero and NPC Lehi shoes remain attached through repeated banked turns and 
       );
     actor.dispose();
   }
+});
+
+test("actor foot soles remain stable when parent object moves and tilts", () => {
+  const parent = new T.Group();
+  const actor = createSculptedCharacterRig("child", { quality: "hero" });
+  parent.add(actor.group);
+  const leftFoot = actor.group.getObjectByName("left-foot")!;
+  const rightFoot = actor.group.getObjectByName("right-foot")!;
+  const initialY = leftFoot.position.y;
+  const standing: CharacterState = {
+    x: 0,
+    y: 4.2,
+    z: 0,
+    vx: 0,
+    vy: 0,
+    vz: 0,
+    yaw: 0,
+    grounded: true,
+    runSpeed: 0,
+  };
+  for (let frame = 0; frame < 60; frame++) {
+    const t = frame / 60;
+    parent.position.y = Math.sin(t * 5) * 0.5;
+    parent.rotation.z = Math.sin(t * 3) * 0.1;
+    parent.rotation.x = Math.cos(t * 4) * 0.1;
+    actor.update(1 / 60, standing);
+    assert.ok(
+      Math.abs(leftFoot.position.y - initialY) < 0.08,
+      `left foot displaced vertically: ${leftFoot.position.y} vs ${initialY}`,
+    );
+    assert.ok(
+      Math.abs(rightFoot.position.y - initialY) < 0.08,
+      `right foot displaced vertically: ${rightFoot.position.y} vs ${initialY}`,
+    );
+  }
+  actor.dispose();
 });

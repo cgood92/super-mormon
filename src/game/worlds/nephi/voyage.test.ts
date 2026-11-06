@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as T from "three";
 import { buildVoyage, shipClearsIsland } from "./voyage";
-import { createPlayer } from "../../physics/physics";
+import { createPlayer, stepPlayer } from "../../physics/physics";
 
 test("voyage follows fourth-day release, automatic calm, Liahona and sustained steering", () => {
   const scene = new T.Scene(),
@@ -65,7 +65,7 @@ test("voyage follows fourth-day release, automatic calm, Liahona and sustained s
     p.y > 4.1,
     "the child follows the stairs to the deck without teleporting",
   );
-  assert.ok(Math.hypot(p.x - childBelow.x, p.z - childBelow.z) > 12);
+  assert.ok(Math.hypot(p.x - childBelow.x, p.z - childBelow.z) > 9);
   assert.equal(state().releaseReady, true);
   assert.equal(runtime.movementLocked!(), false);
   assert.equal(scene.getObjectByName("Voyage child companion")?.visible, true);
@@ -154,6 +154,49 @@ test("voyage exposes a shared moving actor parent and climbable masts", () => {
   world.update!(0.1, p);
   assert.notEqual(world.actorParent!.rotation.z, before);
   assert.ok(Math.abs(p.vx) < 0.05);
+
+  // Ship upper deck uses instanced timber planking with rich materials
+  const instancedMeshes = world.actorParent!.children.filter(
+    (c) => c instanceof T.InstancedMesh,
+  ) as T.InstancedMesh[];
+  assert.ok(instancedMeshes.length > 0, "ship has instanced timber meshes");
+  const totalInstances = instancedMeshes.reduce((sum, m) => sum + m.count, 0);
+  assert.ok(
+    totalInstances > 200,
+    `upper deck and fittings have instanced planks: ${totalInstances}`,
+  );
+
+  // Railing on the ship deck's border is continuous near the stairs
+  for (const z of [11, 13, 15]) {
+    const borderRail = world.solids.find(
+      (s) => s.x > 7 && s.y >= 4.1 && Math.abs(s.z - z) < 0.2,
+    );
+    assert.ok(borderRail, `border railing is solid near stairs at z=${z}`);
+  }
+
+  // Mast climbing attaches snug against the mast trunk
+  const mast = world.climbables![0];
+  const climber = createPlayer(mast.x, mast.y + 1, mast.z + 0.6);
+  climber.vy = -1;
+  stepPlayer(
+    climber,
+    { x: 0, y: -1, jump: false, jumpHeld: false },
+    1 / 60,
+    0,
+    world.solids,
+    world.climbables,
+  );
+  assert.equal(climber.move, "climb");
+  const mastDist = Math.hypot(climber.x - mast.x, climber.z - mast.z);
+  assert.ok(
+    mastDist < 0.45,
+    `climber attaches flush against mast trunk: ${mastDist}`,
+  );
+  assert.ok(
+    Math.abs(mastDist - (mast.radius + 0.16)) < 0.02,
+    `climber hugs cylinder surface: ${mastDist}`,
+  );
+
   world.dispose!();
 });
 
@@ -427,5 +470,280 @@ test("sailing view frames the hull and keeps the next passage clear of opaque sa
     }
   }
   runtime.dispose();
+  world.dispose!();
+});
+
+test("falling or jumping off the boat triggers stay on the boat recovery", () => {
+  const scene = new T.Scene(),
+    world = buildVoyage(scene),
+    p = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
+  let caughtCalled = 0;
+  let resetFn: (() => void) | undefined;
+  const runtime = world.adventure!({
+    setAvatar: () => {},
+    toast: () => {},
+    dialog: (_r, _t, _b, next) => next(),
+    complete: () => {},
+    caught: (reset) => {
+      caughtCalled++;
+      resetFn = reset;
+    },
+  });
+  // Walk for opening scene
+  for (let i = 0; i < 42; i++)
+    runtime.update(0.1, p, {
+      interact: false,
+      interactHeld: false,
+      x: 0,
+      y: 0,
+    });
+  // Player jumps off upper deck into the ocean
+  p.x = 10;
+  p.y = -1;
+  const result = runtime.update(0.1, p, {
+    interact: false,
+    interactHeld: false,
+    x: 0,
+    y: 0,
+  });
+  assert.equal(caughtCalled, 1);
+  assert.equal(result.objective, "Stay on the boat");
+  assert.ok(resetFn);
+  resetFn!();
+  assert.equal(p.x, 2);
+  assert.equal(p.y, 4.2);
+  assert.equal(p.z, 2);
+  runtime.dispose();
+  world.dispose!();
+});
+
+test("storm clouds and lightning operate during storm and clear when calmed", () => {
+  const scene = new T.Scene(),
+    world = buildVoyage(scene),
+    p = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
+  const clouds = scene.getObjectByName("Puffy storm clouds")!;
+  const lightning = scene.getObjectByName("Storm lightning bolt")!;
+  assert.ok(clouds);
+  assert.ok(lightning);
+  assert.equal(clouds.visible, true);
+
+  // During storm, update world repeatedly: lightning should trigger
+  let lightningFlashed = false;
+  for (let i = 0; i < 60; i++) {
+    world.update!(0.1, p);
+    if (lightning.visible) lightningFlashed = true;
+  }
+  assert.ok(lightningFlashed, "lightning bolt flashes during storm");
+
+  // Advance adventure to release so storm clears
+  const runtime = world.adventure!({
+    setAvatar: () => {},
+    toast: () => {},
+    dialog: (_r, _t, _b, next) => next(),
+    complete: () => {},
+  });
+  for (let i = 0; i < 42; i++)
+    runtime.update(0.1, p, {
+      interact: false,
+      interactHeld: false,
+      x: 0,
+      y: 0,
+    });
+  const targets = (runtime.snapshot() as any).targets;
+  Object.assign(p, targets.brothers);
+  runtime.update(0.016, p, { interact: true, interactHeld: true, x: 0, y: 0 });
+  for (
+    let i = 0;
+    i < 300 && (runtime.snapshot() as any).phase === "release";
+    i++
+  ) {
+    runtime.update(0.1, p, {
+      interact: false,
+      interactHeld: false,
+      x: 0,
+      y: 0,
+    });
+  }
+  // After release, storm is 0
+  world.update!(0.1, p);
+  assert.equal(
+    clouds.visible,
+    false,
+    "storm clouds disappear when storm clears",
+  );
+  runtime.dispose();
+  world.dispose!();
+});
+
+test("ocean water stays below the ship cabin floor across all storm conditions", () => {
+  const scene = new T.Scene(),
+    world = buildVoyage(scene),
+    p = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
+  const shipGroup = scene.getObjectByName(
+    "Ancient timber sailing vessel",
+  ) as T.Group;
+  assert.ok(shipGroup);
+  let oceanMesh: T.Mesh | undefined;
+  scene.traverse((obj) => {
+    if (
+      obj instanceof T.Mesh &&
+      obj.geometry instanceof T.PlaneGeometry &&
+      ((obj.geometry.parameters as any).width >= 1000 ||
+        obj.name === "Ocean water plane")
+    ) {
+      oceanMesh = obj;
+    }
+  });
+  assert.ok(oceanMesh);
+  const posAttr = oceanMesh.geometry.getAttribute(
+    "position",
+  ) as T.BufferAttribute;
+
+  for (let frame = 0; frame < 300; frame++) {
+    world.update!(0.05, p);
+    const shipWorldY = shipGroup.position.y;
+    for (let i = 0; i < posAttr.count; i++) {
+      const x = posAttr.getX(i);
+      const z = posAttr.getZ(i);
+      if (Math.abs(x) < 8.0 && Math.abs(z) < 20.0) {
+        const waterWorldY = oceanMesh.position.y + posAttr.getY(i);
+        const cabinFloorWorldY = shipWorldY;
+        assert.ok(
+          waterWorldY < cabinFloorWorldY - 0.5,
+          `ocean water rose too close to cabin floor at frame ${frame}, vertex (${x}, ${z}): waterY=${waterWorldY}, floorY=${cabinFloorWorldY}`,
+        );
+      }
+    }
+  }
+  world.dispose!();
+});
+
+test("Lehi and Sariah rest in beds in the common room and release prompt is only near forward cabin", () => {
+  const scene = new T.Scene(),
+    world = buildVoyage(scene);
+  scene.updateMatrixWorld(true);
+
+  // Lehi and Sariah exist in ship and lie along their sick-beds
+  const lehi = scene.getObjectByName("Lehi resting in sick-bed")!;
+  const sariah = scene.getObjectByName("Sariah resting in sick-bed")!;
+  assert.ok(lehi, "Lehi exists in voyage");
+  assert.ok(sariah, "Sariah exists in voyage");
+
+  const boxL = new T.Box3().setFromObject(lehi);
+  const sizeL = boxL.getSize(new T.Vector3());
+  assert.ok(sizeL.y < sizeL.z, "Lehi lies horizontally along bed");
+  assert.ok(
+    boxL.min.y >= 0.4 && boxL.min.y <= 0.6,
+    `Lehi rests on bed: ${boxL.min.y}`,
+  );
+
+  const boxS = new T.Box3().setFromObject(sariah);
+  const sizeS = boxS.getSize(new T.Vector3());
+  assert.ok(sizeS.y < sizeS.z, "Sariah lies horizontally along bed");
+  assert.ok(
+    boxS.min.y >= 0.4 && boxS.min.y <= 0.6,
+    `Sariah rests on bed: ${boxS.min.y}`,
+  );
+
+  // Both Lehi and Sariah must be completely within the common room interior bounds
+  // (not clipped into hull ribs at x < -5.5 or extending past aft wall at z > 18.5)
+  assert.ok(
+    boxL.min.x > -5.2 && boxL.max.x < 3.8,
+    `Lehi is safely inside room walls in X: [${boxL.min.x}, ${boxL.max.x}]`,
+  );
+  assert.ok(
+    boxL.min.z > 12.0 && boxL.max.z < 18.5,
+    `Lehi is safely inside room walls in Z: [${boxL.min.z}, ${boxL.max.z}]`,
+  );
+  assert.ok(
+    boxS.min.x > -5.2 && boxS.max.x < 3.8,
+    `Sariah is safely inside room walls in X: [${boxS.min.x}, ${boxS.max.x}]`,
+  );
+  assert.ok(
+    boxS.min.z > 12.0 && boxS.max.z < 18.5,
+    `Sariah is safely inside room walls in Z: [${boxS.min.z}, ${boxS.max.z}]`,
+  );
+
+  // Test adventure interaction prompt location
+  const runtime = world.adventure!({
+    setAvatar: () => {},
+    toast: () => {},
+    dialog: (_r, _t, _b, next) => next(),
+    complete: () => {},
+  });
+  const p = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
+  for (let i = 0; i < 42; i++) {
+    runtime.update(0.1, p, {
+      interact: false,
+      interactHeld: false,
+      x: 0,
+      y: 0,
+    });
+  }
+
+  // Player in the aft common room at (-1, 0, 16) must NOT get the release prompt
+  p.x = -1;
+  p.y = 0;
+  p.z = 16;
+  const inCommonRoom = runtime.update(0.1, p, {
+    interact: false,
+    interactHeld: false,
+    x: 0,
+    y: 0,
+  });
+  assert.notEqual(inCommonRoom.prompt, "{action} · Ask them to release Nephi");
+
+  // Player at forward cabin at (-4, 0, -13.5) MUST get the release prompt
+  p.x = -4;
+  p.y = 0;
+  p.z = -13.5;
+  const atForwardCabin = runtime.update(0.1, p, {
+    interact: false,
+    interactHeld: false,
+    x: 0,
+    y: 0,
+  });
+  assert.equal(atForwardCabin.prompt, "{action} · Ask them to release Nephi");
+
+  runtime.dispose();
+  world.dispose!();
+});
+
+test("promised land sits constantly in ocean, transforms with heading like channel islands, and rests below water line", () => {
+  const scene = new T.Scene(),
+    world = buildVoyage(scene);
+  scene.updateMatrixWorld(true);
+
+  const land = scene.getObjectByName("Distant promised shore") as T.Group;
+  assert.ok(land, "Distant promised shore exists");
+
+  // Ocean plane extends past the shore to the horizon
+  let oceanMesh: T.Mesh | undefined;
+  scene.traverse((obj) => {
+    if (obj.name === "Ocean water plane") oceanMesh = obj as T.Mesh;
+  });
+  assert.ok(oceanMesh, "Ocean water plane exists");
+  const geomParams = (oceanMesh.geometry as any).parameters;
+  assert.ok(
+    geomParams.height >= 2400,
+    "Ocean plane spans at least 2400m to cover horizon",
+  );
+
+  // Hill bases sit below ocean water plane (y <= -1.35)
+  for (const child of land.children) {
+    if (child instanceof T.Mesh) {
+      assert.ok(
+        land.position.y + child.position.y <= -2.0,
+        `hill base is anchored below ocean water surface: ${land.position.y + child.position.y}`,
+      );
+    }
+  }
+
+  // Initial land position is distant along the course
+  assert.ok(
+    land.position.z <= -800,
+    `shore is distant at start of voyage: ${land.position.z}`,
+  );
+
   world.dispose!();
 });

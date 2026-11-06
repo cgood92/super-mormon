@@ -239,9 +239,25 @@ test("a climbable attaches in air, climbs, and jump detaches outward", () => {
   p.vy = -1;
   frames(p, { ...idle, y: -1 }, 2, [], [tree]);
   assert.equal(p.move, "climb");
+  const dist = Math.hypot(p.x - tree.x, p.z - tree.z);
+  assert.ok(
+    Math.abs(dist - (tree.radius + 0.16)) < 0.02,
+    `player hugs the climbable surface at ${dist}`,
+  );
+  assert.ok(
+    Math.abs(Math.abs(p.yaw) - Math.PI) < 0.05,
+    `player faces the climbable center with yaw=${p.yaw}`,
+  );
   const start = p.y;
   frames(p, { ...idle, y: 1 }, 20, [], [tree]);
   assert.ok(p.y > start + 0.4);
+  frames(p, { ...idle, x: 1 }, 10, [], [tree]);
+  assert.notEqual(p.x, 0, "horizontal input orbits around the cylinder");
+  const orbitDist = Math.hypot(p.x - tree.x, p.z - tree.z);
+  assert.ok(
+    Math.abs(orbitDist - (tree.radius + 0.16)) < 0.02,
+    "orbit maintains snug distance to climbable",
+  );
   stepPlayer(p, { ...idle, jump: true, jumpHeld: true }, 1 / 60, 0, [], [tree]);
   assert.notEqual(p.move, "climb");
   assert.ok(p.vy > 0);

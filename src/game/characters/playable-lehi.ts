@@ -323,6 +323,7 @@ export function createSculptedCharacterRig(
   const soleCorrection = new T.Vector3();
   const soleLocalOrigin = new T.Vector3();
   const soleParentInverse = new T.Matrix4();
+  const groupInverse = new T.Matrix4();
   const gripParentRotation = new T.Quaternion();
   const gripWorldRotation = new T.Quaternion();
   let clothWasMoving = true;
@@ -463,10 +464,13 @@ export function createSculptedCharacterRig(
         (!state.move || state.move === "run" || state.move === "idle");
       if (groundedWalk) {
         model.group.updateWorldMatrix(true, true);
+        group.updateWorldMatrix(true, false);
+        groupInverse.copy(group.matrixWorld).invert();
         for (let i = 0; i < 2; i++) {
           worldFootBox
             .copy(footMeshes[i].geometry.boundingBox!)
-            .applyMatrix4(footMeshes[i].matrixWorld);
+            .applyMatrix4(footMeshes[i].matrixWorld)
+            .applyMatrix4(groupInverse);
           const stance = driverKnees[i].rotation.x < 0.08;
           worldFootBox.getCenter(soleCenter);
           let anchor = contactAnchors[i];
@@ -492,9 +496,12 @@ export function createSculptedCharacterRig(
             soleCorrection.z = anchor.point.z - soleCenter.z;
           }
           soleCorrection.y = stance
-            ? state.y - worldFootBox.min.y
-            : Math.max(0, state.y - worldFootBox.min.y);
-          soleParentInverse.copy(footPivots[i].parent!.matrixWorld).invert();
+            ? -worldFootBox.min.y
+            : Math.max(0, -worldFootBox.min.y);
+          soleParentInverse
+            .copy(footPivots[i].parent!.matrixWorld)
+            .invert()
+            .multiply(group.matrixWorld);
           soleLocalOrigin.set(0, 0, 0).applyMatrix4(soleParentInverse);
           soleCorrection.applyMatrix4(soleParentInverse).sub(soleLocalOrigin);
           footPivots[i].position.add(soleCorrection);

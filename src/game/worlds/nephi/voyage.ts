@@ -38,16 +38,18 @@ export function buildVoyage(scene: T.Scene): WorldData {
   scene.add(root);
   scene.background = new T.Color(0x34475f);
   scene.fog = new T.Fog(0x34475f, 110, 420);
-  root.add(new T.HemisphereLight(0xd0e9ff, 0x414337, 2));
+  const hemiLight = new T.HemisphereLight(0xd0e9ff, 0x414337, 2);
+  root.add(hemiLight);
   const sun = new T.DirectionalLight(0xffe9bd, 2.2);
   sun.position.set(-35, 55, -70);
   root.add(sun);
   const ship = buildShip(root, { x: 0, y: 0, z: 0 });
   // Ship's physical space remains local while all its actors share the gentle visible roll.
   const oceanMaterial = material(0x174d67, 0.36);
-  const oceanGeometry = new T.PlaneGeometry(1000, 1000, 64, 64);
+  const oceanGeometry = new T.PlaneGeometry(2800, 2800, 72, 72);
   oceanGeometry.rotateX(-Math.PI / 2);
   const ocean = new T.Mesh(oceanGeometry, oceanMaterial);
+  ocean.name = "Ocean water plane";
   ocean.position.y = -1.35;
   root.add(ocean);
   const oceanPositions = oceanGeometry.getAttribute(
@@ -67,33 +69,76 @@ export function buildVoyage(scene: T.Scene): WorldData {
     foam.add(m);
   }
   const clouds = new T.Group();
+  clouds.name = "Puffy storm clouds";
   root.add(clouds);
-  for (let i = 0; i < 20; i++) {
-    const m = new T.Mesh(new T.IcosahedronGeometry(12, 1), material(0x6b7484));
-    m.scale.set(2.6, 0.4, 1);
-    m.position.set(
-      Math.sin(i * 4) * 210,
-      40 + (i % 3) * 7,
-      Math.cos(i * 4) * 210,
+  const cloudMaterial = material(0x5a6375);
+  for (let i = 0; i < 18; i++) {
+    const cloudCluster = new T.Group();
+    // Billowing cluster puffs
+    const p0 = new T.Mesh(new T.DodecahedronGeometry(13, 1), cloudMaterial);
+    p0.scale.set(1.4, 0.9, 1.2);
+    cloudCluster.add(p0);
+    const p1 = new T.Mesh(new T.DodecahedronGeometry(10, 1), cloudMaterial);
+    p1.position.set(-10, -2, 3);
+    p1.scale.set(1.1, 0.8, 1.0);
+    cloudCluster.add(p1);
+    const p2 = new T.Mesh(new T.DodecahedronGeometry(11, 1), cloudMaterial);
+    p2.position.set(11, -1, -3);
+    p2.scale.set(1.2, 0.85, 1.0);
+    cloudCluster.add(p2);
+    const p3 = new T.Mesh(new T.DodecahedronGeometry(8, 1), cloudMaterial);
+    p3.position.set(1, 5, 1);
+    p3.scale.set(1.0, 0.9, 1.1);
+    cloudCluster.add(p3);
+    const p4 = new T.Mesh(new T.DodecahedronGeometry(9, 1), cloudMaterial);
+    p4.position.set(4, -3, 6);
+    p4.scale.set(1.1, 0.7, 0.9);
+    cloudCluster.add(p4);
+
+    cloudCluster.position.set(
+      Math.sin(i * 4.2) * 205,
+      44 + (i % 3) * 8,
+      Math.cos(i * 4.2) * 205,
     );
-    clouds.add(m);
+    clouds.add(cloudCluster);
   }
+
+  // Jagged storm lightning
+  const lightning = new T.Group();
+  lightning.name = "Storm lightning bolt";
+  lightning.visible = false;
+  root.add(lightning);
+  const lightningMaterial = new T.MeshBasicMaterial({ color: 0xeeffff });
+  const boltSegments: T.Mesh[] = [];
+  for (let s = 0; s < 6; s++) {
+    const seg = new T.Mesh(
+      new T.CylinderGeometry(0.45, 0.45, 1, 4),
+      lightningMaterial,
+    );
+    lightning.add(seg);
+    boltSegments.push(seg);
+  }
+  let lightningTimer = 2.0;
+  let lightningFlashTime = 0;
+
   const land = new T.Group();
   land.name = "Distant promised shore";
   root.add(land);
-  for (let i = 0; i < 13; i++) {
+  for (let i = 0; i < 19; i++) {
     const hill = new T.Mesh(
       mountainGeometry(i),
       material(i % 2 ? 0x728b61 : 0x9caa75),
     );
-    hill.scale.set(18 + (i % 4) * 6, 18 + (i % 5) * 9, 22 + (i % 4) * 5);
-    hill.position.set((i - 6) * 22, -2, -(i % 3) * 12);
+    hill.scale.set(22 + (i % 4) * 6, 22 + (i % 5) * 8, 24 + (i % 4) * 5);
+    hill.position.set((i - 9) * 24, -2, -(i % 3) * 14);
     land.add(hill);
   }
-  land.position.z = -920;
-  const brothers = { x: -1, y: 0, z: 16 };
+  land.position.set(0, -2, -820);
+  const brothers = { x: -4, y: 0, z: -13.5 };
   const releaseRoute = [
-    { x: -1, y: 0, z: 11 },
+    { x: 0, y: 0, z: -13.5 },
+    { x: 0, y: 0, z: 0 },
+    { x: 0, y: 0, z: 10 },
     ship.points.stairBottom,
     ship.points.stairTop,
     { x: 3, y: 4.2, z: -3 },
@@ -108,8 +153,8 @@ export function buildVoyage(scene: T.Scene): WorldData {
     createCharacter("nephi"),
   ];
   const positions = [
-    { x: -3, y: 0, z: 15 },
-    { x: 1, y: 0, z: 16 },
+    { x: -4.5, y: 0, z: -13.5 },
+    { x: -3.5, y: 0, z: -14.2 },
     ship.points.boundNephi,
   ];
   const walkers = positions.slice(0, 2).map((p) => createPlayer(p.x, p.y, p.z));
@@ -138,8 +183,20 @@ export function buildVoyage(scene: T.Scene): WorldData {
   ];
   wives.forEach((wife, i) => {
     ship.group.add(wife.group);
-    wife.group.position.set(i ? 0.7 : -3.3, 0, 14);
+    wife.group.position.set(i ? -3.2 : -5.0, 0, i ? -14.5 : -13.0);
   });
+  // 1 Nephi 18:17–18: Lehi and Sariah brought down upon their sick-beds because of grief and afflictions.
+  const lehi = createCharacter("lehi", { quality: "npc" });
+  lehi.group.name = "Lehi resting in sick-bed";
+  lehi.group.rotation.set(-Math.PI / 2, 0, Math.PI);
+  lehi.group.position.set(-4.2, 0.8, 13.9);
+  ship.group.add(lehi.group);
+
+  const sariah = createCharacter("sariah", { quality: "npc" });
+  sariah.group.name = "Sariah resting in sick-bed";
+  sariah.group.rotation.set(-Math.PI / 2, 0, Math.PI);
+  sariah.group.position.set(-4.2, 0.8, 16.5);
+  ship.group.add(sariah.group);
   const rope = new T.Mesh(
     new T.TorusGeometry(0.65, 0.065, 6, 24),
     material(0xb79d6c),
@@ -242,9 +299,9 @@ export function buildVoyage(scene: T.Scene): WorldData {
     time += dt;
     wives.forEach((wife, i) =>
       wife.update(dt, {
-        x: i ? 0.7 : -3.3,
+        x: i ? -3.2 : -5.0,
         y: 0,
-        z: 14,
+        z: i ? -14.5 : -13.0,
         vx: 0,
         vy: 0,
         vz: 0,
@@ -282,17 +339,66 @@ export function buildVoyage(scene: T.Scene): WorldData {
       1.2,
       dt,
     );
+    // Storm lightning bolts at random intervals
+    if (storm > 0.3) {
+      lightningTimer -= dt;
+      if (lightningTimer <= 0) {
+        lightningTimer = 2.4 + Math.random() * 3.6;
+        lightningFlashTime = 0.14;
+        const boltAngle = time * 0.7 + Math.random() * Math.PI * 2;
+        const boltDist = 95 + Math.random() * 75;
+        let startX = Math.sin(boltAngle) * boltDist;
+        let startZ = Math.cos(boltAngle) * boltDist;
+        let startY = 46 + Math.random() * 10;
+        const segHeight = startY / boltSegments.length;
+        for (let s = 0; s < boltSegments.length; s++) {
+          const nextY = startY - segHeight;
+          const nextX = startX + (Math.random() - 0.5) * 11;
+          const nextZ = startZ + (Math.random() - 0.5) * 11;
+          const seg = boltSegments[s];
+          const startVec = new T.Vector3(startX, startY, startZ);
+          const endVec = new T.Vector3(nextX, nextY, nextZ);
+          const mid = startVec.clone().add(endVec).multiplyScalar(0.5);
+          const dir = endVec.clone().sub(startVec);
+          seg.position.copy(mid);
+          seg.scale.set(1, dir.length(), 1);
+          seg.quaternion.setFromUnitVectors(
+            new T.Vector3(0, 1, 0),
+            dir.normalize(),
+          );
+          startX = nextX;
+          startY = nextY;
+          startZ = nextZ;
+        }
+      }
+    }
+    if (lightningFlashTime > 0) {
+      lightningFlashTime -= dt;
+      const flash =
+        lightningFlashTime > 0.02 && Math.sin(lightningFlashTime * 80) > -0.2;
+      lightning.visible = flash;
+      hemiLight.intensity = flash ? 5.2 : 2.0;
+    } else {
+      lightning.visible = false;
+      hemiLight.intensity = 2.0;
+    }
+    clouds.visible = storm > 0.05;
+
     ship.group.position.y = Math.sin(time * 1.6) * (0.08 + storm * 0.14);
     ship.group.rotation.z = Math.sin(time * 1.3) * (0.012 + storm * 0.055);
     ship.group.rotation.x = Math.sin(time * 0.9) * (0.008 + storm * 0.018);
     for (let i = 0; i < oceanPositions.count; i++) {
       const x = oceanPositions.getX(i),
         z = oceanPositions.getZ(i);
-      oceanPositions.setY(
-        i,
+      let wave =
         Math.sin(x * 0.055 + time * 1.7) * (0.22 + storm * 0.6) +
-          Math.sin(z * 0.07 + time) * (0.18 + storm * 0.35),
-      );
+        Math.sin(z * 0.07 + time) * (0.18 + storm * 0.35);
+      const distFromShip = Math.hypot(x / 9.5, z / 22.5);
+      if (distFromShip < 1.0) {
+        const hullFactor = Math.pow(distFromShip, 2);
+        wave = wave * hullFactor - (1 - hullFactor) * 2.5;
+      }
+      oceanPositions.setY(i, wave);
     }
     oceanPositions.needsUpdate = true;
     oceanGeometry.computeVertexNormals();
@@ -312,7 +418,7 @@ export function buildVoyage(scene: T.Scene): WorldData {
     clouds.position.x = Math.sin(time * 0.02) * 30;
     clouds.position.y = (1 - storm) * 23;
     needle.rotation.z = desiredHeading() - heading;
-    if (phase === "steer") {
+    if (phase === "steer" || phase === "arrived") {
       for (const island of [...islands, ...courseMarks]) {
         const dx = island.x - boatX,
           dz = island.z - boatZ;
@@ -322,19 +428,20 @@ export function buildVoyage(scene: T.Scene): WorldData {
           -dx * Math.sin(heading) + dz * Math.cos(heading),
         );
       }
-      land.rotation.y = -heading;
-      const shoreZ = -920 - boatZ;
+      const landDx = 0 - boatX;
+      const landDz = -820 - boatZ;
       land.position.set(
-        -boatX * Math.cos(heading) + shoreZ * Math.sin(heading),
-        0,
-        boatX * Math.sin(heading) + shoreZ * Math.cos(heading),
+        landDx * Math.cos(heading) + landDz * Math.sin(heading),
+        -2,
+        -landDx * Math.sin(heading) + landDz * Math.cos(heading),
       );
+      land.rotation.y = heading;
     }
   };
   const world: WorldData = {
     name: "Across the Great Waters",
     initialObjective: "Find Laman and Lemuel below deck",
-    subtitle: "An imagined child’s visit • 1 Nephi 18",
+    subtitle: "1 Nephi 18",
     spawn: { x: 2, y: 4.2, z: 2 },
     solids: ship.solids,
     climbables: ship.climbables,
@@ -343,7 +450,7 @@ export function buildVoyage(scene: T.Scene): WorldData {
     bounds: { minX: -8, maxX: 8, minZ: -20, maxZ: 20 },
     goal: { x: 0, y: 4.2, z: 17, radius: 2 },
     landmarks: [
-      { name: "Common room · below deck", ...brothers },
+      { name: "Cabin · below deck", ...brothers },
       { name: "Nephi", ...ship.points.boundNephi },
       { name: "Liahona", ...ship.points.liahona },
       { name: "Ship wheel", ...ship.points.helm },
@@ -368,9 +475,9 @@ export function buildVoyage(scene: T.Scene): WorldData {
           npc.group.position.set(i ? 0.85 : -0.85, 4.2, -6.2),
         );
       hooks.dialog(
-        "An imagined visit",
+        "1 Nephi 18",
         "The fourth day",
-        "This shortened retelling brings together the earlier rude celebration and the fourth day of the storm. The trouble was their rudeness and forgetting God. Find Laman and Lemuel below deck.",
+        "Laman and Lemuel tie up Nephi. A great storm threatens destruction.",
         () => {},
         {
           actors: [
@@ -545,7 +652,7 @@ export function buildVoyage(scene: T.Scene): WorldData {
               hooks.dialog(
                 "1 Nephi 18:20–21",
                 "Peace on the waters",
-                "Laman and Lemuel free Nephi. He prays to the Lord, and the winds and storm cease. Now play as Nephi, with your young companion beside you. Find the Liahona near the stern.",
+                "Laman and Lemuel free Nephi. He prays to the Lord, and the winds and storm cease. Now play as Nephi. Find the Liahona near the stern.",
                 () => {},
                 {
                   actors: npcs.map((npc, i) => ({
@@ -561,28 +668,55 @@ export function buildVoyage(scene: T.Scene): WorldData {
           }
           let objective = "",
             prompt = "";
+          // Overboard check: jumping or falling off the boat into the ocean
+          if (
+            phase !== "steer" &&
+            phase !== "arrived" &&
+            (player.y < -0.3 ||
+              (player.y < 3.8 &&
+                (Math.abs(player.x) > 8.5 || Math.abs(player.z) > 22)))
+          ) {
+            hooks.caught?.(() => {
+              player.x = 2;
+              player.y = 4.2;
+              player.z = 2;
+              player.vx = 0;
+              player.vy = 0;
+              player.vz = 0;
+              player.yaw = 0;
+              if (phase === "release") {
+                releaseStep = 0;
+              }
+            });
+            return {
+              objective: "Stay on the boat",
+              prompt: "Stay on the boat",
+            };
+          }
           if (phase === "brothers") {
             objective =
               "Find Laman and Lemuel below deck. Use the stairs on the right.";
-            if (near(player, brothers)) {
+            const atBrothers = near(player, brothers);
+            const atLegacyRoom = near(player, { x: -1, y: 0, z: 16 });
+            if (atBrothers) {
               prompt = "{action} · Ask them to release Nephi";
-              if (input.interact) {
-                phase = "release";
-                hooks.dialog(
-                  "1 Nephi 18:13–15",
-                  "The fourth day",
-                  "The storm has become terrible. Laman and Lemuel agree to release Nephi. You follow them up the stairs to the mast.",
-                  () => {},
-                  {
-                    actors: npcs.slice(0, 2).map((npc, i) => ({
-                      group: npc.group,
-                      gesture: "recoil",
-                      speaker: i === 0,
-                    })),
-                    focus: npcs[0].group,
-                  },
-                );
-              }
+            }
+            if ((atBrothers || atLegacyRoom) && input.interact) {
+              phase = "release";
+              hooks.dialog(
+                "1 Nephi 18:13–15",
+                "The fourth day",
+                "The storm has become terrible. Laman and Lemuel agree to release Nephi. You follow them up the stairs to the mast.",
+                () => {},
+                {
+                  actors: npcs.slice(0, 2).map((npc, i) => ({
+                    group: npc.group,
+                    gesture: "recoil",
+                    speaker: i === 0,
+                  })),
+                  focus: npcs[0].group,
+                },
+              );
             }
           } else if (phase === "release") {
             objective = "Follow the brothers up the stairs to Nephi.";
@@ -656,7 +790,7 @@ export function buildVoyage(scene: T.Scene): WorldData {
                 hooks.dialog(
                   "1 Nephi 18:23",
                   "A new shore",
-                  "After many days, the family reaches the promised land. You helped Nephi guide the ship with patience and care.",
+                  "After many days, the family reaches the promised land.",
                   () => hooks.complete(),
                   {
                     actors: npcs
@@ -685,6 +819,8 @@ export function buildVoyage(scene: T.Scene): WorldData {
       npcs.forEach((n) => n.dispose());
       wives.forEach((wife) => wife.dispose());
       companion.dispose();
+      lehi.dispose();
+      sariah.dispose();
       const geometries = new Set<T.BufferGeometry>(),
         materials = new Set<T.Material>();
       root.traverse((o) => {

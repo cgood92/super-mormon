@@ -31,7 +31,7 @@ const ENTRY_MESSAGES: Partial<Record<WorldId, string>> = {
   tree: "Take your time. Follow the path toward the tree.",
   "broken-bow": "Hunt in the mountains and help feed the family.",
   bountiful: "Climb the mountain trail and pray. Then help build the ship.",
-  voyage: "Explore the ship and meet the family aboard.",
+  voyage: "Find Laman and Lemuel below deck. Use the stairs on the right.",
 };
 
 export function chapterLabel(id: WorldId): string {
