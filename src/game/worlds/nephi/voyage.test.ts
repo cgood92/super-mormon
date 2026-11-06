@@ -171,10 +171,7 @@ test("voyage exposes a shared moving actor parent and climbable masts", () => {
     const borderRail = world.solids.find(
       (s) => s.x > 7 && s.y >= 4.1 && Math.abs(s.z - z) < 0.2,
     );
-    assert.ok(
-      borderRail,
-      `border railing is solid near stairs at z=${z}`,
-    );
+    assert.ok(borderRail, `border railing is solid near stairs at z=${z}`);
   }
 
   // Mast climbing attaches snug against the mast trunk
@@ -493,11 +490,22 @@ test("falling or jumping off the boat triggers stay on the boat recovery", () =>
     },
   });
   // Walk for opening scene
-  for (let i = 0; i < 42; i++) runtime.update(0.1, p, { interact: false, interactHeld: false, x: 0, y: 0 });
+  for (let i = 0; i < 42; i++)
+    runtime.update(0.1, p, {
+      interact: false,
+      interactHeld: false,
+      x: 0,
+      y: 0,
+    });
   // Player jumps off upper deck into the ocean
   p.x = 10;
   p.y = -1;
-  const result = runtime.update(0.1, p, { interact: false, interactHeld: false, x: 0, y: 0 });
+  const result = runtime.update(0.1, p, {
+    interact: false,
+    interactHeld: false,
+    x: 0,
+    y: 0,
+  });
   assert.equal(caughtCalled, 1);
   assert.equal(result.objective, "Stay on the boat");
   assert.ok(resetFn);
@@ -534,16 +542,35 @@ test("storm clouds and lightning operate during storm and clear when calmed", ()
     dialog: (_r, _t, _b, next) => next(),
     complete: () => {},
   });
-  for (let i = 0; i < 42; i++) runtime.update(0.1, p, { interact: false, interactHeld: false, x: 0, y: 0 });
+  for (let i = 0; i < 42; i++)
+    runtime.update(0.1, p, {
+      interact: false,
+      interactHeld: false,
+      x: 0,
+      y: 0,
+    });
   const targets = (runtime.snapshot() as any).targets;
   Object.assign(p, targets.brothers);
   runtime.update(0.016, p, { interact: true, interactHeld: true, x: 0, y: 0 });
-  for (let i = 0; i < 300 && (runtime.snapshot() as any).phase === "release"; i++) {
-    runtime.update(0.1, p, { interact: false, interactHeld: false, x: 0, y: 0 });
+  for (
+    let i = 0;
+    i < 300 && (runtime.snapshot() as any).phase === "release";
+    i++
+  ) {
+    runtime.update(0.1, p, {
+      interact: false,
+      interactHeld: false,
+      x: 0,
+      y: 0,
+    });
   }
   // After release, storm is 0
   world.update!(0.1, p);
-  assert.equal(clouds.visible, false, "storm clouds disappear when storm clears");
+  assert.equal(
+    clouds.visible,
+    false,
+    "storm clouds disappear when storm clears",
+  );
   runtime.dispose();
   world.dispose!();
 });
@@ -697,7 +724,10 @@ test("promised land sits constantly in ocean, transforms with heading like chann
   });
   assert.ok(oceanMesh, "Ocean water plane exists");
   const geomParams = (oceanMesh.geometry as any).parameters;
-  assert.ok(geomParams.height >= 2400, "Ocean plane spans at least 2400m to cover horizon");
+  assert.ok(
+    geomParams.height >= 2400,
+    "Ocean plane spans at least 2400m to cover horizon",
+  );
 
   // Hill bases sit below ocean water plane (y <= -1.35)
   for (const child of land.children) {
@@ -710,7 +740,10 @@ test("promised land sits constantly in ocean, transforms with heading like chann
   }
 
   // Initial land position is distant along the course
-  assert.ok(land.position.z <= -800, `shore is distant at start of voyage: ${land.position.z}`);
+  assert.ok(
+    land.position.z <= -800,
+    `shore is distant at start of voyage: ${land.position.z}`,
+  );
 
   world.dispose!();
 });

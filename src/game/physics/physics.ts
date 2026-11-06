@@ -611,7 +611,9 @@ export function stepPlayer(
         const steps = Math.ceil(Math.abs(targetY - startY) / 0.05);
         for (let step = 1; step <= steps; step++) {
           const candidate = startY + ((targetY - startY) * step) / steps;
-          if (!clearAt(player.x, candidate, player.z, obstacleSolids, bodyHeight))
+          if (
+            !clearAt(player.x, candidate, player.z, obstacleSolids, bodyHeight)
+          )
             break;
           player.y = candidate;
         }

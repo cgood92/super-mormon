@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import * as T from "three";
 import { buildSculptedLehi } from "./lehi-sculpted-models.ts";
-import { createPlayableLehi, createSculptedCharacterRig } from "./playable-lehi.ts";
+import {
+  createPlayableLehi,
+  createSculptedCharacterRig,
+} from "./playable-lehi.ts";
 import type { CharacterState } from "./character.ts";
 
 const standing: CharacterState = {

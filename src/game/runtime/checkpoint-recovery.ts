@@ -69,7 +69,8 @@ export class CheckpointRecovery {
           "A sentry saw Teancum or his servant. Keep both companions out of the amber sight cones, or behind stone cover.";
       } else {
         el("caught-heading").textContent = "Spotted!";
-        el("caught-detail").textContent = "A spy saw you. Back to the beginning.";
+        el("caught-detail").textContent =
+          "A spy saw you. Back to the beginning.";
       }
     }
   };

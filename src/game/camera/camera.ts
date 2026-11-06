@@ -372,17 +372,7 @@ function findClearViewpoint(
   maxCeilY = Infinity,
 ): { eye: T.Vector3; yaw: number; dist: number } | undefined {
   const angleOffsets = [
-    0,
-    0.25,
-    -0.25,
-    0.5,
-    -0.5,
-    0.75,
-    -0.75,
-    1.0,
-    -1.0,
-    1.25,
-    -1.25,
+    0, 0.25, -0.25, 0.5, -0.5, 0.75, -0.75, 1.0, -1.0, 1.25, -1.25,
   ];
   const distances = [
     baseDistance,
@@ -636,9 +626,7 @@ export class FollowCamera {
             const angleOffset =
               i === 0
                 ? 0
-                : (i % 2 === 1 ? 1 : -1) *
-                  Math.ceil(i / 2) *
-                  (Math.PI / 4);
+                : (i % 2 === 1 ? 1 : -1) * Math.ceil(i / 2) * (Math.PI / 4);
             const yaw = player.yaw + angleOffset;
             const roomClamp = room?.viewBounds ?? room?.bounds;
             const eye = new T.Vector3(
@@ -677,8 +665,16 @@ export class FollowCamera {
       });
       if (aligned.length > 0) {
         aligned.sort((a, b) => {
-          const dirA = new T.Vector3(focus.x - a.x, 0, focus.z - a.z).normalize();
-          const dirB = new T.Vector3(focus.x - b.x, 0, focus.z - b.z).normalize();
+          const dirA = new T.Vector3(
+            focus.x - a.x,
+            0,
+            focus.z - a.z,
+          ).normalize();
+          const dirB = new T.Vector3(
+            focus.x - b.x,
+            0,
+            focus.z - b.z,
+          ).normalize();
           const dotA = dirA.dot(prevDir);
           const dotB = dirB.dot(prevDir);
           if (Math.abs(dotA - dotB) > 0.2) return dotB - dotA;
@@ -932,8 +928,7 @@ export class FollowCamera {
             eye.x > roomClamp.maxX - 0.55 ||
             eye.z < roomClamp.minZ + 0.55 ||
             eye.z > roomClamp.maxZ - 0.55 ||
-            (roomClamp.minY !== undefined &&
-              eye.y < roomClamp.minY + 0.25) ||
+            (roomClamp.minY !== undefined && eye.y < roomClamp.minY + 0.25) ||
             (roomClamp.maxY !== undefined && eye.y > roomClamp.maxY - 0.28),
         )
       )

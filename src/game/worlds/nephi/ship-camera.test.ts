@@ -337,14 +337,7 @@ test("entering the common room doorway maintains smooth camera without angle sna
   for (let step = 1; step <= 60; step++) {
     player.z = 11.0 + (step / 60) * 3.0;
     const room = selectCameraRoom(ship.cameraRooms, player, follow.roomId);
-    follow.update(
-      1 / 30,
-      player,
-      ship.solids,
-      neutral,
-      "hub",
-      room,
-    );
+    follow.update(1 / 30, player, ship.solids, neutral, "hub", room);
 
     // Camera must stay behind player, never flipping 180 degrees
     assert.ok(
