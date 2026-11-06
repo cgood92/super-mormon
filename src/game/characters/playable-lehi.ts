@@ -23,6 +23,7 @@ export function createSculptedCharacterRig(
   const actorScale = role === "child" ? 1.15 / 2 : 0.825;
   const body = new T.Group();
   body.name = "body";
+  body.rotation.order = "YXZ";
   group.add(body);
   body.add(model.group);
 
@@ -71,10 +72,15 @@ export function createSculptedCharacterRig(
     for (let i = 0; i < positions.count; i++) {
       const x = positions.getX(i),
         y = positions.getY(i);
+      const isMantle = mesh.name === "flowing-mantle";
       const armWeight =
-        T.MathUtils.smoothstep(Math.abs(x), 0.22, 0.58) *
-        (1 - T.MathUtils.smoothstep(y, 1.45, 1.61)) *
-        T.MathUtils.smoothstep(y, 0.88, 1.12);
+        T.MathUtils.smoothstep(Math.abs(x), isMantle ? 0.35 : 0.22, 0.48) *
+        (1 - T.MathUtils.smoothstep(y, 1.4, 1.6)) *
+        T.MathUtils.smoothstep(
+          y,
+          isMantle ? 0.95 : 0.72,
+          isMantle ? 1.08 : 0.85,
+        );
       indices[i * 4] = 0;
       weights[i * 4] = 1 - armWeight;
       indices[i * 4 + 1] = x < 0 ? 1 : 2;

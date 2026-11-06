@@ -20,6 +20,7 @@ export function createMotionDriver(role: CharacterRole): {
     return object;
   };
   const body = node("body", group);
+  body.rotation.order = "YXZ";
   body.scale.y = 0.84;
   const head = node("head", body, 0, 1.64, 0.025);
   const cloak = node("cloak", body, 0, 1.37, -0.11);
@@ -55,6 +56,7 @@ export function createMotionDriver(role: CharacterRole): {
   let turnBank = 0;
   let lastAirVy = 0;
   let wasLocomoting = false;
+  let skidFacingYaw: number | undefined;
   const stanceAnchors: ({ x: number; z: number; yaw: number } | null)[] = [
     null,
     null,
@@ -75,7 +77,26 @@ export function createMotionDriver(role: CharacterRole): {
         firstUpdate = false;
       }
       const previousYaw = renderedYaw;
-      renderedYaw += angleDiff(state.yaw, renderedYaw) * damp(23, dt);
+      if (state.move === "turnSkid") {
+        const speed = Math.hypot(state.vx, state.vz);
+        const pivotT =
+          state.moveTime !== undefined
+            ? T.MathUtils.smoothstep(state.moveTime, 0.22, 0.41)
+            : 0;
+        if (skidFacingYaw === undefined) {
+          skidFacingYaw =
+            speed > 0.2 ? Math.atan2(state.vx, state.vz) : state.yaw;
+        }
+        if (pivotT > 0) {
+          renderedYaw =
+            skidFacingYaw + angleDiff(state.yaw, skidFacingYaw) * pivotT;
+        } else {
+          renderedYaw = skidFacingYaw;
+        }
+      } else {
+        skidFacingYaw = undefined;
+        renderedYaw += angleDiff(state.yaw, renderedYaw) * damp(23, dt);
+      }
       // Keep the existing tilt in world space while the actor turns beneath it.
       const yawStep = renderedYaw - previousYaw;
       const oldLean = forwardLean;
@@ -229,16 +250,19 @@ export function createMotionDriver(role: CharacterRole): {
       body.scale.y = 0.84 * (1 - landing * 0.09);
       body.scale.x = 1 + landing * 0.045;
       body.scale.z = 1 + landing * 0.045;
+      const turnDiff = angleDiff(state.yaw, renderedYaw);
       body.rotation.z = turnBank;
       body.rotation.x = (armored ? 0.055 : 0) + forwardLean;
+      body.rotation.y = 0;
       cloak.rotation.x =
         -0.08 - gaitBlend * 0.18 + Math.sin(phase * 1.3) * gaitBlend * 0.035;
-      head.rotation.y = Math.sin(idlePhase * 0.4) * 0.055;
+      head.rotation.y = Math.sin(idlePhase * 0.4) * 0.055 + turnDiff * 0.45;
       head.rotation.x = state.grounded
         ? armored
           ? 0.07
           : 0
         : Math.max(-0.12, Math.min(0.15, -state.vy * 0.018));
+      head.rotation.z = 0;
 
       const move =
         state.crouching && !state.grounded && state.move !== "groundPound"
@@ -435,13 +459,38 @@ export function createMotionDriver(role: CharacterRole): {
           arms[1].rotation.set(-0.45, 0, -0.3);
           head.rotation.set(0.08, 0, 0);
         }
-      } else if (move === "backflip" || move === "sideflip") {
+      } else if (move === "sideflip") {
+        // Super Mario 64 side somersault: an acrobatic mid-air cartwheel (MARIO_ANIM_SLIDEFLIP)
+        const progress = Math.min(1, moveTime / 0.65);
+        const angle = Math.PI * 2 * progress;
+        const split = Math.sin(progress * Math.PI);
+        forwardLean = 0;
+        turnBank = 0;
+        // Elevated pivot keeps inverted head and torso above the ground
+        body.position.y = 0.85 * (1 - Math.cos(angle));
+        body.rotation.order = "YXZ";
+        body.rotation.y = Math.PI / 2;
+        body.rotation.x = 0;
+        body.rotation.z = angle;
+        // Acrobatic star/split in the lateral cartwheel plane
+        legs[0].rotation.set(0, 0, 0.65 * split);
+        legs[1].rotation.set(0, 0, -0.65 * split);
+        knees[0].rotation.set(0.12 * (1 - split), 0, 0);
+        knees[1].rotation.set(0.12 * (1 - split), 0, 0);
+        feet[0].rotation.set(0.45 * split, 0, 0);
+        feet[1].rotation.set(0.45 * split, 0, 0);
+        // Arms wheel outward in the lateral cartwheel plane
+        arms[0].rotation.set(-0.1, 0, 2.15 * split);
+        arms[1].rotation.set(-0.1, 0, -2.15 * split);
+        head.rotation.set(-0.08 * split, 0, 0.22 * split);
+      } else if (move === "backflip") {
         const progress = Math.min(1, moveTime / 0.7);
         const angle = Math.PI * 2 * progress;
+        const split = Math.sin(progress * Math.PI);
         // A raised center pivot keeps the inverted head above the ground.
         body.position.y = 0.83 * (1 - Math.cos(angle));
-        body.rotation.x = move === "sideflip" ? 0 : -angle;
-        body.rotation.z = move === "sideflip" ? angle : 0;
+        body.rotation.x = -angle;
+        body.rotation.z = 0;
         legs[0].rotation.x = -0.45;
         legs[1].rotation.x = 0.55;
         knees[0].rotation.x = 0.42;
@@ -464,13 +513,139 @@ export function createMotionDriver(role: CharacterRole): {
         arms[0].rotation.x = arms[1].rotation.x = impact ? -0.5 : -1.35;
         head.rotation.x = -0.08;
       } else if (move === "longJump") {
-        body.rotation.x = 0.28;
+        // SM64 low aerodynamic leap pose: torso pitched forward, arms back, legs kicked back
+        body.rotation.x = 0.38;
         body.scale.z = 1.2;
         body.position.y = Math.max(body.position.y, 0.1);
-        arms[0].rotation.x = -1.15;
-        arms[1].rotation.x = -1.15;
-        legs[0].rotation.x = 0.45;
-        legs[1].rotation.x = 0.45;
+        head.rotation.set(-0.35, 0, 0);
+        arms[0].rotation.set(0.65, 0, 0.35);
+        arms[1].rotation.set(0.65, 0, -0.35);
+        legs[0].rotation.set(0.55, 0, 0);
+        legs[1].rotation.set(0.55, 0, 0);
+        knees[0].rotation.set(0.42, 0, 0);
+        knees[1].rotation.set(0.42, 0, 0);
+        feet[0].rotation.set(0.65, 0, 0);
+        feet[1].rotation.set(0.65, 0, 0);
+      } else if (move === "slideRollout") {
+        // SM64 long jump landing rollout: crouched forward slide, hands near ground
+        body.position.y = -0.04;
+        body.rotation.x = 0.32;
+        head.rotation.set(-0.25, 0, 0);
+        arms[0].rotation.set(-1.1, 0, 0.25);
+        arms[1].rotation.set(-1.1, 0, -0.25);
+        legs[0].rotation.set(-0.65, 0, 0);
+        legs[1].rotation.set(-0.45, 0, 0);
+        knees[0].rotation.set(0.95, 0, 0);
+        knees[1].rotation.set(0.85, 0, 0);
+        feet[0].rotation.set(0.1, 0, 0);
+        feet[1].rotation.set(0.1, 0, 0);
+      } else if (move === "turnSkid") {
+        // Super Mario 64 turn-around skid (MARIO_ANIM_TURNING_PART1 & PART2):
+        // Part 1: Hips dropped low, torso leaning heavily backward opposite sliding momentum,
+        // lead leg braced forward digging heel in, trailing knee bent underneath, arms spread wide for balance.
+        // Part 2: As sliding momentum halts, torso pitches forward, trailing foot pivots around to plant,
+        // pushing off into the new direction.
+        stanceAnchors[0] = null;
+        stanceAnchors[1] = null;
+        const tIn =
+          state.moveTime !== undefined
+            ? T.MathUtils.smoothstep(moveTime, 0, 0.08)
+            : 1.0;
+        const pivot =
+          state.moveTime !== undefined
+            ? T.MathUtils.smoothstep(moveTime, 0.22, 0.41)
+            : 0;
+
+        forwardLean = T.MathUtils.lerp(forwardLean, 0.12 * pivot, tIn);
+        turnBank = T.MathUtils.lerp(turnBank, 0, tIn);
+
+        // Hips drop during skid, then rise back up into the push-off plant
+        const hipDrop = T.MathUtils.lerp(-0.04, -0.01, pivot);
+        body.position.y = hipDrop * tIn;
+
+        // Torso pitch: leans backward against slide (-0.26), then swings forward (+0.10) to drive push-off
+        const bodyPitch = T.MathUtils.lerp(
+          T.MathUtils.lerp(0.1, -0.26, tIn),
+          0.1,
+          pivot,
+        );
+        body.rotation.set(bodyPitch, 0, 0);
+
+        head.rotation.set(T.MathUtils.lerp(0.12 * tIn, -0.04, pivot), 0, 0);
+
+        // Limbs:
+        // Lead leg (0) begins braced heel-dig, kept within coat bounds
+        legs[0].rotation.set(
+          T.MathUtils.lerp(T.MathUtils.lerp(-0.12, -0.26, tIn), 0.2, pivot),
+          0,
+          0,
+        );
+        knees[0].rotation.set(
+          T.MathUtils.lerp(T.MathUtils.lerp(0.08, 0.16, tIn), 0.35, pivot),
+          0,
+          0,
+        );
+        feet[0].rotation.set(T.MathUtils.lerp(-0.35 * tIn, 0.12, pivot), 0, 0);
+
+        // Trailing leg (1) tucked underneath, within coat bounds
+        legs[1].rotation.set(
+          T.MathUtils.lerp(T.MathUtils.lerp(0.12, 0.22, tIn), -0.24, pivot),
+          0,
+          0,
+        );
+        knees[1].rotation.set(
+          T.MathUtils.lerp(T.MathUtils.lerp(0.1, 0.78, tIn), 0.15, pivot),
+          0,
+          0,
+        );
+        feet[1].rotation.set(T.MathUtils.lerp(0.12 * tIn, -0.08, pivot), 0, 0);
+
+        // Arms: wide counterbalance flares inward to pump into sprint
+        arms[0].rotation.set(
+          T.MathUtils.lerp(T.MathUtils.lerp(-0.25, 0.35, tIn), -0.75, pivot),
+          0,
+          T.MathUtils.lerp(0.85 * tIn, 0.15, pivot),
+        );
+        arms[1].rotation.set(
+          T.MathUtils.lerp(T.MathUtils.lerp(0.25, -0.55, tIn), 0.75, pivot),
+          0,
+          T.MathUtils.lerp(-0.85 * tIn, -0.15, pivot),
+        );
+      } else if (move === "dive") {
+        // SM64 aerial dive: horizontal body, arms outstretched forward, legs straight back
+        body.rotation.x = 1.35;
+        head.rotation.set(-0.5, 0, 0);
+        arms[0].rotation.set(-2.8, 0, -0.18);
+        arms[1].rotation.set(-2.8, 0, 0.18);
+        legs[0].rotation.set(0.15, 0, 0);
+        legs[1].rotation.set(0.15, 0, 0);
+        knees[0].rotation.set(0.1, 0, 0);
+        knees[1].rotation.set(0.1, 0, 0);
+        feet[0].rotation.set(0.55, 0, 0);
+        feet[1].rotation.set(0.55, 0, 0);
+      } else if (move === "bellySlide") {
+        // SM64 dive slide: sliding flat on belly, head up, arms forward
+        body.position.y = -0.04;
+        body.rotation.x = 1.42;
+        head.rotation.set(-0.55, 0, 0);
+        arms[0].rotation.set(-2.6, 0, -0.2);
+        arms[1].rotation.set(-2.6, 0, 0.2);
+        legs[0].rotation.set(0.12, 0, 0);
+        legs[1].rotation.set(0.12, 0, 0);
+        knees[0].rotation.set(0.15, 0, 0);
+        knees[1].rotation.set(0.15, 0, 0);
+      } else if (move === "slideKick") {
+        // SM64 slide kick: leaning back, one leg thrust forward, arms planted
+        body.position.y = -0.04;
+        body.rotation.x = -0.38;
+        body.rotation.z = 0.22;
+        head.rotation.set(0.2, 0, -0.15);
+        legs[1].rotation.set(-1.35, 0, 0);
+        knees[1].rotation.set(0.08, 0, 0);
+        legs[0].rotation.set(0.22, 0, 0);
+        knees[0].rotation.set(0.95, 0, 0);
+        arms[0].rotation.set(-0.45, 0, 0.6);
+        arms[1].rotation.set(-0.45, 0, -0.6);
       } else if (move === "wallKick") {
         body.rotation.x = -0.22;
         arms[0].rotation.x = -1.55;

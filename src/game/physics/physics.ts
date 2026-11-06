@@ -37,7 +37,12 @@ export type PlayerMove =
   | "poundLand"
   | "wallKick"
   | "ledgeHang"
-  | "climb";
+  | "climb"
+  | "turnSkid"
+  | "slideRollout"
+  | "dive"
+  | "bellySlide"
+  | "slideKick";
 export type MoveInput = {
   x: number;
   y: number;
@@ -45,6 +50,8 @@ export type MoveInput = {
   jumpHeld: boolean;
   crouch?: boolean;
   traversal?: boolean;
+  dive?: boolean;
+  interact?: boolean;
 };
 export type PlayerState = {
   x: number;
@@ -71,6 +78,7 @@ export type PlayerState = {
   climbAway?: { x: number; z: number };
   airMoveLock: number;
   crouchHeld: boolean;
+  diveHeld?: boolean;
 };
 export type StepEvents = {
   jumped: boolean;
@@ -114,11 +122,17 @@ export function createPlayer(x = 0, y = 0, z = 0): PlayerState {
     climbCooldown: 0,
     airMoveLock: 0,
     crouchHeld: false,
+    diveHeld: false,
   };
 }
 
 function height(player: PlayerState): number {
-  return player.crouching ? CROUCH_HEIGHT : HEIGHT;
+  return player.crouching ||
+    player.move === "slideRollout" ||
+    player.move === "bellySlide" ||
+    player.move === "slideKick"
+    ? CROUCH_HEIGHT
+    : HEIGHT;
 }
 
 function horizontalOverlap(x: number, z: number, solid: Solid): boolean {
@@ -154,19 +168,28 @@ function clearAt(
   return solids.every((solid) => !bodyOverlap(x, y, z, solid, bodyHeight));
 }
 
-function supportHeight(player: PlayerState, solids: Solid[]): number {
+function supportHeightAt(
+  x: number,
+  z: number,
+  footY: number,
+  solids: Solid[],
+): number {
   let result = 0;
   for (const solid of solids) {
     const top = solid.y + solid.h;
     if (
       // Vertical support must be at or below the feet. Higher treads are
       // handled by horizontal step-up, not allowed to mask the floor below.
-      top <= player.y + EPS &&
-      horizontalOverlap(player.x, player.z, solid)
+      top <= footY + EPS &&
+      horizontalOverlap(x, z, solid)
     )
       result = Math.max(result, top);
   }
   return result;
+}
+
+function supportHeight(player: PlayerState, solids: Solid[]): number {
+  return supportHeightAt(player.x, player.z, player.y, solids);
 }
 
 function moveHorizontal(
@@ -445,6 +468,9 @@ export function stepPlayer(
   }
   const crouchPressed = !!input.crouch && !player.crouchHeld;
   player.crouchHeld = !!input.crouch;
+  const diveInput = !!(input.dive || (input.interact && !input.crouch));
+  const divePressed = diveInput && !player.diveHeld;
+  player.diveHeld = diveInput;
   if (
     crouchPressed &&
     !player.grounded &&
@@ -459,6 +485,46 @@ export function stepPlayer(
     player.vy = 0;
     player.coyoteTime = 0;
     player.jumpBufferTime = 0;
+  }
+  if (
+    divePressed &&
+    !player.grounded &&
+    !player.ledge &&
+    !player.climbId &&
+    player.move !== "groundPound" &&
+    player.move !== "poundLand" &&
+    player.move !== "dive"
+  ) {
+    setMove(player, "dive");
+    const diveSpeed = Math.max(7.2, player.runSpeed * 1.3);
+    player.vx = Math.sin(player.yaw) * diveSpeed;
+    player.vz = Math.cos(player.yaw) * diveSpeed;
+    player.vy = Math.max(player.vy, 1.4);
+    player.airMoveLock = 0.45;
+    player.coyoteTime = 0;
+    player.jumpBufferTime = 0;
+  }
+  if (
+    divePressed &&
+    player.grounded &&
+    !player.ledge &&
+    !player.climbId &&
+    player.move !== "bellySlide" &&
+    player.move !== "slideKick"
+  ) {
+    if (player.crouching || player.move === "crawl") {
+      setMove(player, "slideKick");
+      const kickSpeed = Math.max(6.8, player.runSpeed * 1.25);
+      player.vx = Math.sin(player.yaw) * kickSpeed;
+      player.vz = Math.cos(player.yaw) * kickSpeed;
+      player.airMoveLock = 0.35;
+    } else if (player.runSpeed > 3.0) {
+      setMove(player, "bellySlide");
+      const slideSpeed = Math.max(6.6, player.runSpeed * 1.2);
+      player.vx = Math.sin(player.yaw) * slideSpeed;
+      player.vz = Math.cos(player.yaw) * slideSpeed;
+      player.airMoveLock = 0.4;
+    }
   }
   if (
     input.jump &&
@@ -588,18 +654,154 @@ export function stepPlayer(
     const targetSpeed = player.crouching ? SPEED * 0.43 : SPEED;
     const targetVx = worldX * targetSpeed,
       targetVz = worldZ * targetSpeed;
-    if (
+    if (player.move === "bellySlide" || player.move === "slideKick") {
+      const sampleDist = 0.65;
+      const speed = Math.hypot(player.vx, player.vz);
+      const dirX = speed > EPS ? player.vx / speed : Math.sin(player.yaw);
+      const dirZ = speed > EPS ? player.vz / speed : Math.cos(player.yaw);
+      const aheadY = supportHeightAt(
+        player.x + dirX * sampleDist,
+        player.z + dirZ * sampleDist,
+        player.y,
+        solids,
+      );
+      const behindY = supportHeightAt(
+        player.x - dirX * sampleDist,
+        player.z - dirZ * sampleDist,
+        player.y,
+        solids,
+      );
+      const slope = (aheadY - behindY) / (2 * sampleDist);
+      const slopeAccel = -Math.sin(Math.atan(slope)) * GRAVITY * 0.9;
+      const friction = player.move === "bellySlide" ? 18 : 28;
+      const newSpeed = Math.max(0, speed + (slopeAccel - friction) * subdt);
+      if (speed > EPS) {
+        player.vx = dirX * newSpeed;
+        player.vz = dirZ * newSpeed;
+      }
+      player.runSpeed = newSpeed;
+      if (player.jumpBufferTime > 0) {
+        player.vy = 6.2;
+        player.grounded = false;
+        player.jumpBufferTime = 0;
+        setMove(player, "jump");
+        events.jumped = true;
+      } else if (
+        newSpeed < 0.35 ||
+        player.moveTime >= (player.move === "bellySlide" ? 0.48 : 0.35)
+      ) {
+        setMove(
+          player,
+          player.crouching
+            ? length > 0.1
+              ? "crawl"
+              : "crouch"
+            : length > 0.1
+              ? "run"
+              : "idle",
+        );
+      }
+    } else if (player.move === "slideRollout") {
+      const speed = Math.hypot(player.vx, player.vz);
+      const dirX = speed > EPS ? player.vx / speed : Math.sin(player.yaw);
+      const dirZ = speed > EPS ? player.vz / speed : Math.cos(player.yaw);
+      const newSpeed = Math.max(0, speed - FRICTION * 0.42 * subdt);
+      if (speed > EPS) {
+        player.vx = dirX * newSpeed;
+        player.vz = dirZ * newSpeed;
+      }
+      player.runSpeed = newSpeed;
+      if (player.jumpBufferTime > 0) {
+        player.vy = JUMP;
+        player.grounded = false;
+        player.jumpBufferTime = 0;
+        setMove(player, "jump");
+        events.jumped = true;
+      } else if (newSpeed < 0.3 || player.moveTime >= 0.28) {
+        setMove(
+          player,
+          length > 0.1 && !player.crouching
+            ? "run"
+            : player.crouching
+              ? "crawl"
+              : "idle",
+        );
+      }
+    } else if (player.move === "turnSkid") {
+      // Super Mario 64 act_turning_around deceleration (+10% slide distance over prior tuning):
+      // Deceleration 15.7 m/s^2 slides for ~0.41s over ~1.35m from full run speed.
+      const skidFriction = 15.7;
+      const currentSpeed = Math.hypot(player.vx, player.vz);
+      const newSpeed = Math.max(0, currentSpeed - skidFriction * subdt);
+      if (currentSpeed > EPS) {
+        player.vx = (player.vx / currentSpeed) * newSpeed;
+        player.vz = (player.vz / currentSpeed) * newSpeed;
+      }
+      player.runSpeed = newSpeed;
+      if (player.jumpBufferTime > 0) {
+        const flipSpeed = Math.min(8.8, Math.max(7.2, currentSpeed * 1.35));
+        const backDirX =
+          currentSpeed > EPS
+            ? -player.vx / currentSpeed
+            : length > 0.1
+              ? worldX
+              : -Math.sin(player.yaw);
+        const backDirZ =
+          currentSpeed > EPS
+            ? -player.vz / currentSpeed
+            : length > 0.1
+              ? worldZ
+              : -Math.cos(player.yaw);
+        player.vx = backDirX * flipSpeed;
+        player.vz = backDirZ * flipSpeed;
+        player.yaw = Math.atan2(player.vx, player.vz);
+        player.vy = 10.5;
+        player.grounded = false;
+        player.airMoveLock = 0.35;
+        player.jumpBufferTime = 0;
+        setMove(player, "sideflip");
+        events.jumped = true;
+      } else if (
+        (player.runSpeed < 0.35 && player.moveTime >= 0.3) ||
+        player.moveTime >= 0.43
+      ) {
+        if (length > 0.1) {
+          // SM64 begin_walking_action with push-off speed (8.0f / 32.0f = 25% max speed)
+          const pushOffSpeed = 1.6;
+          player.yaw = Math.atan2(worldX, worldZ);
+          player.vx = worldX * pushOffSpeed;
+          player.vz = worldZ * pushOffSpeed;
+          player.runSpeed = pushOffSpeed;
+          setMove(player, "run");
+        } else {
+          setMove(player, "idle");
+        }
+      }
+    } else if (
       player.move === "groundPound" ||
       (player.move === "poundLand" && player.moveTime < 0.18)
     ) {
       player.vx *= Math.exp(-18 * subdt);
       player.vz *= Math.exp(-18 * subdt);
-    } else if (player.airMoveLock <= 0) {
+    } else if (player.move !== "dive" && player.airMoveLock <= 0) {
       const reverse =
         length > 0.01 && player.vx * worldX + player.vz * worldZ < -0.1;
       const cornering =
         length > 0.01 &&
         Math.abs(player.vx * worldZ - player.vz * worldX) > 0.5;
+      const velDotInput =
+        player.runSpeed > EPS
+          ? (player.vx * worldX + player.vz * worldZ) / player.runSpeed
+          : 0;
+      if (
+        player.grounded &&
+        !player.crouching &&
+        player.runSpeed > 3.0 &&
+        length > 0.1 &&
+        velDotInput < -0.7
+      ) {
+        setMove(player, "turnSkid");
+      }
       const maxDelta =
         (length < 0.01
           ? FRICTION
@@ -658,7 +860,7 @@ export function stepPlayer(
             : move === "doubleJump"
               ? 10.6 + speedBonus
               : move === "sideflip"
-                ? 9.5
+                ? 10.5
                 : move === "longJump"
                   ? 8
                   : JUMP + speedBonus * 0.5;
@@ -674,9 +876,17 @@ export function stepPlayer(
         player.airMoveLock = 0.2;
       }
       if (move === "sideflip") {
-        player.vx = -player.vx * 1.1;
-        player.vz = -player.vz * 1.1;
-        player.airMoveLock = 0.25;
+        const flipSpeed = Math.min(8.8, Math.max(7.2, player.runSpeed * 1.35));
+        const dir = Math.hypot(player.vx, player.vz);
+        if (dir > EPS) {
+          player.vx = (-player.vx / dir) * flipSpeed;
+          player.vz = (-player.vz / dir) * flipSpeed;
+        } else if (length > 0.1) {
+          player.vx = worldX * flipSpeed;
+          player.vz = worldZ * flipSpeed;
+        }
+        player.yaw = Math.atan2(player.vx, player.vz);
+        player.airMoveLock = 0.35;
       }
       player.grounded = false;
       player.crouching = standingBlocked;
@@ -777,6 +987,10 @@ export function stepPlayer(
             player.comboTime = 0;
             player.jumpStage = 0;
             setMove(player, "poundLand");
+          } else if (player.move === "longJump") {
+            setMove(player, "slideRollout");
+          } else if (player.move === "dive") {
+            setMove(player, "bellySlide");
           }
         }
         player.grounded = true;
@@ -785,7 +999,13 @@ export function stepPlayer(
     player.y = nextY;
     if (player.grounded) {
       if (player.comboTime <= 0) player.jumpStage = 0;
-      if (player.move !== "poundLand" || player.moveTime >= 0.18)
+      if (
+        (player.move !== "poundLand" || player.moveTime >= 0.18) &&
+        player.move !== "turnSkid" &&
+        player.move !== "slideRollout" &&
+        player.move !== "bellySlide" &&
+        player.move !== "slideKick"
+      )
         setMove(
           player,
           player.crouching

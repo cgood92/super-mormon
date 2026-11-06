@@ -3,6 +3,10 @@ import { createCharacter } from "../characters/character";
 import type { StoryShot } from "../camera/cinematic";
 import { createPlayer, type PlayerState } from "../physics/physics";
 import { createPoundImpact } from "../rendering/pound-impact";
+import {
+  createLocomotionParticles,
+  type LocomotionParticles,
+} from "../rendering/locomotion-particles";
 import { label } from "../rendering/art";
 import { galleryReturnSpawn } from "../worlds/conference/gallery-entry";
 import type { createStoryScene } from "../worlds/jerusalem/story-scenes";
@@ -55,6 +59,7 @@ export class WorldSession {
   treasureMeshes = new Map<string, T.Group>();
   goalMarker: T.Group | null = null;
   poundImpact: ReturnType<typeof createPoundImpact> | null = null;
+  locomotionParticles: LocomotionParticles | null = null;
 
   build(
     id: WorldId,
@@ -67,6 +72,7 @@ export class WorldSession {
     this.scene = new T.Scene();
     this.world = prepared.buildWorld(id, this.scene);
     this.poundImpact = createPoundImpact(this.scene);
+    this.locomotionParticles = createLocomotionParticles(this.scene);
     this.storyObjective = this.world.initialObjective ?? "";
     if (id === "hub") this.decorateGalleryProgress(completed);
     const spawn =
@@ -288,6 +294,8 @@ export class WorldSession {
   dispose() {
     this.poundImpact?.dispose();
     this.poundImpact = null;
+    this.locomotionParticles?.dispose();
+    this.locomotionParticles = null;
     this.adventure?.dispose();
     this.adventure = null;
     this.treeScene?.dispose();

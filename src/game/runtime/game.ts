@@ -38,6 +38,25 @@ import { Discoveries } from "./discoveries";
 import { Gameplay } from "./gameplay";
 import { CheckpointRecovery } from "./checkpoint-recovery";
 
+function parseSlowMoScale(search: string): number | null {
+  try {
+    const params = new URLSearchParams(search);
+    const slowmo = params.get("slowmo");
+    if (slowmo !== null) {
+      const val = parseFloat(slowmo);
+      return Number.isFinite(val) && val > 0 && val < 1 ? val : 0.25;
+    }
+    const speed = params.get("speed");
+    if (speed !== null) {
+      const val = parseFloat(speed);
+      return Number.isFinite(val) && val > 0 && val < 1 ? val : 0.25;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 /** Application lifecycle; scene data, simulation, UI and rendering own their state. */
 export class Game {
   private readonly app = mountGameShell();
@@ -52,6 +71,10 @@ export class Game {
   private readonly session = new WorldSession();
   private readonly testScene = sceneEntry(location.search);
   private readonly completed = this.readProgress();
+  private readonly slowMoDevScale =
+    typeof location !== "undefined" ? parseSlowMoScale(location.search) : null;
+  private timeScale = this.slowMoDevScale ?? 1.0;
+  private slowMoBadge: HTMLElement | null = null;
   private readonly ui = new GameUI(this.app, this.input, this.analytics, {
     canPause: () => this.started && !this.transition,
     restart: () => {
@@ -214,6 +237,20 @@ export class Game {
           snapshot: this.snapshot,
         },
       });
+
+    if (typeof document !== "undefined" && this.slowMoDevScale !== null) {
+      this.slowMoBadge = document.createElement("div");
+      this.slowMoBadge.style.cssText =
+        "position:fixed;bottom:18px;right:18px;background:rgba(20,20,30,0.85);color:#ffd700;padding:8px 16px;border-radius:24px;font-family:system-ui,-apple-system,sans-serif;font-size:13px;font-weight:700;letter-spacing:0.3px;z-index:9999;cursor:pointer;user-select:none;border:1.5px solid rgba(255,215,0,0.6);box-shadow:0 4px 16px rgba(0,0,0,0.4);backdrop-filter:blur(8px);transition:all 0.15s ease;";
+      this.updateSlowMoBadge();
+      this.slowMoBadge.addEventListener("click", () => this.toggleSlowMo());
+      document.body.appendChild(this.slowMoBadge);
+      window.addEventListener("keydown", (e) => {
+        if (e.code === "KeyT" && !e.repeat) {
+          this.toggleSlowMo();
+        }
+      });
+    }
   }
   private readProgress(): Set<StoryId> {
     try {
@@ -535,6 +572,24 @@ export class Game {
     );
   }
 
+  private toggleSlowMo = () => {
+    if (this.slowMoDevScale === null) return;
+    this.timeScale = this.timeScale < 1 ? 1 : this.slowMoDevScale;
+    this.updateSlowMoBadge();
+  };
+
+  private updateSlowMoBadge = () => {
+    if (!this.slowMoBadge || this.slowMoDevScale === null) return;
+    const isSlow = this.timeScale < 1;
+    this.slowMoBadge.textContent = isSlow
+      ? `⏱️ Slow-Mo: ${this.timeScale.toFixed(2)}x (Press T / Tap to Toggle)`
+      : "⏱️ Speed: 1.0x Normal (Press T / Tap for Slow-Mo)";
+    this.slowMoBadge.style.borderColor = isSlow
+      ? "rgba(255,215,0,0.6)"
+      : "rgba(255,255,255,0.2)";
+    this.slowMoBadge.style.color = isSlow ? "#ffd700" : "#ffffff";
+  };
+
   private update = (dt: number, activeElapsed = dt) => {
     this.ui.refreshControlHints();
     if (
@@ -571,7 +626,9 @@ export class Game {
       this.ui.navigateMenu(state, dt);
       return;
     }
-    this.gameplay.update(dt, activeElapsed, state);
+    const effectiveDt = dt * this.timeScale;
+    const effectiveElapsed = activeElapsed * this.timeScale;
+    this.gameplay.update(effectiveDt, effectiveElapsed, state);
   };
   private snapshot = () => ({
     performance: this.view.diagnostics.snapshot(),

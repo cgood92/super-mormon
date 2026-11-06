@@ -1613,7 +1613,7 @@ function makeSculpted(
     add(wrap, materials.mantleLining, "asymmetric-cross-body-cloth-wrap");
   }
 
-  // Skin hands are sculpted, not spherical caps on tube arms.
+  // Skin hands and arms are sculpted to pass continuously through the sleeves to the shoulders.
   for (const side of [-1, 1]) {
     const hand: DistanceField = (x, y, z) => {
       const cx = side * (s.shoulder + 0.15);
@@ -1628,6 +1628,23 @@ function makeSculpted(
         0.785,
         0.09,
         0.079,
+      );
+      // Continuous arm connecting the shoulder through the sleeve to the hand
+      d = smoothUnion(
+        d,
+        capsule(
+          x,
+          y,
+          z,
+          side * (s.shoulder - 0.04),
+          1.28,
+          0.01,
+          cx,
+          0.94,
+          0.046,
+          0.072,
+        ),
+        0.03,
       );
       d = smoothUnion(
         d,
@@ -1655,8 +1672,8 @@ function makeSculpted(
     add(
       sculpt({
         bounds: [
-          [side < 0 ? -0.83 : 0.25, 0.61, -0.06],
-          [side < 0 ? -0.25 : 0.83, 1.09, 0.26],
+          [side < 0 ? -0.83 : 0.22, 0.61, -0.15],
+          [side < 0 ? -0.22 : 0.83, 1.35, 0.26],
         ],
         resolution: resolution(30),
         field: hand,
