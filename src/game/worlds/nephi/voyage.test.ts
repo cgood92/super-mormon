@@ -617,6 +617,25 @@ test("Lehi and Sariah rest in beds in the common room and release prompt is only
     `Sariah rests on bed: ${boxS.min.y}`,
   );
 
+  // Both Lehi and Sariah must be completely within the common room interior bounds
+  // (not clipped into hull ribs at x < -5.5 or extending past aft wall at z > 18.5)
+  assert.ok(
+    boxL.min.x > -5.2 && boxL.max.x < 3.8,
+    `Lehi is safely inside room walls in X: [${boxL.min.x}, ${boxL.max.x}]`,
+  );
+  assert.ok(
+    boxL.min.z > 12.0 && boxL.max.z < 18.5,
+    `Lehi is safely inside room walls in Z: [${boxL.min.z}, ${boxL.max.z}]`,
+  );
+  assert.ok(
+    boxS.min.x > -5.2 && boxS.max.x < 3.8,
+    `Sariah is safely inside room walls in X: [${boxS.min.x}, ${boxS.max.x}]`,
+  );
+  assert.ok(
+    boxS.min.z > 12.0 && boxS.max.z < 18.5,
+    `Sariah is safely inside room walls in Z: [${boxS.min.z}, ${boxS.max.z}]`,
+  );
+
   // Test adventure interaction prompt location
   const runtime = world.adventure!({
     setAvatar: () => {},

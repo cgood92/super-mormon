@@ -214,16 +214,16 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
   addBox(4.1, 0, 15.4, 0.2, 3.5, 6.6, timber, true);
   addBox(-1.85, 0, 18.7, 12.1, 3.5, 0.2, timber, true);
   // Crafted timber beds with pale mattresses, pillows, and folded blankets in the common room.
-  for (const x of [-6.0, 2.5]) {
-    for (const z of [14.5, 17.2]) {
+  for (const x of [-4.2, 2.4]) {
+    for (const z of [14.4, 17.0]) {
       // Solid timber bed frame
       addBox(x, 0, z, 1.45, 0.38, 2.3, darkWood, true);
       // Pale mattress
       addBox(x, 0.38, z, 1.3, 0.12, 2.15, paleWood, false);
-      // Raised pillow at head of bed
-      addBox(x, 0.5, z + 0.8, 1.1, 0.1, 0.45, paleWood, false);
-      // Folded blanket across lower bed
-      addBox(x, 0.42, z - 0.25, 1.32, 0.08, 1.5, darkWood, false);
+      // Raised pillow at head of bed (rests on mattress, non-coplanar)
+      addBox(x, 0.502, z + 0.8, 1.1, 0.1, 0.45, paleWood, false);
+      // Folded blanket across lower bed (rests on mattress, non-coplanar)
+      addBox(x, 0.502, z - 0.3, 1.32, 0.06, 1.5, darkWood, false);
     }
   }
   for (const z of [-12, -8, -4])
@@ -324,6 +324,14 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
     y: y + origin.y,
     z: z + origin.z,
   });
+  const underdeckViewBounds = {
+    minX: origin.x - 7.5,
+    maxX: origin.x + 7.5,
+    minZ: origin.z - 18.5,
+    maxZ: origin.z + 18.5,
+    minY: origin.y - 0.5,
+    maxY: origin.y + 3.6,
+  };
   const cameraRooms: CameraRoom[] = [
     {
       id: "ship-common-room",
@@ -335,6 +343,7 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
         minY: origin.y - 0.5,
         maxY: origin.y + 3.0,
       },
+      viewBounds: underdeckViewBounds,
       distance: 3.2,
       elevation: 0.18,
       targetHeight: 0.85,
@@ -347,10 +356,11 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
         minX: origin.x - 7.5,
         maxX: origin.x + 7.5,
         minZ: origin.z - 18.5,
-        maxZ: origin.z + 11.5,
+        maxZ: origin.z + 12.0,
         minY: origin.y - 0.5,
         maxY: origin.y + 3.6,
       },
+      viewBounds: underdeckViewBounds,
       distance: 3.0,
       elevation: 0.18,
       targetHeight: 0.85,

@@ -187,14 +187,14 @@ export function buildVoyage(scene: T.Scene): WorldData {
   // 1 Nephi 18:17–18: Lehi and Sariah brought down upon their sick-beds because of grief and afflictions.
   const lehi = createCharacter("lehi", { quality: "npc" });
   lehi.group.name = "Lehi resting in sick-bed";
-  lehi.group.rotation.x = -Math.PI / 2;
-  lehi.group.position.set(-6.0, 0.85, 15.3);
+  lehi.group.rotation.set(-Math.PI / 2, 0, Math.PI);
+  lehi.group.position.set(-4.2, 0.8, 13.9);
   ship.group.add(lehi.group);
 
   const sariah = createCharacter("sariah", { quality: "npc" });
   sariah.group.name = "Sariah resting in sick-bed";
-  sariah.group.rotation.x = -Math.PI / 2;
-  sariah.group.position.set(-6.0, 0.84, 18.0);
+  sariah.group.rotation.set(-Math.PI / 2, 0, Math.PI);
+  sariah.group.position.set(-4.2, 0.8, 16.5);
   ship.group.add(sariah.group);
   const rope = new T.Mesh(
     new T.TorusGeometry(0.65, 0.065, 6, 24),

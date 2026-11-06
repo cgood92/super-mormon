@@ -316,3 +316,57 @@ test("approaching the stairs from below deck maintains smooth camera without jum
 
   assert.ok(player.x > 5.0, `player reached stair landing: x=${player.x}`);
 });
+
+test("entering the common room doorway maintains smooth camera without angle snaps or yaw flips", () => {
+  const ship = buildShip(new T.Group(), { x: 0, y: 0, z: 0 });
+  const camera = new T.PerspectiveCamera(58, 16 / 9, 0.08, 200);
+  const follow = new FollowCamera(camera);
+
+  // Player starts in underdeck corridor heading south towards the common room doorway at z=12
+  const player = { x: 0, y: 0, z: 11.0, yaw: 0, role: "child" as const };
+  const initialRoom = selectCameraRoom(ship.cameraRooms, player);
+  follow.reset(player, 0, "hub");
+  // Settle initial room camera
+  for (let i = 0; i < 30; i++) {
+    follow.update(1 / 30, player, ship.solids, neutral, "hub", initialRoom);
+  }
+
+  let prevPos = camera.position.clone();
+
+  // Walk smoothly from z=11.0 through doorway to z=14.0 into the common room
+  for (let step = 1; step <= 60; step++) {
+    player.z = 11.0 + (step / 60) * 3.0;
+    const room = selectCameraRoom(ship.cameraRooms, player, follow.roomId);
+    follow.update(
+      1 / 30,
+      player,
+      ship.solids,
+      neutral,
+      "hub",
+      room,
+    );
+
+    // Camera must stay behind player, never flipping 180 degrees
+    assert.ok(
+      Math.abs(follow.yaw) < 0.8,
+      `camera yaw flipped when entering room at z=${player.z.toFixed(2)}: yaw=${follow.yaw}`,
+    );
+
+    // Camera position must not jump abruptly between frames
+    const frameDelta = camera.position.distanceTo(prevPos);
+    assert.ok(
+      frameDelta < 0.45,
+      `camera jumped abruptly when entering room at z=${player.z.toFixed(2)}: frameDelta=${frameDelta}`,
+    );
+
+    // Camera must stay behind the player
+    assert.ok(
+      camera.position.z <= player.z + 0.5,
+      `camera flipped ahead of player: camZ=${camera.position.z}, playerZ=${player.z}`,
+    );
+
+    prevPos.copy(camera.position);
+  }
+
+  assert.equal(follow.roomId, "ship-common-room");
+});
