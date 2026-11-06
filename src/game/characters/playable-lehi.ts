@@ -75,7 +75,7 @@ export function createSculptedCharacterRig(
       const isMantle = mesh.name === "flowing-mantle";
       const armWeight =
         T.MathUtils.smoothstep(Math.abs(x), isMantle ? 0.35 : 0.22, 0.48) *
-        (1 - T.MathUtils.smoothstep(y, 1.40, 1.60)) *
+        (1 - T.MathUtils.smoothstep(y, 1.4, 1.6)) *
         T.MathUtils.smoothstep(
           y,
           isMantle ? 0.95 : 0.72,

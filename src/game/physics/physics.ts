@@ -762,7 +762,7 @@ export function stepPlayer(
         setMove(player, "sideflip");
         events.jumped = true;
       } else if (
-        (player.runSpeed < 0.35 && player.moveTime >= 0.30) ||
+        (player.runSpeed < 0.35 && player.moveTime >= 0.3) ||
         player.moveTime >= 0.43
       ) {
         if (length > 0.1) {

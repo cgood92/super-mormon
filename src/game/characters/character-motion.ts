@@ -84,7 +84,8 @@ export function createMotionDriver(role: CharacterRole): {
             ? T.MathUtils.smoothstep(state.moveTime, 0.22, 0.41)
             : 0;
         if (skidFacingYaw === undefined) {
-          skidFacingYaw = speed > 0.2 ? Math.atan2(state.vx, state.vz) : state.yaw;
+          skidFacingYaw =
+            speed > 0.2 ? Math.atan2(state.vx, state.vz) : state.yaw;
         }
         if (pivotT > 0) {
           renderedYaw =
@@ -255,8 +256,7 @@ export function createMotionDriver(role: CharacterRole): {
       body.rotation.y = 0;
       cloak.rotation.x =
         -0.08 - gaitBlend * 0.18 + Math.sin(phase * 1.3) * gaitBlend * 0.035;
-      head.rotation.y =
-        Math.sin(idlePhase * 0.4) * 0.055 + turnDiff * 0.45;
+      head.rotation.y = Math.sin(idlePhase * 0.4) * 0.055 + turnDiff * 0.45;
       head.rotation.x = state.grounded
         ? armored
           ? 0.07
@@ -565,85 +565,49 @@ export function createMotionDriver(role: CharacterRole): {
 
         // Torso pitch: leans backward against slide (-0.26), then swings forward (+0.10) to drive push-off
         const bodyPitch = T.MathUtils.lerp(
-          T.MathUtils.lerp(0.10, -0.26, tIn),
-          0.10,
+          T.MathUtils.lerp(0.1, -0.26, tIn),
+          0.1,
           pivot,
         );
         body.rotation.set(bodyPitch, 0, 0);
 
-        head.rotation.set(
-          T.MathUtils.lerp(0.12 * tIn, -0.04, pivot),
-          0,
-          0,
-        );
+        head.rotation.set(T.MathUtils.lerp(0.12 * tIn, -0.04, pivot), 0, 0);
 
         // Limbs:
         // Lead leg (0) begins braced heel-dig, kept within coat bounds
         legs[0].rotation.set(
-          T.MathUtils.lerp(
-            T.MathUtils.lerp(-0.12, -0.26, tIn),
-            0.20,
-            pivot,
-          ),
+          T.MathUtils.lerp(T.MathUtils.lerp(-0.12, -0.26, tIn), 0.2, pivot),
           0,
           0,
         );
         knees[0].rotation.set(
-          T.MathUtils.lerp(
-            T.MathUtils.lerp(0.08, 0.16, tIn),
-            0.35,
-            pivot,
-          ),
+          T.MathUtils.lerp(T.MathUtils.lerp(0.08, 0.16, tIn), 0.35, pivot),
           0,
           0,
         );
-        feet[0].rotation.set(
-          T.MathUtils.lerp(-0.35 * tIn, 0.12, pivot),
-          0,
-          0,
-        );
+        feet[0].rotation.set(T.MathUtils.lerp(-0.35 * tIn, 0.12, pivot), 0, 0);
 
         // Trailing leg (1) tucked underneath, within coat bounds
         legs[1].rotation.set(
-          T.MathUtils.lerp(
-            T.MathUtils.lerp(0.12, 0.22, tIn),
-            -0.24,
-            pivot,
-          ),
+          T.MathUtils.lerp(T.MathUtils.lerp(0.12, 0.22, tIn), -0.24, pivot),
           0,
           0,
         );
         knees[1].rotation.set(
-          T.MathUtils.lerp(
-            T.MathUtils.lerp(0.10, 0.78, tIn),
-            0.15,
-            pivot,
-          ),
+          T.MathUtils.lerp(T.MathUtils.lerp(0.1, 0.78, tIn), 0.15, pivot),
           0,
           0,
         );
-        feet[1].rotation.set(
-          T.MathUtils.lerp(0.12 * tIn, -0.08, pivot),
-          0,
-          0,
-        );
+        feet[1].rotation.set(T.MathUtils.lerp(0.12 * tIn, -0.08, pivot), 0, 0);
 
         // Arms: wide counterbalance flares inward to pump into sprint
         arms[0].rotation.set(
-          T.MathUtils.lerp(
-            T.MathUtils.lerp(-0.25, 0.35, tIn),
-            -0.75,
-            pivot,
-          ),
+          T.MathUtils.lerp(T.MathUtils.lerp(-0.25, 0.35, tIn), -0.75, pivot),
           0,
           T.MathUtils.lerp(0.85 * tIn, 0.15, pivot),
         );
         arms[1].rotation.set(
-          T.MathUtils.lerp(
-            T.MathUtils.lerp(0.25, -0.55, tIn),
-            0.75,
-            pivot,
-          ),
+          T.MathUtils.lerp(T.MathUtils.lerp(0.25, -0.55, tIn), 0.75, pivot),
           0,
           T.MathUtils.lerp(-0.85 * tIn, -0.15, pivot),
         );
