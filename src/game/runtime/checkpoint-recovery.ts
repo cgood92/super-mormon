@@ -60,11 +60,17 @@ export class CheckpointRecovery {
     el("caught-overlay").hidden = false;
     this.setCaughtPhase("caught");
     if (reset) {
-      el("caught-heading").textContent = "Spotted!";
-      el("caught-detail").textContent =
-        this.session.worldId === "teancum"
-          ? "A sentry saw Teancum or his servant. Keep both companions out of the amber sight cones, or behind stone cover."
-          : "A spy saw you. Back to the beginning.";
+      if (this.session.worldId === "voyage") {
+        el("caught-heading").textContent = "Stay on the boat";
+        el("caught-detail").textContent = "Stay on the boat.";
+      } else if (this.session.worldId === "teancum") {
+        el("caught-heading").textContent = "Spotted!";
+        el("caught-detail").textContent =
+          "A sentry saw Teancum or his servant. Keep both companions out of the amber sight cones, or behind stone cover.";
+      } else {
+        el("caught-heading").textContent = "Spotted!";
+        el("caught-detail").textContent = "A spy saw you. Back to the beginning.";
+      }
     }
   };
   private resetCaughtCheckpoint = () => {

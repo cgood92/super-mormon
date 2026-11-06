@@ -344,7 +344,13 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
       distance: 3.0,
       elevation: 0.18,
       targetHeight: 0.85,
-      entryEyes: [point(0, 1.8, 9), point(0, 1.8, 2), point(0, 1.8, -6)],
+      entryEyes: [
+        point(5.5, 1.8, 11.0),
+        point(0, 1.8, 9),
+        point(0, 1.8, 2),
+        point(0, 1.8, -6),
+        point(0, 1.8, -12),
+      ],
       exitEyes: [point(6, 2.2, 9), point(6, 4.0, -0.5)],
     },
   ];

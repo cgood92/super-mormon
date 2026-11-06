@@ -609,6 +609,17 @@ export class FollowCamera {
         player.y + preset.targetHeight,
         player.z,
       );
+      const prevDir = new T.Vector3(
+        focus.x - previous.x,
+        0,
+        focus.z - previous.z,
+      );
+      if (prevDir.lengthSq() > 0.001) prevDir.normalize();
+
+      const currentClear =
+        cameraSegmentClear(previous, previous, solids, 0.22) &&
+        cameraSegmentClear(focus, previous, solids, 0.05);
+
       const safe = anchors
         .map((p) => new T.Vector3(p.x, p.y, p.z))
         .filter(
@@ -618,10 +629,16 @@ export class FollowCamera {
         );
       // Recovery when loading inside a room or when a prop blocks its door shot.
       // Search only on a room transition; normal play never hunts for visibility.
-      if (!safe.length && room) {
-        for (const distance of [3, 1.5])
+      if (!safe.length && room && !currentClear) {
+        for (const distance of [preset.distance, 2.0, 1.5])
           for (let i = 0; i < 8; i++) {
-            const yaw = player.yaw + (i * Math.PI) / 4;
+            const angleOffset =
+              i === 0
+                ? 0
+                : (i % 2 === 1 ? 1 : -1) *
+                  Math.ceil(i / 2) *
+                  (Math.PI / 4);
+            const yaw = player.yaw + angleOffset;
             const eye = new T.Vector3(
               clamp(
                 focus.x - Math.sin(yaw) * distance,
@@ -642,14 +659,38 @@ export class FollowCamera {
               safe.push(eye);
           }
       }
-      safe.sort(
-        (a, b) => a.distanceToSquared(focus) - b.distanceToSquared(focus),
-      );
-      // An authored doorway transition may cut across a wall. Ordinary following
-      // still sweeps physical eye travel and never zooms for sightline occlusion.
-      if (safe[0]) previous = safe[0];
-      this.camera.position.copy(previous);
-      this.lastEye.copy(previous);
+      // Never snap to a viewpoint that inverts/reverses the camera viewing direction
+      // if an aligned anchor is available.
+      const aligned = safe.filter((eye) => {
+        const candidateDir = new T.Vector3(
+          focus.x - eye.x,
+          0,
+          focus.z - eye.z,
+        ).normalize();
+        return candidateDir.dot(prevDir) >= -0.15;
+      });
+      if (aligned.length > 0) {
+        aligned.sort((a, b) => {
+          const dirA = new T.Vector3(focus.x - a.x, 0, focus.z - a.z).normalize();
+          const dirB = new T.Vector3(focus.x - b.x, 0, focus.z - b.z).normalize();
+          const dotA = dirA.dot(prevDir);
+          const dotB = dirB.dot(prevDir);
+          if (Math.abs(dotA - dotB) > 0.2) return dotB - dotA;
+          const distErrA = Math.abs(a.distanceTo(focus) - preset.distance);
+          const distErrB = Math.abs(b.distanceTo(focus) - preset.distance);
+          return distErrA - distErrB;
+        });
+        previous = aligned[0];
+      } else if (safe.length > 0) {
+        safe.sort(
+          (a, b) => a.distanceToSquared(focus) - b.distanceToSquared(focus),
+        );
+        previous = safe[0];
+      }
+      if (safe[0]) {
+        this.camera.position.copy(previous);
+        this.lastEye.copy(previous);
+      }
       this.room = room;
       this.pitch = preset.elevation;
       this.smoothDistance = preset.distance;

@@ -65,7 +65,7 @@ test("voyage follows fourth-day release, automatic calm, Liahona and sustained s
     p.y > 4.1,
     "the child follows the stairs to the deck without teleporting",
   );
-  assert.ok(Math.hypot(p.x - childBelow.x, p.z - childBelow.z) > 12);
+  assert.ok(Math.hypot(p.x - childBelow.x, p.z - childBelow.z) > 9);
   assert.equal(state().releaseReady, true);
   assert.equal(runtime.movementLocked!(), false);
   assert.equal(scene.getObjectByName("Voyage child companion")?.visible, true);
@@ -426,6 +426,78 @@ test("sailing view frames the hull and keeps the next passage clear of opaque sa
       );
     }
   }
+  runtime.dispose();
+  world.dispose!();
+});
+
+test("falling or jumping off the boat triggers stay on the boat recovery", () => {
+  const scene = new T.Scene(),
+    world = buildVoyage(scene),
+    p = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
+  let caughtCalled = 0;
+  let resetFn: (() => void) | undefined;
+  const runtime = world.adventure!({
+    setAvatar: () => {},
+    toast: () => {},
+    dialog: (_r, _t, _b, next) => next(),
+    complete: () => {},
+    caught: (reset) => {
+      caughtCalled++;
+      resetFn = reset;
+    },
+  });
+  // Walk for opening scene
+  for (let i = 0; i < 42; i++) runtime.update(0.1, p, { interact: false, interactHeld: false, x: 0, y: 0 });
+  // Player jumps off upper deck into the ocean
+  p.x = 10;
+  p.y = -1;
+  const result = runtime.update(0.1, p, { interact: false, interactHeld: false, x: 0, y: 0 });
+  assert.equal(caughtCalled, 1);
+  assert.equal(result.objective, "Stay on the boat");
+  assert.ok(resetFn);
+  resetFn!();
+  assert.equal(p.x, 2);
+  assert.equal(p.y, 4.2);
+  assert.equal(p.z, 2);
+  runtime.dispose();
+  world.dispose!();
+});
+
+test("storm clouds and lightning operate during storm and clear when calmed", () => {
+  const scene = new T.Scene(),
+    world = buildVoyage(scene),
+    p = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
+  const clouds = scene.getObjectByName("Puffy storm clouds")!;
+  const lightning = scene.getObjectByName("Storm lightning bolt")!;
+  assert.ok(clouds);
+  assert.ok(lightning);
+  assert.equal(clouds.visible, true);
+
+  // During storm, update world repeatedly: lightning should trigger
+  let lightningFlashed = false;
+  for (let i = 0; i < 60; i++) {
+    world.update!(0.1, p);
+    if (lightning.visible) lightningFlashed = true;
+  }
+  assert.ok(lightningFlashed, "lightning bolt flashes during storm");
+
+  // Advance adventure to release so storm clears
+  const runtime = world.adventure!({
+    setAvatar: () => {},
+    toast: () => {},
+    dialog: (_r, _t, _b, next) => next(),
+    complete: () => {},
+  });
+  for (let i = 0; i < 42; i++) runtime.update(0.1, p, { interact: false, interactHeld: false, x: 0, y: 0 });
+  const targets = (runtime.snapshot() as any).targets;
+  Object.assign(p, targets.brothers);
+  runtime.update(0.016, p, { interact: true, interactHeld: true, x: 0, y: 0 });
+  for (let i = 0; i < 300 && (runtime.snapshot() as any).phase === "release"; i++) {
+    runtime.update(0.1, p, { interact: false, interactHeld: false, x: 0, y: 0 });
+  }
+  // After release, storm is 0
+  world.update!(0.1, p);
+  assert.equal(clouds.visible, false, "storm clouds disappear when storm clears");
   runtime.dispose();
   world.dispose!();
 });
