@@ -682,21 +682,22 @@ export class Gameplay {
       }
     }
     if (this.session.worldId === "palace") {
+      const inCircle = this.near(this.session.world.goal, 3.2, 2);
       if (
         !this.guardsActive &&
-        this.near(this.session.world.goal, 3.7, 2) &&
+        (inCircle || this.near(this.session.world.goal, 4.0, 2)) &&
         hasLineOfSight(
           this.session.player,
           this.session.world.story!.laban,
           this.session.world.solids,
         )
       ) {
-        prompt = "Laban · {action} to speak";
-        if (state.interact) {
+        prompt = inCircle ? "" : "Laban · {action} to speak";
+        if (inCircle || state.interact) {
           this.hooks.dialog(
             "1 NEPHI 3:11–14",
             "Laman asks for the plates.",
-            "Laman asks for his family’s records. Laban refuses and threatens him. Laman flees.",
+            "Laman asks for his family’s records. Laban refuses and threatens him. Laman has to flee.",
             () => {
               this.guardsActive = true;
               this.caughtGrace = 3.8;
@@ -716,7 +717,6 @@ export class Gameplay {
                 );
               }
               this.updateObjective();
-              this.ui.message("Through the gate! Keep running.", 3);
             },
             {
               actors: [

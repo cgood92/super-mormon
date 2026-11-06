@@ -113,10 +113,7 @@ export function house(scene: THREE.Scene): WorldData {
     0x806847,
     "camera-occludable roof",
   );
-  const roofMaterial = roof.material as THREE.MeshStandardMaterial;
-  roofMaterial.transparent = true;
-  roofMaterial.opacity = 0.38;
-  roof.castShadow = false;
+  roof.castShadow = true;
   for (const z of [-4.5, -1, 3.2])
     decor(-7, 0.01, z, 10, 0.035, 0.11, 0xb89b74, "floor seam");
   // East gallery: shallow steps lead to the second storey without repeated jumps.
@@ -162,15 +159,14 @@ export function house(scene: THREE.Scene): WorldData {
   ] as const)
     vessel(group, x, 0, z, scale);
   for (const [x, y, z] of [
-    [-3, 0.9, -10],
-    [-11, 0.9, 10],
-    [2, 1, -11],
+    [-9, 0.98, -10],
+    [-8, 0.98, 10],
+    [1, 0.98, -11],
     [12.2, 4.1, -5.9],
   ] as const)
     oilLamp(group, x, y, z);
   for (const x of [-6.5, 0, 6.5])
-    decor(x, 4.8, -18.5, 0.3, 0.25, 17, palette.timber, "roof beam");
-  label(group, "THE HOUSE OF LEHI", 0, 5.25, -18.42, 4.2);
+    decor(x, 5.2, 0, 0.3, 0.25, 37, palette.timber, "roof beam");
   return {
     name: "Lehi’s House",
     subtitle: "Explore the house and gather the family’s treasures",

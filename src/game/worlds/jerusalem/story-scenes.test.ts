@@ -406,3 +406,43 @@ test("trade pursuit waits through idle refusal and retry until the player moves"
   assert.equal(events.catches, 1);
   mission.dispose();
 });
+
+test("trade automatically triggers Laban refusal and cave completion without button press", () => {
+  const scene = new T.Scene();
+  const world = fixture();
+  const player = createPlayer(0, 0, -20);
+  const dialogHistory: {
+    kicker: string;
+    title: string;
+    body: string;
+    next: () => void;
+  }[] = [];
+  let completed = 0;
+  const mission = createStoryScene("trade", scene, world, {
+    dialog: (kicker, title, body, next) =>
+      dialogHistory.push({ kicker, title, body, next }),
+    toast: () => {},
+    complete: () => completed++,
+    checkpoint: () => {},
+    setMarker: () => {},
+    setDisguise: () => {},
+    caught: () => {},
+  });
+  // Approaching Laban automatically triggers dialog with interact: false
+  mission.update(0.016, player, { interact: false });
+  assert.equal(dialogHistory.length, 1);
+  assert.equal(dialogHistory[0].title, "Laban attempts to steal your treasure");
+  assert.equal(
+    dialogHistory[0].body,
+    "He sends his guards to kill Nephi and his brothers.",
+  );
+  dialogHistory.shift()!.next();
+  assert.equal((mission.snapshot() as { phase: string }).phase, "flee");
+
+  // Move past gate into cave phase
+  player.z = 42;
+  mission.update(0.016, player, { interact: false });
+  assert.equal((mission.snapshot() as { phase: string }).phase, "cave");
+
+  mission.dispose();
+});

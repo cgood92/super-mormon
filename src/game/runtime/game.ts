@@ -298,38 +298,39 @@ export class Game {
       const family =
         this.session.worldId === "palace"
           ? []
-          : [
-              createCharacter(
-                this.session.worldId === "streets" ? "sariah" : "laman",
-              ),
-              createCharacter(
-                this.session.worldId === "streets" ? "nephi" : "sam",
-              ),
-            ];
+          : this.session.worldId === "streets"
+            ? [createCharacter("sariah"), createCharacter("nephi")]
+            : [
+                createCharacter("laman"),
+                createCharacter("lemuel"),
+                createCharacter("sam"),
+              ];
+      const groundY = this.session.world.goal?.y ?? 0;
       family.forEach((actor, i) => {
+        const xOffset = this.session.worldId === "streets" ? 0 : (i - 1) * 1.6;
+        const zOffset =
+          this.session.worldId === "streets" ? (i ? 1.5 : -1.5) : 1.8;
         const state = createPlayer(
-          this.session.player.x +
-            (this.session.worldId === "streets" ? 0 : i ? 1.7 : -1.7),
-          this.session.player.y,
-          this.session.player.z +
-            (this.session.worldId === "streets" ? (i ? 1.5 : -1.5) : 1.8),
+          this.session.player.x + xOffset,
+          groundY,
+          this.session.player.z + zOffset,
         );
         state.yaw = Math.PI;
         actor.update(0, state);
         this.session.scene.add(actor.group);
       });
       this.presentation.dialog(
-        "1 NEPHI 1–3",
+        this.session.worldId === "streets" ? "1 NEPHI 1–2" : "1 NEPHI 3",
         this.session.worldId === "streets"
           ? "Home, safely"
           : this.session.worldId === "house"
             ? "The family’s treasures"
             : "Together again",
         this.session.worldId === "streets"
-          ? "Lehi: Gather the family. The Lord has warned us to leave Jerusalem."
+          ? "Lehi gathers his family, the Lord warns him to leave Jerusalem."
           : this.session.worldId === "house"
-            ? "Nephi: We will offer these treasures for the brass plates."
-            : "Nephi: Do not give up. The Lord will prepare a way.",
+            ? "Nephi proposes to trade the treasure for the brass plates."
+            : "Nephi encourages his brothers not to give up. The Lord will prepare a way.",
         () => {
           family.forEach((actor) => actor.dispose());
           this.complete();
@@ -508,7 +509,13 @@ export class Game {
     el("curtain").classList.remove("closed");
     this.discoveries.updateCollectionHud();
     this.gameplay.updateObjective();
-    if (this.started)
+    if (
+      this.started &&
+      id !== "palace" &&
+      id !== "house" &&
+      id !== "trade" &&
+      id !== "streets"
+    )
       this.ui.message(entryMessage(id, this.session.world, this.completed), 4);
     if (this.started && !document.hidden) {
       this.checkFullscreenResume();
