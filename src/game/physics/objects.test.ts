@@ -21,7 +21,7 @@ test("pickup requires proximity and an unobstructed view", () => {
   assert.equal(nearestCarryObject(player, [object], []), object);
   assert.equal(pickUp(object, player, []), true);
   assert.equal(object.held, true);
-  assert.equal(object.z, 0.8);
+  assert.equal(object.z, 0.55);
 });
 
 test("carried object stays on the near side of a wall when the owner moves", () => {

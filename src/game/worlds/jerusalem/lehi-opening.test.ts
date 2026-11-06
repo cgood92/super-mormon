@@ -50,6 +50,44 @@ test("Lehi's opening holds the chase, shows the warning and blue door, then rele
   s.world.dispose?.();
 });
 
+test("tapping or jumping advances the opening cinematic beats quickly to gameplay", () => {
+  const s = setup();
+  assert.equal(s.runtime.movementLocked!(), true);
+  assert.equal(
+    (s.runtime.snapshot() as { movieBeat?: string }).movieBeat,
+    "warning",
+  );
+
+  // Tap 1: advance to angry-crowd
+  s.runtime.update(0.016, s.player, { ...idle, jump: true });
+  assert.equal(
+    (s.runtime.snapshot() as { movieBeat?: string }).movieBeat,
+    "angry-crowd",
+  );
+
+  // Release jump
+  s.runtime.update(0.016, s.player, idle);
+
+  // Tap 2: advance to blue-door
+  s.runtime.update(0.016, s.player, { ...idle, jump: true });
+  assert.equal(
+    (s.runtime.snapshot() as { movieBeat?: string }).movieBeat,
+    "blue-door",
+  );
+
+  // Release jump
+  s.runtime.update(0.016, s.player, idle);
+
+  // Tap 3: advance to escape (gameplay starts)
+  s.runtime.update(0.016, s.player, { ...idle, jump: true });
+  assert.equal(s.runtime.movementLocked!(), false);
+  assert.equal(s.runtime.camera!(), undefined);
+
+  s.runtime.dispose();
+  s.avatar.dispose();
+  s.world.dispose?.();
+});
+
 for (const aspect of [16 / 9, 9 / 16]) {
   test(`Lehi opening cameras clear opaque city geometry throughout every shot (${aspect})`, () => {
     const s = setup(aspect);

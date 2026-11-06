@@ -512,12 +512,20 @@ export function createStoryScene(
         passedGate &&
         near(p, story.brothers, 5.5) &&
         (!zoram || near(zoram.state, p, 9));
-      if (!dialogueOpen && (input.interact || arrivedWithRecords)) {
-        if (phase === "offer" && reachable(story.laban, 3.4)) {
+      const offerNear = phase === "offer" && reachable(story.laban, 3.4);
+      const caveNear =
+        phase === "cave" &&
+        near(p, story.cave ?? story.brothers, 5.5) &&
+        brothers.every((a) => near(a.state, p, 9));
+      if (
+        !dialogueOpen &&
+        (input.interact || arrivedWithRecords || offerNear || caveNear)
+      ) {
+        if (offerNear) {
           speak(
-            "1 Nephi 3:22–27",
-            "Laban refuses",
-            "Laban: Your treasure is mine! Guards, seize them!",
+            "1 Nephi 3",
+            "Laban attempts to steal your treasure",
+            "He sends his guards to kill Nephi and his brothers.",
             () => {
               advance("flee");
               for (const brother of brothers) brother.state.carrying = false;
@@ -544,15 +552,11 @@ export function createStoryScene(
               );
             },
           );
-        } else if (
-          phase === "cave" &&
-          near(p, story.cave ?? story.brothers, 5.5) &&
-          brothers.every((a) => near(a.state, p, 9))
-        ) {
+        } else if (caveNear) {
           speak(
-            "1 Nephi 3:27–4:3",
-            "Courage to return",
-            "Nephi: The Lord can prepare a way. We must return.",
+            "1 Nephi 3",
+            "The brothers are safe.",
+            "Nephi encourages his brothers to try again.",
             () => {
               advance("done");
               hooks.complete();
@@ -666,7 +670,7 @@ export function createStoryScene(
       for (let i = 0; i < guards.length; i++) {
         const guard = guards[i];
         const active =
-          (pursuit && (phase === "flee" || near(guard.state, p, 13))) ||
+          (pursuit && (phase === "flee" || phase === "cave")) ||
           (id === "night" &&
             phase === "laban" &&
             near(guard.state, p, 3.5) &&

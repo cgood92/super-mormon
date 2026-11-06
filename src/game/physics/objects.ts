@@ -18,8 +18,8 @@ export type CarryObject = {
 export type ObjectTarget = { x: number; y: number; z: number; radius: number };
 
 const REACH = 1.8;
-const HOLD_DISTANCE = 0.8;
-const HOLD_HEIGHT = 1.1;
+const HOLD_DISTANCE = 0.55;
+const HOLD_HEIGHT = 0.95;
 const CROUCH_HOLD_HEIGHT = 0.6;
 const GRAVITY = 22;
 const EPS = 0.0001;

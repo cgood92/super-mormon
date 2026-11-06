@@ -102,19 +102,35 @@ function cityBlock(
   color: number,
 ): void {
   // Flat roofs, plaster parapets, timber lintels, and street-facing clay vessels.
-  add(x, 0, z, w, h, d, color, "Jerusalem dwelling");
+  // Solid height extends to the roof surface (h + 0.17) so feet do not sink.
+  add(x, 0, z, w, h + 0.17, d, color, "Jerusalem dwelling");
   decor(x, h, z, w + 0.25, 0.17, d + 0.25, palette.paleStone, "flat roof");
   for (const side of [-1, 1]) {
-    decor(
-      x + side * (w / 2 - 0.12),
-      h + 0.17,
-      z,
-      0.24,
-      0.4,
-      d,
-      palette.sandstone,
-    );
-    decor(
+    // Leave a gap on the west side of the stair terrace building so player can enter roof
+    if (x === 27 && z === 14 && side === -1) {
+      add(
+        x + side * (w / 2 - 0.12),
+        h + 0.17,
+        z + 2.5,
+        0.24,
+        0.4,
+        d - 5,
+        palette.sandstone,
+        "roof parapet",
+      );
+    } else {
+      add(
+        x + side * (w / 2 - 0.12),
+        h + 0.17,
+        z,
+        0.24,
+        0.4,
+        d,
+        palette.sandstone,
+        "roof parapet",
+      );
+    }
+    add(
       x,
       h + 0.17,
       z + side * (d / 2 - 0.12),
@@ -122,6 +138,7 @@ function cityBlock(
       0.4,
       0.24,
       palette.sandstone,
+      "roof parapet",
     );
   }
   const face = z > 0 ? z - d / 2 - 0.04 : z + d / 2 + 0.04;
@@ -147,48 +164,70 @@ function rockCave(
   group: THREE.Group,
   solids: Solid[],
 ) {
-  // The shell uses the same visible dimensions as its physical surfaces.
-  // Keep the broad 13 m mouth and standing clearance beneath the 7 m ceiling.
+  // Natural terraced rock formations instead of boxy geometry
   const stone = new THREE.MeshStandardMaterial({
     color: 0x796956,
     roughness: 1,
   });
-  for (const [x, z, w, d] of [
-    [-16, 67, 3, 18],
-    [0, 67, 3, 18],
-    [-8, 79, 19, 3],
-  ] as const)
-    sceneryBox(
-      group,
-      solids,
-      stone,
-      { x, y: 0, z, w, h: 9, d },
-      "weathered cave rock wall",
-    );
-  sceneryBox(
+  terracedRock(
     group,
     solids,
     stone,
-    { x: -8, y: 7, z: 69, w: 19, h: 3, d: 22 },
-    "weathered cave rock ceiling",
+    { x: -16, y: 0, z: 88, w: 7, h: 7.5, d: 9 },
+    "west cave ridge",
+  );
+  terracedRock(
+    group,
+    solids,
+    stone,
+    { x: -16, y: 0, z: 96, w: 7, h: 8, d: 9 },
+    "west cave flank",
+  );
+  terracedRock(
+    group,
+    solids,
+    stone,
+    { x: 0, y: 0, z: 88, w: 7, h: 7.5, d: 9 },
+    "east cave ridge",
+  );
+  terracedRock(
+    group,
+    solids,
+    stone,
+    { x: 0, y: 0, z: 96, w: 7, h: 8, d: 9 },
+    "east cave flank",
+  );
+  terracedRock(
+    group,
+    solids,
+    stone,
+    { x: -8, y: 0, z: 102, w: 17, h: 8.5, d: 7 },
+    "rear cave cliff",
+  );
+  terracedRock(
+    group,
+    solids,
+    stone,
+    { x: -8, y: 6.5, z: 92, w: 15, h: 3, d: 13 },
+    "cave rock ceiling",
   );
   for (const [x, z, h] of [
-    [-17, 58, 6],
-    [1, 59, 7],
+    [-15, 80, 5],
+    [-1, 81, 5.5],
   ] as const)
     terracedRock(
       group,
       solids,
       new THREE.MeshStandardMaterial({ color: 0x796956, roughness: 1 }),
-      { x, y: 0, z, w: 8, h, d: 10 },
+      { x, y: 0, z, w: 7, h, d: 8 },
       "Cave entrance boulder",
     );
   const shade = new THREE.Mesh(
-    new THREE.PlaneGeometry(14, 18),
+    new THREE.PlaneGeometry(13, 16),
     new THREE.MeshStandardMaterial({ color: 0x433b31, roughness: 1 }),
   );
   shade.rotation.x = -Math.PI / 2;
-  shade.position.set(-8, 0.015, 69);
+  shade.position.set(-8, 0.015, 92);
   shade.name = "cave interior floor";
   group.add(shade);
 }
@@ -199,7 +238,7 @@ export function buildJerusalem(
   scene: THREE.Scene,
 ): WorldData {
   const { group, add, decor, finish, solids } = makeWorld(scene, "jerusalem");
-  decor(0, -0.5, 25, 80, 0.5, 120, 0xc4a780, "Jerusalem earth and desert road");
+  decor(0, -0.5, 45, 80, 0.5, 140, 0xc4a780, "Jerusalem earth and desert road");
   add(-36, 0, 5.5, 0.9, 8, 69, 0xa98b69, "west city wall");
   add(36, 0, 5.5, 0.9, 8, 69, 0xa98b69, "east city wall");
   add(0, 0, -29, 73, 8, 0.9, 0xa98b69, "north city wall");
@@ -265,8 +304,8 @@ export function buildJerusalem(
   add(0, 0, -20, 8, 0.8, 6, 0xd9c29c, "audience dais");
   add(0, 0, -16.4, 8, 0.4, 1.6, 0xc5a67f, "dais step");
   add(0, 0.8, -22.5, 3, 1.15, 1.2, palette.timber, "Laban audience seat");
-  decor(0, 1.95, -22.9, 3, 2.4, 0.35, palette.timber, "carved seat back");
-  decor(0, 4.1, -23, 4.2, 0.28, 0.7, palette.brass, "audience canopy");
+  add(0, 1.95, -22.9, 3, 2.4, 0.35, palette.timber, "carved seat back");
+  add(0, 4.1, -23, 4.2, 0.28, 0.7, palette.brass, "audience canopy");
   for (const x of [-7, 5.8]) {
     add(x, 0, -11.5, 2, 0.85, 1.3, palette.timber, "offering table");
     vessel(group, x, 0.85, -11.5, 0.8, palette.brass);
@@ -288,6 +327,7 @@ export function buildJerusalem(
   ]) {
     datePalm(group, x, z, 4.8);
     add(x, 0, z, 0.32, 4.8, 0.32, palette.timber, "date palm trunk");
+    add(x, 4.75, z, 2.4, 0.25, 2.4, palette.leaf, "date palm leaf canopy");
   }
   for (let i = 0; i < 12; i++)
     add(
@@ -301,19 +341,33 @@ export function buildJerusalem(
       "optional roof stair",
     );
   add(20.5, 4.2, 10, 5.2, 0.35, 3.2, 0xd4b690, "roof terrace landing");
-  for (const [x, z] of [
-    [-17, 30],
-    [16, 26],
-    [-19.5, -19],
-    [10, -14],
-    [14, -25],
-    [-6, -25],
+  // Place oil lamps on real surfaces (tables, chests, and dais) — no floating candles.
+  for (const [x, y, z] of [
+    [-7, 0.85, -11.5],
+    [5.8, 0.85, -11.5],
+    [10, 1.1, -22],
+    [16.8, 1.1, -26],
   ]) {
-    oilLamp(group, x, 1, z);
+    oilLamp(group, x, y, z);
     if (id === "night") {
       const glow = new THREE.PointLight(0xffcb80, 14, 12);
-      glow.position.set(x, 3, z);
+      glow.position.set(x, y + 2, z);
       group.add(glow);
+    }
+  }
+  // Subtle paving flagstones along the thoroughfare give the ground natural texture.
+  for (let z = -8; z <= 38; z += 3.2) {
+    for (const x of [-3.2, 0, 3.2]) {
+      decor(
+        x + (Math.floor(z) % 2) * 0.3,
+        0.005,
+        z,
+        1.7,
+        0.02,
+        1.5,
+        0xbba07f,
+        "street paver",
+      );
     }
   }
   for (const z of [25, 6, -6])
@@ -355,7 +409,7 @@ export function buildJerusalem(
   }
   const audience = { x: 0, y: 0.8, z: -21.1 };
   const brothers = { x: 0, y: 0, z: 43 };
-  const cave = { x: -8, y: 0, z: 72 };
+  const cave = { x: -8, y: 0, z: 92 };
   // The doorway faces the outer lane, discovered by turning around the dwelling
   // at the cross street. Every story still builds exactly the same city.
   const home = { x: -33.2, y: 0, z: -15, radius: 1.25 };
@@ -371,7 +425,7 @@ export function buildJerusalem(
             : "Jerusalem by Night",
     subtitle:
       id === "streets"
-        ? "Find the indigo doorway around the western homes"
+        ? "Find the indigo doorway to Lehi’s home"
         : id === "palace"
           ? "Ask Laban for the brass plates, then return to your brothers"
           : id === "trade"
@@ -435,12 +489,44 @@ export function buildJerusalem(
         z: 22,
         y: 0,
         height: 4.8,
-        radius: 0.23,
+        radius: 0.35,
+      },
+      {
+        id: "jerusalem-east-palm-1",
+        x: 20,
+        z: 5,
+        y: 0,
+        height: 4.8,
+        radius: 0.35,
+      },
+      {
+        id: "jerusalem-east-palm-2",
+        x: 20,
+        z: -10,
+        y: 0,
+        height: 4.8,
+        radius: 0.35,
+      },
+      {
+        id: "jerusalem-northwest-palm",
+        x: -30,
+        z: 23,
+        y: 0,
+        height: 4.8,
+        radius: 0.35,
+      },
+      {
+        id: "jerusalem-outside-south-palm",
+        x: 13,
+        z: 47,
+        y: 0,
+        height: 4.8,
+        radius: 0.35,
       },
     ],
     tokens:
       id === "streets" ? [{ id: "roof-route", x: 19, y: 5, z: 10 }] : undefined,
-    bounds: { minX: -35.2, maxX: 35.2, minZ: -28.2, maxZ: 80 },
+    bounds: { minX: -35.2, maxX: 35.2, minZ: -28.2, maxZ: 108 },
     ...finish(),
   };
 }

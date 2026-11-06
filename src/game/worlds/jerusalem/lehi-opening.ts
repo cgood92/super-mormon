@@ -53,9 +53,24 @@ export function createLehiOpening(
   const objectives = [
     "Lehi warns Jerusalem: repent and turn to the Lord. · 1 Nephi 1:18–19",
     "The people mock Lehi and become angry. His life is in danger. · 1 Nephi 1:19–20",
-    "Lehi’s home is behind the blue door, around the western houses.",
+    "Lehi’s home is behind the blue door.",
     "Help Lehi get home safely. Avoid the angry people and find the blue door!",
   ];
+
+  const skipToNextBeat = () => {
+    if (disposed || elapsed >= 15) return;
+    if (elapsed < 5) elapsed = 5;
+    else if (elapsed < 9) elapsed = 9;
+    else elapsed = 15;
+  };
+
+  const onPointerDown = () => {
+    skipToNextBeat();
+  };
+  if (typeof window !== "undefined") {
+    window.addEventListener("pointerdown", onPointerDown);
+  }
+  let lastAction = false;
   return {
     movementLocked: () => !disposed && elapsed < 15,
     camera: () => camera,
@@ -64,9 +79,19 @@ export function createLehiOpening(
       movieBeat: elapsed < 15 ? names[beat()] : undefined,
       elapsed,
     }),
-    update(dt, player) {
+    update(dt, player, input) {
       if (disposed || elapsed >= 15)
         return { objective: objectives[3], prompt: "" };
+      const actionPressed = !!input?.jump;
+      if (actionPressed && !lastAction) {
+        skipToNextBeat();
+      }
+      lastAction = actionPressed;
+      if (elapsed >= 15) {
+        camera = undefined;
+        hooks.toast(objectives[3]);
+        return { objective: objectives[3], prompt: "" };
+      }
       dt = Math.max(0, Math.min(dt, 0.1));
       elapsed = Math.min(15, elapsed + dt);
       const current = beat();
@@ -139,6 +164,9 @@ export function createLehiOpening(
     },
     dispose() {
       disposed = true;
+      if (typeof window !== "undefined") {
+        window.removeEventListener("pointerdown", onPointerDown);
+      }
       camera = undefined;
       listeners.forEach(({ rig }) => rig.dispose());
       root.remove(doorway, confrontation);
