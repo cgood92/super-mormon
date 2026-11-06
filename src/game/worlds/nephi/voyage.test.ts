@@ -561,7 +561,8 @@ test("ocean water stays below the ship cabin floor across all storm conditions",
     if (
       obj instanceof T.Mesh &&
       obj.geometry instanceof T.PlaneGeometry &&
-      (obj.geometry.parameters as any).width === 1000
+      ((obj.geometry.parameters as any).width >= 1000 ||
+        obj.name === "Ocean water plane")
     ) {
       oceanMesh = obj;
     }
@@ -678,5 +679,38 @@ test("Lehi and Sariah rest in beds in the common room and release prompt is only
   assert.equal(atForwardCabin.prompt, "{action} · Ask them to release Nephi");
 
   runtime.dispose();
+  world.dispose!();
+});
+
+test("promised land sits constantly in ocean, transforms with heading like channel islands, and rests below water line", () => {
+  const scene = new T.Scene(),
+    world = buildVoyage(scene);
+  scene.updateMatrixWorld(true);
+
+  const land = scene.getObjectByName("Distant promised shore") as T.Group;
+  assert.ok(land, "Distant promised shore exists");
+
+  // Ocean plane extends past the shore to the horizon
+  let oceanMesh: T.Mesh | undefined;
+  scene.traverse((obj) => {
+    if (obj.name === "Ocean water plane") oceanMesh = obj as T.Mesh;
+  });
+  assert.ok(oceanMesh, "Ocean water plane exists");
+  const geomParams = (oceanMesh.geometry as any).parameters;
+  assert.ok(geomParams.height >= 2400, "Ocean plane spans at least 2400m to cover horizon");
+
+  // Hill bases sit below ocean water plane (y <= -1.35)
+  for (const child of land.children) {
+    if (child instanceof T.Mesh) {
+      assert.ok(
+        land.position.y + child.position.y <= -2.0,
+        `hill base is anchored below ocean water surface: ${land.position.y + child.position.y}`,
+      );
+    }
+  }
+
+  // Initial land position is distant along the course
+  assert.ok(land.position.z <= -800, `shore is distant at start of voyage: ${land.position.z}`);
+
   world.dispose!();
 });

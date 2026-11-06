@@ -46,9 +46,10 @@ export function buildVoyage(scene: T.Scene): WorldData {
   const ship = buildShip(root, { x: 0, y: 0, z: 0 });
   // Ship's physical space remains local while all its actors share the gentle visible roll.
   const oceanMaterial = material(0x174d67, 0.36);
-  const oceanGeometry = new T.PlaneGeometry(1000, 1000, 64, 64);
+  const oceanGeometry = new T.PlaneGeometry(2800, 2800, 72, 72);
   oceanGeometry.rotateX(-Math.PI / 2);
   const ocean = new T.Mesh(oceanGeometry, oceanMaterial);
+  ocean.name = "Ocean water plane";
   ocean.position.y = -1.35;
   root.add(ocean);
   const oceanPositions = oceanGeometry.getAttribute(
@@ -123,16 +124,16 @@ export function buildVoyage(scene: T.Scene): WorldData {
   const land = new T.Group();
   land.name = "Distant promised shore";
   root.add(land);
-  for (let i = 0; i < 13; i++) {
+  for (let i = 0; i < 19; i++) {
     const hill = new T.Mesh(
       mountainGeometry(i),
       material(i % 2 ? 0x728b61 : 0x9caa75),
     );
-    hill.scale.set(18 + (i % 4) * 6, 18 + (i % 5) * 9, 22 + (i % 4) * 5);
-    hill.position.set((i - 6) * 22, -2, -(i % 3) * 12);
+    hill.scale.set(22 + (i % 4) * 6, 22 + (i % 5) * 8, 24 + (i % 4) * 5);
+    hill.position.set((i - 9) * 24, -2, -(i % 3) * 14);
     land.add(hill);
   }
-  land.position.z = -920;
+  land.position.set(0, -2, -820);
   const brothers = { x: -4, y: 0, z: -13.5 };
   const releaseRoute = [
     { x: 0, y: 0, z: -13.5 },
@@ -417,7 +418,7 @@ export function buildVoyage(scene: T.Scene): WorldData {
     clouds.position.x = Math.sin(time * 0.02) * 30;
     clouds.position.y = (1 - storm) * 23;
     needle.rotation.z = desiredHeading() - heading;
-    if (phase === "steer") {
+    if (phase === "steer" || phase === "arrived") {
       for (const island of [...islands, ...courseMarks]) {
         const dx = island.x - boatX,
           dz = island.z - boatZ;
@@ -427,8 +428,14 @@ export function buildVoyage(scene: T.Scene): WorldData {
           -dx * Math.sin(heading) + dz * Math.cos(heading),
         );
       }
-      land.rotation.y = 0;
-      land.position.set(-boatX * 0.25 - heading * 35, 0, -920 - boatZ * 0.3);
+      const landDx = 0 - boatX;
+      const landDz = -820 - boatZ;
+      land.position.set(
+        landDx * Math.cos(heading) + landDz * Math.sin(heading),
+        -2,
+        -landDx * Math.sin(heading) + landDz * Math.cos(heading),
+      );
+      land.rotation.y = heading;
     }
   };
   const world: WorldData = {
