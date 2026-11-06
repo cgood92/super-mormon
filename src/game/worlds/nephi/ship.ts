@@ -43,14 +43,6 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
     color: 0xaf8250,
     roughness: 0.9,
   });
-  const deckWood = new T.MeshStandardMaterial({
-    color: 0xa47948,
-    roughness: 0.88,
-  });
-  const deckWoodAlt = new T.MeshStandardMaterial({
-    color: 0x93683a,
-    roughness: 0.9,
-  });
   const darkWood = new T.MeshStandardMaterial({
     color: 0x4c3021,
     roughness: 1,
@@ -103,23 +95,6 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
         h,
         d,
       });
-  };
-  const addSolidOnly = (
-    x: number,
-    y: number,
-    z: number,
-    w: number,
-    h: number,
-    d: number,
-  ) => {
-    solids.push({
-      x: x + origin.x,
-      y: y + origin.y,
-      z: z + origin.z,
-      w,
-      h,
-      d,
-    });
   };
   const beam = (
     a: Point,
@@ -218,47 +193,14 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
   // Upper deck leaves a full-height stair opening and a clear lower run-out.
   // The opening continues past the final tread so a running descent cannot grab
   // the overhead deck before the player has settled on the cabin floor.
-  // Planks are individually laid out with visible timber seams and alternating wood tones.
-  const deckPlankMaterials = [paleWood, deckWood, deckWoodAlt, paleWood, deckWoodAlt];
-
-  const layPlanks = (
-    xMin: number,
-    xMax: number,
-    z: number,
-    bayIndex: number,
-  ) => {
-    const spanW = xMax - xMin;
-    if (spanW <= 0.1) return;
-    const numPlanks = Math.max(1, Math.round(spanW / 1.25));
-    const plankW = spanW / numPlanks;
-    for (let i = 0; i < numPlanks; i++) {
-      const px = xMin + (i + 0.5) * plankW;
-      const mat =
-        deckPlankMaterials[
-          (Math.abs(bayIndex) * 2 + i) % deckPlankMaterials.length
-        ];
-      addBox(px, 3.95, z, plankW - 0.035, 0.25, 0.94, mat, false);
-    }
-  };
-
+  // Long timber planks run across the beam, matching the lower deck construction.
   for (let z = -21; z <= 21; z++) {
     const w = halfWidth(z) - 0.18;
     if (z >= -1 && z <= 12) {
-      const portW = w + 4.5;
-      const portCenter = (-w + 4.5) / 2;
-      addSolidOnly(portCenter, 3.95, z, portW, 0.25, 1.0);
-      layPlanks(-w, 4.5, z, z);
-
-      if (w > 7.5) {
-        const starW = w - 7.5;
-        const starCenter = (w + 7.5) / 2;
-        addSolidOnly(starCenter, 3.95, z, starW, 0.25, 1.0);
-        layPlanks(7.5, w, z, z + 3);
-      }
-    } else {
-      addSolidOnly(0, 3.95, z, w * 2, 0.25, 1.0);
-      layPlanks(-w, w, z, z);
-    }
+      addBox((-w + 4.5) / 2, 3.95, z, w + 4.5, 0.25, 0.94, paleWood, true);
+      if (w > 7.5)
+        addBox((w + 7.5) / 2, 3.95, z, w - 7.5, 0.25, 0.94, paleWood, true);
+    } else addBox(0, 3.95, z, w * 2, 0.25, 0.94, paleWood, true);
   }
   // Fourteen 30cm risers work with the shared physics step height.
   for (let i = 0; i < 14; i++)
@@ -315,8 +257,7 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
     for (const side of [-1, 1]) {
       addBox(side * (w - 0.2), 0.15, z, 0.22, 4, 0.22, darkWood);
       addBox(side * (w - 0.1), 4.2, z, 0.18, 1.15, 0.18, darkWood);
-      if (!(side === 1 && z >= 11 && z <= 15))
-        addBox(side * (w - 0.1), 4.2, z, 0.24, 1.05, 2.1, timber, true);
+      addBox(side * (w - 0.1), 4.2, z, 0.24, 1.05, 2.1, timber, true);
     }
   }
   for (const z of [-19, 19])

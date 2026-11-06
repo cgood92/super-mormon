@@ -166,6 +166,17 @@ test("voyage exposes a shared moving actor parent and climbable masts", () => {
     `upper deck and fittings have instanced planks: ${totalInstances}`,
   );
 
+  // Railing on the ship deck's border is continuous near the stairs
+  for (const z of [11, 13, 15]) {
+    const borderRail = world.solids.find(
+      (s) => s.x > 7 && s.y >= 4.1 && Math.abs(s.z - z) < 0.2,
+    );
+    assert.ok(
+      borderRail,
+      `border railing is solid near stairs at z=${z}`,
+    );
+  }
+
   // Mast climbing attaches snug against the mast trunk
   const mast = world.climbables![0];
   const climber = createPlayer(mast.x, mast.y + 1, mast.z + 0.6);
