@@ -193,7 +193,7 @@ export function createVisionDarkness(scene: T.Scene) {
   const uniforms = {
     visionPlayer: { value: new T.Vector3() },
     visionStrength: { value: 0 },
-    visionRadius: { value: 0.6 },
+    visionRadius: { value: 0.72 },
   };
   const patched = new Map<
     T.Material,
@@ -258,7 +258,7 @@ export function createVisionDarkness(scene: T.Scene) {
     });
   return {
     uniforms,
-    update(player: Point, strength: number, radius = 0.6) {
+    update(player: Point, strength: number, radius = 0.72) {
       uniforms.visionPlayer.value.set(player.x, player.y, player.z);
       uniforms.visionStrength.value = strength;
       uniforms.visionRadius.value = radius;
@@ -582,8 +582,8 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
     x: tree.x,
     z: tree.z,
     y: 0,
-    height: 11,
-    radius: 1.1,
+    height: 7.7,
+    radius: 0.65,
   });
   climbables.push({
     id: "eastern-return-vine",
@@ -1221,7 +1221,7 @@ export function createTreeOfLifeScene(
       if (phase === "opening" && !dialogOpen)
         say(
           "A vision in the wilderness",
-          "You are Lehi. Find the iron rod and follow it toward the tree of life. Walk at your own pace through this artistic interpretation. — 1 Nephi 8",
+          "You are Lehi. Find the iron rod and follow it to the tree of life.",
           () => {
             phase = "rod";
             hooks.setMarker(data.path[0]);
@@ -1303,7 +1303,7 @@ export function createTreeOfLifeScene(
         if (input.interact)
           say(
             "Joy at the tree",
-            "The fruit fills Lehi with joy he longs to share. The tree represents the love of God, revealed through Jesus Christ. — 1 Nephi 8:10–12; 11:21–23",
+            "The tree represents the love of God revealed through Jesus Christ. (1 Nephi 8; 11)",
             () => {
               phase = "done";
               save(p(data.tree.x, data.tree.z + 3));
@@ -1378,7 +1378,7 @@ export function createTreeOfLifeScene(
       // Garden light falls away in every direction, including behind the player.
       const gardenDistance = distance(player, data.tree);
       const strength = T.MathUtils.smoothstep(gardenDistance, 22, 38);
-      darkness.update(player, strength, route.distance > 3 ? 0.6 : 0.85);
+      darkness.update(player, strength, route.distance > 3 ? 0.72 : 1.02);
       if (scene.background instanceof T.Color)
         scene.background.setHex(0xbdcfd5).lerp(new T.Color(0x000000), strength);
       // Camera-depth fog must not obscure the visibility bubble when orbiting.

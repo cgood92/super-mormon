@@ -64,7 +64,7 @@ test("Bountiful requires prayer, tools, reconciliation and four individually ali
     true,
     "Prayer marker persists at the summit",
   );
-  for (let i = 0; i < 4; i++) act(); // prayer, ore, hammer pickup, first forge blow
+  for (let i = 0; i < 3; i++) act(); // ore, hammer pickup, first forge blow
   assert.equal(state().phase, "forge");
   act();
   act();

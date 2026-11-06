@@ -49,7 +49,7 @@ test("night mission requires the account, Zoram, plates, gate, and return in ord
   assert.equal(dialogs.length, 0);
   player.z = -20;
   interact();
-  assert.equal(dialogs[0].title, "A difficult account");
+  assert.equal(dialogs[0].title, "A drunk Laban");
   assert.equal(disguise, false);
   dialogs.shift()!.next();
   assert.equal(disguise, true);

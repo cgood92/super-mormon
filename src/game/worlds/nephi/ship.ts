@@ -126,9 +126,9 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
       w = halfWidth(z);
     for (const [x, y] of [
       [-w, 4.15],
-      [-w * 0.82, 0.65],
-      [0, 0.04],
-      [w * 0.82, 0.65],
+      [-w * 0.88, -0.1],
+      [0, -0.55],
+      [w * 0.88, -0.1],
       [w, 4.15],
     ])
       vertices.push(x, y, z);
