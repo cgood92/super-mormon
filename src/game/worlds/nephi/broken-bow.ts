@@ -1,5 +1,5 @@
 import * as T from "three";
-import type { WorldData, Point } from "../../runtime/worlds";
+import type { WorldData, Point, Solid } from "../../runtime/worlds";
 import {
   sceneryBox,
   sceneryCanvasTent,
@@ -17,6 +17,70 @@ import {
   createHuntingBow,
   createArrowModel,
 } from "../../rendering/hunting-models";
+
+function mountainRockLedge(
+  parent: T.Group,
+  solids: Solid[],
+  material: T.Material,
+  shape: Solid,
+  name: string,
+): T.Group {
+  const group = new T.Group();
+  group.name = name;
+  parent.add(group);
+  solids.push(shape);
+  const sides = 8;
+  const outline = [
+    [-0.48, -0.5],
+    [0.48, -0.5],
+    [0.5, -0.48],
+    [0.5, 0.48],
+    [0.48, 0.5],
+    [-0.48, 0.5],
+    [-0.5, 0.48],
+    [-0.5, -0.48],
+  ];
+  const variation = 0.84 + 0.18 * Math.sin(shape.x * 0.37 + shape.z * 0.21);
+  const profile = (t: number) =>
+    0.91 + 0.09 * Math.pow(Math.max(0, Math.cos((t * Math.PI) / 2)), variation);
+  const vertices: number[] = [],
+    colors: number[] = [];
+  const pt = (t: number, j: number) => {
+    const [ox, oz] = outline[((j % sides) + sides) % sides];
+    const taper = profile(t);
+    return new T.Vector3(ox * shape.w * taper, shape.h * t, oz * shape.d * taper);
+  };
+  const triangle = (a: T.Vector3, b: T.Vector3, c: T.Vector3) => {
+    vertices.push(...a.toArray(), ...b.toArray(), ...c.toArray());
+    for (const p of [a, b, c]) {
+      const shade = 0.95 + 0.05 * Math.sin(p.x * 0.7 + p.z * 0.4 + p.y * 0.3);
+      colors.push(shade, shade, shade);
+    }
+  };
+  for (let j = 0; j < sides; j++) {
+    const b0 = pt(0, j),
+      b1 = pt(0, j + 1),
+      t0 = pt(1, j),
+      t1 = pt(1, j + 1);
+    triangle(b0, b1, t1);
+    triangle(b0, t1, t0);
+  }
+  const topCenter = new T.Vector3(0, shape.h, 0);
+  for (let j = 0; j < sides; j++) triangle(topCenter, pt(1, j), pt(1, j + 1));
+  const geometry = new T.BufferGeometry();
+  geometry.setAttribute("position", new T.Float32BufferAttribute(vertices, 3));
+  geometry.setAttribute("color", new T.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+  const matClone = (material as T.MeshStandardMaterial).clone();
+  matClone.vertexColors = true;
+  const mesh = new T.Mesh(geometry, matClone);
+  mesh.position.set(shape.x, shape.y, shape.z);
+  mesh.name = name;
+  mesh.receiveShadow = true;
+  group.add(mesh);
+  markScenery(mesh, { kind: "solid", solids: [shape] });
+  return group;
+}
 
 const p = (x: number, z: number, y = 0): Point => ({ x, y, z });
 /** 1 Nephi 16:18–32. Landscape and animal species are an imagined Arabian setting. */
@@ -74,7 +138,7 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
     { x: 0.2, z: 42, top: 7.3, w: 5.5, d: 3.3 },
   ];
   for (const [i, ledge] of trail.entries())
-    sceneryBox(
+    mountainRockLedge(
       root,
       solids,
       i % 2 ? stone : sand,
@@ -233,9 +297,9 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
   root.add(props);
   function prop(at: Point, color: number, scale: T.Vector3, name: string) {
     const m = new T.Mesh(new T.CylinderGeometry(0.08, 0.1, 1, 8), mat(color));
-    m.position.set(at.x, at.y + 0.22, at.z);
+    m.position.set(at.x, at.y + 0.08, at.z);
     m.scale.copy(scale);
-    m.rotation.z = 1.15;
+    m.rotation.set(Math.PI / 2, 0, 0.45);
     m.name = name;
     props.add(m);
     markScenery(m, {
@@ -303,10 +367,10 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
     const piece = new T.Mesh(
       new T.TubeGeometry(
         new T.CatmullRomCurve3([
-          new T.Vector3(0, 0, -0.03),
-          new T.Vector3(0, sign * 0.28, -0.11),
-          new T.Vector3(0, sign * 0.52, -0.05),
-          new T.Vector3(0, sign * 0.72, 0.15),
+          new T.Vector3(0, 0, 0.16),
+          new T.Vector3(0, sign * 0.28, 0.12),
+          new T.Vector3(0, sign * 0.52, 0.06),
+          new T.Vector3(0, sign * 0.72, -0.08),
         ]),
         12,
         0.036,
@@ -320,9 +384,9 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
   });
   const steelString = new T.Line(
     new T.BufferGeometry().setFromPoints([
-      new T.Vector3(0, -0.72, 0.15),
-      new T.Vector3(0, 0, 0.15),
-      new T.Vector3(0, 0.72, 0.15),
+      new T.Vector3(0, -0.72, -0.08),
+      new T.Vector3(0, 0, -0.08),
+      new T.Vector3(0, 0.72, -0.08),
     ]),
     new T.LineBasicMaterial({ color: 0xdad9cf }),
   );
@@ -522,8 +586,10 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
           if (!hooks.attachEquipment)
             steel.position.set(player.x + 0.4, player.y + 1.1, player.z + 0.25);
           const orientHeld = (group: T.Group) => {
+            const currentYaw = aiming ? yaw : player.yaw;
+            const currentPitch = aiming ? pitch : 0.03;
             const desired = new T.Quaternion().setFromEuler(
-              new T.Euler(-pitch, yaw, 0, "YXZ"),
+              new T.Euler(-currentPitch, currentYaw, 0, "YXZ"),
             );
             if (hooks.attachEquipment && group.parent) {
               group.parent.updateWorldMatrix(true, false);
@@ -535,7 +601,7 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
           };
           orientHeld(steel);
           steelNocked.visible = phase === "practice" && aiming;
-          steelNocked.position.z = 0.69 - charge * 0.53;
+          steelNocked.position.z = 0.46 - charge * 0.53;
           steelHalves.forEach((piece, i) => {
             const sign = i ? 1 : -1;
             const fall = Math.max(0, breakTime);
@@ -647,7 +713,7 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
             const steelLine = steelString.geometry.getAttribute(
               "position",
             ) as T.BufferAttribute;
-            steelLine.setZ(1, 0.15 - charge * 0.53);
+            steelLine.setZ(1, -0.08 - charge * 0.53);
             steelLine.needsUpdate = true;
             steelString.geometry.computeBoundingSphere();
             if (hooks.attachEquipment)
@@ -717,13 +783,21 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
           );
           if (!hooks.attachEquipment)
             bundles.position.set(player.x, player.y + 1.15, player.z - 0.42);
-          let prompt = near ? "Interact" : "";
+          let prompt = near
+            ? phase === "wood" || phase === "arrow"
+              ? "{action} Pick up"
+              : phase === "counsel"
+                ? "{action} · Speak with Lehi"
+                : phase === "guide"
+                  ? "{action} · Read the Liahona"
+                  : "{action} Interact"
+            : "";
           const optionalNear =
             !optionalTalked &&
             (phase === "practice" || phase === "wood" || phase === "arrow") &&
             Math.hypot(player.x - (lehi.x + 4), player.z - lehi.z) < 2.4 &&
             Math.abs(player.y) < 1;
-          if (optionalNear) prompt = "Speak with Lemuel";
+          if (optionalNear) prompt = "{action} · Speak with Lemuel";
           if (phase === "hunt" || phase === "practice") {
             prompt = aiming
               ? `Hold {action} to draw; release to fire • {move} aims • ${Math.round(charge * 100)}%`
@@ -823,7 +897,7 @@ export function buildBrokenBow(scene: T.Scene): WorldData {
             else if (phase === "guide")
               say(
                 "Into the mountains",
-                "The writing on the Liahona gives direction. Follow the trail into the mountain. Aim carefully and bring back enough food for the family. Wildlife and hunting details here are imagined; the scripture does not identify the species.",
+                "The writing on the Liahona gives direction. Follow the trail into the mountain. Aim carefully and bring back enough food for the family.",
                 "hunt",
               );
           }

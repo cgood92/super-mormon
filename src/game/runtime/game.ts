@@ -514,7 +514,9 @@ export class Game {
       id !== "palace" &&
       id !== "house" &&
       id !== "trade" &&
-      id !== "streets"
+      id !== "streets" &&
+      id !== "night" &&
+      id !== "tree"
     )
       this.ui.message(entryMessage(id, this.session.world, this.completed), 4);
     if (this.started && !document.hidden) {

@@ -104,8 +104,11 @@ export function sceneryTerraceUnion(
   const face = (points: number[][], color: number) => {
     const tint = new T.Color(color);
     for (const index of [0, 1, 2, 0, 2, 3]) {
-      vertices.push(...points[index]);
-      colors.push(tint.r, tint.g, tint.b);
+      const pt = points[index];
+      vertices.push(...pt);
+      const stratum =
+        0.94 + 0.1 * Math.sin(pt[1] * 2.8 + pt[0] * 0.35 + pt[2] * 0.2);
+      colors.push(tint.r * stratum, tint.g * stratum, tint.b * stratum);
     }
   };
   const top = (i: number, j: number) => {

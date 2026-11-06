@@ -13,7 +13,7 @@ import {
 import { buildFamilyCamp } from "../shared/family-camp";
 import { buildShip } from "./ship";
 import { createCharacter } from "../../characters/character";
-import type { WorldData, Point } from "../../runtime/worlds";
+import type { WorldData, Point, Solid } from "../../runtime/worlds";
 
 const point = (x: number, z: number, y = 0): Point => ({ x, y, z });
 /** Interactive retelling of 1 Nephi 17–18. All architecture and vessel geometry are imagined. */
@@ -128,8 +128,31 @@ export function buildBountiful(scene: T.Scene): WorldData {
     const side = i % 2 ? -1 : 1,
       x = side * (24 + (i % 5) * 8),
       z = -44 + (i % 7) * 5;
-    mesh(sphere, 0xc6b686, x, 0.15, z, 5, 1.1, 4, "Shore dunes");
-    mesh(sphere, 0x78874d, x + 2, 0.5, z + 2, 1.3, 0.7, 1.6, "Coastal scrub");
+    const dune = mesh(sphere, 0xc6b686, x, 0.15, z, 5, 1.1, 4, "Shore dunes");
+    const duneSolid: Solid = { x, y: 0, z, w: 4.6, h: 1.1, d: 3.6 };
+    solids.push(duneSolid);
+    markScenery(dune, { kind: "solid", solids: [duneSolid] });
+    const scrub = mesh(
+      sphere,
+      0x78874d,
+      x + 2,
+      0.5,
+      z + 2,
+      1.3,
+      0.7,
+      1.6,
+      "Coastal scrub",
+    );
+    const scrubSolid: Solid = {
+      x: x + 2,
+      y: 0,
+      z: z + 2,
+      w: 1.2,
+      h: 0.7,
+      d: 1.4,
+    };
+    solids.push(scrubSolid);
+    markScenery(scrub, { kind: "solid", solids: [scrubSolid] });
   }
   for (let i = 0; i < 26; i++) {
     const x = -85 + i * 6.8;
@@ -172,10 +195,49 @@ export function buildBountiful(scene: T.Scene): WorldData {
     })),
     "Mountain prayer ledges",
   );
+  for (let i = 0; i < 7; i++) {
+    const yTier = (i + 1) * 1.125;
+    rock(
+      -43.5,
+      0,
+      15 + i * 3.5,
+      3.4,
+      yTier + 0.4,
+      3.2,
+      0xa79e78,
+      "Mountain west flank crag",
+    );
+    rock(
+      -30.2,
+      0,
+      15 + i * 3.5,
+      2.8,
+      yTier + 0.4,
+      3.0,
+      0xb2a884,
+      "Mountain east flank crag",
+    );
+  }
   const summit = point(-36, 39, 9),
     ore = point(-22, 18),
     forge = point(-8, 10),
     brothers = point(9, 4);
+  const prayerCircle = mesh(
+    new T.RingGeometry(1.2, 1.45, 32),
+    0x5dd8ff,
+    summit.x,
+    summit.y + 0.05,
+    summit.z,
+    1,
+    1,
+    1,
+    "Prayer circle",
+  );
+  prayerCircle.rotation.x = -Math.PI / 2;
+  markScenery(prayerCircle, {
+    kind: "decoration",
+    reason: "Visual summit prayer circle marker",
+  });
   // One fitted outcrop owns the whole ore surface. Intersecting little mounds
   // previously created inward seams and competing collision corrections.
   rock(-22, 0, 18.8, 4.2, 1.6, 3.8, 0x76645a, "Ore outcrop");
@@ -365,6 +427,7 @@ export function buildBountiful(scene: T.Scene): WorldData {
   powerGlow.name = "Quiet light of reconciliation";
   root.add(powerGlow);
   let disposed = false;
+  let shipBuilt = false;
   const data: WorldData = {
     name: "Bountiful",
     initialObjective: "Climb the mountain trail and pray",
@@ -372,7 +435,9 @@ export function buildBountiful(scene: T.Scene): WorldData {
     spawn: { ...point(-27, 9), yaw: 0 },
     solids,
     climbables,
-    cameraRooms: ship.cameraRooms,
+    get cameraRooms() {
+      return shipBuilt ? ship.cameraRooms : [];
+    },
     actorParent: root,
     swimRegions: [
       { minX: -78, maxX: 63, minZ: -68, maxZ: -50, surfaceY: -0.35 },
@@ -565,14 +630,14 @@ export function buildBountiful(scene: T.Scene): WorldData {
             axe.position.set(axePoint.x, 0.18, axePoint.z);
             axe.rotation.set(0, 0, Math.PI / 2);
           }
+          const strikeAngle =
+            hasHammer && swing > 0
+              ? Math.sin((1 - swing / 0.4) * Math.PI) * 1.5
+              : 0;
           tool.rotation.set(
-            0,
+            strikeAngle,
             hooks.attachEquipment && hasHammer ? 0 : player.yaw,
-            hasHammer
-              ? swing > 0
-                ? Math.sin((1 - swing / 0.4) * Math.PI) * -1.5
-                : 0.2
-              : Math.PI / 2,
+            hasHammer ? 0.2 : Math.PI / 2,
           );
           sparks.position.set(forge.x, 1.1, forge.z);
           sparks.scale.setScalar(0.15 + (1 - spark / 0.3) * 0.65);
@@ -646,6 +711,7 @@ export function buildBountiful(scene: T.Scene): WorldData {
               Math.hypot(player.x - p.x, player.z - p.z) <
                 (phase === "timber" && carrying ? 2.8 : 3.2) &&
               Math.abs(player.y - p.y) < 3;
+          prayerCircle.visible = phase === "pray";
           marker.visible =
             phase === "pray" || Math.hypot(player.x - p.x, player.z - p.z) > 5;
           marker.position.set(
@@ -694,7 +760,11 @@ export function buildBountiful(scene: T.Scene): WorldData {
                                 : "Swing axe"
                           : "Inspect the finished ship"
             : "";
-          if (!dialog && near && input.interact) {
+          const inPrayerCircle =
+            phase === "pray" &&
+            Math.hypot(player.x - summit.x, player.z - summit.z) < 2.5 &&
+            player.y >= 8.5;
+          if (!dialog && (inPrayerCircle || (near && input.interact))) {
             if (phase === "pray")
               say(
                 "A command to build",
@@ -724,7 +794,7 @@ export function buildBountiful(scene: T.Scene): WorldData {
             } else if (phase === "oppose")
               say(
                 "Remember the Lord",
-                "Nephi: Remember the Lord’s power. Do not touch me. Nephi extends his hand, and his brothers draw back and tremble.",
+                "Nephi reminds his brothers of the Lord's power. Nephi extends his hand and his brothers draw back and tremble.",
                 "power",
               );
             else if (phase === "timber" && !carrying) {
@@ -829,9 +899,10 @@ export function buildBountiful(scene: T.Scene): WorldData {
                   "Gangway landing",
                 );
                 climbables.push(...ship.climbables);
+                shipBuilt = true;
                 say(
                   "A ship completed",
-                  "They worked timbers with curious workmanship, as the Lord showed Nephi. The family saw that the ship was good. Explore this imagined vessel, including its stairs, common room and masts. (1 Nephi 18:1–4)",
+                  "A ship completed.",
                   "explore",
                 );
               }

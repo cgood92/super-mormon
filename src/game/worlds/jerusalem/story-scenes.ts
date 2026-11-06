@@ -351,16 +351,19 @@ export function createStoryScene(
             x: story.brothers.x - 2,
             y: 0,
             z: story.brothers.z,
+            yaw: Math.PI,
           }),
           makeActor(scene, "lemuel", {
             x: story.brothers.x + 2,
             y: 0,
             z: story.brothers.z,
+            yaw: Math.PI,
           }),
           makeActor(scene, "sam", {
             x: story.brothers.x,
             y: 0,
             z: story.brothers.z + 2.4,
+            yaw: Math.PI,
           }),
         ];
   actors.push(...brothers);
@@ -517,9 +520,15 @@ export function createStoryScene(
         phase === "cave" &&
         near(p, story.cave ?? story.brothers, 5.5) &&
         brothers.every((a) => near(a.state, p, 9));
+      const zoramNear =
+        phase === "zoram" && zoram !== undefined && reachable(zoram.state, 3.2);
       if (
         !dialogueOpen &&
-        (input.interact || arrivedWithRecords || offerNear || caveNear)
+        (input.interact ||
+          arrivedWithRecords ||
+          offerNear ||
+          caveNear ||
+          zoramNear)
       ) {
         if (offerNear) {
           speak(
@@ -565,7 +574,7 @@ export function createStoryScene(
         } else if (phase === "laban" && reachable(story.laban, 3.4)) {
           speak(
             "1 Nephi 4:6–19",
-            "A difficult account",
+            "A drunk Laban",
             "Directed by the Spirit, Nephi takes Laban’s life and puts on his garments. (1 Nephi 4)",
             () => {
               advance("zoram");
@@ -590,7 +599,7 @@ export function createStoryScene(
           speak(
             "1 Nephi 4:20–26",
             "Meet Zoram",
-            "Nephi: Bring the brass plates. Zoram: Follow me to the treasury.",
+            "Nephi asks Zoram to bring the brass plates. Zoram says to follow him into the treasury.",
             () => advance("plates"),
           );
         } else if (
@@ -611,7 +620,7 @@ export function createStoryScene(
           speak(
             "1 Nephi 4:27–38",
             "Together outside the city",
-            "Nephi: It is I. Do not fear. Zoram promises to join the family.",
+            "Zoram promises to join the family.",
             () => {
               advance("done");
               hooks.complete();
@@ -652,8 +661,23 @@ export function createStoryScene(
         }
       } else if (zoram && phase === "plates" && story.plates)
         stepActor(zoram, story.plates, dt, 3.8, world);
-      else if (zoram && phase === "escape")
-        stepActor(zoram, { x: player.x, z: player.z }, dt, 5.0, world);
+      else if (zoram && phase === "escape") {
+        const distToPlayer = distance(zoram.state, p);
+        if (distToPlayer > 2.2) {
+          const followTarget = {
+            x: player.x - Math.sin(player.yaw) * 1.8,
+            z: player.z - Math.cos(player.yaw) * 1.8,
+          };
+          stepActor(zoram, followTarget, dt, 5.0, world);
+        } else {
+          zoram.state.runSpeed = 0;
+          zoram.state.move = "idle";
+          const dx = player.x - zoram.state.x,
+            dz = player.z - zoram.state.z;
+          if (Math.hypot(dx, dz) > 0.1) zoram.state.yaw = Math.atan2(dx, dz);
+          zoram.rig.update(dt, zoram.state);
+        }
+      }
       if (phase === "offer") {
         treasure[0]?.carry(player);
         treasure

@@ -142,21 +142,21 @@ export function createHuntingBow() {
   tube(
     group,
     [
-      new THREE.Vector3(0, -0.69, 0.13),
-      new THREE.Vector3(0, -0.45, -0.09),
-      new THREE.Vector3(0, 0, -0.03),
-      new THREE.Vector3(0, 0.45, -0.09),
-      new THREE.Vector3(0, 0.69, 0.13),
+      new THREE.Vector3(0, -0.69, -0.08),
+      new THREE.Vector3(0, -0.45, 0.1),
+      new THREE.Vector3(0, 0, 0.16),
+      new THREE.Vector3(0, 0.45, 0.1),
+      new THREE.Vector3(0, 0.69, -0.08),
     ],
     0.032,
     wood,
   );
-  ellipsoid(group, wrap, 0, 0, -0.03, 0.045, 0.13, 0.045);
+  ellipsoid(group, wrap, 0, 0, 0.16, 0.045, 0.13, 0.045);
   const stringGeometry = new THREE.BufferGeometry();
   stringGeometry.setAttribute(
     "position",
     new THREE.Float32BufferAttribute(
-      [0, -0.69, 0.13, 0, 0, 0.13, 0, 0.69, 0.13],
+      [0, -0.69, -0.08, 0, 0, -0.08, 0, 0.69, -0.08],
       3,
     ),
   );
@@ -171,7 +171,7 @@ export function createHuntingBow() {
       const p = stringGeometry.getAttribute(
         "position",
       ) as THREE.BufferAttribute;
-      p.setZ(1, 0.13 - Math.max(0, Math.min(1, charge)) * 0.53);
+      p.setZ(1, -0.08 - Math.max(0, Math.min(1, charge)) * 0.53);
       p.needsUpdate = true;
       stringGeometry.computeBoundingSphere();
     },
