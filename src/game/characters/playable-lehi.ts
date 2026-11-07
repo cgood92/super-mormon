@@ -296,13 +296,19 @@ export function createSculptedCharacterRig(
     // The trailing shoes reach local Y ~= 0.61 in a crawl. Lift the low hem
     // past them, while mapping its authored height into a curved sweep.
     const hem = 1 - T.MathUtils.smoothstep(point.y, 0.18, 0.48);
-    const gatheredY = 0.58 + (point.y - 0.122) * 0.53;
+    const rear = 1 - T.MathUtils.smoothstep(point.z, -0.03, 0.06);
+    const center = 1 - T.MathUtils.smoothstep(Math.abs(point.x), 0.04, 0.34);
+    const front = T.MathUtils.smoothstep(point.z, -0.02, 0.18);
+    const flank = T.MathUtils.smoothstep(Math.abs(point.x), 0.1, 0.35);
+    // Profile slope: front of the coat gathers higher near the chest (Y ~= 0.74),
+    // while the rear drape sweeps gracefully over the hips (Y ~= 0.655).
+    // Lateral curve: arches smoothly over the spine and wraps around the flanks.
+    const hemCurve = front * 0.085 + (1 - rear) * flank * 0.04;
+    const gatheredY = 0.665 + hemCurve + (point.y - 0.122) * 0.53;
     point.y += (gatheredY - point.y) * weight;
     point.z *= 1 - 0.28 * weight;
     // Preserve the authored front-to-back arc at the hem. Interpolating the
     // entire low ring to one Z coordinate makes a flat cut face in rear views.
-    const rear = 1 - T.MathUtils.smoothstep(point.z, -0.03, 0.06);
-    const center = 1 - T.MathUtils.smoothstep(Math.abs(point.x), 0.04, 0.34);
     const hemDepth = backDrape + point.z * 0.58 - 0.1 * rear * center * hem;
     point.z += (hemDepth - point.z) * weight;
   };
@@ -538,7 +544,23 @@ export function createSculptedCharacterRig(
           for (let i = 0; i < attribute.count; i++) {
             const j = i * 3;
             clothPoint.set(rest[j], rest[j + 1], rest[j + 2]);
-            drape(clothPoint, crawling);
+            if (crawling) {
+              const ry = rest[j + 1];
+              if (ry < 0.95) {
+                const reach = (0.95 - ry) / (0.95 - 0.72);
+                // Lower tunic extends down over the seat and crotch
+                clothPoint.y = T.MathUtils.lerp(ry, 0.52, reach);
+                // Form a continuous pelvic seat between the thighs
+                if (Math.abs(clothPoint.x) > 0.1) {
+                  clothPoint.x *= 1 - 0.12 * reach;
+                }
+                clothPoint.z = T.MathUtils.lerp(
+                  clothPoint.z,
+                  rest[j + 2] * 0.85 + 0.08,
+                  reach,
+                );
+              }
+            }
             attribute.setXYZ(i, clothPoint.x, clothPoint.y, clothPoint.z);
           }
           attribute.needsUpdate = true;

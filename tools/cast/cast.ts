@@ -1210,6 +1210,14 @@ function init() {
       setTimeout(() => openInspector(roleCard), 100);
     }
   }
+  const yawParam = urlParams.get("yaw");
+  const pitchParam = urlParams.get("pitch");
+  if (yawParam !== null || pitchParam !== null) {
+    const y = yawParam ? parseFloat(yawParam) : 0;
+    const p = pitchParam ? parseFloat(pitchParam) : 0;
+    setGlobalCameraAngle(y, p);
+    syncOrbit = true;
+  }
 
   applyFilters();
   requestRender();
