@@ -90,10 +90,37 @@ function makeWorld(
   return { group, add, decor, finish, solids };
 }
 
+function createJerusalemGroundTexture(): THREE.DataTexture {
+  const size = 128;
+  const data = new Uint8Array(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const idx = (y * size + x) * 4;
+      const n1 =
+        (((Math.sin(x * 12.9898 + y * 78.233) * 43758.5453) % 1) + 1) * 0.5;
+      const n2 = Math.sin(x * 0.35) * Math.cos(y * 0.35) * 0.5 + 0.5;
+      const n3 = Math.sin(x * 0.08 + y * 0.12) * 0.5 + 0.5;
+      const factor = 0.84 + n1 * 0.12 + n2 * 0.1 + n3 * 0.08;
+      data[idx] = Math.min(255, Math.floor(196 * factor));
+      data[idx + 1] = Math.min(255, Math.floor(167 * factor));
+      data[idx + 2] = Math.min(255, Math.floor(128 * factor));
+      data[idx + 3] = 255;
+    }
+  }
+  const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(24, 42);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 function cityBlock(
   add: ReturnType<typeof makeWorld>["add"],
   decor: ReturnType<typeof makeWorld>["decor"],
   group: THREE.Group,
+  solids: Solid[],
   x: number,
   z: number,
   w: number,
@@ -102,8 +129,12 @@ function cityBlock(
   color: number,
 ): void {
   // Flat roofs, plaster parapets, timber lintels, and street-facing clay vessels.
-  // Solid height extends to the roof surface (h + 0.17) so feet do not sink.
-  add(x, 0, z, w, h + 0.17, d, color, "Jerusalem dwelling");
+  // Physical support extends to the roof surface (h + 0.17) so feet do not sink,
+  // while the dwelling wall render stops at h beneath the roof slab to eliminate coplanar z-fighting.
+  const shape = { x, y: 0, z, w, h: h + 0.17, d };
+  solids.push(shape);
+  const dwellingMesh = box(group, x, 0, z, w, h, d, color, "Jerusalem dwelling");
+  markScenery(dwellingMesh, { kind: "solid", solids: [shape] });
   decor(x, h, z, w + 0.25, 0.17, d + 0.25, palette.paleStone, "flat roof");
   for (const side of [-1, 1]) {
     // Leave a gap on the west side of the stair terrace building so player can enter roof
@@ -238,7 +269,22 @@ export function buildJerusalem(
   scene: THREE.Scene,
 ): WorldData {
   const { group, add, decor, finish, solids } = makeWorld(scene, "jerusalem");
-  decor(0, -0.5, 45, 80, 0.5, 140, 0xc4a780, "Jerusalem earth and desert road");
+  const groundTex = createJerusalemGroundTexture();
+  const ground = decor(
+    0,
+    -0.5,
+    42.5,
+    80,
+    0.5,
+    155,
+    0xc4a780,
+    "Jerusalem earth and desert road",
+  );
+  if (ground.material instanceof THREE.MeshStandardMaterial) {
+    ground.material.map = groundTex;
+    ground.material.roughness = 0.95;
+    ground.material.needsUpdate = true;
+  }
   add(-36, 0, 5.5, 0.9, 8, 69, 0xa98b69, "west city wall");
   add(36, 0, 5.5, 0.9, 8, 69, 0xa98b69, "east city wall");
   add(0, 0, -29, 73, 8, 0.9, 0xa98b69, "north city wall");
@@ -262,7 +308,7 @@ export function buildJerusalem(
     [0, 14, 18, 12, 4.6, 0xcfad86],
     [-6, 0, 14, 8, 5.2, 0xd1ac84],
   ])
-    cityBlock(add, decor, group, x, z, w, d, h, c);
+    cityBlock(add, decor, group, solids, x, z, w, d, h, c);
   decor(-32.06, 0, -15, 0.12, 2.8, 2.8, palette.indigo, "Lehi indigo doorway");
   decor(-32.15, 2.8, -15, 0.28, 0.2, 3.2, palette.timber, "Lehi door lintel");
   const sign = label(group, "LEHI’S HOUSE", -32.22, 3.5, -15, 2.6);
@@ -294,7 +340,16 @@ export function buildJerusalem(
     [14, -9, 4, 0.65],
   ])
     add(x, 4.8, z, w, 1.7, d, 0xc6a780, "palace doorway lintel");
-  decor(-2, 0.015, -18, 20, 0.035, 18, 0xd0b38a, "audience court paving");
+  decor(
+    0,
+    0.015,
+    -18.75,
+    35.2,
+    0.035,
+    19.5,
+    0xd0b38a,
+    "palace interior stone paving",
+  );
   for (const x of [-9, 5])
     for (const z of [-24, -18, -12]) {
       column(group, x, z, 6.1, 0.48, palette.paleStone);
@@ -327,7 +382,7 @@ export function buildJerusalem(
   ]) {
     datePalm(group, x, z, 4.8);
     add(x, 0, z, 0.32, 4.8, 0.32, palette.timber, "date palm trunk");
-    add(x, 4.75, z, 2.4, 0.25, 2.4, palette.leaf, "date palm leaf canopy");
+    solids.push({ x, y: 4.8, z, w: 2.4, h: 0.25, d: 2.4 });
   }
   for (let i = 0; i < 12; i++)
     add(
@@ -355,23 +410,7 @@ export function buildJerusalem(
       group.add(glow);
     }
   }
-  // Subtle paving flagstones along the thoroughfare give the ground natural texture.
-  for (let z = -8; z <= 38; z += 3.2) {
-    for (const x of [-3.2, 0, 3.2]) {
-      decor(
-        x + (Math.floor(z) % 2) * 0.3,
-        0.005,
-        z,
-        1.7,
-        0.02,
-        1.5,
-        0xbba07f,
-        "street paver",
-      );
-    }
-  }
-  for (const z of [25, 6, -6])
-    decor(0, 0.01, z, 36, 0.035, 0.18, 0xac906e, "cross street paving seam");
+
   for (const [x, z, w] of [
     [-23, 53, 4],
     [13, 58, 4],

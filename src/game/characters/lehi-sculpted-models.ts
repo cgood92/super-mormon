@@ -1755,7 +1755,7 @@ function makeSculpted(
       0.065,
     );
     for (const side of [-1, 1]) {
-      if (index !== 2)
+      if (index !== 2 && !faceProfile)
         d = smoothUnion(
           d,
           ellipsoid(
