@@ -114,6 +114,10 @@ export function buildWatersOfMormon(scene: T.Scene): WorldData {
     [-16, 25, 15, 12, 5],
     [23, 30, 10, 25, 7],
     [-21, 41, 13, 12, 5],
+    [20, 8, 12, 14, 6.5],
+    [-25, -3, 8, 12, 5],
+    [6, -3, 12, 8, 5],
+    [-6, 36, 7, 7, 5.5],
   ]) {
     solid(
       x,
@@ -285,6 +289,23 @@ export function buildWatersOfMormon(scene: T.Scene): WorldData {
       "Shallow clear water over the single solid earth bed; no duplicate walk surface.",
   });
   group.add(water);
+  const arrivalRing = new T.Mesh(
+    new T.RingGeometry(1.6, 1.95, 48),
+    new T.MeshBasicMaterial({
+      color: 0x65c5bd,
+      side: T.DoubleSide,
+      transparent: true,
+      opacity: 0.85,
+    }),
+  );
+  arrivalRing.rotation.x = -Math.PI / 2;
+  arrivalRing.position.set(0, 0.05, 98);
+  arrivalRing.name = "Alma arrival circle";
+  group.add(arrivalRing);
+  markScenery(arrivalRing, {
+    kind: "decoration",
+    reason: "Arrival circle to speak with Alma beside the water.",
+  });
   for (let i = 0; i < 5; i++)
     decor(
       -4 + i * 1.9,
@@ -321,6 +342,8 @@ export function buildWatersOfMormon(scene: T.Scene): WorldData {
     { x: -4, z: 19, base: Math.PI, phase: 0 },
     { x: 16, z: 35, base: Math.PI, phase: 2.3 },
     { x: 10, z: 62, base: 0, phase: 1.4 },
+    { x: 23, z: 18, base: -Math.PI / 2, phase: 1.8 },
+    { x: -24, z: 28, base: 0, phase: 1.1 },
   ].map((s) => ({
     ...s,
     rig: actor("spy", s.x, s.z, s.base),
@@ -499,7 +522,7 @@ export function buildWatersOfMormon(scene: T.Scene): WorldData {
               hooks.dialog(
                 "Mosiah 18:13–16",
                 "Baptized at the Waters of Mormon",
-                "Alma baptizes you as a witness of your covenant to serve God. You join the believers in this peaceful place. The city, route, and spies in this adventure are an imagined adaptation of the account.",
+                "Alma baptizes you as a witness of your covenant to serve God. You join the believers in this peaceful place.",
                 () => hooks.complete(),
               );
             }
@@ -528,7 +551,7 @@ export function buildWatersOfMormon(scene: T.Scene): WorldData {
                     "Escape the city unseen",
                     "Follow the outer edge into the woods",
                     "Find the hidden fountain in the thicket",
-                    "Speak with Alma by the water",
+                    "Arrive at the circle to speak with Alma",
                   ][stage],
             prompt:
               close && stage === 3 && !pending && baptism < 0

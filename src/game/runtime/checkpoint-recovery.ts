@@ -67,6 +67,10 @@ export class CheckpointRecovery {
         el("caught-heading").textContent = "Spotted!";
         el("caught-detail").textContent =
           "A sentry saw Teancum or his servant. Keep both companions out of the amber sight cones, or behind stone cover.";
+      } else if (this.session.worldId === "ammon") {
+        el("caught-heading").textContent = "Hit by a rock!";
+        el("caught-detail").textContent =
+          "Dodge the robbers' stones and protect the flock. Try again!";
       } else {
         el("caught-heading").textContent = "Spotted!";
         el("caught-detail").textContent =
