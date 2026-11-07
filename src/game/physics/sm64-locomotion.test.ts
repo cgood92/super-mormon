@@ -241,5 +241,58 @@ test("SM64 rig poses articulate turnSkid, slideRollout, dive, bellySlide, and sl
     "lead leg extended forward in slide kick",
   );
 
+  // Tree / pole grasping pose
+  driver.update(1 / 60, {
+    ...baseState,
+    move: "climb",
+    vy: 0,
+    runSpeed: 0,
+    moveTime: 0.1,
+  });
+  assert.ok(
+    leftArm.rotation.x < -1.8 && leftArm.rotation.z < -0.2,
+    "left arm wrapped around trunk with bent elbow",
+  );
+  assert.ok(
+    rightArm.rotation.x < -1.8 && rightArm.rotation.z > 0.2,
+    "right arm wrapped around trunk with bent elbow",
+  );
+  const leftKnee = driver.group.getObjectByName("left-knee")!;
+  assert.ok(
+    leftKnee.rotation.x > 0.7 && rightKnee.rotation.x > 0.7,
+    "knees bent clasping bark",
+  );
+
+  // Top of pole handstand pose
+  driver.update(1 / 60, {
+    ...baseState,
+    move: "handstand",
+    moveTime: 0.2,
+  });
+  assert.ok(
+    Math.abs(body.rotation.x - Math.PI) < 0.1,
+    "handstand body inverted 180 degrees",
+  );
+  assert.ok(
+    leftArm.rotation.x < -2.8 && rightArm.rotation.x < -2.8,
+    "arms extended to pole rim",
+  );
+  assert.ok(
+    leftKnee.rotation.x === 0 && rightKnee.rotation.x === 0,
+    "legs straight up in handstand",
+  );
+
+  // Ledge hang
+  driver.update(1 / 60, {
+    ...baseState,
+    move: "ledgeHang",
+    runSpeed: 0,
+    moveTime: 0.1,
+  });
+  assert.ok(
+    leftArm.rotation.x < -2.6 && rightArm.rotation.x < -2.6,
+    "hands reaching up to ledge rim",
+  );
+
   driver.dispose();
 });

@@ -321,19 +321,22 @@ export function createMotionDriver(role: CharacterRole): {
         arms[0].rotation.x = arms[1].rotation.x = -0.55;
         head.rotation.x = -0.1;
       } else if (move === "kneel") {
-        body.scale.y = 0.84;
-        body.position.y = -0.145;
-        body.rotation.x = 0.26;
-        body.rotation.z = 0;
-        legs[0].rotation.set(-1.42, 0, 0);
-        legs[1].rotation.set(-1.42, 0, 0);
-        knees[0].rotation.set(2.4, 0, 0);
-        knees[1].rotation.set(2.4, 0, 0);
-        feet[0].rotation.set(-0.95, 0, 0);
-        feet[1].rotation.set(-0.95, 0, 0);
-        arms[0].rotation.set(-1.25, 0.14, 0.35);
-        arms[1].rotation.set(-1.25, -0.14, -0.35);
-        head.rotation.x = 0.25;
+        // Reverent kneeling prayer / council pose:
+        // Torso upright with gentle reverent bow, head tilted peacefully downward,
+        // hands folded reverently in front of the chest, knees resting naturally on the ground,
+        // shins and feet extending back along the floor within the garment drape.
+        body.scale.set(1, 0.84, 1);
+        body.position.y = -0.21;
+        body.rotation.set(0.1, 0, 0);
+        legs[0].rotation.set(-0.28, 0, 0);
+        legs[1].rotation.set(-0.28, 0, 0);
+        knees[0].rotation.set(2.2, 0, 0);
+        knees[1].rotation.set(2.2, 0, 0);
+        feet[0].rotation.set(0.6, 0, 0);
+        feet[1].rotation.set(0.6, 0, 0);
+        arms[0].rotation.set(-0.42, 0.22, 0.78);
+        arms[1].rotation.set(-0.42, -0.22, -0.78);
+        head.rotation.set(0.22, 0, 0);
       } else if (move === "jump") {
         // SM64 single jump: iconic fist punch into the air, opposite leg raised high
         arms[1].rotation.set(-2.25, 0, -0.15); // right fist raised high
@@ -653,17 +656,67 @@ export function createMotionDriver(role: CharacterRole): {
         legs[0].rotation.x = -0.85;
         legs[1].rotation.x = 0.7;
       } else if (move === "ledgeHang") {
+        // SM64 ledge hang & shimmy: hands gripping rim, pendular body sway,
+        // lateral hand reach when shimmying
+        const shimmying = (state.runSpeed ?? 0) > 0.1;
+        const sway = Math.sin(moveTime * 3.2) * 0.08;
         body.position.y = 0;
-        arms[0].rotation.x = -2.7;
-        arms[1].rotation.x = -2.7;
-        legs[0].rotation.x = 0.2;
-        legs[1].rotation.x = -0.2;
+        body.rotation.x = -0.04 + sway;
+        if (shimmying) {
+          const shimmyCycle = Math.sin(moveTime * 9);
+          arms[0].rotation.set(-2.8 + shimmyCycle * 0.25, 0, 0.15);
+          arms[1].rotation.set(-2.8 - shimmyCycle * 0.25, 0, -0.15);
+          legs[0].rotation.set(0.15 + shimmyCycle * 0.2, 0, 0.1);
+          legs[1].rotation.set(0.15 - shimmyCycle * 0.2, 0, -0.1);
+        } else {
+          arms[0].rotation.set(-2.8, 0, 0.1);
+          arms[1].rotation.set(-2.8, 0, -0.1);
+          legs[0].rotation.set(0.12 + sway * 1.4, 0, 0);
+          legs[1].rotation.set(0.12 + sway * 1.4, 0, 0);
+        }
+        knees[0].rotation.set(0.25, 0, 0);
+        knees[1].rotation.set(0.25, 0, 0);
       } else if (move === "climb") {
-        const cycle = Math.sin(moveTime * 11);
-        arms[0].rotation.x = -2.5 + cycle * 0.35;
-        arms[1].rotation.x = -2.5 - cycle * 0.35;
-        legs[0].rotation.x = -0.3 - cycle * 0.4;
-        legs[1].rotation.x = -0.3 + cycle * 0.4;
+        // SM64 pole climbing: arms wrapped around trunk, knees and inner feet clasping bark,
+        // alternating reach and knee-hitch when ascending/sliding
+        const isClimbing =
+          Math.abs(state.vy ?? 0) > 0.1 || (state.runSpeed ?? 0) > 0.1;
+        if (isClimbing) {
+          const cycle = Math.sin(moveTime * 10);
+          arms[0].rotation.set(-2.2 + cycle * 0.45, -0.25, -0.3);
+          arms[1].rotation.set(-2.2 - cycle * 0.45, 0.25, 0.3);
+          legs[0].rotation.set(-0.4 - cycle * 0.35, 0, 0.2);
+          legs[1].rotation.set(-0.4 + cycle * 0.35, 0, -0.2);
+          knees[0].rotation.set(0.8 + cycle * 0.3, 0, 0);
+          knees[1].rotation.set(0.8 - cycle * 0.3, 0, 0);
+          feet[0].rotation.set(0.2, 0, 0.15);
+          feet[1].rotation.set(0.2, 0, -0.15);
+        } else {
+          // Stationary holding pole: torso hugging trunk, arms wrapped with bent elbows,
+          // knees & inner feet clasping bark
+          arms[0].rotation.set(-1.95, -0.28, -0.32);
+          arms[1].rotation.set(-1.95, 0.28, 0.32);
+          legs[0].rotation.set(-0.45, 0, 0.22);
+          legs[1].rotation.set(-0.45, 0, -0.22);
+          knees[0].rotation.set(0.9, 0, -0.15);
+          knees[1].rotation.set(0.9, 0, 0.15);
+          feet[0].rotation.set(0.2, 0, 0.2);
+          feet[1].rotation.set(0.2, 0, -0.2);
+        }
+      } else if (move === "handstand") {
+        // SM64 top-of-pole handstand: inverted 180 deg, balancing on arms on pole rim,
+        // legs extended straight up with gentle balance sway
+        body.position.y = 0.52;
+        body.rotation.x = Math.PI;
+        body.rotation.z = Math.sin(moveTime * 2.5) * 0.04;
+        arms[0].rotation.set(-2.95, 0, 0.08);
+        arms[1].rotation.set(-2.95, 0, -0.08);
+        legs[0].rotation.set(0.08, 0, 0.12);
+        legs[1].rotation.set(0.08, 0, -0.12);
+        knees[0].rotation.set(0, 0, 0);
+        knees[1].rotation.set(0, 0, 0);
+        feet[0].rotation.set(0.35, 0, 0);
+        feet[1].rotation.set(0.35, 0, 0);
       }
       if (state.dancing && move === "idle") {
         const beat = (state.danceTime ?? idlePhase) * 4;

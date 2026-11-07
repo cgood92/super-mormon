@@ -378,7 +378,8 @@ export function createSculptedCharacterRig(
           crawling ? -0.14 : 0,
         );
       }
-      if (crawling || wasCrawling) {
+      const kneeBent = crawling || state.move === "kneel";
+      if (kneeBent || wasCrawling) {
         model.group.updateWorldMatrix(true, true);
         for (let side = 0; side < 2; side++) {
           const mesh = trousers[side];
@@ -395,7 +396,7 @@ export function createSculptedCharacterRig(
           for (let i = 0; i < attribute.count; i++) {
             const j = i * 3;
             trouserPoint.set(rest[j], rest[j + 1], rest[j + 2]);
-            if (crawling) {
+            if (kneeBent) {
               if (role !== "moroni")
                 trouserPoint.y = Math.min(trouserPoint.y, height(0.6));
               const weight =
@@ -412,7 +413,7 @@ export function createSculptedCharacterRig(
                 height(0.37) + y * Math.cos(angle) - z * Math.sin(angle);
               trouserPoint.z = y * Math.sin(angle) + z * Math.cos(angle);
             }
-            if (crawling && role === "moroni") {
+            if (kneeBent && role === "moroni") {
               const anchor = T.MathUtils.smoothstep(
                 rest[j + 1],
                 height(0.58),
@@ -542,7 +543,7 @@ export function createSculptedCharacterRig(
         }
       }
       clothWasMoving = clothMoving;
-      wasCrawling = crawling;
+      wasCrawling = kneeBent;
       if (state.lookYaw !== undefined) {
         // Compensate the complete parent transform, including turn lean and
         // nonuniform scale, so the rendered face matches world-space sight tests.

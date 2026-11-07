@@ -1195,6 +1195,21 @@ function init() {
   if (q) {
     (document.getElementById("search-input") as HTMLInputElement).value = q;
   }
+  const m = urlParams.get("motion");
+  if (m) {
+    activeMotion = m;
+    const motionSelect = document.getElementById(
+      "motion-selector",
+    ) as HTMLSelectElement;
+    if (motionSelect) motionSelect.value = m;
+  }
+  const roleParam = urlParams.get("role");
+  if (roleParam) {
+    const roleCard = cards.find((c) => c.entry.role === roleParam);
+    if (roleCard) {
+      setTimeout(() => openInspector(roleCard), 100);
+    }
+  }
 
   applyFilters();
   requestRender();

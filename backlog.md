@@ -42,7 +42,7 @@ High-level roadmap and tasks to achieve 1:1 gameplay feel, physics, kinematic cu
   - Mid-air stall with 360° flip tuck.
   - High-velocity vertical drop ($v_y = -75\text{f}$ terminal velocity).
   - Heavy landing impact with ground compression and dust shockwave.
-- [ ] **Ledge Hang, Shimmy & Pop-Up** (`mario_actions_airborne.c: act_ledge_grab`)
+- [x] **Ledge Hang, Shimmy & Pop-Up** (`mario_actions_airborne.c: act_ledge_grab`)
   - Smooth ledge snap and hanging swing idle.
   - Shimmying along walkable ledge edges.
   - Pull-up climbing animation with root translation matching geometry.
@@ -51,18 +51,18 @@ High-level roadmap and tasks to achieve 1:1 gameplay feel, physics, kinematic cu
 
 ## 3. Tree & Pole Climbing Mechanics (`mario_actions_object.c`)
 
-- [ ] **Tree / Pole Rig Poses & Grasping** (`act_holding_pole`)
+- [x] **Tree / Pole Rig Poses & Grasping** (`act_holding_pole`)
   - Torso-to-trunk hugging alignment facing the center axis of the tree.
   - Arms wrapped around the trunk with bent elbows; knees and inner feet clasping the bark.
   - Circumference orbiting: analog horizontal stick inputs orbit the player smoothly around the tree's perimeter.
-- [ ] **Climbing & Sliding Kinematics** (`act_climbing_pole`)
+- [x] **Climbing & Sliding Kinematics** (`act_climbing_pole`)
   - Alternating hand-over-hand and knee-hitch climbing gait going upward.
   - Smooth vertical slide down the trunk with bark friction.
-- [ ] **Reaching the Top: Handstand Transition & Pose** (`act_top_of_pole_transition`, `act_top_of_pole`)
+- [x] **Reaching the Top: Handstand Transition & Pose** (`act_top_of_pole_transition`, `act_top_of_pole`)
   - Upon reaching the top of the trunk/pole, hoist up over the rim into a full two-handed handstand.
   - Balance upside down on top of the tree with legs extended in the air.
   - Horizontal input pirouettes/spins the character in place while balancing on hands.
-- [ ] **Dismounts & Let-Go Mechanics** (`act_top_of_pole_jump`)
+- [x] **Dismounts & Let-Go Mechanics** (`act_top_of_pole_jump`)
   - **Handstand Launch Leap**: Pressing jump while in the top handstand launches the player straight up into a super high vertical leap ($v_y = 62\text{f}$) followed by a somersault descent.
   - **Mid-Trunk Kick-Off**: Pressing jump while attached to the trunk kicks outward and away with back-deflection impulse ($v_{\text{away}} = 18\text{f}, v_y = 36\text{f}$).
   - **Drop / Let Go**: Pressing crouch releases grip and drops the character straight down off the trunk without outward push.
@@ -88,7 +88,7 @@ High-level roadmap and tasks to achieve 1:1 gameplay feel, physics, kinematic cu
 - [ ] **8-Way C-Button Camera Stepping**
   - Snappy $45^\circ$ directional orbit increments when tapping C-Left / C-Right.
   - Preset zoom toggle (Lakitu normal $\to$ Mario close-up $\to$ overhead wide view).
-- [ ] **Intelligent Corner Peeking & Obstacle Easing**
+- [x] **Intelligent Corner Peeking & Obstacle Easing**
   - Camera rotates around pillars and building corners without getting caught on edges.
   - Avoid pushing through transparent interior ceilings.
 - [ ] **First-Person Look-Around Mode**
