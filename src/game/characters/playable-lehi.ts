@@ -285,32 +285,38 @@ export function createSculptedCharacterRig(
   let wasCrawling = false;
   const drape = (point: T.Vector3, crawling: boolean) => {
     if (!crawling) return;
-    // With the spine horizontal, gravity is local +Z. Gather the skirt around
-    // the hips and let its hem hang below the back, clear of the trailing feet.
-    const weight = 1 - T.MathUtils.smoothstep(point.y, 0.45, 1.16);
-    const backDrape = T.MathUtils.lerp(
-      0.05,
-      -0.2,
-      T.MathUtils.smoothstep(point.y, 0.18, 0.65),
-    );
-    // The trailing shoes reach local Y ~= 0.61 in a crawl. Lift the low hem
-    // past them, while mapping its authored height into a curved sweep.
-    const hem = 1 - T.MathUtils.smoothstep(point.y, 0.18, 0.48);
-    const rear = 1 - T.MathUtils.smoothstep(point.z, -0.03, 0.06);
-    const center = 1 - T.MathUtils.smoothstep(Math.abs(point.x), 0.04, 0.34);
-    const front = T.MathUtils.smoothstep(point.z, -0.02, 0.18);
-    const flank = T.MathUtils.smoothstep(Math.abs(point.x), 0.1, 0.35);
-    // Profile slope: front of the coat gathers higher near the chest (Y ~= 0.74),
-    // while the rear drape sweeps gracefully over the hips (Y ~= 0.655).
-    // Lateral curve: arches smoothly over the spine and wraps around the flanks.
-    const hemCurve = front * 0.085 + (1 - rear) * flank * 0.04;
-    const gatheredY = 0.665 + hemCurve + (point.y - 0.122) * 0.53;
-    point.y += (gatheredY - point.y) * weight;
-    point.z *= 1 - 0.28 * weight;
-    // Preserve the authored front-to-back arc at the hem. Interpolating the
-    // entire low ring to one Z coordinate makes a flat cut face in rear views.
-    const hemDepth = backDrape + point.z * 0.58 - 0.1 * rear * center * hem;
-    point.z += (hemDepth - point.z) * weight;
+    // With the spine horizontal, gravity is local +Z. Wrap the mantle smoothly
+    // over the back and buttocks, cascading naturally down the thighs toward
+    // the knees without center creases, gaping rear cutoffs, or lateral wings.
+    const restX = point.x;
+    const restY = point.y;
+    const restZ = point.z;
+    const weight = 1 - T.MathUtils.smoothstep(restY, 0.45, 1.16);
+
+    // Profile reach: front gathers higher near the chest/ribs (Y ~= 0.72)
+    // while the rear coat completely covers the bottom and cascades
+    // naturally down the thighs toward the knees.
+    const front = T.MathUtils.smoothstep(restZ, -0.02, 0.18);
+    const hemCurve = front * 0.06;
+    const gatheredY = 0.36 + hemCurve + (restY - 0.12) * 0.55;
+    point.y += (gatheredY - restY) * weight;
+
+    // Follow the body contour smoothly outside the tunic from mid-back over the seat
+    const rear = 1 - T.MathUtils.smoothstep(restZ, -0.03, 0.06);
+    const flank = T.MathUtils.smoothstep(Math.abs(restX), 0.12, 0.34);
+    const spineArch =
+      0.035 * (1 - Math.min(1, (restX * restX) / (0.22 * 0.22)));
+
+    const backZ = -0.34 + (0.95 - point.y) * 0.45 + flank * 0.12;
+    const hemZ = 0.24 + flank * 0.12 - rear * spineArch;
+
+    // Lower hem cascades smoothly down along the thighs toward the bent knees
+    const hem = 1 - T.MathUtils.smoothstep(restY, 0.12, 0.45);
+    const targetZ = T.MathUtils.lerp(backZ, hemZ, hem) + restZ * 0.35;
+    point.z += (targetZ - restZ) * weight;
+
+    // Wrap lateral width around the hips and thighs
+    point.x *= 1 - 0.12 * weight;
   };
   const worldGaze = new T.Vector3();
   const gazeParentInverse = new T.Matrix4();
