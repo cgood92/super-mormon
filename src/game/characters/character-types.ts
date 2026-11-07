@@ -58,6 +58,7 @@ export type CharacterMove =
   | "wallKick"
   | "ledgeHang"
   | "climb"
+  | "handstand"
   | "turnSkid"
   | "slideRollout"
   | "dive"

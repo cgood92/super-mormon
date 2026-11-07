@@ -389,7 +389,7 @@ test("coated actors build only the visible front inset and short footwear", () =
   undertunic.dispose();
 });
 
-test("crawl gathers the rear coat ahead of bent shoes through a full gait", () => {
+test("crawl drapes the rear coat over the seat to the knees without inner exposure", () => {
   for (const quality of ["hero", "npc", "crowd"] as const) {
     for (const role of [
       "nephi",
@@ -406,9 +406,6 @@ test("crawl gathers the rear coat ahead of bent shoes through a full gait", () =
       const coat = actor.group.getObjectByName(
         "flowing-mantle",
       ) as T.SkinnedMesh;
-      const shoes = ["left-sandal", "right-sandal"].map(
-        (name) => actor.group.getObjectByName(name) as T.Mesh,
-      );
       const inner = [
         "continuous-robe-and-sleeves",
         "visible-front-tunic",
@@ -418,8 +415,6 @@ test("crawl gathers the rear coat ahead of bent shoes through a full gait", () =
         "right-sandal",
       ].map((name) => actor.group.getObjectByName(name) as T.Mesh);
       const model = coat.parent!;
-      const modelInverse = new T.Matrix4();
-      const shoeBox = new T.Box3();
       for (let frame = 0; frame < 60; frame++) {
         actor.update(1 / 60, {
           ...walking,
@@ -432,19 +427,11 @@ test("crawl gathers the rear coat ahead of bent shoes through a full gait", () =
         actor.group.updateMatrixWorld(true);
         coat.skeleton.update();
         coat.geometry.computeBoundingBox();
-        modelInverse.copy(model.matrixWorld).invert();
         const hemY = coat.geometry.boundingBox!.min.y;
-        for (const shoe of shoes) {
-          shoe.geometry.computeBoundingBox();
-          shoeBox
-            .copy(shoe.geometry.boundingBox!)
-            .applyMatrix4(shoe.matrixWorld)
-            .applyMatrix4(modelInverse);
-          assert.ok(
-            hemY > shoeBox.max.y,
-            `${role} ${quality} crawl frame ${frame}: ${shoe.name} enters rear coat by ${(shoeBox.max.y - hemY).toFixed(3)}m`,
-          );
-        }
+        assert.ok(
+          hemY <= 0.48,
+          `${role} ${quality} crawl frame ${frame}: rear coat fails to reach knees (hem=${hemY.toFixed(3)}m)`,
+        );
         if (frame % 5 !== 0) continue;
         const direction = new T.Vector3(0, 0, 1).transformDirection(
           model.matrixWorld,

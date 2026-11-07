@@ -38,6 +38,7 @@ export type PlayerMove =
   | "wallKick"
   | "ledgeHang"
   | "climb"
+  | "handstand"
   | "turnSkid"
   | "slideRollout"
   | "dive"
@@ -543,10 +544,10 @@ export function stepPlayer(
 
     if (player.ledge) {
       player.vx = player.vy = player.vz = 0;
-      player.runSpeed = 0;
       if (input.crouch) {
         player.ledge = undefined;
         player.climbCooldown = 0.25;
+        player.runSpeed = 0;
         setMove(player, "jump");
       } else if (
         (input.jump || (input.y > 0.4 && player.moveTime >= 0.16)) &&
@@ -559,30 +560,94 @@ export function stepPlayer(
         player.grounded = true;
         player.crouching = false;
         player.jumpBufferTime = 0;
+        player.runSpeed = 0;
         setMove(player, "idle");
-      } else continue;
+      } else {
+        // Shimmying laterally along the ledge face
+        if (Math.abs(input.x) > 0.1) {
+          const tangentX = Math.cos(player.yaw);
+          const tangentZ = -Math.sin(player.yaw);
+          const shimmyStep = input.x * 1.5 * subdt;
+          const candX = player.x + tangentX * shimmyStep;
+          const candZ = player.z + tangentZ * shimmyStep;
+          const candLedgeX = player.ledge.x + tangentX * shimmyStep;
+          const candLedgeZ = player.ledge.z + tangentZ * shimmyStep;
+          if (
+            clearAt(candX, player.y, candZ, solids, HEIGHT) &&
+            clearAt(candLedgeX, player.ledge.top, candLedgeZ, solids, HEIGHT)
+          ) {
+            player.x = candX;
+            player.z = candZ;
+            player.ledge.x = candLedgeX;
+            player.ledge.z = candLedgeZ;
+            player.runSpeed = Math.abs(input.x) * 1.5;
+          } else {
+            player.runSpeed = 0;
+          }
+        } else {
+          player.runSpeed = 0;
+        }
+        continue;
+      }
     }
 
     if (player.climbId) {
       const climb = climbables.find((item) => item.id === player.climbId);
       if (!climb) {
         player.climbId = undefined;
-      } else if (input.crouch || input.jump) {
+      } else if (player.move === "handstand") {
+        player.vx = player.vy = player.vz = 0;
+        player.runSpeed = 0;
+        player.grounded = false;
+        // Horizontal input pirouettes / spins character in place on pole top
+        if (Math.abs(input.x) > 0.05) {
+          player.yaw += input.x * 3.6 * subdt;
+        }
+        if (input.crouch || input.y < -0.3) {
+          // Lower back down onto trunk
+          player.y = climb.y + climb.height - 0.7;
+          player.climbCooldown = 0.2;
+          setMove(player, "climb");
+          continue;
+        } else if (input.jump) {
+          // Handstand launch leap: super high vertical leap (vy = 62f flat ~ JUMP * 1.48)
+          player.climbId = undefined;
+          player.climbCooldown = 0.35;
+          player.vx = 0;
+          player.vz = 0;
+          player.vy = JUMP * 1.48;
+          player.airMoveLock = 0.25;
+          events.jumped = true;
+          setMove(player, "tripleJump");
+          player.jumpBufferTime = 0;
+        }
+        continue;
+      } else if (player.climbCooldown <= 0 && (input.crouch || input.jump)) {
         player.climbId = undefined;
         player.climbCooldown = 0.35;
         if (input.jump) {
-          player.vx = (player.climbAway?.x ?? 0) * 4.5;
-          player.vz = (player.climbAway?.z ?? 1) * 4.5;
-          player.vy = JUMP * 0.85;
+          // Mid-trunk kick-off: back-deflection impulse (v_away = 18f, v_y = 36f)
+          player.vx = (player.climbAway?.x ?? 0) * 5.5;
+          player.vz = (player.climbAway?.z ?? 1) * 5.5;
+          player.vy = JUMP * 0.98;
           player.airMoveLock = 0.18;
           events.jumped = true;
           setMove(player, "jump");
           player.jumpBufferTime = 0;
         } else {
+          // Drop / let-go straight down without outward impulse
+          player.vx = 0;
+          player.vz = 0;
           player.vy = -1;
           setMove(player, "jump");
         }
       } else {
+        const topOfPoleY = climb.y + climb.height - 0.6;
+        if (player.y >= topOfPoleY - 0.08 && input.y > 0.2) {
+          player.y = climb.y + climb.height;
+          setMove(player, "handstand");
+          continue;
+        }
         const isClimbSolid = (s: Solid) =>
           Math.abs(s.x - climb.x) <= climb.radius + 0.25 &&
           Math.abs(s.z - climb.z) <= climb.radius + 0.25 &&
