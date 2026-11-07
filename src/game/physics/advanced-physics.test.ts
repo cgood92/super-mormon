@@ -329,3 +329,95 @@ test("jump chain heights increase progressively and triple jump commits to full 
   // Triple jump commits to full arc even with jumpHeld: false
   assert.ok(maxHeights[2] > 2.5, `triple jump commit height ${maxHeights[2]}`);
 });
+
+test("ledge hang allows shimmying laterally along the ledge face", () => {
+  const ledge: Solid = { x: 0, y: 0, z: 2, w: 4, h: 2, d: 1 };
+  const p = createPlayer(0, 1.3, 1.1);
+  p.vy = -2;
+  frames(p, { ...idle, y: 1 }, 2, [ledge]);
+  assert.equal(p.move, "ledgeHang");
+  const startX = p.x;
+  frames(p, { ...idle, x: 1 }, 10, [ledge]);
+  assert.equal(p.move, "ledgeHang");
+  assert.ok(
+    Math.abs(p.x - startX) > 0.1,
+    `player shimmied along ledge: x=${p.x}`,
+  );
+});
+
+test("reaching the top of a climbable transitions into handstand with launch leap", () => {
+  const tree: Climbable = {
+    id: "tree",
+    x: 0,
+    z: 0,
+    y: 0,
+    height: 3,
+    radius: 0.25,
+  };
+  const p = createPlayer(0, 2.2, 0.41);
+  p.vy = -1;
+  frames(p, { ...idle, y: -1 }, 2, [], [tree]);
+  assert.equal(p.move, "climb");
+
+  // Climb up to the top
+  frames(p, { ...idle, y: 1 }, 20, [], [tree]);
+  assert.equal(p.move, "handstand");
+  assert.ok(p.y >= tree.y + tree.height - 0.25);
+
+  // Pirouette in place
+  const startYaw = p.yaw;
+  frames(p, { ...idle, x: 1 }, 8, [], [tree]);
+  assert.equal(p.move, "handstand");
+  assert.notEqual(p.yaw, startYaw, "pirouette rotates yaw in place");
+
+  // Handstand Launch Leap: super high leap with tripleJump somersault commit
+  stepPlayer(p, { ...idle, jump: true, jumpHeld: true }, 1 / 60, 0, [], [tree]);
+  assert.equal(p.move, "tripleJump");
+  assert.equal(p.climbId, undefined);
+  assert.ok(p.vy > 12.0, `handstand launch vy = ${p.vy}`);
+});
+
+test("handstand can lower back down to climb trunk with crouch", () => {
+  const tree: Climbable = {
+    id: "tree",
+    x: 0,
+    z: 0,
+    y: 0,
+    height: 3,
+    radius: 0.25,
+  };
+  const p = createPlayer(0, 2.2, 0.41);
+  p.vy = -1;
+  frames(p, { ...idle, y: -1 }, 2, [], [tree]);
+  frames(p, { ...idle, y: 1 }, 20, [], [tree]);
+  assert.equal(p.move, "handstand");
+
+  // Crouch lowers back down onto the trunk
+  stepPlayer(p, { ...idle, crouch: true }, 1 / 60, 0, [], [tree]);
+  assert.equal(p.move, "climb");
+  assert.equal(p.climbId, "tree");
+  assert.ok(p.y < tree.y + tree.height);
+});
+
+test("mid-trunk crouch drops straight down without outward velocity", () => {
+  const tree: Climbable = {
+    id: "tree",
+    x: 0,
+    z: 0,
+    y: 0,
+    height: 4,
+    radius: 0.25,
+  };
+  const p = createPlayer(0, 1.5, 0.41);
+  p.vy = -1;
+  frames(p, { ...idle, y: -1 }, 2, [], [tree]);
+  assert.equal(p.move, "climb");
+
+  // Crouch let-go drops straight down
+  stepPlayer(p, { ...idle, crouch: true }, 1 / 60, 0, [], [tree]);
+  assert.equal(p.move, "jump");
+  assert.equal(p.climbId, undefined);
+  assert.equal(p.vx, 0);
+  assert.equal(p.vz, 0);
+  assert.ok(p.vy < 0);
+});

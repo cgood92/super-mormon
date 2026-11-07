@@ -1195,6 +1195,29 @@ function init() {
   if (q) {
     (document.getElementById("search-input") as HTMLInputElement).value = q;
   }
+  const m = urlParams.get("motion");
+  if (m) {
+    activeMotion = m;
+    const motionSelect = document.getElementById(
+      "motion-selector",
+    ) as HTMLSelectElement;
+    if (motionSelect) motionSelect.value = m;
+  }
+  const roleParam = urlParams.get("role");
+  if (roleParam) {
+    const roleCard = cards.find((c) => c.entry.role === roleParam);
+    if (roleCard) {
+      setTimeout(() => openInspector(roleCard), 100);
+    }
+  }
+  const yawParam = urlParams.get("yaw");
+  const pitchParam = urlParams.get("pitch");
+  if (yawParam !== null || pitchParam !== null) {
+    const y = yawParam ? parseFloat(yawParam) : 0;
+    const p = pitchParam ? parseFloat(pitchParam) : 0;
+    setGlobalCameraAngle(y, p);
+    syncOrbit = true;
+  }
 
   applyFilters();
   requestRender();

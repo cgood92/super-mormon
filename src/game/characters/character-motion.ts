@@ -65,15 +65,18 @@ export function createMotionDriver(role: CharacterRole): {
     group,
     update(dt, state) {
       dt = Math.min(Math.max(dt, 0), 0.1);
+      const vx = state.vx ?? 0;
+      const vz = state.vz ?? 0;
+      const vy = state.vy ?? 0;
       group.position.set(state.x, state.y, state.z);
       if (firstUpdate) {
         renderedYaw = state.yaw;
-        previousVx = state.vx;
-        previousVz = state.vz;
-        previousX = state.x - state.vx * dt;
-        previousZ = state.z - state.vz * dt;
+        previousVx = vx;
+        previousVz = vz;
+        previousX = state.x - vx * dt;
+        previousZ = state.z - vz * dt;
         previousForwardSpeed =
-          Math.sin(state.yaw) * state.vx + Math.cos(state.yaw) * state.vz;
+          Math.sin(state.yaw) * vx + Math.cos(state.yaw) * vz;
         firstUpdate = false;
       }
       const previousYaw = renderedYaw;
@@ -109,9 +112,9 @@ export function createMotionDriver(role: CharacterRole): {
       const speed = Math.min(1, state.runSpeed / 6.5);
       gaitBlend += ((state.grounded ? speed : 0) - gaitBlend) * damp(10, dt);
       const localForward =
-        Math.sin(renderedYaw) * state.vx + Math.cos(renderedYaw) * state.vz;
+        Math.sin(renderedYaw) * vx + Math.cos(renderedYaw) * vz;
       const localLateral =
-        Math.cos(renderedYaw) * state.vx - Math.sin(renderedYaw) * state.vz;
+        Math.cos(renderedYaw) * vx - Math.sin(renderedYaw) * vz;
       const headingError = angleDiff(state.yaw, renderedYaw);
       let bankTarget = Math.max(
         -0.16,
@@ -132,8 +135,8 @@ export function createMotionDriver(role: CharacterRole): {
       if (state.grounded) {
         // Acceleration is measured in world space before projecting it into
         // the rendered heading: turning alone must not invent braking.
-        const ax = dt > 0 ? (state.vx - previousVx) / dt : 0;
-        const az = dt > 0 ? (state.vz - previousVz) / dt : 0;
+        const ax = dt > 0 ? (vx - previousVx) / dt : 0;
+        const az = dt > 0 ? (vz - previousVz) / dt : 0;
         const moving = Math.min(1, state.runSpeed / 1.5);
         const anticipation = (acceleration: number) =>
           Math.max(-0.055, Math.min(0.055, acceleration * 0.002)) * moving;
@@ -150,8 +153,8 @@ export function createMotionDriver(role: CharacterRole): {
         leanTarget *= limit;
         bankTarget *= limit;
       }
-      previousVx = state.vx;
-      previousVz = state.vz;
+      previousVx = vx;
+      previousVz = vz;
       turnBank += (bankTarget - turnBank) * damp(14, dt);
       forwardLean += (leanTarget - forwardLean) * damp(12, dt);
       const fullStrideAngle = 0.23 + speed * 0.18;
@@ -303,10 +306,14 @@ export function createMotionDriver(role: CharacterRole): {
         body.rotation.z = 0;
         for (let i = 0; i < 2; i++) {
           const cycle = Math.sin(phase + i * Math.PI);
-          arms[i].rotation.set(-Math.PI / 2 + cycle * 0.12, 0, 0);
+          arms[i].rotation.set(
+            -Math.PI / 2 + cycle * 0.14,
+            (i === 0 ? -1 : 1) * 0.03,
+            0,
+          );
           legs[i].rotation.set(-Math.PI / 2 - cycle * 0.1, 0, 0);
           knees[i].rotation.x = Math.PI / 2;
-          feet[i].rotation.x = 0;
+          feet[i].rotation.x = -0.22;
         }
         head.rotation.set(-Math.PI / 2, 0, 0);
       } else if (move === "crouch") {
@@ -321,19 +328,22 @@ export function createMotionDriver(role: CharacterRole): {
         arms[0].rotation.x = arms[1].rotation.x = -0.55;
         head.rotation.x = -0.1;
       } else if (move === "kneel") {
-        body.scale.y = 0.84;
-        body.position.y = -0.145;
-        body.rotation.x = 0.26;
-        body.rotation.z = 0;
-        legs[0].rotation.set(-1.42, 0, 0);
-        legs[1].rotation.set(-1.42, 0, 0);
-        knees[0].rotation.set(2.4, 0, 0);
-        knees[1].rotation.set(2.4, 0, 0);
-        feet[0].rotation.set(-0.95, 0, 0);
-        feet[1].rotation.set(-0.95, 0, 0);
-        arms[0].rotation.set(-1.25, 0.14, 0.35);
-        arms[1].rotation.set(-1.25, -0.14, -0.35);
-        head.rotation.x = 0.25;
+        // Reverent kneeling prayer / council pose:
+        // Torso upright with gentle reverent bow, head tilted peacefully downward,
+        // hands folded reverently in front of the chest, knees resting naturally on the ground,
+        // shins and feet extending back along the floor within the garment drape.
+        body.scale.set(1, 0.84, 1);
+        body.position.y = -0.21;
+        body.rotation.set(0.1, 0, 0);
+        legs[0].rotation.set(-0.28, 0, 0);
+        legs[1].rotation.set(-0.28, 0, 0);
+        knees[0].rotation.set(2.2, 0, 0);
+        knees[1].rotation.set(2.2, 0, 0);
+        feet[0].rotation.set(0.6, 0, 0);
+        feet[1].rotation.set(0.6, 0, 0);
+        arms[0].rotation.set(-0.42, 0.22, 0.78);
+        arms[1].rotation.set(-0.42, -0.22, -0.78);
+        head.rotation.set(0.22, 0, 0);
       } else if (move === "jump") {
         // SM64 single jump: iconic fist punch into the air, opposite leg raised high
         arms[1].rotation.set(-2.25, 0, -0.15); // right fist raised high
@@ -653,17 +663,67 @@ export function createMotionDriver(role: CharacterRole): {
         legs[0].rotation.x = -0.85;
         legs[1].rotation.x = 0.7;
       } else if (move === "ledgeHang") {
+        // SM64 ledge hang & shimmy: hands gripping rim, pendular body sway,
+        // lateral hand reach when shimmying
+        const shimmying = (state.runSpeed ?? 0) > 0.1;
+        const sway = Math.sin(moveTime * 3.2) * 0.08;
         body.position.y = 0;
-        arms[0].rotation.x = -2.7;
-        arms[1].rotation.x = -2.7;
-        legs[0].rotation.x = 0.2;
-        legs[1].rotation.x = -0.2;
+        body.rotation.x = -0.04 + sway;
+        if (shimmying) {
+          const shimmyCycle = Math.sin(moveTime * 9);
+          arms[0].rotation.set(-2.8 + shimmyCycle * 0.25, 0, 0.15);
+          arms[1].rotation.set(-2.8 - shimmyCycle * 0.25, 0, -0.15);
+          legs[0].rotation.set(0.15 + shimmyCycle * 0.2, 0, 0.1);
+          legs[1].rotation.set(0.15 - shimmyCycle * 0.2, 0, -0.1);
+        } else {
+          arms[0].rotation.set(-2.8, 0, 0.1);
+          arms[1].rotation.set(-2.8, 0, -0.1);
+          legs[0].rotation.set(0.12 + sway * 1.4, 0, 0);
+          legs[1].rotation.set(0.12 + sway * 1.4, 0, 0);
+        }
+        knees[0].rotation.set(0.25, 0, 0);
+        knees[1].rotation.set(0.25, 0, 0);
       } else if (move === "climb") {
-        const cycle = Math.sin(moveTime * 11);
-        arms[0].rotation.x = -2.5 + cycle * 0.35;
-        arms[1].rotation.x = -2.5 - cycle * 0.35;
-        legs[0].rotation.x = -0.3 - cycle * 0.4;
-        legs[1].rotation.x = -0.3 + cycle * 0.4;
+        // SM64 pole climbing: arms wrapped around trunk, knees and inner feet clasping bark,
+        // alternating reach and knee-hitch when ascending/sliding
+        const isClimbing =
+          Math.abs(state.vy ?? 0) > 0.1 || (state.runSpeed ?? 0) > 0.1;
+        if (isClimbing) {
+          const cycle = Math.sin(moveTime * 10);
+          arms[0].rotation.set(-2.2 + cycle * 0.45, -0.25, -0.3);
+          arms[1].rotation.set(-2.2 - cycle * 0.45, 0.25, 0.3);
+          legs[0].rotation.set(-0.4 - cycle * 0.35, 0, 0.2);
+          legs[1].rotation.set(-0.4 + cycle * 0.35, 0, -0.2);
+          knees[0].rotation.set(0.8 + cycle * 0.3, 0, 0);
+          knees[1].rotation.set(0.8 - cycle * 0.3, 0, 0);
+          feet[0].rotation.set(0.2, 0, 0.15);
+          feet[1].rotation.set(0.2, 0, -0.15);
+        } else {
+          // Stationary holding pole: torso hugging trunk, arms wrapped with bent elbows,
+          // knees & inner feet clasping bark
+          arms[0].rotation.set(-1.95, -0.28, -0.32);
+          arms[1].rotation.set(-1.95, 0.28, 0.32);
+          legs[0].rotation.set(-0.45, 0, 0.22);
+          legs[1].rotation.set(-0.45, 0, -0.22);
+          knees[0].rotation.set(0.9, 0, -0.15);
+          knees[1].rotation.set(0.9, 0, 0.15);
+          feet[0].rotation.set(0.2, 0, 0.2);
+          feet[1].rotation.set(0.2, 0, -0.2);
+        }
+      } else if (move === "handstand") {
+        // SM64 top-of-pole handstand: inverted 180 deg, balancing on arms on pole rim,
+        // legs extended straight up with gentle balance sway
+        body.position.y = 0.52;
+        body.rotation.x = Math.PI;
+        body.rotation.z = Math.sin(moveTime * 2.5) * 0.04;
+        arms[0].rotation.set(-2.95, 0, 0.08);
+        arms[1].rotation.set(-2.95, 0, -0.08);
+        legs[0].rotation.set(0.08, 0, 0.12);
+        legs[1].rotation.set(0.08, 0, -0.12);
+        knees[0].rotation.set(0, 0, 0);
+        knees[1].rotation.set(0, 0, 0);
+        feet[0].rotation.set(0.35, 0, 0);
+        feet[1].rotation.set(0.35, 0, 0);
       }
       if (state.dancing && move === "idle") {
         const beat = (state.danceTime ?? idlePhase) * 4;

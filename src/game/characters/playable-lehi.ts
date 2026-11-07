@@ -285,26 +285,38 @@ export function createSculptedCharacterRig(
   let wasCrawling = false;
   const drape = (point: T.Vector3, crawling: boolean) => {
     if (!crawling) return;
-    // With the spine horizontal, gravity is local +Z. Gather the skirt around
-    // the hips and let its hem hang below the back, clear of the trailing feet.
-    const weight = 1 - T.MathUtils.smoothstep(point.y, 0.45, 1.16);
-    const backDrape = T.MathUtils.lerp(
-      0.05,
-      -0.2,
-      T.MathUtils.smoothstep(point.y, 0.18, 0.65),
-    );
-    // The trailing shoes reach local Y ~= 0.61 in a crawl. Lift the low hem
-    // past them, while mapping its authored height into a curved sweep.
-    const hem = 1 - T.MathUtils.smoothstep(point.y, 0.18, 0.48);
-    const gatheredY = 0.67 + (point.y - 0.122) * 0.55;
-    point.y += (gatheredY - point.y) * weight;
-    point.z *= 1 - 0.32 * weight;
-    // Preserve the authored front-to-back arc at the hem. Interpolating the
-    // entire low ring to one Z coordinate makes a flat cut face in rear views.
-    const rear = 1 - T.MathUtils.smoothstep(point.z, -0.03, 0.06);
-    const center = 1 - T.MathUtils.smoothstep(Math.abs(point.x), 0.04, 0.34);
-    const hemDepth = backDrape + point.z * 0.5 - 0.13 * rear * center * hem;
-    point.z += (hemDepth - point.z) * weight;
+    // With the spine horizontal, gravity is local +Z. Wrap the mantle smoothly
+    // over the back and buttocks, cascading naturally down the thighs toward
+    // the knees without center creases, gaping rear cutoffs, or lateral wings.
+    const restX = point.x;
+    const restY = point.y;
+    const restZ = point.z;
+    const weight = 1 - T.MathUtils.smoothstep(restY, 0.45, 1.16);
+
+    // Profile reach: front gathers higher near the chest/ribs (Y ~= 0.72)
+    // while the rear coat completely covers the bottom and cascades
+    // naturally down the thighs toward the knees.
+    const front = T.MathUtils.smoothstep(restZ, -0.02, 0.18);
+    const hemCurve = front * 0.06;
+    const gatheredY = 0.36 + hemCurve + (restY - 0.12) * 0.55;
+    point.y += (gatheredY - restY) * weight;
+
+    // Follow the body contour smoothly outside the tunic from mid-back over the seat
+    const rear = 1 - T.MathUtils.smoothstep(restZ, -0.03, 0.06);
+    const flank = T.MathUtils.smoothstep(Math.abs(restX), 0.12, 0.34);
+    const spineArch =
+      0.035 * (1 - Math.min(1, (restX * restX) / (0.22 * 0.22)));
+
+    const backZ = -0.34 + (0.95 - point.y) * 0.45 + flank * 0.12;
+    const hemZ = 0.24 + flank * 0.12 - rear * spineArch;
+
+    // Lower hem cascades smoothly down along the thighs toward the bent knees
+    const hem = 1 - T.MathUtils.smoothstep(restY, 0.12, 0.45);
+    const targetZ = T.MathUtils.lerp(backZ, hemZ, hem) + restZ * 0.35;
+    point.z += (targetZ - restZ) * weight;
+
+    // Wrap lateral width around the hips and thighs
+    point.x *= 1 - 0.12 * weight;
   };
   const worldGaze = new T.Vector3();
   const gazeParentInverse = new T.Matrix4();
@@ -355,12 +367,16 @@ export function createSculptedCharacterRig(
         actorScale * driverBody.scale.z,
       );
       head.rotation.copy(driverHead.rotation);
-      head.position.z = crawling ? 0.13 : 0;
+      head.position.set(
+        0,
+        height(crawling ? 1.45 : 1.49),
+        crawling ? 0.125 : 0,
+      );
       body.position.z = crawling ? (-0.77 * actorScale) / 0.825 : 0;
       if (crawling) body.position.y *= actorScale / 0.825;
       if (crawling) body.scale.setScalar(actorScale);
       for (let i = 0; i < 2; i++) {
-        legPivots[i].scale.y = crawling && role !== "moroni" ? 1.4 : 1;
+        legPivots[i].scale.y = crawling && role !== "moroni" ? 1.34 : 1;
         legPivots[i].position.z = crawling ? -0.02 : 0;
         armPivots[i].scale.y = 1;
       }
@@ -369,16 +385,17 @@ export function createSculptedCharacterRig(
         legPivots[i].rotation.copy(driverLegs[i].rotation);
         kneePivots[i].rotation.copy(driverKnees[i].rotation);
         footPivots[i].rotation.copy(driverFeet[i].rotation);
-        footPivots[i].scale.setScalar(crawling ? 0.65 : 1);
+        footPivots[i].scale.setScalar(crawling ? 0.78 : 1);
         // Sole corrections are transient offsets, including X when banked.
         // Restore the complete authored pivot before solving this frame.
         footPivots[i].position.set(
           0,
           height(0.1) - height(0.37) + (driverFeet[i].position.y + 0.28),
-          crawling ? -0.14 : 0,
+          crawling ? -0.134 : 0,
         );
       }
-      if (crawling || wasCrawling) {
+      const kneeBent = crawling || state.move === "kneel";
+      if (kneeBent || wasCrawling) {
         model.group.updateWorldMatrix(true, true);
         for (let side = 0; side < 2; side++) {
           const mesh = trousers[side];
@@ -395,7 +412,7 @@ export function createSculptedCharacterRig(
           for (let i = 0; i < attribute.count; i++) {
             const j = i * 3;
             trouserPoint.set(rest[j], rest[j + 1], rest[j + 2]);
-            if (crawling) {
+            if (kneeBent) {
               if (role !== "moroni")
                 trouserPoint.y = Math.min(trouserPoint.y, height(0.6));
               const weight =
@@ -412,7 +429,7 @@ export function createSculptedCharacterRig(
                 height(0.37) + y * Math.cos(angle) - z * Math.sin(angle);
               trouserPoint.z = y * Math.sin(angle) + z * Math.cos(angle);
             }
-            if (crawling && role === "moroni") {
+            if (kneeBent && role === "moroni") {
               const anchor = T.MathUtils.smoothstep(
                 rest[j + 1],
                 height(0.58),
@@ -533,7 +550,23 @@ export function createSculptedCharacterRig(
           for (let i = 0; i < attribute.count; i++) {
             const j = i * 3;
             clothPoint.set(rest[j], rest[j + 1], rest[j + 2]);
-            drape(clothPoint, crawling);
+            if (crawling) {
+              const ry = rest[j + 1];
+              if (ry < 0.95) {
+                const reach = (0.95 - ry) / (0.95 - 0.72);
+                // Lower tunic extends down over the seat and crotch
+                clothPoint.y = T.MathUtils.lerp(ry, 0.52, reach);
+                // Form a continuous pelvic seat between the thighs
+                if (Math.abs(clothPoint.x) > 0.1) {
+                  clothPoint.x *= 1 - 0.12 * reach;
+                }
+                clothPoint.z = T.MathUtils.lerp(
+                  clothPoint.z,
+                  rest[j + 2] * 0.85 + 0.08,
+                  reach,
+                );
+              }
+            }
             attribute.setXYZ(i, clothPoint.x, clothPoint.y, clothPoint.z);
           }
           attribute.needsUpdate = true;
@@ -542,7 +575,7 @@ export function createSculptedCharacterRig(
         }
       }
       clothWasMoving = clothMoving;
-      wasCrawling = crawling;
+      wasCrawling = kneeBent;
       if (state.lookYaw !== undefined) {
         // Compensate the complete parent transform, including turn lean and
         // nonuniform scale, so the rendered face matches world-space sight tests.
