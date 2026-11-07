@@ -289,28 +289,28 @@ export function createSculptedCharacterRig(
     // the hips and let its hem hang below the back, clear of the trailing feet.
     const weight = 1 - T.MathUtils.smoothstep(point.y, 0.45, 1.16);
     const backDrape = T.MathUtils.lerp(
-      0.05,
-      -0.2,
+      0.04,
+      -0.12,
       T.MathUtils.smoothstep(point.y, 0.18, 0.65),
     );
     // The trailing shoes reach local Y ~= 0.61 in a crawl. Lift the low hem
     // past them, while mapping its authored height into a curved sweep.
     const hem = 1 - T.MathUtils.smoothstep(point.y, 0.18, 0.48);
     const rear = 1 - T.MathUtils.smoothstep(point.z, -0.03, 0.06);
-    const center = 1 - T.MathUtils.smoothstep(Math.abs(point.x), 0.04, 0.34);
     const front = T.MathUtils.smoothstep(point.z, -0.02, 0.18);
-    const flank = T.MathUtils.smoothstep(Math.abs(point.x), 0.1, 0.35);
-    // Profile slope: front of the coat gathers higher near the chest (Y ~= 0.74),
-    // while the rear drape sweeps gracefully over the hips (Y ~= 0.655).
-    // Lateral curve: arches smoothly over the spine and wraps around the flanks.
-    const hemCurve = front * 0.085 + (1 - rear) * flank * 0.04;
-    const gatheredY = 0.665 + hemCurve + (point.y - 0.122) * 0.53;
+    // Profile slope: front of the coat gathers higher near the chest (Y ~= 0.72),
+    // while the rear drape sweeps over the hips (Y ~= 0.636).
+    const hemCurve = front * 0.085;
+    const gatheredY = 0.636 + hemCurve + (point.y - 0.068) * 0.48;
     point.y += (gatheredY - point.y) * weight;
-    point.z *= 1 - 0.28 * weight;
-    // Preserve the authored front-to-back arc at the hem. Interpolating the
-    // entire low ring to one Z coordinate makes a flat cut face in rear views.
-    const hemDepth = backDrape + point.z * 0.58 - 0.1 * rear * center * hem;
+    point.z *= 1 - 0.25 * weight;
+    // Natural parabolic arch over the spine without sharp clefts or center creases
+    const spineArch =
+      0.08 * (1 - Math.min(1, (point.x * point.x) / (0.32 * 0.32)));
+    const hemDepth = backDrape + point.z * 0.62 - rear * hem * spineArch;
     point.z += (hemDepth - point.z) * weight;
+    // Tuck lateral flare so the mantle wraps around the body instead of flaring into wings
+    point.x *= 1 - 0.24 * weight;
   };
   const worldGaze = new T.Vector3();
   const gazeParentInverse = new T.Matrix4();
