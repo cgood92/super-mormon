@@ -296,14 +296,14 @@ export function createSculptedCharacterRig(
     // The trailing shoes reach local Y ~= 0.61 in a crawl. Lift the low hem
     // past them, while mapping its authored height into a curved sweep.
     const hem = 1 - T.MathUtils.smoothstep(point.y, 0.18, 0.48);
-    const gatheredY = 0.67 + (point.y - 0.122) * 0.55;
+    const gatheredY = 0.58 + (point.y - 0.122) * 0.53;
     point.y += (gatheredY - point.y) * weight;
-    point.z *= 1 - 0.32 * weight;
+    point.z *= 1 - 0.28 * weight;
     // Preserve the authored front-to-back arc at the hem. Interpolating the
     // entire low ring to one Z coordinate makes a flat cut face in rear views.
     const rear = 1 - T.MathUtils.smoothstep(point.z, -0.03, 0.06);
     const center = 1 - T.MathUtils.smoothstep(Math.abs(point.x), 0.04, 0.34);
-    const hemDepth = backDrape + point.z * 0.5 - 0.13 * rear * center * hem;
+    const hemDepth = backDrape + point.z * 0.58 - 0.1 * rear * center * hem;
     point.z += (hemDepth - point.z) * weight;
   };
   const worldGaze = new T.Vector3();
@@ -355,12 +355,16 @@ export function createSculptedCharacterRig(
         actorScale * driverBody.scale.z,
       );
       head.rotation.copy(driverHead.rotation);
-      head.position.z = crawling ? 0.13 : 0;
+      head.position.set(
+        0,
+        height(crawling ? 1.45 : 1.49),
+        crawling ? 0.125 : 0,
+      );
       body.position.z = crawling ? (-0.77 * actorScale) / 0.825 : 0;
       if (crawling) body.position.y *= actorScale / 0.825;
       if (crawling) body.scale.setScalar(actorScale);
       for (let i = 0; i < 2; i++) {
-        legPivots[i].scale.y = crawling && role !== "moroni" ? 1.4 : 1;
+        legPivots[i].scale.y = crawling && role !== "moroni" ? 1.34 : 1;
         legPivots[i].position.z = crawling ? -0.02 : 0;
         armPivots[i].scale.y = 1;
       }
@@ -369,13 +373,13 @@ export function createSculptedCharacterRig(
         legPivots[i].rotation.copy(driverLegs[i].rotation);
         kneePivots[i].rotation.copy(driverKnees[i].rotation);
         footPivots[i].rotation.copy(driverFeet[i].rotation);
-        footPivots[i].scale.setScalar(crawling ? 0.65 : 1);
+        footPivots[i].scale.setScalar(crawling ? 0.78 : 1);
         // Sole corrections are transient offsets, including X when banked.
         // Restore the complete authored pivot before solving this frame.
         footPivots[i].position.set(
           0,
           height(0.1) - height(0.37) + (driverFeet[i].position.y + 0.28),
-          crawling ? -0.14 : 0,
+          crawling ? -0.134 : 0,
         );
       }
       const kneeBent = crawling || state.move === "kneel";

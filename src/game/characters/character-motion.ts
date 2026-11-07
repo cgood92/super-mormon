@@ -65,15 +65,18 @@ export function createMotionDriver(role: CharacterRole): {
     group,
     update(dt, state) {
       dt = Math.min(Math.max(dt, 0), 0.1);
+      const vx = state.vx ?? 0;
+      const vz = state.vz ?? 0;
+      const vy = state.vy ?? 0;
       group.position.set(state.x, state.y, state.z);
       if (firstUpdate) {
         renderedYaw = state.yaw;
-        previousVx = state.vx;
-        previousVz = state.vz;
-        previousX = state.x - state.vx * dt;
-        previousZ = state.z - state.vz * dt;
+        previousVx = vx;
+        previousVz = vz;
+        previousX = state.x - vx * dt;
+        previousZ = state.z - vz * dt;
         previousForwardSpeed =
-          Math.sin(state.yaw) * state.vx + Math.cos(state.yaw) * state.vz;
+          Math.sin(state.yaw) * vx + Math.cos(state.yaw) * vz;
         firstUpdate = false;
       }
       const previousYaw = renderedYaw;
@@ -109,9 +112,9 @@ export function createMotionDriver(role: CharacterRole): {
       const speed = Math.min(1, state.runSpeed / 6.5);
       gaitBlend += ((state.grounded ? speed : 0) - gaitBlend) * damp(10, dt);
       const localForward =
-        Math.sin(renderedYaw) * state.vx + Math.cos(renderedYaw) * state.vz;
+        Math.sin(renderedYaw) * vx + Math.cos(renderedYaw) * vz;
       const localLateral =
-        Math.cos(renderedYaw) * state.vx - Math.sin(renderedYaw) * state.vz;
+        Math.cos(renderedYaw) * vx - Math.sin(renderedYaw) * vz;
       const headingError = angleDiff(state.yaw, renderedYaw);
       let bankTarget = Math.max(
         -0.16,
@@ -132,8 +135,8 @@ export function createMotionDriver(role: CharacterRole): {
       if (state.grounded) {
         // Acceleration is measured in world space before projecting it into
         // the rendered heading: turning alone must not invent braking.
-        const ax = dt > 0 ? (state.vx - previousVx) / dt : 0;
-        const az = dt > 0 ? (state.vz - previousVz) / dt : 0;
+        const ax = dt > 0 ? (vx - previousVx) / dt : 0;
+        const az = dt > 0 ? (vz - previousVz) / dt : 0;
         const moving = Math.min(1, state.runSpeed / 1.5);
         const anticipation = (acceleration: number) =>
           Math.max(-0.055, Math.min(0.055, acceleration * 0.002)) * moving;
@@ -150,8 +153,8 @@ export function createMotionDriver(role: CharacterRole): {
         leanTarget *= limit;
         bankTarget *= limit;
       }
-      previousVx = state.vx;
-      previousVz = state.vz;
+      previousVx = vx;
+      previousVz = vz;
       turnBank += (bankTarget - turnBank) * damp(14, dt);
       forwardLean += (leanTarget - forwardLean) * damp(12, dt);
       const fullStrideAngle = 0.23 + speed * 0.18;
@@ -303,10 +306,14 @@ export function createMotionDriver(role: CharacterRole): {
         body.rotation.z = 0;
         for (let i = 0; i < 2; i++) {
           const cycle = Math.sin(phase + i * Math.PI);
-          arms[i].rotation.set(-Math.PI / 2 + cycle * 0.12, 0, 0);
+          arms[i].rotation.set(
+            -Math.PI / 2 + cycle * 0.14,
+            (i === 0 ? -1 : 1) * 0.03,
+            0,
+          );
           legs[i].rotation.set(-Math.PI / 2 - cycle * 0.1, 0, 0);
           knees[i].rotation.x = Math.PI / 2;
-          feet[i].rotation.x = 0;
+          feet[i].rotation.x = -0.22;
         }
         head.rotation.set(-Math.PI / 2, 0, 0);
       } else if (move === "crouch") {
