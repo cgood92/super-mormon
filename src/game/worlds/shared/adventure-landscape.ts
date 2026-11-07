@@ -261,10 +261,9 @@ export function adventureLandscape(
   };
   const marker = new T.Mesh(
     new T.OctahedronGeometry(0.42),
-    new T.MeshBasicMaterial({ color: 0x4dd7ff, depthTest: false }),
+    new T.MeshBasicMaterial({ color: 0x4dd7ff, depthTest: true }),
   );
   marker.name = "Blue next task beacon";
-  marker.renderOrder = 20;
   root.add(marker);
   markScenery(marker, {
     kind: "decoration",

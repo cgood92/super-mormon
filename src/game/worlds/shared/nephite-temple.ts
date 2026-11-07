@@ -17,7 +17,7 @@ export function buildNephiteTemple(parent: T.Group, solids: Solid[]) {
   temple.name = "Nephi's temple · Solomon-pattern interpretation";
   parent.add(temple);
   const stone = new T.MeshStandardMaterial({
-    color: 0xbcb494,
+    color: 0xe5e2d6,
     roughness: 0.92,
   });
   const cedar = new T.MeshStandardMaterial({

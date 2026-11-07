@@ -166,7 +166,8 @@ export function buildOliveVineyard(scene: T.Scene): WorldData {
     return group;
   };
   const wildBranch = makeTwig("Visible wild branch to collect");
-  wildBranch.position.set(-23.1, 1.8, 17);
+  wildBranch.position.set(-23.4, 2.1, 17);
+  wildBranch.rotation.y = Math.PI;
   root.add(wildBranch);
   const young = new T.Group();
   young.name = "Three young tender natural branches";
@@ -179,8 +180,8 @@ export function buildOliveVineyard(scene: T.Scene): WorldData {
     young.add(twig);
   }
   const naturalBranch = makeTwig("Visible natural branch to gather back");
-  naturalBranch.position.set(-29, 2, -20);
-  naturalBranch.visible = false;
+  naturalBranch.position.set(-29.4, 2, -20);
+  naturalBranch.rotation.y = Math.PI;
   root.add(naturalBranch);
   const carried = new T.Group();
   carried.name = "Hand-held olive branches";
@@ -246,7 +247,7 @@ export function buildOliveVineyard(scene: T.Scene): WorldData {
       action: "Meet the servant",
       auto: true,
       ref: "Jacob 5:1–6",
-      text: "Jacob retells Zenos's allegory of the Lord's patient care. You are an imagined helper. Begin with the large decaying mother tree: prune it and loosen the soil around its roots.",
+      text: "Follow the Lord of the vineyard's instructions and do what he says.",
     },
     {
       id: "prune",
@@ -266,7 +267,7 @@ export function buildOliveVineyard(scene: T.Scene): WorldData {
       action: "Return to the servant",
       auto: true,
       ref: "Jacob 5:4–11",
-      text: "Now nourish the roots with water and mulch. Tender branches will appear. Then take the leafy branch from the wild tree and graft it beside the mother trunk.",
+      text: "Now nourish the roots with water and dung. Tender branches will appear. Then take the leafy branch from the wild tree and graft it beside the mother trunk.",
     },
     {
       id: "nourish",
@@ -363,16 +364,6 @@ export function buildOliveVineyard(scene: T.Scene): WorldData {
           choice.fruit.setColorAt(i, new T.Color(i < 6 ? 0xcab557 : 0x5b4541));
         if (choice.fruit.instanceColor)
           choice.fruit.instanceColor.needsUpdate = true;
-      },
-    },
-    {
-      id: "mixed",
-      at: farC,
-      tree: { x: 32, y: 0, z: -20 },
-      action: "Care for the tree with mixed fruit",
-      ref: "Jacob 5:25–28",
-      run: () => {
-        branch(32, -20);
       },
     },
     {
@@ -568,7 +559,7 @@ export function buildOliveVineyard(scene: T.Scene): WorldData {
             } else if (task.text)
               hooks.dialog(
                 task.ref,
-                "The servant's counsel",
+                "The Lord of the vineyard",
                 task.text,
                 finish,
                 {

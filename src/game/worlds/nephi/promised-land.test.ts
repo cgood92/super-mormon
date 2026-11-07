@@ -125,8 +125,7 @@ test("branching mountain valleys support two ordinary routes and complete only a
     walk(h, -15, 12);
     walk(h, side * 20, 12);
     walk(h, side * 20, -18);
-    walk(h, 0, -18);
-    walk(h, 0, -54);
+    walk(h, side * 26, -36);
     walk(h, side * 20, -54);
     walk(h, side * 20, -91);
     walk(h, 25, -91);

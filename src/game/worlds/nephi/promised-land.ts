@@ -114,18 +114,35 @@ export function buildPromisedLand(scene: T.Scene): WorldData {
   };
   shelter(-12, 40, "Family tent");
   shelter(13, 43, "Shore tent");
-  // The hills are now reachable terrain, with broad interconnecting valleys.
-  // Every mountain has a fitted supporting profile; the passages are real gaps.
-  for (const [row, z] of [0, -36, -72].entries()) {
-    const xs = row === 1 ? [-53, -18, 18, 53] : [-35, 0, 35];
-    for (const [i, x] of xs.entries())
-      terracedRock(
-        root,
-        solids,
-        material(i % 2 ? 0x7b8c68 : 0x8e9571),
-        { x, y: 0, z, w: 24, h: 7 + (i % 3) * 1.1, d: 24 },
-        "Valley mountain",
-      );
+  // The hills form a winding, maze-like network of mountain valleys with dead ends and spurs.
+  // Every mountain has a fitted supporting profile; the passages are real winding gaps.
+  const mountainSpecs = [
+    // Row 0 (z = 0): base mountains
+    { x: -35, z: 0, w: 24, h: 7, d: 24 },
+    { x: 0, z: 0, w: 24, h: 7.5, d: 24 },
+    { x: 35, z: 0, w: 24, h: 8, d: 24 },
+    // Row 1 (z = -36): central maze bluff blocks the straight path; side formations create winding canyons
+    { x: 0, z: -36, w: 22, h: 8.5, d: 22 },
+    { x: -50, z: -36, w: 20, h: 8, d: 22 },
+    { x: 50, z: -36, w: 20, h: 8, d: 22 },
+    // Staggered spurs that create dead ends and baffles
+    { x: -7, z: -18, w: 14, h: 7.2, d: 14 },
+    { x: 7, z: -54, w: 14, h: 7.2, d: 14 },
+    { x: -52, z: -18, w: 16, h: 7.5, d: 18 },
+    { x: 52, z: -54, w: 16, h: 7.5, d: 18 },
+    // Row 2 (z = -72): northern canyon walls
+    { x: -35, z: -72, w: 24, h: 7.8, d: 24 },
+    { x: 0, z: -72, w: 22, h: 8.2, d: 22 },
+    { x: 35, z: -72, w: 24, h: 7.4, d: 24 },
+  ];
+  for (const [i, s] of mountainSpecs.entries()) {
+    terracedRock(
+      root,
+      solids,
+      material(i % 2 ? 0x7b8c68 : 0x8e9571),
+      { x: s.x, y: 0, z: s.z, w: s.w, h: s.h, d: s.d },
+      "Valley mountain",
+    );
   }
   for (const [x, z] of [
     [-67, 10],
@@ -143,17 +160,15 @@ export function buildPromisedLand(scene: T.Scene): WorldData {
     [-15, 21, 20, 14],
     [-20, 14, -20, -18],
     [20, 14, 20, -18],
-    [-20, -18, 20, -18],
-    [0, -18, 0, -54],
-    [-38, -18, -38, -54],
-    [38, -18, 38, -54],
-    [-38, -54, 38, -54],
-    [-20, -54, -20, -92],
-    [20, -54, 20, -92],
-    [-60, 14, -60, -92],
-    [60, 14, 60, -92],
-    [-60, -92, 60, -92],
-    [25, -92, 25, -105],
+    [-20, -18, -26, -36],
+    [20, -18, 26, -36],
+    [-26, -36, -20, -54],
+    [26, -36, 20, -54],
+    [-20, -54, -20, -91],
+    [20, -54, 20, -91],
+    [-20, -91, 25, -91],
+    [20, -91, 25, -91],
+    [25, -91, 25, -105],
   ];
   const positions = land.ground.geometry.getAttribute("position"),
     colors = land.ground.geometry.getAttribute("color");
@@ -370,7 +385,7 @@ export function buildPromisedLand(scene: T.Scene): WorldData {
             trail.push({ x: player.x, y: player.y, z: player.z });
             land.update(0, settlement);
             hooks.toast(
-              "Lehi is buried. His relatives wait in their circle until you lead them away. The Lord warns Nephi to depart; lead those who choose to follow through the valleys. Follow the blue beacon to the settlement clearing, then choose to settle. (2 Nephi 4:12; 5:5–8)",
+              "Lead the families through the valleys to the blue beacon.",
             );
           }
           const arrived =

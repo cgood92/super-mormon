@@ -124,12 +124,53 @@ export function buildAmmonFlocks(scene: T.Scene): WorldData {
     });
   }
   // Buildings and terraces stay outside the wide route between the royal yard and Sebus.
+  // King Lamoni's ancient royal palace: stepped stone platform, royal hall, and pillared portico
+  const palaceStone = material(0xbfa77d),
+    palaceTrim = material(0xd4be96),
+    palaceDark = material(0x8a7052);
   sceneryBox(
     root,
     solids,
-    material(0xc5ae81),
-    { x: -13, y: 0, z: -29, w: 10, h: 5, d: 7 },
-    "Lamoni's house",
+    palaceStone,
+    { x: -14, y: 0, z: -29, w: 14, h: 1.2, d: 11 },
+    "Lamoni palace stepped base",
+  );
+  sceneryBox(
+    root,
+    solids,
+    palaceStone,
+    { x: -14, y: 1.2, z: -29, w: 11, h: 4.8, d: 8.5 },
+    "Lamoni palace royal hall",
+  );
+  sceneryBox(
+    root,
+    solids,
+    palaceTrim,
+    { x: -14, y: 6.0, z: -29, w: 12.2, h: 0.6, d: 9.7 },
+    "Lamoni palace upper cornice",
+  );
+  sceneryBox(
+    root,
+    solids,
+    palaceTrim,
+    { x: -6.5, y: 0, z: -26.5, w: 3, h: 0.6, d: 4 },
+    "Lamoni palace entrance terrace",
+  );
+  for (const pz of [-28, -25]) {
+    sceneryBox(
+      root,
+      solids,
+      palaceDark,
+      { x: -5.3, y: 0.6, z: pz, w: 0.5, h: 3.2, d: 0.5 },
+      "Palace portico pillar",
+    );
+  }
+  sceneryBox(
+    root,
+    solids,
+    palaceTrim,
+    { x: -6.5, y: 3.8, z: -26.5, w: 3.2, h: 0.45, d: 4.2 },
+    "Palace portico canopy",
   );
   for (const x of [-27, 27])
     for (let i = 0; i < 3; i++)
@@ -593,7 +634,7 @@ export function buildAmmonFlocks(scene: T.Scene): WorldData {
               phase = "recover";
               flock.forEach((a) => (a.settled = false));
               hooks.toast(
-                "Circle behind the gold-marked strays. Each animal stays gathered once it reaches the water.",
+                "Gather the scattered strays. Each animal stays gathered once it reaches the water.",
               );
             }
           }
@@ -611,7 +652,7 @@ export function buildAmmonFlocks(scene: T.Scene): WorldData {
             });
             lastTrailPoint = undefined;
             hooks.toast(
-              "The servants hold the flock safely. Face the Lamanite robbers; hold {action} to spin, aim with {move}, release to cast.",
+              "The servants hold the flock safely. Face the robbers; hold {action} to spin and cast.",
             );
           }
           flock.forEach((a) => {
@@ -676,24 +717,28 @@ export function buildAmmonFlocks(scene: T.Scene): WorldData {
                 ) < 0.65
               ) {
                 battleRetries++;
-                raiders.forEach((enemy, index) => {
-                  enemy.defeated = false;
-                  enemy.attackClock = index * 0.8;
-                  enemy.projectile = undefined;
-                  enemy.missile.visible = false;
-                });
-                aiming = false;
-                stone = undefined;
-                spin = createSlingSpinState();
-                player.x = 0;
-                player.y = 0;
-                player.z = 34;
-                player.vx = 0;
-                player.vy = 0;
-                player.vz = 0;
-                hooks.toast(
-                  "Try the battle again. The servants have kept the gathered flock safe.",
-                );
+                const doReset = () => {
+                  raiders.forEach((enemy, index) => {
+                    enemy.defeated = false;
+                    enemy.attackClock = index * 0.8;
+                    enemy.projectile = undefined;
+                    enemy.missile.visible = false;
+                  });
+                  aiming = false;
+                  stone = undefined;
+                  spin = createSlingSpinState();
+                  player.x = 0;
+                  player.y = 0;
+                  player.z = 34;
+                  player.vx = 0;
+                  player.vy = 0;
+                  player.vz = 0;
+                  hooks.toast(
+                    "Try the battle again. The servants have kept the gathered flock safe.",
+                  );
+                };
+                if (hooks.caught) hooks.caught(doReset);
+                else doReset();
               }
               if (
                 r.projectile &&
@@ -731,7 +776,7 @@ export function buildAmmonFlocks(scene: T.Scene): WorldData {
             ).addScaledVector(aimDirection(yaw, pitch), 0.55);
           if (phase === "protect") {
             prompt = aiming
-              ? `Release {action} to cast • {move} aims • ${Math.round(slingCharge(spin) * 100)}% • {jump} / {crouch} cancel`
+              ? `Release {action} to cast • {move} aims`
               : "Hold {action} to spin and aim the sling";
             if (input.jump || input.crouch) {
               aiming = false;
@@ -784,7 +829,8 @@ export function buildAmmonFlocks(scene: T.Scene): WorldData {
             aiming = false;
             hooks.toast("The flock is safe. Return the flock to the king.");
           }
-          sling.group.visible = phase === "protect";
+          sling.group.visible =
+            phase === "protect" && (aiming || spin.pendingRelease);
           sling.group.position.copy(origin());
           sling.group.rotation.set(-pitch, yaw, 0, "YXZ");
           sling.setSpin(spin.phase, aiming);

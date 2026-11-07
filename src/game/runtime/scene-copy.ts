@@ -23,7 +23,7 @@ const ENTRY_MESSAGES: Partial<Record<WorldId, string>> = {
   palace: "Find Laban at the far end of the courtyard.",
   trade: "Your brothers will follow. Bring the treasures to Laban.",
   jacob: "Explore the settlement and meet Jacob’s neighbors.",
-  ammon: "Meet Lamoni, gather the flocks, and guard the waters of Sebus.",
+  ammon: "Gather the flocks and guard the waters of Sebus.",
   waters: "Many generations later: slip past Noah’s spies and find Alma.",
   promised: "Help the family settle, then follow the journey to a new home.",
   vineyard: "Explore the vineyard in Jacob’s retelling. Care for the trees.",

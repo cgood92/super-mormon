@@ -150,7 +150,7 @@ export function buildTitleOfLiberty(scene: T.Scene): WorldData {
       rig.group.name = `Liberty volunteer ${i + 1}.${j + 1}`;
       const sword = new T.Group();
       const blade = new T.Mesh(
-        new T.BoxGeometry(0.13, 1.15, 0.07),
+        new T.BoxGeometry(0.09, 0.85, 0.05),
         new T.MeshStandardMaterial({
           color: 0xc0c5c4,
           metalness: 0.65,
@@ -158,16 +158,20 @@ export function buildTitleOfLiberty(scene: T.Scene): WorldData {
         }),
       );
       const cross = new T.Mesh(
-        new T.BoxGeometry(0.45, 0.09, 0.13),
+        new T.BoxGeometry(0.3, 0.06, 0.08),
         new T.MeshStandardMaterial({ color: 0x8d7443 }),
       );
-      blade.position.y = 0.6;
-      sword.add(blade, cross);
-      sword.position.set(0.6, 0.85, 0);
-      sword.rotation.z = -0.3;
+      const grip = new T.Mesh(
+        new T.BoxGeometry(0.06, 0.16, 0.06),
+        new T.MeshStandardMaterial({ color: 0x5a3e2a }),
+      );
+      grip.position.y = -0.08;
+      blade.position.y = 0.45;
+      sword.add(blade, cross, grip);
       sword.name = "Volunteer sword held upright";
       sword.visible = false;
-      rig.group.add(sword);
+      sword.rotation.x = Math.PI / 2;
+      rig.sockets.rightHand.add(sword);
       markScenery(sword, {
         kind: "decoration",
         reason: "Carried equipment follows an animated volunteer.",
@@ -399,7 +403,7 @@ export function buildTitleOfLiberty(scene: T.Scene): WorldData {
   return {
     name: "The Title of Liberty",
     subtitle: "Moroni rallies the people · Alma 46",
-    initialObjective: "Go to the quiet prayer court wearing Moroni's coat",
+    initialObjective: "Go to the prayer court wearing Moroni's coat",
     spawn: place(0, 53),
     solids,
     actorParent: root,
@@ -500,7 +504,8 @@ export function buildTitleOfLiberty(scene: T.Scene): WorldData {
       );
       let cinematicCamera:
         { position: T.Vector3; focus: T.Vector3; cut: boolean } | undefined;
-      let cameraClock = 0;
+      let plannedBeat = -1;
+      let plannedAspect = -1;
       const prologueAnchor = new T.Group();
       prologueAnchor.scale.setScalar(3);
       const playerActor = root.getObjectByName("moroni-character");
@@ -654,52 +659,67 @@ export function buildTitleOfLiberty(scene: T.Scene): WorldData {
             phase === "ending" ||
             phase === "gather"
           ) {
-            cameraClock -= delta;
-            if (cameraClock <= 0) {
-              cameraClock = 0.25;
-              prologueAnchor.position.set(player.x, player.y, player.z);
-              prologueAnchor.scale.setScalar(phase === "prologue" ? 3 : 1);
-              prologueAnchor.updateMatrixWorld(true);
-              const anchor =
-                phase === "prologue"
+            const beat =
+              phase === "prologue"
+                ? elapsed < 4.5
+                  ? 0
+                  : elapsed < 8
+                    ? 1
+                    : 2
+                : phase === "gather"
+                  ? 3
+                  : elapsed < 4
+                    ? 4
+                    : 5;
+            const aspect = hooks.viewAspect?.() ?? 16 / 9;
+            prologueAnchor.position.set(player.x, player.y, player.z);
+            prologueAnchor.scale.setScalar(phase === "prologue" ? 3 : 1);
+            prologueAnchor.updateMatrixWorld(true);
+            const anchor =
+              phase === "prologue"
+                ? prologueAnchor
+                : phase === "gather"
                   ? prologueAnchor
-                  : phase === "gather"
-                    ? prologueAnchor
-                    : elapsed < 4
-                      ? opponents[0].group
-                      : opponents[2].group;
-              const camera = new T.PerspectiveCamera(
-                58,
-                hooks.viewAspect?.() ?? 16 / 9,
-                0.08,
-                320,
-              );
-              camera.position.copy(anchor.position).add(new T.Vector3(8, 5, 8));
-              camera.lookAt(anchor.position);
-              const plan = planStoryCamera(
-                camera,
-                {
-                  cutaway: true,
-                  actors: [{ group: anchor }],
-                  wide: phase === "prologue" ? 10 : 7,
-                },
-                solids,
-                meshObstacles,
-              );
-              cinematicCamera = {
-                position: plan.wide,
-                focus: plan.focus,
-                cut: true,
-              };
+                  : elapsed < 4
+                    ? opponents[0].group
+                    : opponents[2].group;
+            const isCut =
+              beat !== plannedBeat || Math.abs(aspect - plannedAspect) > 0.05;
+            if (isCut) {
+              plannedBeat = beat;
+              plannedAspect = aspect;
             }
+            const camera = new T.PerspectiveCamera(58, aspect, 0.08, 320);
+            camera.position.copy(anchor.position).add(new T.Vector3(8, 5, 8));
+            camera.lookAt(anchor.position);
+            const plan = planStoryCamera(
+              camera,
+              {
+                cutaway: true,
+                actors: [{ group: anchor }],
+                wide: phase === "prologue" ? 10 : 7,
+              },
+              solids,
+              meshObstacles,
+            );
+            cinematicCamera = {
+              position: plan.wide,
+              focus: plan.focus,
+              cut: isCut,
+            };
           } else {
             cinematicCamera = undefined;
-            cameraClock = 0;
+            plannedBeat = -1;
           }
           syncPose();
+          const nearPrayer = withinTask(player, prayer, 3.8);
+          const onAnyRoof = roofSites.some(
+            (_, i) => !roofs.has(i) && onRoof(player, i),
+          );
+          const nearTower = withinTask(player, tower, 4);
           const objective =
             phase === "prayer"
-              ? "Go to the quiet prayer court wearing Moroni's coat"
+              ? "Go to the prayer court wearing Moroni's coat"
               : phase === "prologue"
                 ? elapsed < 4.5
                   ? "Moroni removes and rends his coat, then writes the title"
@@ -717,18 +737,25 @@ export function buildTitleOfLiberty(scene: T.Scene): WorldData {
                         : phase === "ending"
                           ? "Amalickiah escapes; the surrendered followers return to Zarahemla"
                           : "The people covenant to maintain peace and liberty";
+          let prompt = "";
+          if (phase === "prayer") {
+            prompt = nearPrayer
+              ? "{action} · Pray"
+              : "Follow the beacon to the prayer court";
+          } else if (phase === "roofs") {
+            prompt = onAnyRoof ? "Hold {action} to wave the banner" : "";
+          } else if (phase === "tower") {
+            prompt = nearTower
+              ? "{action} · Wave the banner"
+              : "Follow the beacon up the switchback stairs";
+          } else if (phase === "lead") {
+            prompt = "Explore toward the back-left camp";
+          } else if (phase === "done") {
+            prompt = "Journey complete";
+          }
           return {
             objective,
-            prompt:
-              phase === "roofs"
-                ? "Find a rooftop route · hold action on the roof to wave"
-                : phase === "prayer" || phase === "tower"
-                  ? "Follow the beacon · interact when you arrive"
-                  : phase === "lead"
-                    ? "Explore toward the back-left camp"
-                    : phase === "done"
-                      ? "Journey complete"
-                      : "",
+            prompt,
             carrying: banner.visible,
             holdingBanner: banner.visible,
             wave: signal > 0 || (phase === "prologue" && elapsed >= 8),

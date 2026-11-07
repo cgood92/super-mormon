@@ -139,22 +139,55 @@ export function buildJacobSherem(scene: T.Scene): WorldData {
     if (disposed) return;
     const delta = Math.min(Math.max(dt, 0), 0.1);
     time += delta;
-    for (const r of residents)
-      patrol(
-        r.actor,
-        r.body,
-        r.extent,
-        r.z,
-        time * r.speed + r.offset,
-        r.speed,
-        delta,
-      );
+    if (phase === "epilogue" || phase === "done") {
+      const cx = sherem.group.position.x,
+        cz = sherem.group.position.z;
+      residents.forEach((r, i) => {
+        const angle = (i / residents.length) * Math.PI * 2;
+        const radius = 3.6 + (i % 3) * 1.3;
+        const tx = cx + Math.cos(angle) * radius;
+        const tz = cz + Math.sin(angle) * radius;
+        const current = r.actor.group.position;
+        const dx = tx - current.x,
+          dz = tz - current.z,
+          d = Math.hypot(dx, dz);
+        const speed = 9.5; // fast-forward gathering rush
+        const step = Math.min(d, speed * delta);
+        const nx = d > 0.05 ? current.x + (dx / d) * step : tx;
+        const nz = d > 0.05 ? current.z + (dz / d) * step : tz;
+        const facing = Math.atan2(cx - nx, cz - nz);
+        r.actor.update(delta, {
+          x: nx,
+          y: 0,
+          z: nz,
+          vx: d > 0.1 ? (dx / d) * speed : 0,
+          vy: 0,
+          vz: d > 0.1 ? (dz / d) * speed : 0,
+          yaw: d > 0.1 ? Math.atan2(dx, dz) : facing,
+          grounded: true,
+          runSpeed: d > 0.1 ? speed : 0,
+        });
+        r.body.x = nx;
+        r.body.z = nz;
+      });
+    } else {
+      for (const r of residents)
+        patrol(
+          r.actor,
+          r.body,
+          r.extent,
+          r.z,
+          time * r.speed + r.offset,
+          r.speed,
+          delta,
+        );
+    }
     if (phase === "search")
       patrol(sherem, sheremBody, 30, 40, time * 1.8 + 32.8, 1.8, delta);
     land.update(delta); // This search deliberately has no objective beacon.
   };
   const closingCaption =
-    "Later, after many days of care, Sherem called a gathering for the next day. He confessed Christ, then died after speaking. Peace returned (Jacob 7:15–23).";
+    "Later, after many days, Sherem called a gathering for the next day. The multitude gathered round and saw and believed as he confessed Christ before he died. Peace returned (Jacob 7:15–23).";
   animate(0);
   return {
     name: "Jacob and Sherem",
