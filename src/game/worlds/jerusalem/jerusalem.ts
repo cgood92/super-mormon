@@ -133,7 +133,17 @@ function cityBlock(
   // while the dwelling wall render stops at h beneath the roof slab to eliminate coplanar z-fighting.
   const shape = { x, y: 0, z, w, h: h + 0.17, d };
   solids.push(shape);
-  const dwellingMesh = box(group, x, 0, z, w, h, d, color, "Jerusalem dwelling");
+  const dwellingMesh = box(
+    group,
+    x,
+    0,
+    z,
+    w,
+    h,
+    d,
+    color,
+    "Jerusalem dwelling",
+  );
   markScenery(dwellingMesh, { kind: "solid", solids: [shape] });
   decor(x, h, z, w + 0.25, 0.17, d + 0.25, palette.paleStone, "flat roof");
   for (const side of [-1, 1]) {

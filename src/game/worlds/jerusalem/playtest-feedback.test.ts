@@ -10,29 +10,55 @@ test("Jerusalem ground has procedural texture and extends past the back of Laban
   const scene = new THREE.Scene();
   const world = buildJerusalem("streets", scene);
   try {
-    const ground = scene.getObjectByName("Jerusalem earth and desert road") as THREE.Mesh;
+    const ground = scene.getObjectByName(
+      "Jerusalem earth and desert road",
+    ) as THREE.Mesh;
     assert.ok(ground, "ground mesh exists");
     assert.ok(ground.material instanceof THREE.MeshStandardMaterial);
-    assert.ok(ground.material.map instanceof THREE.DataTexture, "ground has procedural texture map");
+    assert.ok(
+      ground.material.map instanceof THREE.DataTexture,
+      "ground has procedural texture map",
+    );
 
     // Palace back wall is at z = -28.5; ground must extend past it
     const bbox = new THREE.Box3().setFromObject(ground);
-    assert.ok(bbox.min.z < -30, `ground must extend behind palace: minZ=${bbox.min.z}`);
-    assert.ok(bbox.max.z > 115, `ground must extend past south desert road: maxZ=${bbox.max.z}`);
+    assert.ok(
+      bbox.min.z < -30,
+      `ground must extend behind palace: minZ=${bbox.min.z}`,
+    );
+    assert.ok(
+      bbox.max.z > 115,
+      `ground must extend past south desert road: maxZ=${bbox.max.z}`,
+    );
 
     // No street pavers or cross street paving seams
     const paver = scene.getObjectByName("street paver");
     assert.equal(paver, undefined, "random street pavers should be removed");
     const seam = scene.getObjectByName("cross street paving seam");
-    assert.equal(seam, undefined, "cross street paving seams should be removed");
+    assert.equal(
+      seam,
+      undefined,
+      "cross street paving seams should be removed",
+    );
 
     // Laban's palace back floor has stone paving
-    const palacePaving = scene.getObjectByName("palace interior stone paving") as THREE.Mesh;
+    const palacePaving = scene.getObjectByName(
+      "palace interior stone paving",
+    ) as THREE.Mesh;
     assert.ok(palacePaving, "palace interior stone paving exists");
     const palaceBox = new THREE.Box3().setFromObject(palacePaving);
-    assert.ok(palaceBox.min.z <= -28.4, `palace paving covers rear corridor: minZ=${palaceBox.min.z}`);
-    assert.ok(palaceBox.min.x <= -17.5, `palace paving covers west corridor: minX=${palaceBox.min.x}`);
-    assert.ok(palaceBox.max.x >= 17.5, `palace paving covers east corridor: maxX=${palaceBox.max.x}`);
+    assert.ok(
+      palaceBox.min.z <= -28.4,
+      `palace paving covers rear corridor: minZ=${palaceBox.min.z}`,
+    );
+    assert.ok(
+      palaceBox.min.x <= -17.5,
+      `palace paving covers west corridor: minX=${palaceBox.min.x}`,
+    );
+    assert.ok(
+      palaceBox.max.x >= 17.5,
+      `palace paving covers east corridor: maxX=${palaceBox.max.x}`,
+    );
   } finally {
     world.dispose?.();
   }
@@ -45,8 +71,10 @@ test("dwelling flat roofs do not share coplanar height with dwelling walls (no z
     const dwellings: THREE.Mesh[] = [];
     const roofs: THREE.Mesh[] = [];
     scene.traverse((obj) => {
-      if (obj.name === "Jerusalem dwelling" && obj instanceof THREE.Mesh) dwellings.push(obj);
-      if (obj.name === "flat roof" && obj instanceof THREE.Mesh) roofs.push(obj);
+      if (obj.name === "Jerusalem dwelling" && obj instanceof THREE.Mesh)
+        dwellings.push(obj);
+      if (obj.name === "flat roof" && obj instanceof THREE.Mesh)
+        roofs.push(obj);
     });
     assert.ok(dwellings.length >= 8);
     assert.ok(roofs.length >= 8);
@@ -78,7 +106,11 @@ test("date palms have no green rendered cube, canopy is walkable, and player can
   try {
     // No green rendered box
     const greenBox = scene.getObjectByName("date palm leaf canopy");
-    assert.equal(greenBox, undefined, "date palm leaf canopy green box should not be rendered");
+    assert.equal(
+      greenBox,
+      undefined,
+      "date palm leaf canopy green box should not be rendered",
+    );
 
     // West palm: x = -17, z = 22, height = 4.8
     const palm = world.climbables?.find((c) => c.id === "jerusalem-west-palm");
@@ -110,7 +142,10 @@ test("date palms have no green rendered cube, canopy is walkable, and player can
         world.climbables,
       );
     }
-    assert.ok(player.y >= palm.height - 0.7, `player climbs to near top of tree: y=${player.y}`);
+    assert.ok(
+      player.y >= palm.height - 0.7,
+      `player climbs to near top of tree: y=${player.y}`,
+    );
 
     // Holding up reaches handstand at the top of the tree
     for (let frame = 0; frame < 10; frame++) {
@@ -123,7 +158,11 @@ test("date palms have no green rendered cube, canopy is walkable, and player can
         world.climbables,
       );
     }
-    assert.equal(player.move, "handstand", "reaching top transitions into handstand");
+    assert.equal(
+      player.move,
+      "handstand",
+      "reaching top transitions into handstand",
+    );
 
     // Player can stand on top of the canopy platform
     const canopyWalker = createPlayer(-17, 5.5, 22);
@@ -139,8 +178,15 @@ test("date palms have no green rendered cube, canopy is walkable, and player can
         world.climbables,
       );
     }
-    assert.equal(canopyWalker.grounded, true, "player lands on top of tree canopy");
-    assert.ok(canopyWalker.y >= 4.8, `canopy walker standing at tree top: y=${canopyWalker.y}`);
+    assert.equal(
+      canopyWalker.grounded,
+      true,
+      "player lands on top of tree canopy",
+    );
+    assert.ok(
+      canopyWalker.y >= 4.8,
+      `canopy walker standing at tree top: y=${canopyWalker.y}`,
+    );
   } finally {
     world.dispose?.();
   }
@@ -165,7 +211,10 @@ test("wall kick works reliably on the outside perimeter city wall", () => {
     );
     assert.equal(events.jumped, true);
     assert.equal(player.move, "wallKick");
-    assert.ok(player.vz > 0, `wall kick pushes south away from wall: vz=${player.vz}`);
+    assert.ok(
+      player.vz > 0,
+      `wall kick pushes south away from wall: vz=${player.vz}`,
+    );
   } finally {
     world.dispose?.();
   }
