@@ -316,6 +316,9 @@ function moveCameraEye(
   previous: T.Vector3,
   requested: T.Vector3,
   solids: readonly Solid[],
+  blockers: readonly Solid[] = solids.filter((s) =>
+    isBoomBlocker(s, previous.y),
+  ),
   radius = EYE_RADIUS,
 ): T.Vector3 {
   const prevFloor = floorUnderPoint(
@@ -333,7 +336,7 @@ function moveCameraEye(
   // Move horizontally in X/Z, blocked only by vertical walls spanning currentY
   const hStart = new T.Vector3(previous.x, currentY, previous.z);
   const hReq = new T.Vector3(requested.x, currentY, requested.z);
-  const hWalls = solids.filter(
+  const hWalls = blockers.filter(
     (s) => s.y < currentY - 0.05 && s.y + s.h > currentY + 0.05,
   );
 
@@ -362,7 +365,8 @@ function moveCameraEye(
     resY = Math.max(resY, currentY - 0.12);
   }
 
-  return new T.Vector3(safeH.x, resY, safeH.z);
+  const safeEye = new T.Vector3(safeH.x, resY, safeH.z);
+  return recoverCameraEye(safeEye, solids, radius);
 }
 
 /**
@@ -657,7 +661,7 @@ export class FollowCamera {
         )
       : 0;
 
-    const safeEye = moveCameraEye(this.lastEye, eye, solids, 0.22);
+    const safeEye = moveCameraEye(this.lastEye, eye, solids, blockers, 0.22);
     if (room) {
       const b = room.viewBounds ?? room.bounds;
       safeEye.x = clamp(safeEye.x, b.minX + 0.55, b.maxX - 0.55);

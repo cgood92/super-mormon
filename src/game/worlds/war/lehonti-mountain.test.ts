@@ -88,7 +88,7 @@ test("Lehonti opening establishes summit and valley before releasing a fresh rac
   });
   assert.equal(runtime.movementLocked?.(), true);
   const captions = new Set<string>();
-  for (let i = 0; i < 159; i++) {
+  for (let i = 0; i < 239; i++) {
     captions.add(runtime.update(0.1, player, idle).objective);
     const state = runtime.snapshot() as {
       timer: number;
@@ -143,7 +143,7 @@ test("opening cuts frame summit, valley and runner safely on phone and desktop",
     ].map((name) => ({ group: scene.getObjectByName(name)! }));
     actors.push({ group: avatar.group });
     const meshes = new StoryMeshObstacles(world.actorParent, actors);
-    for (let frame = 0; frame < 160; frame++) {
+    for (let frame = 0; frame < 240; frame++) {
       world.update?.(0.1, player);
       const shot = runtime.camera!();
       assert.ok(shot);
@@ -191,4 +191,162 @@ test("opening cuts frame summit, valley and runner safely on phone and desktop",
     avatar.dispose();
     world.dispose?.();
   }
+});
+
+test("outro depicts Amalickiah's parley, poisoning of Lehonti, and ends with Lehonti's death", () => {
+  const scene = new T.Scene(),
+    world = buildLehontiMountain(scene);
+  const player = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
+  let done = 0;
+  let nextDialog: (() => void) | undefined;
+  const runtime = world.adventure!({
+    setAvatar() {},
+    toast() {},
+    complete() {
+      done++;
+    },
+    dialog(_ref, _title, _body, next) {
+      nextDialog = next;
+    },
+  });
+
+  // Advance past opening directly with jump input
+  runtime.update(0.1, player, { ...idle, jump: true });
+  runtime.update(0.1, player, { ...idle, jump: true });
+  runtime.update(0.1, player, { ...idle, jump: true });
+  assert.equal((runtime.snapshot() as { phase: string }).phase, "race");
+
+  // Win race 1
+  Object.assign(player, ANTIPAS_ROUTE.at(-1)!);
+  runtime.update(0.1, player, idle);
+  assert.ok(nextDialog);
+  nextDialog();
+  nextDialog = undefined;
+
+  // Win race 2
+  Object.assign(player, ANTIPAS_ROUTE.at(-1)!);
+  runtime.update(0.1, player, idle);
+  assert.ok(nextDialog);
+  nextDialog();
+  nextDialog = undefined;
+
+  // Win race 3
+  Object.assign(player, ANTIPAS_ROUTE.at(-1)!);
+  runtime.update(0.1, player, idle);
+  assert.ok(nextDialog);
+  nextDialog();
+  nextDialog = undefined;
+
+  // Now in outro!
+  const state = runtime.snapshot() as { phase: string; outroBeat: string };
+  assert.equal(state.phase, "outro");
+  assert.equal(state.outroBeat, "ascent");
+  assert.equal(runtime.movementLocked?.(), true);
+
+  const outroCaptions = new Set<string>();
+  // Step through all 3 beats of the outro (17.9s)
+  for (let step = 0; step < 179; step++) {
+    const res = runtime.update(0.1, player, idle);
+    outroCaptions.add(res.objective);
+    assert.ok(runtime.camera?.());
+  }
+
+  assert.ok([...outroCaptions].some((c) => /negotiate/i.test(c)));
+  assert.ok([...outroCaptions].some((c) => /poison/i.test(c)));
+  assert.ok([...outroCaptions].some((c) => /Lehonti dies|command/i.test(c)));
+  // Must NOT mention marching back or coronation; ends after Lehonti dies
+  assert.ok(
+    ![...outroCaptions].some((c) => /marching|crowned king/i.test(c)),
+    "outro must end after Lehonti dies without marching back",
+  );
+
+  // Final step completes the outro (reaching 18.0s)
+  runtime.update(0.1, player, idle);
+  assert.equal((runtime.snapshot() as { phase: string }).phase, "done");
+  assert.equal(done, 1);
+  assert.equal(runtime.movementLocked?.(), false);
+  assert.equal(runtime.camera?.(), undefined);
+
+  runtime.dispose();
+  world.dispose?.();
+});
+
+test("player and embassy messenger start side-by-side at the trailhead without overlapping", () => {
+  const scene = new T.Scene(),
+    world = buildLehontiMountain(scene);
+  const messenger = scene.getObjectByName("Actual embassy messenger 1")!;
+  assert.ok(messenger, "embassy messenger exists");
+
+  // Both should start on the first terrace
+  assert.equal(world.spawn.x, 28);
+  assert.equal(messenger.position.x, 28);
+  assert.equal(world.spawn.y, 0.34);
+  assert.equal(messenger.position.y, 0.34);
+
+  // Lateral distance between them along the starting line must be generous (> 1.5m)
+  const lateralDist = Math.abs(messenger.position.z - world.spawn.z);
+  assert.ok(
+    lateralDist >= 1.5,
+    `runners must start side-by-side, not overlapping (was ${lateralDist.toFixed(2)}m apart)`,
+  );
+
+  // Both should be facing West down the trail toward the summit (-PI/2)
+  assert.ok(
+    Math.abs(Math.sin((world.spawn.yaw ?? 0) + Math.PI / 2)) < 0.01,
+    "player must face West down the trail",
+  );
+  assert.ok(
+    Math.abs(Math.sin(messenger.rotation.y + Math.PI / 2)) < 0.01,
+    "messenger must face West down the trail",
+  );
+
+  world.dispose?.();
+});
+
+test("actors physically block the player and prevent walking through them", () => {
+  const scene = new T.Scene(),
+    world = buildLehontiMountain(scene);
+  const player = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
+  const messenger = scene.getObjectByName("Actual embassy messenger 1")!;
+
+  // Try to move player directly onto the messenger (lateral intrusion)
+  player.x = messenger.position.x;
+  player.y = messenger.position.y;
+  player.z = messenger.position.z - 0.2; // Only 0.2m away
+  player.vz = 5.0; // Moving toward messenger
+
+  world.update?.(1 / 60, player);
+
+  const distToMessenger = Math.hypot(
+    player.x - messenger.position.x,
+    player.z - messenger.position.z,
+  );
+  assert.ok(
+    distToMessenger >= 0.71,
+    `player must be pushed outside actor cylinder, was ${distToMessenger.toFixed(2)}m`,
+  );
+  assert.ok(
+    player.vz <= 0.001,
+    "velocity into actor must be cancelled, cannot penetrate",
+  );
+
+  // Also verify Lehonti at the summit camp blocks penetration
+  player.x = 0.25;
+  player.y = 30.6;
+  player.z = 0;
+  player.vx = -4.0; // Moving toward Lehonti at (0, 30.6, 0)
+
+  world.update?.(1 / 60, player);
+
+  const distToLehonti = Math.hypot(player.x, player.z);
+  assert.ok(
+    distToLehonti >= 0.71,
+    `player must not walk through Lehonti, was ${distToLehonti.toFixed(2)}m away`,
+  );
+  assert.ok(
+    player.vx >= -0.001,
+    "velocity into Lehonti must be deflected, cannot pass through",
+  );
+
+  world.dispose?.();
 });

@@ -323,12 +323,28 @@ test("clicking on the screen (pointerdown) skips cutscenes to gameplay with came
       `camera must not be at Lehi's house (x=${camera.position.x})`,
     );
 
-    // Subsequent frames must remain unlocked and camera undefined
+    // Subsequent frames must remain unlocked, camera undefined, and player free to turn
     for (let i = 0; i < 5; i++) {
       s.runtime.update(0.016, s.player, idle);
       assert.equal(s.runtime.camera!(), undefined);
       assert.equal(s.runtime.movementLocked!(), false);
     }
+
+    // Verify player is NOT locked sideways during gameplay: running North rotates heading to North
+    for (let frame = 0; frame < 15; frame++) {
+      stepPlayer(
+        s.player,
+        { x: 0, y: 1, jump: false, jumpHeld: false },
+        0.016,
+        0,
+        s.world.solids,
+      );
+      s.runtime.update(0.016, s.player, idle);
+    }
+    assert.ok(
+      Math.abs(s.player.yaw) < 0.1,
+      `player yaw must turn towards travel heading (North ~ 0), not stay locked sideways: yaw=${s.player.yaw}`,
+    );
 
     // Pointer listener must have been removed
     assert.equal(

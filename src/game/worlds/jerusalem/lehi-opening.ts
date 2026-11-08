@@ -59,7 +59,10 @@ export function createLehiOpening(
 
   let lastAction = false;
   let finished = false;
-  let lastPlayer: { yaw: number } | undefined;
+
+  const onPointerDown = () => {
+    advance();
+  };
 
   const removePointerListener = () => {
     if (typeof window !== "undefined") {
@@ -67,62 +70,65 @@ export function createLehiOpening(
     }
   };
 
-  const finishOpening = (player?: { yaw: number }) => {
-    elapsed = 15;
-    camera = undefined;
-    const p = player ?? lastPlayer;
-    if (p) p.yaw = -Math.PI / 2;
-    if (!finished) {
-      finished = true;
-      hooks.toast(objectives[3]);
-      removePointerListener();
-    }
-  };
-
-  const skipToNextBeat = () => {
-    if (disposed || elapsed >= 15) return;
-    if (elapsed < 5) elapsed = 5;
-    else if (elapsed < 9) elapsed = 9;
-    else finishOpening();
-  };
-
-  const onPointerDown = () => {
-    skipToNextBeat();
-  };
   if (typeof window !== "undefined") {
     window.addEventListener("pointerdown", onPointerDown);
   }
+
+  // Advance to the next beat on button press or screen click
+  const advance = () => {
+    if (disposed || finished) return;
+    if (elapsed < 5) elapsed = 5;
+    else if (elapsed < 9) elapsed = 9;
+    else elapsed = 15;
+  };
+
+  // Conclude the opening cinematic and transfer control to the player
+  const finish = (player: { yaw: number }) => {
+    if (finished) return;
+    finished = true;
+    elapsed = 15;
+    camera = undefined;
+    player.yaw = -Math.PI / 2;
+    hooks.toast(objectives[3]);
+    removePointerListener();
+  };
+
   return {
-    movementLocked: () => !disposed && elapsed < 15,
-    camera: () => (!disposed && elapsed < 15 ? camera : undefined),
+    movementLocked: () => !disposed && !finished,
+    camera: () => (!disposed && !finished ? camera : undefined),
     snapshot: () => ({
-      phase: elapsed < 15 ? "intro" : "escape",
-      movieBeat: elapsed < 15 ? names[beat()] : undefined,
+      phase: finished ? "escape" : "intro",
+      movieBeat: finished ? undefined : names[beat()],
       elapsed,
     }),
     update(dt, player, input) {
-      lastPlayer = player;
       if (disposed) return { objective: objectives[3], prompt: "" };
-      if (elapsed >= 15) {
-        if (!finished) finishOpening(player);
-        player.yaw = -Math.PI / 2;
+
+      // Once finished, gameplay is active: never override player controls or yaw
+      if (finished) {
         return { objective: objectives[3], prompt: "" };
       }
+
+      // Check jump button press to advance beat
       const actionPressed = !!input?.jump;
       if (actionPressed && !lastAction) {
-        skipToNextBeat();
+        advance();
       }
       lastAction = actionPressed;
+
+      // If user skipped to the end, complete opening now
       if (elapsed >= 15) {
-        finishOpening(player);
+        finish(player);
         return { objective: objectives[3], prompt: "" };
       }
+
       dt = Math.max(0, Math.min(dt, 0.1));
       elapsed = Math.min(15, elapsed + dt);
       if (elapsed >= 15) {
-        finishOpening(player);
+        finish(player);
         return { objective: objectives[3], prompt: "" };
       }
+
       const current = beat();
       player.yaw = current === 3 ? -Math.PI / 2 : 0;
       for (const [i, { rig, state }] of listeners.entries()) {
@@ -180,9 +186,6 @@ export function createLehiOpening(
           obstacles,
         );
         camera = { position: plan.wide, focus: plan.focus, cut: true };
-      }
-      if (elapsed >= 15) {
-        finishOpening(player);
       }
       return {
         objective: objectives[current],

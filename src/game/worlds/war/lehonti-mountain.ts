@@ -10,12 +10,14 @@ import {
   createCharacter,
   type CharacterRole,
 } from "../../characters/character";
+import { createCarriedProp } from "../../characters/roster-data";
 import {
   markScenery,
   sceneryTerraceUnion,
   terracedRock,
 } from "../shared/scenery";
 import type { Point, WorldData } from "../../runtime/worlds";
+import type { PlayerState } from "../../physics/physics";
 
 const corners: [number, number][] = [
   [28, 28],
@@ -70,14 +72,14 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
   );
   const { root, solids } = land;
   const crowdRigs: ReturnType<typeof createCharacter>[] = [];
-  const crowd = (role: CharacterRole, point: Point) => {
+  const crowd = (role: CharacterRole, point: Point, yaw = Math.PI) => {
     const rig = createCharacter(role, { quality: "crowd" });
     rig.update(0, {
       ...point,
       vx: 0,
       vy: 0,
       vz: 0,
-      yaw: Math.PI,
+      yaw,
       grounded: true,
       runSpeed: 0,
     });
@@ -208,53 +210,106 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
   const amalickiah = land.actor("amalickiah", valley);
   amalickiah.group.name = "Amalickiah sends a secret embassy from the valley";
   amalickiah.group.visible = true;
+  // Face directly along the ascending trail heading toward the summit
+  const trailheadYaw = -Math.PI / 2;
+  // Side-by-side starting lanes at the trailhead (1.6m separation across the trail)
+  const messengerStart = {
+    x: route[0].x,
+    y: route[0].y,
+    z: route[0].z + 0.85,
+  };
   const messengers = [0, 1, 2].map((i) => {
-    const rig = crowd("guard", route[0]);
+    const rig = crowd("guard", messengerStart, trailheadYaw);
     rig.group.name = `Actual embassy messenger ${i + 1}`;
     rig.group.visible = i === 0;
     return rig;
   });
-  const campFlags = new T.InstancedMesh(
-    new T.ConeGeometry(0.22, 1, 5),
-    new T.MeshStandardMaterial({
-      color: 0xd9c89d,
-      transparent: true,
-      opacity: 0.7,
-      depthWrite: false,
-    }),
-    8,
-  );
-  const flagTransform = new T.Object3D();
-  for (let i = 0; i < 8; i++) {
-    flagTransform.position.set(
-      summit.x + Math.cos(i * 0.785) * 2,
-      summit.y + 1.1,
-      summit.z + Math.sin(i * 0.785) * 2,
-    );
-    flagTransform.updateMatrix();
-    campFlags.setMatrixAt(i, flagTransform.matrix);
+
+  const servant = crowd("guard", valley);
+  servant.group.name = "Amalickiah's treacherous servant";
+  servant.group.visible = false;
+  const jar = createCarriedProp("jar");
+  if (jar) {
+    jar.name = "Poison jar";
+    jar.position.set(0.18, 0.85, 0.35);
+    jar.rotation.set(-0.25, 0.2, 0);
+    jar.scale.setScalar(0.85);
+    servant.group.add(jar);
+    jar.visible = false;
   }
-  campFlags.name = "Lehonti's small summit camp";
-  root.add(campFlags);
-  markScenery(campFlags, {
-    kind: "decoration",
-    reason:
-      "Small pennants above the solid summit terraces; they do not support the player.",
+
+  // Camp council pavilion for the historical poisoning sequence
+  const woodMat = new T.MeshStandardMaterial({
+    color: 0x5a4632,
+    roughness: 0.8,
   });
-  let phase: "opening" | "race" | "done" = "opening";
+  const canvasMat = new T.MeshStandardMaterial({
+    color: 0xc8bc9f,
+    roughness: 0.9,
+  });
+  const rugMat = new T.MeshStandardMaterial({
+    color: 0x7a634e,
+    roughness: 0.9,
+  });
+  const councilTent = new T.Group();
+  councilTent.name = "Camp council pavilion";
+  for (const [px, pz] of [
+    [-1.8, -1.8],
+    [1.8, -1.8],
+    [-1.8, 1.8],
+    [1.8, 1.8],
+  ]) {
+    const pole = new T.Mesh(
+      new T.CylinderGeometry(0.06, 0.06, 2.3, 6),
+      woodMat,
+    );
+    pole.position.set(px, 1.15, pz);
+    councilTent.add(pole);
+  }
+  const tentRoof = new T.Mesh(new T.BoxGeometry(4.0, 0.08, 4.0), canvasMat);
+  tentRoof.position.set(0, 2.3, 0);
+  councilTent.add(tentRoof);
+  const matMesh = new T.Mesh(new T.BoxGeometry(3.6, 0.04, 3.6), rugMat);
+  matMesh.position.set(0, 0.02, 0);
+  councilTent.add(matMesh);
+  councilTent.visible = false;
+  root.add(councilTent);
+  markScenery(councilTent, {
+    kind: "decoration",
+    reason: "Camp council pavilion for historical outro sequence.",
+  });
+
+  const OPENING_BEAT_0 = 8.0;
+  const OPENING_BEAT_1 = 16.0;
+  const OPENING_DURATION = 24.0;
+
+  const OUTRO_BEAT_0 = 6.0;
+  const OUTRO_BEAT_1 = 12.0;
+  const OUTRO_DURATION = 18.0;
+
+  let phase: "opening" | "race" | "outro" | "done" = "opening";
   let openingTime = 0;
+  let outroTime = 0;
   let race = 0,
     pending = false,
     time = 0,
     retries = 0,
     messengerProgress = 0,
     runnerProgress = 0;
-  const trailhead = { x: route[0].x, y: 0, z: route[0].z + 3.3, yaw: Math.PI };
+  const playerStart = {
+    x: route[0].x,
+    y: route[0].y,
+    z: route[0].z - 0.75,
+    yaw: trailheadYaw,
+  };
+  const trailhead = playerStart;
   const target = () => summit;
   function updateActors(dt: number) {
     messengers.forEach((rig, i) => {
-      rig.group.visible = phase !== "done" && i === race;
-      if (i === race && phase === "race") {
+      const active = i === race;
+      rig.group.visible = phase !== "done" && phase !== "outro" && active;
+      if (!active) return;
+      if (phase === "race") {
         const p = locationAt(messengerProgress);
         const ahead = locationAt(
           Math.min(route.length - 1, messengerProgress + 0.01),
@@ -264,36 +319,113 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
           dz = ahead.z - behind.z;
         const length = Math.hypot(dx, dz) || 1;
         const speed = race === 2 ? 1.25 : race === 1 ? 1.17 : 1.1;
+
+        // Tangent and left-normal vectors:
+        // Across the counter-clockwise spiral, left is always toward the outer lane.
+        const tx = dx / length,
+          tz = dz / length;
+        const nx = tz,
+          nz = -tx;
+
+        // Lane offset smoothly transitions to 0 near the summit camp
+        const laneOffset =
+          0.85 *
+          Math.max(0, Math.min(1, (route.length - 6 - messengerProgress) / 4));
+        const mx = p.x + nx * laneOffset;
+        const mz = p.z + nz * laneOffset;
+
         // Terrace tops are level, so feet follow their actual support height
-        // instead of hovering along an interpolated slope between steps.
+        // matching the physical terrace solid under the messenger's position.
         const support = Math.max(
-          ...route
+          ...solids
             .filter(
-              (step) =>
-                Math.abs(step.x - p.x) <= 2.85 &&
-                Math.abs(step.z - p.z) <= 2.85,
+              (s) =>
+                Math.abs(mx - s.x) <= s.w / 2 && Math.abs(mz - s.z) <= s.d / 2,
             )
-            .map((step) => step.y),
+            .map((s) => s.y + s.h),
         );
         rig.update(dt, {
-          ...p,
+          x: mx,
           y: support,
-          vx: (dx / length) * speed * 5,
+          z: mz,
+          vx: tx * speed * 5,
           vy: 0,
-          vz: (dz / length) * speed * 5,
+          vz: tz * speed * 5,
           yaw: Math.atan2(dx, dz),
           grounded: true,
           runSpeed: speed * 5,
           move: "run",
         });
+      } else if (phase !== "outro" && phase !== "done") {
+        rig.update(dt, {
+          x: messengerStart.x,
+          y: messengerStart.y,
+          z: messengerStart.z,
+          vx: 0,
+          vy: 0,
+          vz: 0,
+          yaw: trailheadYaw,
+          grounded: true,
+          runSpeed: 0,
+          move: "idle",
+        });
       }
     });
+  }
+
+  const solidActors = [lehonti, ...summitGuards, amalickiah, ...messengers];
+
+  function resolveActorCollisions(player: PlayerState) {
+    if (phase === "outro" || phase === "done") return;
+    for (const rig of solidActors) {
+      if (!rig.group.visible) continue;
+      const ax = rig.group.position.x;
+      const ay = rig.group.position.y;
+      const az = rig.group.position.z;
+
+      // Vertical span check (SM64 cylinder overlap):
+      // Player height is 1.65m; actor height is ~1.7m.
+      const playerTop = player.y + 1.65;
+      const playerBottom = player.y;
+      const actorTop = ay + 1.7;
+      const actorBottom = ay;
+
+      if (playerBottom >= actorTop || playerTop <= actorBottom) {
+        continue;
+      }
+
+      // Horizontal cylinder separation check
+      const dx = player.x - ax;
+      const dz = player.z - az;
+      const dist = Math.hypot(dx, dz);
+      const minDistance = 0.72; // Combined radii of player (0.32) and NPC (~0.4)
+
+      if (dist < minDistance) {
+        let nx = dx / (dist || 1);
+        let nz = dz / (dist || 1);
+        if (dist < 0.0001) {
+          nx = 0;
+          nz = 1;
+        }
+        const overlap = minDistance - dist;
+        player.x += nx * overlap;
+        player.z += nz * overlap;
+
+        // Cancel player velocity pointing into the actor (SM64 wall/actor deflection)
+        const vDot = player.vx * nx + player.vz * nz;
+        if (vDot < 0) {
+          player.vx -= vDot * nx;
+          player.vz -= vDot * nz;
+          player.runSpeed = Math.hypot(player.vx, player.vz);
+        }
+      }
+    }
   }
   return {
     name: "Lehonti on Mount Antipas",
     subtitle: "Race to warn Lehonti · inspired by Alma 47",
     initialObjective:
-      "Watch Lehonti’s summit camp and Amalickiah’s secret embassy",
+      "Lehonti and his people hold the summit of Mount Antipas. They refuse to fight the Nephites.",
     spawn: trailhead,
     solids,
     actorParent: root,
@@ -320,29 +452,37 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
         runnerProgress = Math.max(runnerProgress, nearest);
         land.update(delta, route[Math.min(route.length - 1, nearest + 3)]);
       } else land.update(delta, phase === "done" ? undefined : target());
+      if (player) {
+        resolveActorCollisions(player);
+      }
     },
     adventure(hooks) {
       hooks.setAvatar("warning-runner");
-      hooks.toast(
-        "Alma 47:7–11 · The warning runner and timed races are imagined.",
-      );
       let cinematicCamera:
         { position: T.Vector3; focus: T.Vector3; cut: boolean } | undefined;
       let lastAspect = 0;
       let lastBeat = -1;
       const runnerAnchor = new T.Group();
-      runnerAnchor.position.set(trailhead.x, trailhead.y, trailhead.z);
+      runnerAnchor.position.set(route[0].x, route[0].y, route[0].z);
       const cameraActors: StoryActor[] = [
         lehonti,
         amalickiah,
         ...summitGuards,
         ...messengers,
+        servant,
+        { group: councilTent },
       ].map((rig) => ({ group: rig.group }));
       const playerActor = root.getObjectByName("warning-runner-character");
       if (playerActor) cameraActors.push({ group: playerActor });
       const meshObstacles = new StoryMeshObstacles(root, cameraActors);
+
       function frameOpening() {
-        const beat = openingTime < 5 ? 0 : openingTime < 10 ? 1 : 2;
+        const beat =
+          openingTime < OPENING_BEAT_0
+            ? 0
+            : openingTime < OPENING_BEAT_1
+              ? 1
+              : 2;
         const anchor =
           beat === 0
             ? lehonti.group
@@ -371,22 +511,317 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
         lastBeat = beat;
         lastAspect = hooks.viewAspect?.() ?? 16 / 9;
       }
+
+      function frameOutro(beat: number) {
+        const aspect = hooks.viewAspect?.() ?? 16 / 9;
+        const camera = new T.PerspectiveCamera(58, aspect, 0.08, 320);
+        const focus = new T.Vector3();
+        const cameraPos = new T.Vector3();
+        const actorsToFrame: StoryActor[] = [];
+
+        if (beat === 0) {
+          // Parley at ~75% mountain height (route[70])
+          focus.set(18, 24.14 + 1.1, 3.3);
+          cameraPos.set(18 + 5.8, 24.14 + 1.4, 3.3);
+          actorsToFrame.push(
+            { group: amalickiah.group },
+            { group: lehonti.group },
+          );
+        } else if (beat === 1) {
+          // Council tent: servant secretly poisoning Lehonti by degrees
+          focus.set(summit.x, summit.y + 0.95, summit.z);
+          cameraPos.set(summit.x, summit.y + 1.25, summit.z + 4.8);
+          actorsToFrame.push(
+            { group: lehonti.group },
+            { group: servant.group },
+            { group: amalickiah.group },
+          );
+        } else {
+          // Lehonti dies; Amalickiah takes chief command
+          focus.set(summit.x, summit.y + 0.85, summit.z + 0.2);
+          cameraPos.set(summit.x + 0.5, summit.y + 1.1, summit.z + 4.2);
+          actorsToFrame.push(
+            { group: amalickiah.group },
+            { group: lehonti.group },
+            { group: servant.group },
+          );
+        }
+
+        camera.position.copy(cameraPos);
+        camera.lookAt(focus);
+        const plan = planStoryCamera(
+          camera,
+          {
+            cutaway: true,
+            actors: actorsToFrame,
+            wide: beat === 0 ? 6.2 : 5.0,
+          },
+          solids,
+          meshObstacles,
+        );
+        cinematicCamera = { position: plan.wide, focus: plan.focus, cut: true };
+        lastBeat = beat;
+        lastAspect = aspect;
+      }
+
+      function updateOutroActors(
+        delta: number,
+        beat: number,
+        _timeInOutro: number,
+      ) {
+        if (beat === 0) {
+          councilTent.visible = false;
+          if (jar) jar.visible = false;
+          servant.group.visible = false;
+
+          // Parley at route[70] on Mount Antipas (~75% height, y = 24.14)
+          amalickiah.group.visible = true;
+          amalickiah.group.rotation.x = 0;
+          amalickiah.update(delta, {
+            x: 18,
+            y: 24.14,
+            z: 2.0,
+            vx: 0,
+            vy: 0,
+            vz: 0,
+            grounded: true,
+            runSpeed: 0,
+            move: "idle",
+            pointing: true,
+            yaw: 0,
+            lookYaw: 0,
+          });
+
+          lehonti.group.visible = true;
+          lehonti.group.rotation.x = 0;
+          lehonti.update(delta, {
+            x: 18,
+            y: 24.14,
+            z: 4.6,
+            vx: 0,
+            vy: 0,
+            vz: 0,
+            grounded: true,
+            runSpeed: 0,
+            move: "idle",
+            yaw: Math.PI,
+            lookYaw: Math.PI,
+          });
+
+          summitGuards[0].update(delta, {
+            x: 16.8,
+            y: 24.14,
+            z: 6.0,
+            vx: 0,
+            vy: 0,
+            vz: 0,
+            grounded: true,
+            runSpeed: 0,
+            move: "idle",
+            yaw: Math.PI,
+          });
+          summitGuards[1].update(delta, {
+            x: 19.2,
+            y: 24.14,
+            z: 6.0,
+            vx: 0,
+            vy: 0,
+            vz: 0,
+            grounded: true,
+            runSpeed: 0,
+            move: "idle",
+            yaw: Math.PI,
+          });
+        } else if (beat === 1) {
+          councilTent.visible = true;
+          councilTent.position.set(summit.x, summit.y, summit.z);
+          if (jar) jar.visible = true;
+          servant.group.visible = true;
+
+          // Lehonti is kneeling inside the tent, bowed downward as poison takes hold
+          lehonti.group.visible = true;
+          lehonti.group.rotation.x = 0;
+          lehonti.update(delta, {
+            x: summit.x - 0.2,
+            y: summit.y,
+            z: summit.z,
+            vx: 0,
+            vy: 0,
+            vz: 0,
+            grounded: true,
+            runSpeed: 0,
+            move: "kneel",
+            yaw: 0,
+            lookPitch: 0.35,
+          });
+
+          // Servant administers the poison jar
+          servant.group.rotation.x = 0;
+          servant.update(delta, {
+            x: summit.x + 0.65,
+            y: summit.y,
+            z: summit.z + 0.2,
+            vx: 0,
+            vy: 0,
+            vz: 0,
+            grounded: true,
+            runSpeed: 0,
+            move: "kneel",
+            yaw: -Math.PI * 0.75,
+          });
+
+          // Amalickiah stands at the tent entrance, watching cunningly
+          amalickiah.group.rotation.x = 0;
+          amalickiah.update(delta, {
+            x: summit.x - 0.85,
+            y: summit.y,
+            z: summit.z + 0.1,
+            vx: 0,
+            vy: 0,
+            vz: 0,
+            grounded: true,
+            runSpeed: 0,
+            move: "idle",
+            yaw: Math.PI * 0.25,
+            lookYaw: Math.PI * 0.25,
+          });
+
+          summitGuards[0].update(delta, {
+            x: summit.x - 2.2,
+            y: summit.y,
+            z: summit.z - 1.2,
+            vx: 0,
+            vy: 0,
+            vz: 0,
+            grounded: true,
+            runSpeed: 0,
+            move: "idle",
+            yaw: Math.PI * 0.25,
+          });
+          summitGuards[1].update(delta, {
+            x: summit.x + 2.2,
+            y: summit.y,
+            z: summit.z - 1.2,
+            vx: 0,
+            vy: 0,
+            vz: 0,
+            grounded: true,
+            runSpeed: 0,
+            move: "idle",
+            yaw: -Math.PI * 0.25,
+          });
+        } else {
+          councilTent.visible = true;
+          councilTent.position.set(summit.x, summit.y, summit.z);
+          if (jar) jar.visible = false;
+          servant.group.visible = true;
+
+          // Lehonti has fallen / died on the ground
+          lehonti.group.visible = true;
+          lehonti.group.rotation.x = -Math.PI / 2;
+          lehonti.update(delta, {
+            x: summit.x - 0.7,
+            y: summit.y + 0.15,
+            z: summit.z - 0.2,
+            vx: 0,
+            vy: 0,
+            vz: 0,
+            grounded: true,
+            runSpeed: 0,
+            move: "idle",
+            yaw: 0,
+          });
+
+          // Amalickiah steps forward and commands the army
+          amalickiah.group.rotation.x = 0;
+          amalickiah.update(delta, {
+            x: summit.x,
+            y: summit.y,
+            z: summit.z + 0.3,
+            vx: 0,
+            vy: 0,
+            vz: 0,
+            grounded: true,
+            runSpeed: 0,
+            move: "idle",
+            pointing: true,
+            yaw: Math.PI,
+            lookPitch: -0.15,
+          });
+
+          // Guards and servant kneel in submission
+          servant.group.rotation.x = 0;
+          servant.update(delta, {
+            x: summit.x + 0.9,
+            y: summit.y,
+            z: summit.z + 0.5,
+            vx: 0,
+            vy: 0,
+            vz: 0,
+            grounded: true,
+            runSpeed: 0,
+            move: "kneel",
+            yaw: -Math.PI * 0.75,
+          });
+          summitGuards[0].update(delta, {
+            x: summit.x - 1.6,
+            y: summit.y,
+            z: summit.z + 1.2,
+            vx: 0,
+            vy: 0,
+            vz: 0,
+            grounded: true,
+            runSpeed: 0,
+            move: "kneel",
+            yaw: Math.PI * 0.25,
+          });
+          summitGuards[1].update(delta, {
+            x: summit.x + 1.6,
+            y: summit.y,
+            z: summit.z + 1.2,
+            vx: 0,
+            vy: 0,
+            vz: 0,
+            grounded: true,
+            runSpeed: 0,
+            move: "kneel",
+            yaw: -Math.PI * 0.25,
+          });
+        }
+      }
+
+      function cleanupOutro() {
+        councilTent.visible = false;
+        if (jar) jar.visible = false;
+        servant.group.visible = false;
+      }
+
       frameOpening();
       return {
-        movementLocked: () => phase === "opening" || pending,
+        movementLocked: () =>
+          phase === "opening" || phase === "outro" || pending,
         camera: () => cinematicCamera,
         snapshot: () => ({
           openingTime,
           openingBeat:
             phase === "opening"
-              ? openingTime < 5
+              ? openingTime < OPENING_BEAT_0
                 ? "summit"
-                : openingTime < 10
+                : openingTime < OPENING_BEAT_1
                   ? "embassy"
                   : "warning"
               : undefined,
+          outroTime,
+          outroBeat:
+            phase === "outro"
+              ? outroTime < OUTRO_BEAT_0
+                ? "ascent"
+                : outroTime < OUTRO_BEAT_1
+                  ? "poison"
+                  : "command"
+              : undefined,
           phase,
-          race: race + 1,
+          race: Math.min(3, race + 1),
           target: target(),
           route,
           checkpointIndex: route.length - 1,
@@ -397,39 +832,56 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
           retries,
           pending,
         }),
-        update(dt, player) {
+        update(dt, player, input) {
           if (phase === "opening") {
             const delta = Math.min(0.1, Math.max(0, dt));
-            openingTime += delta;
-            const beat = openingTime < 5 ? 0 : openingTime < 10 ? 1 : 2;
+            if (input?.jump || input?.interact) {
+              if (openingTime < OPENING_BEAT_0) openingTime = OPENING_BEAT_0;
+              else if (openingTime < OPENING_BEAT_1)
+                openingTime = OPENING_BEAT_1;
+              else openingTime = OPENING_DURATION;
+            } else {
+              openingTime += delta;
+            }
+            const beat =
+              openingTime < OPENING_BEAT_0
+                ? 0
+                : openingTime < OPENING_BEAT_1
+                  ? 1
+                  : 2;
             if (
               beat !== lastBeat ||
               lastAspect !== (hooks.viewAspect?.() ?? 16 / 9)
             ) {
               frameOpening();
             }
+            const amalickiahYaw = Math.atan2(
+              route[0].x - valley.x,
+              route[0].z - valley.z,
+            );
             amalickiah.update(delta, {
               ...valley,
               vx: 0,
               vy: 0,
               vz: 0,
-              yaw: Math.atan2(route[0].x - valley.x, route[0].z - valley.z),
+              yaw: amalickiahYaw,
               grounded: true,
               runSpeed: 0,
-              pointing: beat === 1 && openingTime < 8.8,
-              lookYaw: Math.sin(openingTime * 0.7) * 0.12,
+              pointing: beat === 1 && openingTime < OPENING_BEAT_1 - 1.5,
+              lookYaw: amalickiahYaw + Math.sin(openingTime * 0.7) * 0.12,
             });
+            const lehontiYaw = Math.PI / 2;
             lehonti.update(delta, {
               ...summit,
               vx: 0,
               vy: 0,
               vz: 0,
-              yaw: Math.PI / 2,
+              yaw: lehontiYaw,
               grounded: true,
               runSpeed: 0,
-              lookYaw: Math.sin(openingTime * 0.5) * 0.16,
+              lookYaw: lehontiYaw + Math.sin(openingTime * 0.5) * 0.16,
             });
-            if (openingTime >= 16) {
+            if (openingTime >= OPENING_DURATION) {
               phase = "race";
               cinematicCamera = undefined;
               Object.assign(player, {
@@ -450,10 +902,47 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
                   : beat === 1
                     ? "In the valley, Amalickiah plots to take command. His secret messenger asks Lehonti to come down."
                     : "It is a trap. In this imagined warning race, reach Lehonti before the messenger. Follow the blue trail!",
-              prompt:
-                phase === "opening"
-                  ? "Alma 47:7–11 · Opening scene"
-                  : "Race to the summit",
+              prompt: "",
+            };
+          }
+          if (phase === "outro") {
+            const delta = Math.min(0.1, Math.max(0, dt));
+            if (input?.jump || input?.interact) {
+              if (outroTime < OUTRO_BEAT_0) outroTime = OUTRO_BEAT_0;
+              else if (outroTime < OUTRO_BEAT_1) outroTime = OUTRO_BEAT_1;
+              else outroTime = OUTRO_DURATION;
+            } else {
+              outroTime += delta;
+            }
+            const beat =
+              outroTime < OUTRO_BEAT_0 ? 0 : outroTime < OUTRO_BEAT_1 ? 1 : 2;
+
+            updateOutroActors(delta, beat, outroTime);
+
+            if (
+              beat !== lastBeat ||
+              lastAspect !== (hooks.viewAspect?.() ?? 16 / 9)
+            ) {
+              frameOutro(beat);
+            }
+            if (outroTime >= OUTRO_DURATION - 0.001) {
+              phase = "done";
+              cinematicCamera = undefined;
+              cleanupOutro();
+              hooks.complete();
+              return {
+                objective: "Lehonti's story remembered",
+                prompt: "Journey complete",
+              };
+            }
+            return {
+              objective:
+                beat === 0
+                  ? "Alma 47:12–16 · Amalickiah ascends nearly to the camp; Lehonti comes down with his guards to negotiate."
+                  : beat === 1
+                    ? "Alma 47:18 · Second in command, Amalickiah has his servant secretly administer poison to Lehonti by degrees."
+                    : "Alma 47:19 · Lehonti dies, poisoned by degrees. Amalickiah takes chief command of the entire army.",
+              prompt: "",
             };
           }
           if (phase === "done")
@@ -503,8 +992,11 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
                   race++;
                   pending = false;
                   if (race === 3) {
-                    phase = "done";
-                    hooks.complete();
+                    phase = "outro";
+                    outroTime = 0;
+                    lastBeat = -1;
+                    updateOutroActors(0, 0, 0);
+                    frameOutro(0);
                   } else {
                     // A short imagined return trip gives the next messenger a
                     // fresh full ascent without requiring a long downhill replay.
@@ -549,11 +1041,15 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
         },
         dispose() {
           cinematicCamera = undefined;
+          cleanupOutro();
         },
       };
     },
     dispose: () => {
       crowdRigs.forEach((rig) => rig.dispose());
+      woodMat.dispose();
+      canvasMat.dispose();
+      rugMat.dispose();
       land.dispose();
     },
   };
