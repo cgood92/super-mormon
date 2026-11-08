@@ -277,7 +277,11 @@ test("Antipas has three playable messenger races that automatically warn Lehonti
   for (let frame = 0; frame < 241; frame++)
     h.runtime.update(0.1, h.player, idle);
   let raced = 0;
-  for (let i = 0; i < 6 && state().phase !== "done" && state().phase !== "outro"; i++) {
+  for (
+    let i = 0;
+    i < 6 && state().phase !== "done" && state().phase !== "outro";
+    i++
+  ) {
     const before = state();
     if (before.phase === "race") {
       raced++;

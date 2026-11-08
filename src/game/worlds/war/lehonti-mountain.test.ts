@@ -266,3 +266,83 @@ test("outro depicts Amalickiah's ascent, poisoning of Lehonti, and coronation as
   runtime.dispose();
   world.dispose?.();
 });
+
+test("player and embassy messenger start side-by-side at the trailhead without overlapping", () => {
+  const scene = new T.Scene(),
+    world = buildLehontiMountain(scene);
+  const messenger = scene.getObjectByName("Actual embassy messenger 1")!;
+  assert.ok(messenger, "embassy messenger exists");
+
+  // Both should start on the first terrace
+  assert.equal(world.spawn.x, 28);
+  assert.equal(messenger.position.x, 28);
+  assert.equal(world.spawn.y, 0.34);
+  assert.equal(messenger.position.y, 0.34);
+
+  // Lateral distance between them along the starting line must be generous (> 1.5m)
+  const lateralDist = Math.abs(messenger.position.z - world.spawn.z);
+  assert.ok(
+    lateralDist >= 1.5,
+    `runners must start side-by-side, not overlapping (was ${lateralDist.toFixed(2)}m apart)`,
+  );
+
+  // Both should be facing West down the trail toward the summit (-PI/2)
+  assert.ok(
+    Math.abs(Math.sin((world.spawn.yaw ?? 0) + Math.PI / 2)) < 0.01,
+    "player must face West down the trail",
+  );
+  assert.ok(
+    Math.abs(Math.sin(messenger.rotation.y + Math.PI / 2)) < 0.01,
+    "messenger must face West down the trail",
+  );
+
+  world.dispose?.();
+});
+
+test("actors physically block the player and prevent walking through them", () => {
+  const scene = new T.Scene(),
+    world = buildLehontiMountain(scene);
+  const player = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
+  const messenger = scene.getObjectByName("Actual embassy messenger 1")!;
+
+  // Try to move player directly onto the messenger (lateral intrusion)
+  player.x = messenger.position.x;
+  player.y = messenger.position.y;
+  player.z = messenger.position.z - 0.2; // Only 0.2m away
+  player.vz = 5.0; // Moving toward messenger
+
+  world.update?.(1 / 60, player);
+
+  const distToMessenger = Math.hypot(
+    player.x - messenger.position.x,
+    player.z - messenger.position.z,
+  );
+  assert.ok(
+    distToMessenger >= 0.71,
+    `player must be pushed outside actor cylinder, was ${distToMessenger.toFixed(2)}m`,
+  );
+  assert.ok(
+    player.vz <= 0.001,
+    "velocity into actor must be cancelled, cannot penetrate",
+  );
+
+  // Also verify Lehonti at the summit camp blocks penetration
+  player.x = 0.25;
+  player.y = 30.6;
+  player.z = 0;
+  player.vx = -4.0; // Moving toward Lehonti at (0, 30.6, 0)
+
+  world.update?.(1 / 60, player);
+
+  const distToLehonti = Math.hypot(player.x, player.z);
+  assert.ok(
+    distToLehonti >= 0.71,
+    `player must not walk through Lehonti, was ${distToLehonti.toFixed(2)}m away`,
+  );
+  assert.ok(
+    player.vx >= -0.001,
+    "velocity into Lehonti must be deflected, cannot pass through",
+  );
+
+  world.dispose?.();
+});
