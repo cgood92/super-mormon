@@ -193,7 +193,7 @@ test("opening cuts frame summit, valley and runner safely on phone and desktop",
   }
 });
 
-test("outro depicts Amalickiah's ascent, poisoning of Lehonti, and coronation as king", () => {
+test("outro depicts Amalickiah's parley, poisoning of Lehonti, and ends with Lehonti's death", () => {
   const scene = new T.Scene(),
     world = buildLehontiMountain(scene);
   const player = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
@@ -244,19 +244,23 @@ test("outro depicts Amalickiah's ascent, poisoning of Lehonti, and coronation as
   assert.equal(runtime.movementLocked?.(), true);
 
   const outroCaptions = new Set<string>();
-  // Step through all 4 beats of the outro (23.9s)
-  for (let step = 0; step < 239; step++) {
+  // Step through all 3 beats of the outro (17.9s)
+  for (let step = 0; step < 179; step++) {
     const res = runtime.update(0.1, player, idle);
     outroCaptions.add(res.objective);
     assert.ok(runtime.camera?.());
   }
 
-  assert.ok([...outroCaptions].some((c) => /negotiate|summit/i.test(c)));
+  assert.ok([...outroCaptions].some((c) => /negotiate/i.test(c)));
   assert.ok([...outroCaptions].some((c) => /poison/i.test(c)));
   assert.ok([...outroCaptions].some((c) => /Lehonti dies|command/i.test(c)));
-  assert.ok([...outroCaptions].some((c) => /king/i.test(c)));
+  // Must NOT mention marching back or coronation; ends after Lehonti dies
+  assert.ok(
+    ![...outroCaptions].some((c) => /marching|crowned king/i.test(c)),
+    "outro must end after Lehonti dies without marching back",
+  );
 
-  // Final step completes the outro (reaching 24.0s)
+  // Final step completes the outro (reaching 18.0s)
   runtime.update(0.1, player, idle);
   assert.equal((runtime.snapshot() as { phase: string }).phase, "done");
   assert.equal(done, 1);

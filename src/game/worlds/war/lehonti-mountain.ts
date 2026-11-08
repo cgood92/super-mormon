@@ -818,9 +818,7 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
                 ? "ascent"
                 : outroTime < OUTRO_BEAT_1
                   ? "poison"
-                  : outroTime < OUTRO_BEAT_2
-                    ? "command"
-                    : "king"
+                  : "command"
               : undefined,
           phase,
           race: Math.min(3, race + 1),
@@ -912,27 +910,22 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
             if (input?.jump || input?.interact) {
               if (outroTime < OUTRO_BEAT_0) outroTime = OUTRO_BEAT_0;
               else if (outroTime < OUTRO_BEAT_1) outroTime = OUTRO_BEAT_1;
-              else if (outroTime < OUTRO_BEAT_2) outroTime = OUTRO_BEAT_2;
               else outroTime = OUTRO_DURATION;
             } else {
               outroTime += delta;
             }
             const beat =
-              outroTime < OUTRO_BEAT_0
-                ? 0
-                : outroTime < OUTRO_BEAT_1
-                  ? 1
-                  : outroTime < OUTRO_BEAT_2
-                    ? 2
-                    : 3;
+              outroTime < OUTRO_BEAT_0 ? 0 : outroTime < OUTRO_BEAT_1 ? 1 : 2;
+
+            updateOutroActors(delta, beat, outroTime);
+
             if (
               beat !== lastBeat ||
               lastAspect !== (hooks.viewAspect?.() ?? 16 / 9)
             ) {
-              frameOutro();
+              frameOutro(beat);
             }
-            updateOutroActors(delta, beat, outroTime);
-            if (outroTime >= OUTRO_DURATION) {
+            if (outroTime >= OUTRO_DURATION - 0.001) {
               phase = "done";
               cinematicCamera = undefined;
               cleanupOutro();
@@ -945,12 +938,10 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
             return {
               objective:
                 beat === 0
-                  ? "Alma 47:12–14 · Amalickiah climbs nearly to the summit; Lehonti comes down to negotiate."
+                  ? "Alma 47:12–16 · Amalickiah ascends nearly to the camp; Lehonti comes down with his guards to negotiate."
                   : beat === 1
-                    ? "Alma 47:18 · Second in command, Amalickiah has his servant secretly poison Lehonti by degrees."
-                    : beat === 2
-                      ? "Alma 47:19 · Lehonti dies. Amalickiah takes chief command of the entire army."
-                      : "Alma 47:35 · Marching to the city of Nephi, Amalickiah is crowned king over all the land.",
+                    ? "Alma 47:18 · Second in command, Amalickiah has his servant secretly administer poison to Lehonti by degrees."
+                    : "Alma 47:19 · Lehonti dies, poisoned by degrees. Amalickiah takes chief command of the entire army.",
               prompt: "",
             };
           }
@@ -1004,7 +995,8 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
                     phase = "outro";
                     outroTime = 0;
                     lastBeat = -1;
-                    frameOutro();
+                    updateOutroActors(0, 0, 0);
+                    frameOutro(0);
                   } else {
                     // A short imagined return trip gives the next messenger a
                     // fresh full ascent without requiring a long downhill replay.
@@ -1055,7 +1047,6 @@ export function buildLehontiMountain(scene: T.Scene): WorldData {
     },
     dispose: () => {
       crowdRigs.forEach((rig) => rig.dispose());
-      goldMat.dispose();
       woodMat.dispose();
       canvasMat.dispose();
       rugMat.dispose();
