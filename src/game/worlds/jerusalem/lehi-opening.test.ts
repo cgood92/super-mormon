@@ -224,7 +224,172 @@ test("rapidly skipping the opening movie releases control to an unobstructed fol
     "camera position must be clear of solid scenery",
   );
 
+  // Subsequent frame check: camera must remain undefined
+  s.runtime.update(0.016, s.player, idle);
+  assert.equal(s.runtime.camera!(), undefined);
+  assert.equal(s.runtime.movementLocked!(), false);
+
   s.runtime.dispose();
   s.avatar.dispose();
   s.world.dispose?.();
+});
+
+test("clicking on the screen (pointerdown) skips cutscenes to gameplay with camera at Lehi, not Lehi's house", () => {
+  const listeners: Record<string, () => void> = {};
+  const originalWindow = globalThis.window;
+  (globalThis as any).window = {
+    addEventListener(event: string, fn: () => void) {
+      listeners[event] = fn;
+    },
+    removeEventListener(event: string) {
+      delete listeners[event];
+    },
+  };
+
+  try {
+    const s = setup();
+    const camera = new T.PerspectiveCamera(58, 16 / 9, 0.08, 320);
+    const follow = new FollowCamera(camera);
+    follow.reset(s.player, s.player.yaw, "streets");
+
+    // Initialize beat 0
+    s.runtime.update(0.016, s.player, idle);
+    let advCam = s.runtime.camera?.();
+    if (advCam) applyAdventureCamera(camera, advCam, s.world.solids, 0.016);
+
+    // Click 1: advance to angry-crowd
+    listeners.pointerdown?.();
+    s.runtime.update(0.016, s.player, idle);
+    assert.equal(
+      (s.runtime.snapshot() as { movieBeat?: string }).movieBeat,
+      "angry-crowd",
+    );
+    advCam = s.runtime.camera?.();
+    if (advCam) applyAdventureCamera(camera, advCam, s.world.solids, 0.016);
+
+    // Click 2: advance to blue-door (pointing at Lehi's house)
+    listeners.pointerdown?.();
+    s.runtime.update(0.016, s.player, idle);
+    assert.equal(
+      (s.runtime.snapshot() as { movieBeat?: string }).movieBeat,
+      "blue-door",
+    );
+    advCam = s.runtime.camera?.();
+    assert.ok(advCam, "must have blue door cutscene camera");
+    applyAdventureCamera(camera, advCam, s.world.solids, 0.016);
+    // Camera is positioned at Lehi's house across the city
+    assert.ok(camera.position.x < -30, "camera placed at Lehi's house doorway");
+
+    // Click 3: skip past blue-door to gameplay
+    listeners.pointerdown?.();
+
+    // Now update gameplay frame
+    s.runtime.update(0.016, s.player, idle);
+    assert.equal(
+      s.runtime.movementLocked!(),
+      false,
+      "movement must be unlocked",
+    );
+    assert.equal(
+      s.runtime.camera!(),
+      undefined,
+      "camera must be undefined after skip",
+    );
+    assert.equal(
+      s.player.yaw,
+      -Math.PI / 2,
+      "player yaw must face west down the street",
+    );
+
+    // Gameplay follow update takes over
+    follow.update(
+      0.016,
+      s.player,
+      s.world.solids,
+      { orbitX: 0, orbitY: 0, recenter: false },
+      "streets",
+    );
+    const focus = new T.Vector3(s.player.x, s.player.y + 1.2, s.player.z);
+    assert.ok(
+      camera.position.distanceTo(focus) < 10,
+      `camera must reset near Lehi: distance=${camera.position.distanceTo(focus)}m`,
+    );
+    assert.ok(
+      cameraSegmentClear(focus, camera.position, s.world.solids, 0.05),
+      "camera must have line of sight to player",
+    );
+    assert.ok(
+      camera.position.x > -5 && camera.position.x < 10,
+      `camera must not be at Lehi's house (x=${camera.position.x})`,
+    );
+
+    // Subsequent frames must remain unlocked and camera undefined
+    for (let i = 0; i < 5; i++) {
+      s.runtime.update(0.016, s.player, idle);
+      assert.equal(s.runtime.camera!(), undefined);
+      assert.equal(s.runtime.movementLocked!(), false);
+    }
+
+    // Pointer listener must have been removed
+    assert.equal(
+      listeners.pointerdown,
+      undefined,
+      "pointerdown listener removed after finish",
+    );
+
+    s.runtime.dispose();
+    s.avatar.dispose();
+    s.world.dispose?.();
+  } finally {
+    (globalThis as any).window = originalWindow;
+  }
+});
+
+test("rapid spam clicking pointerdown instantly releases into gameplay behind Lehi", () => {
+  const listeners: Record<string, () => void> = {};
+  const originalWindow = globalThis.window;
+  (globalThis as any).window = {
+    addEventListener(event: string, fn: () => void) {
+      listeners[event] = fn;
+    },
+    removeEventListener(event: string) {
+      delete listeners[event];
+    },
+  };
+
+  try {
+    const s = setup();
+    const camera = new T.PerspectiveCamera(58, 16 / 9, 0.08, 320);
+    const follow = new FollowCamera(camera);
+    follow.reset(s.player, s.player.yaw, "streets");
+
+    s.runtime.update(0.016, s.player, idle);
+
+    // Spam 5 clicks rapidly
+    for (let i = 0; i < 5; i++) {
+      listeners.pointerdown?.();
+    }
+
+    s.runtime.update(0.016, s.player, idle);
+    assert.equal(s.runtime.movementLocked!(), false);
+    assert.equal(s.runtime.camera!(), undefined);
+    assert.equal(s.player.yaw, -Math.PI / 2);
+
+    follow.update(
+      0.016,
+      s.player,
+      s.world.solids,
+      { orbitX: 0, orbitY: 0, recenter: false },
+      "streets",
+    );
+    const focus = new T.Vector3(s.player.x, s.player.y + 1.2, s.player.z);
+    assert.ok(camera.position.distanceTo(focus) < 10);
+    assert.ok(cameraSegmentClear(focus, camera.position, s.world.solids, 0.05));
+
+    s.runtime.dispose();
+    s.avatar.dispose();
+    s.world.dispose?.();
+  } finally {
+    (globalThis as any).window = originalWindow;
+  }
 });
