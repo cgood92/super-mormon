@@ -57,11 +57,33 @@ export function createLehiOpening(
     "Help Lehi get home safely. Avoid the angry people and find the blue door!",
   ];
 
+  let lastAction = false;
+  let finished = false;
+  let lastPlayer: { yaw: number } | undefined;
+
+  const removePointerListener = () => {
+    if (typeof window !== "undefined") {
+      window.removeEventListener("pointerdown", onPointerDown);
+    }
+  };
+
+  const finishOpening = (player?: { yaw: number }) => {
+    elapsed = 15;
+    camera = undefined;
+    const p = player ?? lastPlayer;
+    if (p) p.yaw = -Math.PI / 2;
+    if (!finished) {
+      finished = true;
+      hooks.toast(objectives[3]);
+      removePointerListener();
+    }
+  };
+
   const skipToNextBeat = () => {
     if (disposed || elapsed >= 15) return;
     if (elapsed < 5) elapsed = 5;
     else if (elapsed < 9) elapsed = 9;
-    else elapsed = 15;
+    else finishOpening();
   };
 
   const onPointerDown = () => {
@@ -70,31 +92,37 @@ export function createLehiOpening(
   if (typeof window !== "undefined") {
     window.addEventListener("pointerdown", onPointerDown);
   }
-  let lastAction = false;
   return {
     movementLocked: () => !disposed && elapsed < 15,
-    camera: () => camera,
+    camera: () => (!disposed && elapsed < 15 ? camera : undefined),
     snapshot: () => ({
       phase: elapsed < 15 ? "intro" : "escape",
       movieBeat: elapsed < 15 ? names[beat()] : undefined,
       elapsed,
     }),
     update(dt, player, input) {
-      if (disposed || elapsed >= 15)
+      lastPlayer = player;
+      if (disposed) return { objective: objectives[3], prompt: "" };
+      if (elapsed >= 15) {
+        if (!finished) finishOpening(player);
+        player.yaw = -Math.PI / 2;
         return { objective: objectives[3], prompt: "" };
+      }
       const actionPressed = !!input?.jump;
       if (actionPressed && !lastAction) {
         skipToNextBeat();
       }
       lastAction = actionPressed;
       if (elapsed >= 15) {
-        camera = undefined;
-        player.yaw = -Math.PI / 2;
-        hooks.toast(objectives[3]);
+        finishOpening(player);
         return { objective: objectives[3], prompt: "" };
       }
       dt = Math.max(0, Math.min(dt, 0.1));
       elapsed = Math.min(15, elapsed + dt);
+      if (elapsed >= 15) {
+        finishOpening(player);
+        return { objective: objectives[3], prompt: "" };
+      }
       const current = beat();
       player.yaw = current === 3 ? -Math.PI / 2 : 0;
       for (const [i, { rig, state }] of listeners.entries()) {
@@ -154,8 +182,7 @@ export function createLehiOpening(
         camera = { position: plan.wide, focus: plan.focus, cut: true };
       }
       if (elapsed >= 15) {
-        camera = undefined;
-        hooks.toast(objectives[3]);
+        finishOpening(player);
       }
       return {
         objective: objectives[current],
@@ -165,9 +192,7 @@ export function createLehiOpening(
     },
     dispose() {
       disposed = true;
-      if (typeof window !== "undefined") {
-        window.removeEventListener("pointerdown", onPointerDown);
-      }
+      removePointerListener();
       camera = undefined;
       listeners.forEach(({ rig }) => rig.dispose());
       root.remove(doorway, confrontation);
