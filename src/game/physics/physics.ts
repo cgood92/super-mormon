@@ -286,8 +286,20 @@ function nearbyWall(
         Math.min(player.z, solid.z + solid.d / 2),
       ) - player.z;
     const d = Math.hypot(dx, dz);
-    if (d > EPS && d < RADIUS + 0.22 && dx * towardX + dz * towardZ > 0.05)
-      return { x: -dx / d, z: -dz / d };
+    if (d > EPS && d < RADIUS + 0.25) {
+      const facingIntoWall =
+        Math.sin(player.yaw) * dx + Math.cos(player.yaw) * dz;
+      const velIntoWall = player.vx * dx + player.vz * dz;
+      const inputIntoWall = towardX * dx + towardZ * dz;
+      if (
+        d < RADIUS + 0.12 ||
+        inputIntoWall > 0.02 ||
+        velIntoWall > 0.02 ||
+        facingIntoWall > 0.05
+      ) {
+        return { x: -dx / d, z: -dz / d };
+      }
+    }
   }
 }
 
@@ -649,10 +661,10 @@ export function stepPlayer(
           continue;
         }
         const isClimbSolid = (s: Solid) =>
-          Math.abs(s.x - climb.x) <= climb.radius + 0.25 &&
-          Math.abs(s.z - climb.z) <= climb.radius + 0.25 &&
-          s.w <= climb.radius * 2 + 0.35 &&
-          s.d <= climb.radius * 2 + 0.35;
+          Math.abs(s.x - climb.x) <= 0.25 &&
+          Math.abs(s.z - climb.z) <= 0.25 &&
+          (s.w <= climb.radius * 2 + 0.35 ||
+            s.y >= climb.y + climb.height - 0.6);
         const obstacleSolids = solids.filter((s) => !isClimbSolid(s));
 
         const targetY = Math.max(

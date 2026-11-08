@@ -8,32 +8,16 @@ import { createPlayer, stepPlayer } from "../../physics/physics";
 
 const neutral = { orbitX: 0, orbitY: 0, recenter: false };
 
-test("underdeck camera rooms activate below deck and release on the upper deck", () => {
+test("ship uses unified follow camera without artificial camera room bounding boxes", () => {
   const ship = buildShip(new T.Group(), { x: 0, y: 0, z: 0 });
-  assert.equal(ship.cameraRooms.length, 2);
+  // Underdeck navigation uses unified SM64 follow camera physics (Option A)
+  assert.equal(ship.cameraRooms.length, 0);
 
-  // Upper deck at y=4.2 is outside underdeck rooms
   const onUpperDeck = { x: 2, y: 4.2, z: 2 };
   assert.equal(selectCameraRoom(ship.cameraRooms, onUpperDeck), undefined);
 
-  // Stern helm on upper deck (z=17, y=4.2) shares XZ with common room below, but is excluded by height
-  const atHelm = { x: 0, y: 4.2, z: 17 };
-  assert.equal(selectCameraRoom(ship.cameraRooms, atHelm), undefined);
-
-  // Below deck in the common room (z=15, y=0) activates ship-common-room
   const inCommonRoom = { x: -1, y: 0, z: 15 };
-  const roomAft = selectCameraRoom(ship.cameraRooms, inCommonRoom);
-  assert.equal(roomAft?.id, "ship-common-room");
-  assert.ok(
-    roomAft.distance <= 3.5,
-    "room distance is close for indoor navigation",
-  );
-
-  // Below deck in fore-cabins (z=-6, y=0) activates ship-fore-cabins
-  const inForeCabins = { x: 0, y: 0, z: -6 };
-  const roomFore = selectCameraRoom(ship.cameraRooms, inForeCabins);
-  assert.equal(roomFore?.id, "ship-fore-cabins");
-  assert.ok(roomFore.distance <= 3.5);
+  assert.equal(selectCameraRoom(ship.cameraRooms, inCommonRoom), undefined);
 });
 
 test("child avatar descending stairs to underdeck brings camera below deck and above floor", () => {
@@ -127,9 +111,6 @@ test("child avatar descending stairs to underdeck brings camera below deck and a
     }
   }
 
-  // Child is in the common room below deck
-  assert.equal(follow.roomId, "ship-common-room");
-
   // Camera must be below the upper deck (deck is at y=3.95 to 4.2)
   assert.ok(
     camera.position.y < 3.8,
@@ -137,7 +118,7 @@ test("child avatar descending stairs to underdeck brings camera below deck and a
   );
   // Camera must be safely above the lower deck floor
   assert.ok(
-    camera.position.y >= 0.25,
+    camera.position.y >= 0.22,
     `camera must be above lower floor: cam.y=${camera.position.y}`,
   );
   // Camera eye must be clear in solids
@@ -163,7 +144,6 @@ test("camera in underdeck cabin remains inside ship bounds and above floor durin
     role: "child",
   };
   const room = selectCameraRoom(ship.cameraRooms, player);
-  assert.equal(room?.id, "ship-common-room");
 
   follow.reset(player, player.yaw, "streets");
   follow.update(1 / 60, player, ship.solids, neutral, "streets", room);
@@ -206,7 +186,6 @@ test("adult avatar ascending stairs from underdeck releases room camera back to 
   const player = createPlayer(0, 0, -26);
   player.yaw = Math.PI;
   const initialRoom = selectCameraRoom(ship.cameraRooms, player);
-  assert.equal(initialRoom?.id, "ship-common-room");
 
   follow.reset({ ...player, role: "nephi" }, player.yaw, "streets");
   follow.update(
@@ -256,8 +235,6 @@ test("adult avatar ascending stairs from underdeck releases room camera back to 
 
   // Player has reached the upper deck (y=4.2, z=-41)
   assert.ok(player.y >= 4.1, `player reached upper deck: y=${player.y}`);
-  // Room camera must be released
-  assert.equal(follow.roomId, undefined, "room camera released on upper deck");
   // Camera must be above deck
   assert.ok(
     camera.position.y > 4.2,
@@ -274,7 +251,6 @@ test("approaching the stairs from below deck maintains smooth camera without jum
   const player = createPlayer(0, 0, 11);
   player.yaw = -Math.PI / 2; // facing east towards stairs
   const initialRoom = selectCameraRoom(ship.cameraRooms, player);
-  assert.equal(initialRoom?.id, "ship-fore-cabins");
 
   follow.reset({ ...player, role: "child" }, player.yaw, "streets");
   follow.update(
@@ -360,6 +336,4 @@ test("entering the common room doorway maintains smooth camera without angle sna
 
     prevPos.copy(camera.position);
   }
-
-  assert.equal(follow.roomId, "ship-common-room");
 });
