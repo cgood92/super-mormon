@@ -128,3 +128,32 @@ test("the conference spawn camera follows past its physical column without freez
     "camera must continue following beyond the column",
   );
 });
+
+test("walking past Laban's palace column follows the player continuously without freezing", () => {
+  const p = { x: 5, y: 0, z: -12, yaw: Math.PI, grounded: true, runSpeed: 6.5 };
+  const camera = new T.PerspectiveCamera(58, 16 / 9, 0.08, 200);
+  const follow = new FollowCamera(camera);
+  const column = { x: 5, y: 0, z: -18, w: 0.85, h: 6.1, d: 0.85 };
+  follow.reset(p, p.yaw, "streets");
+
+  for (let frame = 0; frame < 300; frame++) {
+    p.z -= 0.1; // Running straight past the column toward the audience hall
+    const previous = camera.position.clone();
+    follow.update(1 / 60, p, [column], undefined, "streets");
+    const camDistToPlayer = camera.position.distanceTo(
+      new T.Vector3(p.x, p.y + 1, p.z),
+    );
+    assert.ok(
+      camDistToPlayer < 9.0,
+      `camera stranded behind column at frame ${frame}: dist=${camDistToPlayer.toFixed(2)}m`,
+    );
+    assert.ok(
+      camera.position.distanceTo(previous) > 1e-4,
+      `camera froze stationary at frame ${frame}`,
+    );
+  }
+  assert.ok(
+    camera.position.z < -30,
+    "camera must continue following far past the column",
+  );
+});
