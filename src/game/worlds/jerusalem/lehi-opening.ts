@@ -89,6 +89,7 @@ export function createLehiOpening(
       lastAction = actionPressed;
       if (elapsed >= 15) {
         camera = undefined;
+        player.yaw = -Math.PI / 2;
         hooks.toast(objectives[3]);
         return { objective: objectives[3], prompt: "" };
       }

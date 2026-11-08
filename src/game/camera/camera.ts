@@ -519,15 +519,28 @@ export class FollowCamera {
     dt = clamp(dt, 0, 0.1);
     const preset: Preset = room ?? MODES[mode];
 
-    // An authored/story camera moved us: adopt its view and continue from it.
+    // An authored/story camera moved us: adopt its view and continue from it if safe.
     if (this.camera.position.distanceToSquared(this.lastEye) > 0.0025) {
       this.focus.set(
         player.x,
         player.y + focusHeight(player, preset),
         player.z,
       );
-      this.lastEye.copy(this.camera.position);
-      this.adoptEye(this.camera.position);
+      const eyeClear =
+        cameraSegmentClear(
+          this.camera.position,
+          this.camera.position,
+          solids,
+          EYE_RADIUS,
+        ) && cameraSegmentClear(this.focus, this.camera.position, solids, 0.05);
+
+      if (eyeClear) {
+        this.lastEye.copy(this.camera.position);
+        this.adoptEye(this.camera.position);
+      } else {
+        this.reset(player, player.yaw, mode);
+        if (room) this.enterRoom(room, player, preset, solids);
+      }
     }
 
     // Room changes may cut to an authored doorway eye (SM64 castle doors).

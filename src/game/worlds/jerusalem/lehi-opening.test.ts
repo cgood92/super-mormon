@@ -4,7 +4,8 @@ import * as T from "three";
 import { buildJerusalem } from "./jerusalem";
 import { createCharacter } from "../../characters/character";
 import { createPlayer, stepPlayer } from "../../physics/physics";
-import { cameraSegmentClear } from "../../camera/camera";
+import { cameraSegmentClear, FollowCamera } from "../../camera/camera";
+import { applyAdventureCamera } from "../../camera/adventure-camera";
 import { StoryMeshObstacles } from "../../camera/cinematic";
 
 const idle = { x: 0, y: 0, interact: false, interactHeld: false };
@@ -175,6 +176,54 @@ test("after the opening, normal player movement can reach the home around the we
   assert.ok(
     Math.hypot(s.player.x - s.world.goal.x, s.player.z - s.world.goal.z) < 1.25,
   );
+  s.runtime.dispose();
+  s.avatar.dispose();
+  s.world.dispose?.();
+});
+
+test("rapidly skipping the opening movie releases control to an unobstructed follow camera near Lehi", () => {
+  const s = setup();
+  const camera = new T.PerspectiveCamera(58, 16 / 9, 0.08, 320);
+  const follow = new FollowCamera(camera);
+  follow.reset(s.player, s.player.yaw, "streets");
+
+  // Skip rapidly with jump taps
+  s.runtime.update(0.016, s.player, { ...idle, jump: true }); // beat 1: angry-crowd
+  let advCam = s.runtime.camera?.();
+  if (advCam) applyAdventureCamera(camera, advCam, s.world.solids, 0.016);
+  s.runtime.update(0.016, s.player, idle);
+
+  s.runtime.update(0.016, s.player, { ...idle, jump: true }); // beat 2: blue-door
+  advCam = s.runtime.camera?.();
+  if (advCam) applyAdventureCamera(camera, advCam, s.world.solids, 0.016);
+  s.runtime.update(0.016, s.player, idle);
+
+  s.runtime.update(0.016, s.player, { ...idle, jump: true }); // skip to gameplay
+  assert.equal(s.runtime.movementLocked!(), false);
+  assert.equal(s.runtime.camera!(), undefined);
+
+  // Gameplay update: follow camera should be near Lehi with line of sight, not across the map
+  follow.update(
+    0.016,
+    s.player,
+    s.world.solids,
+    { orbitX: 0, orbitY: 0, recenter: false },
+    "streets",
+  );
+  const focus = new T.Vector3(s.player.x, s.player.y + 1.2, s.player.z);
+  assert.ok(
+    camera.position.distanceTo(focus) < 10,
+    `camera ended up too far: ${camera.position.distanceTo(focus)}m`,
+  );
+  assert.ok(
+    cameraSegmentClear(focus, camera.position, s.world.solids, 0.05),
+    "camera must have clear line of sight to player",
+  );
+  assert.ok(
+    cameraSegmentClear(camera.position, camera.position, s.world.solids, 0.2),
+    "camera position must be clear of solid scenery",
+  );
+
   s.runtime.dispose();
   s.avatar.dispose();
   s.world.dispose?.();
