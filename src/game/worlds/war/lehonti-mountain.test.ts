@@ -88,7 +88,7 @@ test("Lehonti opening establishes summit and valley before releasing a fresh rac
   });
   assert.equal(runtime.movementLocked?.(), true);
   const captions = new Set<string>();
-  for (let i = 0; i < 159; i++) {
+  for (let i = 0; i < 239; i++) {
     captions.add(runtime.update(0.1, player, idle).objective);
     const state = runtime.snapshot() as {
       timer: number;
@@ -143,7 +143,7 @@ test("opening cuts frame summit, valley and runner safely on phone and desktop",
     ].map((name) => ({ group: scene.getObjectByName(name)! }));
     actors.push({ group: avatar.group });
     const meshes = new StoryMeshObstacles(world.actorParent, actors);
-    for (let frame = 0; frame < 160; frame++) {
+    for (let frame = 0; frame < 240; frame++) {
       world.update?.(0.1, player);
       const shot = runtime.camera!();
       assert.ok(shot);
@@ -191,4 +191,78 @@ test("opening cuts frame summit, valley and runner safely on phone and desktop",
     avatar.dispose();
     world.dispose?.();
   }
+});
+
+test("outro depicts Amalickiah's ascent, poisoning of Lehonti, and coronation as king", () => {
+  const scene = new T.Scene(),
+    world = buildLehontiMountain(scene);
+  const player = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
+  let done = 0;
+  let nextDialog: (() => void) | undefined;
+  const runtime = world.adventure!({
+    setAvatar() {},
+    toast() {},
+    complete() {
+      done++;
+    },
+    dialog(_ref, _title, _body, next) {
+      nextDialog = next;
+    },
+  });
+
+  // Advance past opening directly with jump input
+  runtime.update(0.1, player, { ...idle, jump: true });
+  runtime.update(0.1, player, { ...idle, jump: true });
+  runtime.update(0.1, player, { ...idle, jump: true });
+  assert.equal((runtime.snapshot() as { phase: string }).phase, "race");
+
+  // Win race 1
+  Object.assign(player, ANTIPAS_ROUTE.at(-1)!);
+  runtime.update(0.1, player, idle);
+  assert.ok(nextDialog);
+  nextDialog();
+  nextDialog = undefined;
+
+  // Win race 2
+  Object.assign(player, ANTIPAS_ROUTE.at(-1)!);
+  runtime.update(0.1, player, idle);
+  assert.ok(nextDialog);
+  nextDialog();
+  nextDialog = undefined;
+
+  // Win race 3
+  Object.assign(player, ANTIPAS_ROUTE.at(-1)!);
+  runtime.update(0.1, player, idle);
+  assert.ok(nextDialog);
+  nextDialog();
+  nextDialog = undefined;
+
+  // Now in outro!
+  const state = runtime.snapshot() as { phase: string; outroBeat: string };
+  assert.equal(state.phase, "outro");
+  assert.equal(state.outroBeat, "ascent");
+  assert.equal(runtime.movementLocked?.(), true);
+
+  const outroCaptions = new Set<string>();
+  // Step through all 4 beats of the outro (23.9s)
+  for (let step = 0; step < 239; step++) {
+    const res = runtime.update(0.1, player, idle);
+    outroCaptions.add(res.objective);
+    assert.ok(runtime.camera?.());
+  }
+
+  assert.ok([...outroCaptions].some((c) => /negotiate|summit/i.test(c)));
+  assert.ok([...outroCaptions].some((c) => /poison/i.test(c)));
+  assert.ok([...outroCaptions].some((c) => /Lehonti dies|command/i.test(c)));
+  assert.ok([...outroCaptions].some((c) => /king/i.test(c)));
+
+  // Final step completes the outro (reaching 24.0s)
+  runtime.update(0.1, player, idle);
+  assert.equal((runtime.snapshot() as { phase: string }).phase, "done");
+  assert.equal(done, 1);
+  assert.equal(runtime.movementLocked?.(), false);
+  assert.equal(runtime.camera?.(), undefined);
+
+  runtime.dispose();
+  world.dispose?.();
 });
