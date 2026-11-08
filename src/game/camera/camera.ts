@@ -97,33 +97,39 @@ export function cameraSegmentClear(
 ): boolean {
   const direction = end.clone().sub(start);
   return !solids.some((solid) => {
-    const min = [
-      solid.x - solid.w / 2 - radius,
-      solid.y - radius,
-      solid.z - solid.d / 2 - radius,
-    ];
-    const max = [
-      solid.x + solid.w / 2 + radius,
-      solid.y + solid.h + radius,
-      solid.z + solid.d / 2 + radius,
-    ];
+    const minX = solid.x - solid.w / 2 - radius;
+    const maxX = solid.x + solid.w / 2 + radius;
+    const minZ = solid.z - solid.d / 2 - radius;
+    const maxZ = solid.z + solid.d / 2 + radius;
+
     let enter = 0,
       exit = 1;
-    for (let axis = 0; axis < 3; axis++) {
-      const origin = start.getComponent(axis),
-        delta = direction.getComponent(axis);
+    for (const [origin, delta, min, max] of [
+      [start.x, direction.x, minX, maxX],
+      [start.z, direction.z, minZ, maxZ],
+    ] as const) {
       if (Math.abs(delta) < 1e-9) {
-        if (origin < min[axis] || origin > max[axis]) return false;
+        if (origin < min || origin > max) return false;
       } else {
-        let a = (min[axis] - origin) / delta,
-          b = (max[axis] - origin) / delta;
+        let a = (min - origin) / delta,
+          b = (max - origin) / delta;
         if (a > b) [a, b] = [b, a];
         enter = Math.max(enter, a);
         exit = Math.min(exit, b);
         if (enter > exit) return false;
       }
     }
-    return exit > 1e-5 && enter < 1 - 1e-5 && enter <= exit;
+    if (exit < 1e-5 || enter > 1 - 1e-5 || enter > exit) return false;
+
+    // Check segment height over the solid's footprint:
+    // If the lowest point over the footprint is on/above the top surface, it is a floor beneath us.
+    const yAtEnter = start.y + enter * direction.y;
+    const yAtExit = start.y + exit * direction.y;
+    if (Math.min(yAtEnter, yAtExit) >= solid.y + solid.h - 0.02) return false;
+    // If the highest point is below the bottom, it passes underneath an overhead ceiling.
+    if (Math.max(yAtEnter, yAtExit) <= solid.y - radius + 0.02) return false;
+
+    return true;
   });
 }
 
@@ -149,7 +155,7 @@ function boomFraction(
     ];
     const maxs = [
       solid.x + solid.w / 2 + radius,
-      solid.y + solid.h + radius,
+      solid.y + solid.h,
       solid.z + solid.d / 2 + radius,
     ];
     let enter = -Infinity,
@@ -189,7 +195,7 @@ export function resolveCameraPosition(
     ];
     const maxs = [
       solid.x + solid.w / 2 + radius,
-      solid.y + solid.h + radius,
+      solid.y + solid.h,
       solid.z + solid.d / 2 + radius,
     ];
     let enter = 0;
@@ -260,6 +266,51 @@ function recoverCameraEye(
   return nearest ?? eye.clone();
 }
 
+/** Highest floor support beneath a point. */
+function floorUnderPoint(
+  x: number,
+  y: number,
+  z: number,
+  solids: readonly Solid[],
+  radius = EYE_RADIUS,
+): number {
+  let highest = -Infinity;
+  for (const s of solids) {
+    if (
+      x + radius >= s.x - s.w / 2 &&
+      x - radius <= s.x + s.w / 2 &&
+      z + radius >= s.z - s.d / 2 &&
+      z - radius <= s.z + s.d / 2
+    ) {
+      const top = s.y + s.h;
+      if (top <= y + 0.35) highest = Math.max(highest, top);
+    }
+  }
+  return highest;
+}
+
+/** Lowest ceiling overhead above a point. */
+function ceilingUnderPoint(
+  x: number,
+  y: number,
+  z: number,
+  solids: readonly Solid[],
+  radius = EYE_RADIUS,
+): number {
+  let lowest = Infinity;
+  for (const s of solids) {
+    if (
+      x + radius >= s.x - s.w / 2 &&
+      x - radius <= s.x + s.w / 2 &&
+      z + radius >= s.z - s.d / 2 &&
+      z - radius <= s.z + s.d / 2
+    ) {
+      if (s.y >= y - 0.05) lowest = Math.min(lowest, s.y);
+    }
+  }
+  return lowest;
+}
+
 /** Move camera eye while preventing it from passing through solid walls. */
 function moveCameraEye(
   previous: T.Vector3,
@@ -267,17 +318,51 @@ function moveCameraEye(
   solids: readonly Solid[],
   radius = EYE_RADIUS,
 ): T.Vector3 {
-  const start = recoverCameraEye(previous, solids, radius);
-  if (cameraSegmentClear(start, requested, solids, radius)) return requested;
-  let clear = 0,
-    blocked = 1;
-  for (let iteration = 0; iteration < 24; iteration++) {
-    const fraction = (clear + blocked) / 2;
-    const trial = start.clone().lerp(requested, fraction);
-    if (cameraSegmentClear(start, trial, solids, radius)) clear = fraction;
-    else blocked = fraction;
+  const prevFloor = floorUnderPoint(
+    previous.x,
+    previous.y,
+    previous.z,
+    solids,
+    radius,
+  );
+  const currentY =
+    prevFloor > -Infinity
+      ? Math.max(previous.y, prevFloor + radius)
+      : previous.y;
+
+  // Move horizontally in X/Z, blocked only by vertical walls spanning currentY
+  const hStart = new T.Vector3(previous.x, currentY, previous.z);
+  const hReq = new T.Vector3(requested.x, currentY, requested.z);
+  const hWalls = solids.filter(
+    (s) => s.y < currentY - 0.05 && s.y + s.h > currentY + 0.05,
+  );
+
+  const start = recoverCameraEye(hStart, hWalls, radius);
+  let safeH = hReq.clone();
+  if (!cameraSegmentClear(start, hReq, hWalls, radius)) {
+    let clear = 0,
+      blocked = 1;
+    for (let iteration = 0; iteration < 24; iteration++) {
+      const fraction = (clear + blocked) / 2;
+      const trial = start.clone().lerp(hReq, fraction);
+      if (cameraSegmentClear(start, trial, hWalls, radius)) clear = fraction;
+      else blocked = fraction;
+    }
+    safeH = start.clone().lerp(hReq, clear);
   }
-  return start.lerp(requested, clear);
+
+  // Resolve vertical position at safe horizontal location
+  const floor = floorUnderPoint(safeH.x, currentY, safeH.z, solids, radius);
+  const ceil = ceilingUnderPoint(safeH.x, currentY, safeH.z, solids, radius);
+  let resY = requested.y;
+  if (floor > -Infinity) resY = Math.max(resY, floor + radius);
+  if (ceil < Infinity) resY = Math.min(resY, ceil - radius);
+  // Smooth descent over step risers (prevent instant 30cm drops)
+  if (resY < currentY && floor > -Infinity) {
+    resY = Math.max(resY, currentY - 0.12);
+  }
+
+  return new T.Vector3(safeH.x, resY, safeH.z);
 }
 
 /**
@@ -302,8 +387,23 @@ function ceilingAbovePath(
     const flat = { ...s, y: -1e6, h: 2e6 };
     const a = new T.Vector3(target.x, 0, target.z);
     const b = new T.Vector3(eye.x, 0, eye.z);
-    if (!cameraSegmentClear(a, b, [flat], radius) || a.distanceTo(b) < 1e-6)
+    if (!cameraSegmentClear(a, b, [flat], radius) || a.distanceTo(b) < 1e-6) {
+      const dist = a.distanceTo(b);
+      const fraction =
+        dist < 1e-6
+          ? 0
+          : clamp(
+              ((s.x - target.x) * (eye.x - target.x) +
+                (s.z - target.z) * (eye.z - target.z)) /
+                (dist * dist),
+              0,
+              1,
+            );
+      const rayY = target.y + fraction * (eye.y - target.y);
+      // If the sightline passes over this solid, it is a floor beneath us, not a ceiling.
+      if (rayY >= s.y + s.h - 0.05) continue;
       ceiling = s.y;
+    }
   }
   return ceiling;
 }
@@ -420,8 +520,15 @@ export class FollowCamera {
     const preset: Preset = room ?? MODES[mode];
 
     // An authored/story camera moved us: adopt its view and continue from it.
-    if (this.camera.position.distanceToSquared(this.lastEye) > 0.0025)
+    if (this.camera.position.distanceToSquared(this.lastEye) > 0.0025) {
+      this.focus.set(
+        player.x,
+        player.y + focusHeight(player, preset),
+        player.z,
+      );
+      this.lastEye.copy(this.camera.position);
       this.adoptEye(this.camera.position);
+    }
 
     // Room changes may cut to an authored doorway eye (SM64 castle doors).
     if (room?.id !== this.room?.id)
@@ -518,7 +625,7 @@ export class FollowCamera {
     // A stationary sightline obstruction does not collapse chosen zoom.
     if (expanding || moving || orbiting || !eyeClear) {
       if (limit < this.boomDistance) this.boomDistance = limit;
-      else this.boomDistance += (limit - this.boomDistance) * ease(11, dt);
+      else this.boomDistance += (limit - this.boomDistance) * ease(8, dt);
     }
 
     const eye = this.eyeAt(this.boomDistance);
@@ -663,7 +770,7 @@ export class FollowCamera {
   ): number {
     const ideal = this.eyeAt(this.idealDistance);
     const blockers = solids.filter((s) => isBoomBlocker(s, this.focus.y));
-    let fraction = boomFraction(this.focus, ideal, blockers, EYE_RADIUS);
+    let fraction = boomFraction(this.focus, ideal, blockers, 0.08);
     const bounds = room?.viewBounds ?? room?.bounds;
     if (bounds)
       fraction = Math.min(fraction, boundsFraction(this.focus, ideal, bounds));
@@ -674,12 +781,13 @@ export class FollowCamera {
     const eye = this.eyeAt(Math.max(distance, 0));
     if (!cameraSegmentClear(eye, eye, solids, EYE_RADIUS)) {
       const solidFraction = boomFraction(this.focus, ideal, solids, EYE_RADIUS);
-      distance = Math.min(
-        distance,
-        solidFraction < 1
-          ? this.idealDistance * solidFraction - 0.05
-          : this.idealDistance,
-      );
+      if (solidFraction < 1) {
+        distance = Math.min(
+          distance,
+          this.idealDistance * solidFraction - 0.05,
+        );
+      }
+      return Math.max(distance, 0.3);
     }
     const floor = Math.min(MIN_DISTANCE, this.idealDistance * fraction);
     return Math.max(distance, floor, 0.3);

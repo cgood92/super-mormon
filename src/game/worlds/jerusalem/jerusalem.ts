@@ -96,21 +96,23 @@ function createJerusalemGroundTexture(): THREE.DataTexture {
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const idx = (y * size + x) * 4;
-      const n1 =
+      // High-frequency sand grain + gentle dune waves
+      const grain =
         (((Math.sin(x * 12.9898 + y * 78.233) * 43758.5453) % 1) + 1) * 0.5;
-      const n2 = Math.sin(x * 0.35) * Math.cos(y * 0.35) * 0.5 + 0.5;
-      const n3 = Math.sin(x * 0.08 + y * 0.12) * 0.5 + 0.5;
-      const factor = 0.84 + n1 * 0.12 + n2 * 0.1 + n3 * 0.08;
-      data[idx] = Math.min(255, Math.floor(196 * factor));
-      data[idx + 1] = Math.min(255, Math.floor(167 * factor));
-      data[idx + 2] = Math.min(255, Math.floor(128 * factor));
+      const wave = Math.sin(x * 0.35) * Math.cos(y * 0.35) * 0.5 + 0.5;
+      const dune = Math.sin(x * 0.08 + y * 0.12) * 0.5 + 0.5;
+      // Subtle natural variation (95% to 105%) around the original base color (0xc4a780)
+      const factor = 0.95 + grain * 0.05 + wave * 0.03 + dune * 0.02;
+      data[idx] = Math.min(255, Math.round(196 * factor));
+      data[idx + 1] = Math.min(255, Math.round(167 * factor));
+      data[idx + 2] = Math.min(255, Math.round(128 * factor));
       data[idx + 3] = 255;
     }
   }
   const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(24, 42);
+  tex.repeat.set(32, 62);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.needsUpdate = true;
   return tex;
@@ -287,10 +289,11 @@ export function buildJerusalem(
     80,
     0.5,
     155,
-    0xc4a780,
+    0xffffff,
     "Jerusalem earth and desert road",
   );
   if (ground.material instanceof THREE.MeshStandardMaterial) {
+    ground.material.color.setHex(0xffffff);
     ground.material.map = groundTex;
     ground.material.roughness = 0.95;
     ground.material.needsUpdate = true;

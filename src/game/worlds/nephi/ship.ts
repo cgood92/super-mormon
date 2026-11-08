@@ -332,42 +332,10 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
     minY: origin.y - 0.5,
     maxY: origin.y + 3.6,
   };
-  const cameraRooms: CameraRoom[] = [
-    {
-      id: "ship-common-room",
-      bounds: {
-        minX: origin.x - 7.5,
-        maxX: origin.x + 4.0,
-        minZ: origin.z + 12.0,
-        maxZ: origin.z + 18.5,
-        minY: origin.y - 0.5,
-        maxY: origin.y + 3.0,
-      },
-      viewBounds: underdeckViewBounds,
-      distance: 3.2,
-      elevation: 0.18,
-      targetHeight: 0.85,
-      entryEyes: [],
-      exitEyes: [],
-    },
-    {
-      id: "ship-fore-cabins",
-      bounds: {
-        minX: origin.x - 7.5,
-        maxX: origin.x + 7.5,
-        minZ: origin.z - 18.5,
-        maxZ: origin.z + 12.0,
-        minY: origin.y - 0.5,
-        maxY: origin.y + 3.6,
-      },
-      viewBounds: underdeckViewBounds,
-      distance: 3.0,
-      elevation: 0.18,
-      targetHeight: 0.85,
-      entryEyes: [],
-      exitEyes: [],
-    },
-  ];
+  // Option A: Underdeck and stair traversal rely on the unified SM64 follow camera
+  // (ceiling pitch limiting, floor support, and spring-arm collision) without
+  // artificial camera room bounding boxes.
+  const cameraRooms: CameraRoom[] = [];
   return {
     group,
     solids,
