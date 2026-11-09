@@ -4,6 +4,7 @@ import * as T from "three";
 import { buildBountiful } from "./bountiful";
 import { createPlayer, stepPlayer } from "../../physics/physics";
 import { sceneryCollisionErrors } from "../shared/scenery";
+import { cameraSegmentClear } from "../../camera/camera";
 
 test("Bountiful requires prayer, tools, reconciliation and four individually aligned timbers", () => {
   const scene = new T.Scene(),
@@ -124,24 +125,20 @@ test("Bountiful requires prayer, tools, reconciliation and four individually ali
       );
     }
   }
-  assert.equal(state().phase, "timber");
+  assert.equal(state().phase, "movie");
+  assert.equal((state() as any).movieBeat, "completed");
   assert.ok(
     Number.isFinite(state().target.x),
-    "Snapshot stays valid while final dialog awaits Continue",
+    "Snapshot stays valid while movie plays",
   );
   assert.equal(runtime.movementLocked!(), true);
-  runtime.update(0.016, player, {
-    interact: false,
-    interactHeld: false,
-    x: 0,
-    y: 0,
-  });
-  finishDialog!();
-  assert.equal(state().phase, "explore");
-  assert.ok(player.y >= 4.2, "Finished ship places Nephi on its upper deck");
   assert.ok(world.solids.length > originalSolids + 40);
   assert.equal(world.climbables!.length, 2);
   assert.equal(completed, 0);
+  const shot1 = runtime.camera!();
+  assert.ok(shot1, "completed ship opening shot exists");
+  assert.equal(shot1.focus.z, -38);
+
   const boarding = createPlayer(21, 0, -27);
   for (let i = 0; i < 140; i++)
     stepPlayer(
@@ -156,11 +153,48 @@ test("Bountiful requires prayer, tools, reconciliation and four individually ali
     boarding.y >= 4.1,
     `Boarding stairs must reach deck: ${boarding.x}, ${boarding.y}`,
   );
-  act();
+
+  // Advance to boarding beat
+  runtime.update(3.5, player, {
+    interact: false,
+    interactHeld: false,
+    x: 0,
+    y: 0,
+  });
+  assert.equal((state() as any).movieBeat, "boarding");
+
+  // Advance during boarding: Nephi ascends stairs
+  runtime.update(3.0, player, {
+    interact: false,
+    interactHeld: false,
+    x: 0,
+    y: 0,
+  });
+  assert.ok(player.x < 19, "Nephi ascends the boarding stairs toward the deck");
+
+  // Advance to sailing beat
+  runtime.update(1.5, player, {
+    interact: false,
+    interactHeld: false,
+    x: 0,
+    y: 0,
+  });
+  assert.equal((state() as any).movieBeat, "sailing");
+  const shipMesh = scene.getObjectByName("Ancient timber sailing vessel")!;
+  assert.ok(
+    shipMesh.position.z < -40,
+    "Ship glides forward into the ocean during the sailing beat",
+  );
+
+  // Complete the movie
+  runtime.update(4.5, player, {
+    interact: false,
+    interactHeld: false,
+    x: 0,
+    y: 0,
+  });
   assert.equal(completed, 1);
-  act();
-  assert.equal(completed, 1);
-  assert.equal(dialogs, 6);
+  assert.equal(dialogs, 5);
   world.dispose!();
   assert.equal(scene.children.length, 0);
 });
@@ -398,4 +432,152 @@ test("Bountiful people block a direct walk while leaving room around", () => {
     assert.ok(p.z < z - 0.6, `walked through person at ${x},${z}: ${p.z}`);
   }
   world.dispose!();
+});
+
+test("Bountiful ending movie clip plays completed ship, boarding family, and sailing departure with skip support", () => {
+  const scene = new T.Scene();
+  const world = buildBountiful(scene);
+  let completed = 0;
+  const runtime = world.adventure!({
+    setAvatar: () => {},
+    toast: () => {},
+    complete: () => completed++,
+    dialog: (_k, _t, _b, next) => next(),
+  });
+  const player = createPlayer();
+  const state = () =>
+    runtime.snapshot() as {
+      phase: string;
+      target: { x: number; y: number; z: number };
+      movieBeat?: string;
+    };
+  function act() {
+    const p = state().target;
+    Object.assign(player, { x: p.x, y: p.y, z: p.z });
+    return runtime.update(0.016, player, {
+      interact: true,
+      interactHeld: true,
+      x: 0,
+      y: 0,
+    });
+  }
+  // Fast-forward through prayer, ore, forge, brothers
+  act(); // pray
+  for (let i = 0; i < 3; i++) act(); // ore, hammer, blow 1
+  act(); // blow 2
+  act(); // blow 3 -> oppose
+  act(); // oppose
+  runtime.update(3, player, {
+    interact: false,
+    interactHeld: false,
+    x: 0,
+    y: 0,
+  }); // power reconciliation
+  assert.equal(state().phase, "timber");
+
+  // Place 4 timbers
+  for (let i = 0; i < 4; i++) {
+    act(); // axe
+    act();
+    act();
+    act(); // fell
+    act(); // carry
+    const sockets = (runtime.snapshot() as any).sockets;
+    player.yaw = sockets[i].yaw;
+    act(); // deposit
+  }
+
+  // Movie begins immediately upon 4th timber placement
+  assert.equal(state().phase, "movie");
+  assert.equal(state().movieBeat, "completed");
+  assert.equal(runtime.movementLocked!(), true);
+  assert.ok(runtime.camera!());
+  const camera1 = runtime.camera!()!;
+  assert.ok(Number.isFinite(camera1.position.x));
+  assert.ok(Number.isFinite(camera1.focus.z));
+  assert.ok(
+    cameraSegmentClear(
+      new T.Vector3(camera1.position.x, camera1.position.y, camera1.position.z),
+      new T.Vector3(camera1.position.x, camera1.position.y, camera1.position.z),
+      world.solids,
+      0.2,
+    ),
+    "completed shot camera eye must be clear of solids",
+  );
+
+  // Verify boarding cast members were instantiated
+  assert.ok(scene.getObjectByName("lehi-character · boarding"));
+  assert.ok(scene.getObjectByName("sariah-character · boarding"));
+  assert.ok(scene.getObjectByName("wife-character · boarding"));
+  assert.ok(scene.getObjectByName("child-character · boarding"));
+
+  // Skip 1 (jump key): advance to boarding beat
+  runtime.update(0.016, player, {
+    interact: false,
+    interactHeld: false,
+    x: 0,
+    y: 0,
+    jump: true,
+  });
+  assert.equal(state().movieBeat, "boarding");
+  const camera2 = runtime.camera!()!;
+  assert.ok(Number.isFinite(camera2.position.x));
+  assert.ok(
+    cameraSegmentClear(
+      new T.Vector3(camera2.position.x, camera2.position.y, camera2.position.z),
+      new T.Vector3(camera2.position.x, camera2.position.y, camera2.position.z),
+      world.solids,
+      0.2,
+    ),
+    "boarding shot camera eye must be clear of solids",
+  );
+
+  // Release jump and skip 2: advance to sailing beat
+  runtime.update(0.016, player, {
+    interact: false,
+    interactHeld: false,
+    x: 0,
+    y: 0,
+    jump: false,
+  });
+  runtime.update(0.016, player, {
+    interact: false,
+    interactHeld: false,
+    x: 0,
+    y: 0,
+    jump: true,
+  });
+  assert.equal(state().movieBeat, "sailing");
+  const camera3 = runtime.camera!()!;
+  assert.ok(Number.isFinite(camera3.position.x));
+  assert.ok(
+    cameraSegmentClear(
+      new T.Vector3(camera3.position.x, camera3.position.y, camera3.position.z),
+      new T.Vector3(camera3.position.x, camera3.position.y, camera3.position.z),
+      world.solids,
+      0.2,
+    ),
+    "sailing shot camera eye must be clear of solids",
+  );
+
+  // Release jump and skip 3: complete level
+  runtime.update(0.016, player, {
+    interact: false,
+    interactHeld: false,
+    x: 0,
+    y: 0,
+    jump: false,
+  });
+  runtime.update(0.016, player, {
+    interact: false,
+    interactHeld: false,
+    x: 0,
+    y: 0,
+    jump: true,
+  });
+  assert.equal(completed, 1);
+
+  // Dispose cleanly cleans up all movie actors and scene meshes
+  world.dispose!();
+  assert.equal(scene.children.length, 0);
 });
