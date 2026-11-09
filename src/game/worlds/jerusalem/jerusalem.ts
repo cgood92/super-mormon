@@ -10,6 +10,7 @@ import {
   column,
   datePalm,
   label,
+  material,
   oilLamp,
   palette,
   vessel,
@@ -463,6 +464,7 @@ export function buildJerusalem(
     ground.material.roughness = 0.95;
     ground.material.needsUpdate = true;
   }
+  ground.castShadow = false;
 
   // Clear daytime sky and distant horizon (eliminating unnatural blue rooftop haze)
   if (id !== "night") {
@@ -811,7 +813,7 @@ export function buildJerusalem(
   // LABAN'S EXPANDED PALACE & FORTIFIED TREASURY
   // ==========================================
   // Palace stone floor paving covering audience hall, rear gallery, and inner vault
-  decor(
+  const palacePaving = decor(
     0,
     0.015,
     -27.5,
@@ -821,6 +823,7 @@ export function buildJerusalem(
     0xd0b38a,
     "palace interior stone paving",
   );
+  palacePaving.castShadow = false;
 
   // Outer palace exterior walls and room partitions (aligned seamlessly at z = -28.5)
   add(-18, 0, -18.75, 0.7, 7, 19.5, 0xb19472, "palace west exterior");
