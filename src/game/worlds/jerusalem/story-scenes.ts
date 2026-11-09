@@ -770,7 +770,7 @@ export function createStoryScene(
         offer: "Offer your family's treasure to Laban",
         flee: "Escape through the city gate with your brothers",
         cave: "Lead your brothers to the cave",
-        laban: "Find Laban in the night city",
+        laban: "Find Laban at night (drunk and sleeping)",
         zoram: "Find Zoram at the treasury",
         plates: "Take the brass plates",
         escape: "Lead Zoram outside to your brothers",
