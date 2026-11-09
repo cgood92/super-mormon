@@ -23,7 +23,7 @@ export type StoryHooks = {
   toast(text: string): void;
   complete(): void;
   checkpoint(point: Point): void;
-  setMarker(point: Point): void;
+  setMarker(point: Point & { beamHeight?: number }): void;
   setDisguise(enabled: boolean): void;
   caught(): void;
 };
@@ -404,7 +404,12 @@ export function createStoryScene(
     plates.group.visible = true;
   }
   const marker = () => {
-    if (phase === "offer" || phase === "laban") hooks.setMarker(story.laban);
+    if (phase === "offer" || phase === "laban")
+      hooks.setMarker(
+        id === "night" && phase === "laban"
+          ? { ...story.laban, beamHeight: 0.9 }
+          : story.laban,
+      );
     else if (phase === "flee") hooks.setMarker(story.gate);
     else if (phase === "cave") hooks.setMarker(story.cave ?? story.brothers);
     else if (phase === "zoram")
@@ -765,7 +770,7 @@ export function createStoryScene(
         offer: "Offer your family's treasure to Laban",
         flee: "Escape through the city gate with your brothers",
         cave: "Lead your brothers to the cave",
-        laban: "Find Laban in the night city",
+        laban: "Find Laban at night (drunk and sleeping)",
         zoram: "Find Zoram at the treasury",
         plates: "Take the brass plates",
         escape: "Lead Zoram outside to your brothers",

@@ -5,6 +5,7 @@ import { buildJerusalem } from "./jerusalem";
 import { createPlayer, stepPlayer } from "../../physics/physics";
 import { FollowCamera, cameraSegmentClear } from "../../camera/camera";
 import { createCharacter } from "../../characters/character";
+import { hasLineOfSight } from "../../physics/interactions";
 
 test("Jerusalem ground has procedural texture and extends past the back of Laban's palace", () => {
   const scene = new THREE.Scene();
@@ -345,6 +346,92 @@ test("expanded Laban's palace includes audience hall, inner courtyard garden, st
     assert.ok(
       infiltrator.z <= -30,
       `infiltrator reached inner vault chamber: z=${infiltrator.z}`,
+    );
+  } finally {
+    world.dispose?.();
+  }
+});
+
+test("drunk Laban is hidden in the horse stable behind the 2nd slat divider with straw and obstructed sightlines", () => {
+  const scene = new THREE.Scene();
+  const world = buildJerusalem("night", scene);
+  try {
+    const laban = world.story?.laban;
+    assert.ok(laban, "night Laban coordinates defined");
+    assert.equal(laban.x, -27);
+    assert.equal(laban.z, -30);
+
+    // Laban is placed behind divider 1 (z = -28) and in front of stable north wall (z = -32)
+    const divider1 = world.solids.find((s) => s.z === -28 && s.w === 8);
+    const divider2 = world.solids.find((s) => s.z === -22 && s.w === 8);
+    assert.ok(divider1 && divider2, "both timber dividers exist");
+    assert.ok(
+      laban.z < divider1.z,
+      "Laban is located behind the second timber divider (deeper into stall)",
+    );
+
+    // Decorative straw bedding exists in the stable stall
+    const stallStraw = scene.getObjectByName("stable stall straw 1");
+    assert.ok(stallStraw, "stable stall straw exists");
+
+    // Goal marker diamond floats inches above his body (beamHeight = 0.9m), below the 1.4m divider
+    assert.equal(world.goal.beamHeight, 0.9);
+    assert.ok(
+      world.goal.beamHeight! < divider1.h,
+      "goal diamond is below the stable divider height, preventing distant beacon visibility",
+    );
+
+    // Line of sight is obstructed from street / entrance (z = -18) and stall 1 (z = -23)
+    const streetPlayer = createPlayer(-19.5, 0, -18);
+    assert.equal(
+      hasLineOfSight(streetPlayer, laban, world.solids),
+      false,
+      "street player cannot see Laban through timber dividers",
+    );
+
+    const stall1Player = createPlayer(-27, 0, -23);
+    assert.equal(
+      hasLineOfSight(stall1Player, laban, world.solids),
+      false,
+      "stall 1 player cannot see Laban behind divider 1",
+    );
+
+    // Player walking down aisle to z = -30 and turning west into the stall reaches Laban
+    const searcher = createPlayer(-20, 0, -18);
+    // Walk north down the aisle (y: 1 with camera facing north at Math.PI)
+    for (let frame = 0; frame < 180; frame++) {
+      if (searcher.z <= -30) break;
+      stepPlayer(
+        searcher,
+        { x: 0, y: 1, jump: false, jumpHeld: false },
+        1 / 60,
+        Math.PI,
+        world.solids,
+      );
+    }
+    assert.ok(
+      searcher.z <= -29.5,
+      `searcher walked down stable aisle: z=${searcher.z}`,
+    );
+
+    // Turn west into the stall towards Laban (x: -1 with camera facing north at Math.PI)
+    for (let frame = 0; frame < 180; frame++) {
+      if (searcher.x <= -26) break;
+      stepPlayer(
+        searcher,
+        { x: -1, y: 0, jump: false, jumpHeld: false },
+        1 / 60,
+        Math.PI,
+        world.solids,
+      );
+    }
+    assert.ok(
+      searcher.x <= -26,
+      `searcher entered stall behind 2nd divider: x=${searcher.x}`,
+    );
+    assert.ok(
+      hasLineOfSight(searcher, laban, world.solids),
+      "searcher now has clear line of sight to examine Laban",
     );
   } finally {
     world.dispose?.();

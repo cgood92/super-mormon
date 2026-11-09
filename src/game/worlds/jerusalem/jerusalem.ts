@@ -921,6 +921,10 @@ export function buildJerusalem(
   decor(-30, 0.55, -28, 1.0, 0.15, 1.8, 0xd4b88a, "manger straw 1");
   add(-30, 0, -22, 1.2, 0.6, 2.0, palette.paleStone, "stone manger 2");
   decor(-30, 0.55, -22, 1.0, 0.15, 1.8, 0xd4b88a, "manger straw 2");
+  // Straw bedding on the stall floors and fallen wine goblet behind the 2nd slat
+  decor(-26.5, 0.015, -30, 3.2, 0.03, 2.6, 0xd4b88a, "stable stall straw 1");
+  decor(-26.5, 0.015, -25, 3.2, 0.03, 2.6, 0xd4b88a, "stable stall straw 2");
+  vessel(group, -25.2, 0, -30.4, 0.45, palette.brass);
 
   // ==========================================
   // NORTHEAST DISTRICT: POOL OF BETHESDA (JOHN 5:1–9)
@@ -1138,26 +1142,6 @@ export function buildJerusalem(
     "blind walking staff",
   );
 
-  // Palace Inner Peristyle Courtyard Garden (North of Audience Hall)
-  add(-12, 0, -33.25, 0.7, 6.5, 9.5, 0xb19472, "courtyard west wall");
-  add(-3, 0, -38, 18, 6.5, 0.7, 0xb19472, "courtyard north wall");
-  for (const cx of [-9, -3, 3]) {
-    column(group, cx, -34, 4.8, 0.34, palette.paleStone);
-  }
-  // Carved stone palace fountain / water basin
-  add(-3, 0, -34, 2.4, 0.6, 2.4, palette.paleStone, "palace garden basin");
-  decor(-3, 0.5, -34, 1.8, 0.05, 1.8, palette.turquoise, "palace basin water");
-
-  // Palace Stables & Chariot Yard (West Flank of Palace, terminating at z = -18 to keep street clear)
-  add(-25, 0, -32, 14, 2.5, 0.6, palette.limestone, "stable north wall");
-  add(-32, 0, -25, 0.6, 2.5, 14, palette.limestone, "stable west wall");
-  add(-25, 0, -28, 8, 1.4, 0.3, palette.timber, "stable divider 1");
-  add(-25, 0, -22, 8, 1.4, 0.3, palette.timber, "stable divider 2");
-  add(-30, 0, -28, 1.2, 0.6, 2.0, palette.paleStone, "stone manger 1");
-  decor(-30, 0.55, -28, 1.0, 0.15, 1.8, 0xd4b88a, "manger straw 1");
-  add(-30, 0, -22, 1.2, 0.6, 2.0, palette.paleStone, "stone manger 2");
-  decor(-30, 0.55, -22, 1.0, 0.15, 1.8, 0xd4b88a, "manger straw 2");
-
   // Date Palms (Trunks are climbables; leaf canopies have physical walking support at y = 4.8)
   const palmCoords = [
     [-17, 22], // jerusalem-west-palm (tested)
@@ -1245,7 +1229,7 @@ export function buildJerusalem(
   const brothers = { x: 0, y: 0, z: 46 };
   const cave = { x: -8, y: 0, z: 92 };
   const home = { x: -33.2, y: 0, z: -15, radius: 1.25 };
-  const laban = id === "night" ? { x: -19.5, y: 0, z: -6 } : audience;
+  const laban = id === "night" ? { x: -27, y: 0, z: -30 } : audience;
 
   return {
     name:
@@ -1284,7 +1268,7 @@ export function buildJerusalem(
       id === "streets"
         ? home
         : id === "night"
-          ? { ...laban, radius: 3 }
+          ? { ...laban, radius: 3, beamHeight: 0.9 }
           : { x: 0, y: 0.8, z: -18, radius: 3.2 },
     escapeGoal:
       id === "trade" ? { ...cave, radius: 3 } : { ...brothers, radius: 3 },

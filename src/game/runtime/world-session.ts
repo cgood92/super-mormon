@@ -135,6 +135,7 @@ export class WorldSession {
         this.world.goal.x,
         this.world.goal.y,
         this.world.goal.z,
+        this.world.goal.beamHeight ?? 2.6,
       );
     const spawnGuards =
       id === "trade" || id === "night"
@@ -194,9 +195,16 @@ export class WorldSession {
         checkpoint: (point) => {
           this.storyCheckpoint = { ...point };
         },
-        setMarker: (point) => {
-          if (this.goalMarker)
+        setMarker: (point: {
+          x: number;
+          y: number;
+          z: number;
+          beamHeight?: number;
+        }) => {
+          if (this.goalMarker) {
             this.goalMarker.position.set(point.x, point.y + 0.04, point.z);
+            this.goalMarker.userData.beamHeight = point.beamHeight ?? 2.6;
+          }
         },
         setDisguise: (enabled) =>
           this.setAvatar(enabled ? "nephi-disguised" : "nephi", this.scene),
@@ -242,8 +250,9 @@ export class WorldSession {
     this.avatar.update(0, this.player);
   }
 
-  private marker(x: number, y: number, z: number): T.Group {
+  private marker(x: number, y: number, z: number, beamHeight = 2.6): T.Group {
     const g = new T.Group();
+    g.userData.beamHeight = beamHeight;
     g.position.set(x, y + 0.04, z);
     const ring = new T.Mesh(
       new T.TorusGeometry(0.85, 0.055, 8, 48),
@@ -263,7 +272,7 @@ export class WorldSession {
         emissiveIntensity: 0.25,
       }),
     );
-    beam.position.y = 2.6;
+    beam.position.y = beamHeight;
     beam.rotation.z = Math.PI;
     g.add(beam);
     this.scene.add(g);
