@@ -255,9 +255,15 @@ test("night Laban is in the city; Zoram and plates occupy the separate palace tr
   for (const [x, z] of [
     [0, 40],
     [0, 25],
-    [-19.5, 25],
-    [-19.5, -6],
-    [-15, -6],
+    [-16, 25],
+    [-16, -6],
+    [-20, -6],
+    [-20, -18],
+    [-20, -30],
+    [-27, -30],
+    [-20, -30],
+    [-20, -6],
+    [-16, -6],
     [-15, -14],
     [-6, -14],
     [6, -14],
@@ -280,7 +286,10 @@ test("night Laban is in the city; Zoram and plates occupy the separate palace tr
     go(p, x, z, data.solids, 0.3);
     assert.ok(p.y < 0.05, "Zoram can follow the entire route on foot");
   }
-  assert.ok(data.story.laban.z > -9);
+  assert.ok(
+    data.story.laban.x <= -25 && data.story.laban.z <= -28,
+    "Laban is hidden in the palace stables behind the dividers",
+  );
   for (const point of [data.story.treasury, data.story.plates])
     assert.ok(point.x > 8 && point.z < -18);
 });
