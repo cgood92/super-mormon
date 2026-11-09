@@ -169,7 +169,7 @@ export function createLehiOpening(
             current === 2
               ? new T.Vector3(-1.6, 2.4, 5.8)
               : current === 1
-                ? new T.Vector3(-2.5, 2.5, -5)
+                ? new T.Vector3(-1.4, 2.2, -5.6)
                 : new T.Vector3(4, 2.8, 6),
           );
         probe.lookAt(anchor.position);
@@ -180,7 +180,15 @@ export function createLehiOpening(
             cutaway: true,
             actors: [{ group: anchor }],
             wide:
-              current === 1 ? 9 : current === 2 ? 4 : current === 3 ? 5 : 4.5,
+              current === 1
+                ? aspect < 1
+                  ? 10.2
+                  : 8.5
+                : current === 2
+                  ? 4
+                  : current === 3
+                    ? 5
+                    : 4.5,
           },
           solids,
           obstacles,
