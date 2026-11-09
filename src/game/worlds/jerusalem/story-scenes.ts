@@ -407,7 +407,7 @@ export function createStoryScene(
     if (phase === "offer" || phase === "laban")
       hooks.setMarker(
         id === "night" && phase === "laban"
-          ? { ...story.laban, beamHeight: 0.75 }
+          ? { ...story.laban, beamHeight: 0.9 }
           : story.laban,
       );
     else if (phase === "flee") hooks.setMarker(story.gate);

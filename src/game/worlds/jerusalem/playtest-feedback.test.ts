@@ -374,8 +374,8 @@ test("drunk Laban is hidden in the horse stable behind the 2nd slat divider with
     const stallStraw = scene.getObjectByName("stable stall straw 1");
     assert.ok(stallStraw, "stable stall straw exists");
 
-    // Goal marker diamond floats inches above his body (beamHeight = 0.75m), below the 1.4m divider
-    assert.equal(world.goal.beamHeight, 0.75);
+    // Goal marker diamond floats inches above his body (beamHeight = 0.9m), below the 1.4m divider
+    assert.equal(world.goal.beamHeight, 0.9);
     assert.ok(
       world.goal.beamHeight! < divider1.h,
       "goal diamond is below the stable divider height, preventing distant beacon visibility",
