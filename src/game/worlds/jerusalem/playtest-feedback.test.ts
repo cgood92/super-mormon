@@ -276,8 +276,15 @@ test("expanded Jerusalem features Solomon's Temple, Waters of Shiloah, market st
         world.solids,
       );
     }
-    assert.equal(awningWalker.grounded, true, "player lands on market awning platform");
-    assert.ok(awningWalker.y >= 2.4, `player standing atop awning: y=${awningWalker.y}`);
+    assert.equal(
+      awningWalker.grounded,
+      true,
+      "player lands on market awning platform",
+    );
+    assert.ok(
+      awningWalker.y >= 2.4,
+      `player standing atop awning: y=${awningWalker.y}`,
+    );
 
     // 5. Ambient Animals
     const donkeys = scene.children[0].children.filter(
@@ -395,10 +402,15 @@ test("Pool of Bethesda features five porches, disturbed rippling water, and wait
     const eastRoof = scene.getObjectByName("bethesda east porch roof");
     const centralBeam = scene.getObjectByName("bethesda central porch beam");
     assert.ok(northWall && southWall, "retaining walls exist");
-    assert.ok(northRoof && southRoof && westRoof && eastRoof && centralBeam, "five colonnaded porches exist");
+    assert.ok(
+      northRoof && southRoof && westRoof && eastRoof && centralBeam,
+      "five colonnaded porches exist",
+    );
 
     // Wading into the pool
-    const water = scene.getObjectByName("bethesda pool water surface") as THREE.Mesh;
+    const water = scene.getObjectByName(
+      "bethesda pool water surface",
+    ) as THREE.Mesh;
     assert.ok(water, "pool water surface exists");
 
     // Stepped descent into the pool

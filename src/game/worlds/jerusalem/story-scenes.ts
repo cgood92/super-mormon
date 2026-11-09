@@ -722,7 +722,7 @@ export function createStoryScene(
           const flankSign = i % 2 === 0 ? 1 : -1;
           const target = {
             x: p.x + (i === 0 ? 0.6 : -0.6) * flankSign,
-            y: p.y,
+            y: player.y,
             z: p.z + (i === 0 ? -0.4 : 0.4) * flankSign,
           };
           const guardSpeed = (id === "night" ? 2.1 : 4.3) + (i % 2) * 0.35;

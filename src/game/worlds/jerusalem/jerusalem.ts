@@ -253,7 +253,8 @@ function packDonkey(
     donkeyGroup.add(mesh);
     markScenery(mesh, {
       kind: "decoration",
-      reason: "Ambient pack donkey; solid physical obstacle prevents pass-through.",
+      reason:
+        "Ambient pack donkey; solid physical obstacle prevents pass-through.",
     });
     return mesh;
   };
@@ -323,7 +324,8 @@ function sheepModel(
   sheepGroup.add(body);
   markScenery(body, {
     kind: "decoration",
-    reason: "Resting flock sheep; solid physical obstacle prevents pass-through.",
+    reason:
+      "Resting flock sheep; solid physical obstacle prevents pass-through.",
   });
 
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 7, 5), darkMat);
@@ -430,7 +432,8 @@ function rockCave(
   shade.name = "cave interior floor";
   markScenery(shade, {
     kind: "decoration",
-    reason: "Cave interior shaded floor; ground mesh provides physical support.",
+    reason:
+      "Cave interior shaded floor; ground mesh provides physical support.",
   });
   group.add(shade);
 }
@@ -517,16 +520,7 @@ export function buildJerusalem(
   // Temple Sanctuary (Debir & Heikhal)
   add(28, 1.2, -61, 16, 7.5, 14, palette.paleStone, "temple sanctuary wall");
   // Solid cedar roof slab so the player stands firmly on top of the roof at y = 9.0m
-  add(
-    28,
-    8.7,
-    -61,
-    16.5,
-    0.3,
-    14.5,
-    palette.timber,
-    "temple cedar roof slab",
-  );
+  add(28, 8.7, -61, 16.5, 0.3, 14.5, palette.timber, "temple cedar roof slab");
   // Temple Portico (Ulam)
   add(28, 1.2, -52.5, 16, 5.5, 3, palette.limestone, "temple portico");
   // Twin Polished Bronze Pillars: Boaz and Jachin (1 Kings 7:15–22)
@@ -537,7 +531,16 @@ export function buildJerusalem(
   // Temple Outer Courtyard Colonnade
   for (const colX of [6, 12, 40, 44]) {
     column(group, colX, -48, 4.2, 0.32, palette.paleStone);
-    add(colX, 1.2, -48, 0.7, 4.2, 0.7, palette.paleStone, "temple court column");
+    add(
+      colX,
+      1.2,
+      -48,
+      0.7,
+      4.2,
+      0.7,
+      palette.paleStone,
+      "temple court column",
+    );
   }
   // Great Bronze Altar of Burnt Offering
   add(12, 1.2, -56, 4.5, 1.4, 4.5, palette.limestone, "temple altar base");
@@ -571,7 +574,16 @@ export function buildJerusalem(
   });
   // Conduit mouth representing Hezekiah's Tunnel from Gihon
   decor(37, 0.5, 15, 2.2, 1.2, 1.2, palette.sandstone, "conduit tunnel mouth");
-  decor(37, 0.1, 15.6, 1.4, 0.25, 1.0, palette.turquoise, "conduit water cascade");
+  decor(
+    37,
+    0.1,
+    15.6,
+    1.4,
+    0.25,
+    1.0,
+    palette.turquoise,
+    "conduit water cascade",
+  );
   // Clay water jars set by women along the stone steps
   vessel(group, 29.5, 0.5, 18, 1.1, palette.clay);
   vessel(group, 29.5, 0.5, 22, 0.9, palette.clay);
@@ -603,7 +615,16 @@ export function buildJerusalem(
   vessel(group, 0, 1.4, 4, 0.7, palette.darkClay);
   // Animal watering trough beside well
   add(2.2, 0, 4, 0.9, 0.45, 2.2, palette.limestone, "animal water trough");
-  decor(2.2, 0.38, 4, 0.7, 0.02, 2.0, palette.turquoise, "trough water surface");
+  decor(
+    2.2,
+    0.38,
+    4,
+    0.7,
+    0.02,
+    2.0,
+    palette.turquoise,
+    "trough water surface",
+  );
 
   // Market Stalls with Walkable Canopy Awnings (SM64 parkour platforms)
   const stalls = [
@@ -692,11 +713,56 @@ export function buildJerusalem(
   // ROOFTOP HIGHWAYS & CONNECTING BRIDGES (SM64 FUN)
   // ==========================================
   // Wooden plank bridges spanning narrow alleys between flat rooftops
-  add(-35, 4.2, 14, 6.0, 0.22, 1.4, palette.timber, "rooftop plank bridge west 1");
-  add(-35, 4.4, -1, 6.0, 0.22, 1.4, palette.timber, "rooftop plank bridge west 2");
-  add(35, 4.5, 14, 6.0, 0.22, 1.4, palette.timber, "rooftop plank bridge east 1");
-  add(51, 4.5, 14, 6.0, 0.22, 1.4, palette.timber, "rooftop plank bridge east 2");
-  add(51, 4.7, -1, 6.0, 0.22, 1.4, palette.timber, "rooftop plank bridge east 3");
+  add(
+    -35,
+    4.2,
+    14,
+    6.0,
+    0.22,
+    1.4,
+    palette.timber,
+    "rooftop plank bridge west 1",
+  );
+  add(
+    -35,
+    4.4,
+    -1,
+    6.0,
+    0.22,
+    1.4,
+    palette.timber,
+    "rooftop plank bridge west 2",
+  );
+  add(
+    35,
+    4.5,
+    14,
+    6.0,
+    0.22,
+    1.4,
+    palette.timber,
+    "rooftop plank bridge east 1",
+  );
+  add(
+    51,
+    4.5,
+    14,
+    6.0,
+    0.22,
+    1.4,
+    palette.timber,
+    "rooftop plank bridge east 2",
+  );
+  add(
+    51,
+    4.7,
+    -1,
+    6.0,
+    0.22,
+    1.4,
+    palette.timber,
+    "rooftop plank bridge east 3",
+  );
 
   // Rooftop shade arbors (woven reed shelters for sleeping during hot seasons)
   decor(-27, 5.4, 31, 4.5, 0.12, 4.5, 0xcaa680, "rooftop reed canopy 1");
@@ -881,7 +947,8 @@ export function buildJerusalem(
   );
   markScenery(bethesdaWater, {
     kind: "decoration",
-    reason: "Pool of Bethesda water surface; pool floor provides walking support.",
+    reason:
+      "Pool of Bethesda water surface; pool floor provides walking support.",
   });
 
   // Concentric animated ripple ring meshes when the angel troubles the water
@@ -912,38 +979,137 @@ export function buildJerusalem(
   // Porch 1: North Colonnade
   for (const cx of [54, 57.5, 61, 64.5]) {
     column(group, cx, -63.5, 3.6, 0.3, palette.paleStone);
-    add(cx, 0, -63.5, 0.65, 3.6, 0.65, palette.paleStone, "bethesda north column");
+    add(
+      cx,
+      0,
+      -63.5,
+      0.65,
+      3.6,
+      0.65,
+      palette.paleStone,
+      "bethesda north column",
+    );
   }
-  add(59, 3.6, -63.5, 12.5, 0.2, 3.2, palette.timber, "bethesda north porch roof");
+  add(
+    59,
+    3.6,
+    -63.5,
+    12.5,
+    0.2,
+    3.2,
+    palette.timber,
+    "bethesda north porch roof",
+  );
 
   // Porch 2: South Colonnade
   for (const cx of [54, 57.5, 61, 64.5]) {
     column(group, cx, -42.5, 3.6, 0.3, palette.paleStone);
-    add(cx, 0, -42.5, 0.65, 3.6, 0.65, palette.paleStone, "bethesda south column");
+    add(
+      cx,
+      0,
+      -42.5,
+      0.65,
+      3.6,
+      0.65,
+      palette.paleStone,
+      "bethesda south column",
+    );
   }
-  add(59, 3.6, -42.5, 12.5, 0.2, 3.2, palette.timber, "bethesda south porch roof");
+  add(
+    59,
+    3.6,
+    -42.5,
+    12.5,
+    0.2,
+    3.2,
+    palette.timber,
+    "bethesda south porch roof",
+  );
 
   // Porch 3: West Colonnade
   for (const cz of [-60, -56, -50, -46]) {
     column(group, 50.5, cz, 3.6, 0.3, palette.paleStone);
-    add(50.5, 0, cz, 0.65, 3.6, 0.65, palette.paleStone, "bethesda west column");
+    add(
+      50.5,
+      0,
+      cz,
+      0.65,
+      3.6,
+      0.65,
+      palette.paleStone,
+      "bethesda west column",
+    );
   }
-  add(50.5, 3.6, -53, 3.2, 0.2, 16.5, palette.timber, "bethesda west porch roof");
+  add(
+    50.5,
+    3.6,
+    -53,
+    3.2,
+    0.2,
+    16.5,
+    palette.timber,
+    "bethesda west porch roof",
+  );
 
   // Porch 4: East Colonnade
   for (const cz of [-60, -56, -50, -46]) {
     column(group, 67.5, cz, 3.6, 0.3, palette.paleStone);
-    add(67.5, 0, cz, 0.65, 3.6, 0.65, palette.paleStone, "bethesda east column");
+    add(
+      67.5,
+      0,
+      cz,
+      0.65,
+      3.6,
+      0.65,
+      palette.paleStone,
+      "bethesda east column",
+    );
   }
-  add(67.5, 3.6, -53, 3.2, 0.2, 16.5, palette.timber, "bethesda east porch roof");
+  add(
+    67.5,
+    3.6,
+    -53,
+    3.2,
+    0.2,
+    16.5,
+    palette.timber,
+    "bethesda east porch roof",
+  );
 
   // Porch 5: Central Dividing Colonnade (dividing upper & lower basins)
   for (const cx of [55.5, 59, 62.5]) {
     column(group, cx, -53, 3.6, 0.3, palette.paleStone);
-    add(cx, 0, -53, 0.65, 3.6, 0.65, palette.paleStone, "bethesda central column");
+    add(
+      cx,
+      0,
+      -53,
+      0.65,
+      3.6,
+      0.65,
+      palette.paleStone,
+      "bethesda central column",
+    );
   }
-  add(59, 0.45, -53, 12, 0.45, 0.85, palette.limestone, "bethesda dividing stylobate");
-  add(59, 3.6, -53, 12, 0.2, 1.2, palette.timber, "bethesda central porch beam");
+  add(
+    59,
+    0.45,
+    -53,
+    12,
+    0.45,
+    0.85,
+    palette.limestone,
+    "bethesda dividing stylobate",
+  );
+  add(
+    59,
+    3.6,
+    -53,
+    12,
+    0.2,
+    1.2,
+    palette.timber,
+    "bethesda central porch beam",
+  );
 
   // Ambient Waiting Infirm & Disabled Figures under the porches
   // Figure 1: Infirm man of 38 years lying on a woven sleeping mat under the west porch
@@ -958,7 +1124,16 @@ export function buildJerusalem(
   // Figure 3: Waiting blind figure with staff on stone bench under north porch
   add(61, 0, -63.5, 2.2, 0.5, 0.8, palette.limestone, "bethesda stone bench");
   decor(61, 0.52, -63.5, 0.55, 0.5, 0.55, 0x7a624d, "seated blind figure");
-  decor(61.35, 0.5, -63.2, 0.06, 0.9, 0.06, palette.timber, "blind walking staff");
+  decor(
+    61.35,
+    0.5,
+    -63.2,
+    0.06,
+    0.9,
+    0.06,
+    palette.timber,
+    "blind walking staff",
+  );
 
   // Palace Inner Peristyle Courtyard Garden (North of Audience Hall)
   add(-12, 0, -33.25, 0.7, 6.5, 9.5, 0xb19472, "courtyard west wall");
