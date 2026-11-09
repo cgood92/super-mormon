@@ -212,6 +212,7 @@ function packDonkey(
   y: number,
   z: number,
   yaw = 0,
+  solids?: Solid[],
 ): void {
   const donkeyGroup = new THREE.Group();
   donkeyGroup.position.set(x, y, z);
@@ -252,7 +253,7 @@ function packDonkey(
     donkeyGroup.add(mesh);
     markScenery(mesh, {
       kind: "decoration",
-      reason: "Ambient pack donkey; nonblocking pack animal decor.",
+      reason: "Ambient pack donkey; solid physical obstacle prevents pass-through.",
     });
     return mesh;
   };
@@ -283,6 +284,14 @@ function packDonkey(
   }
 
   group.add(donkeyGroup);
+
+  if (solids) {
+    const cos = Math.abs(Math.cos(yaw));
+    const sin = Math.abs(Math.sin(yaw));
+    const bw = Math.max(0.8, 0.85 * cos + 1.25 * sin);
+    const bd = Math.max(0.8, 0.85 * sin + 1.25 * cos);
+    solids.push({ x, y, z, w: bw, h: 1.35, d: bd });
+  }
 }
 
 /** Stylized woolly flock sheep resting in city animal pen. */
@@ -292,6 +301,7 @@ function sheepModel(
   y: number,
   z: number,
   yaw = 0,
+  solids?: Solid[],
 ): void {
   const sheepGroup = new THREE.Group();
   sheepGroup.position.set(x, y, z);
@@ -313,7 +323,7 @@ function sheepModel(
   sheepGroup.add(body);
   markScenery(body, {
     kind: "decoration",
-    reason: "Resting flock sheep; nonblocking ambient animal decor.",
+    reason: "Resting flock sheep; solid physical obstacle prevents pass-through.",
   });
 
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 7, 5), darkMat);
@@ -338,6 +348,14 @@ function sheepModel(
   }
 
   group.add(sheepGroup);
+
+  if (solids) {
+    const cos = Math.abs(Math.cos(yaw));
+    const sin = Math.abs(Math.sin(yaw));
+    const bw = Math.max(0.7, 0.75 * cos + 1.05 * sin);
+    const bd = Math.max(0.7, 0.75 * sin + 1.05 * cos);
+    solids.push({ x, y, z, w: bw, h: 0.85, d: bd });
+  }
 }
 
 function rockCave(
@@ -427,10 +445,10 @@ export function buildJerusalem(
 
   // Vast procedural terrain extending north past the Temple and south past the desert cave
   const ground = decor(
-    0,
+    8,
     -0.5,
     20,
-    120,
+    150,
     0.5,
     195,
     0xffffff,
@@ -443,58 +461,63 @@ export function buildJerusalem(
     ground.material.needsUpdate = true;
   }
 
+  // Clear daytime sky and distant horizon (eliminating unnatural blue rooftop haze)
+  if (id !== "night") {
+    scene.background = new THREE.Color(0xdce5ec);
+    scene.fog = new THREE.Fog(scene.background, 160, 340);
+  }
+
   // ==========================================
   // PERIMETER CITY WALLS & FORTIFICATIONS
   // ==========================================
   // West Broad Wall (Hezekiah's Broad Wall - 7m stone ramparts)
   add(-56, 0, -15, 1.4, 8, 110, 0xa98b69, "west city wall");
-  // East Kidron Valley Wall
-  add(56, 0, -15, 1.4, 8, 110, 0xa98b69, "east city wall");
-  // North Wall enclosing the Temple Mount
-  add(0, 0, -70, 113.4, 8, 1.4, 0xa98b69, "north city wall");
+  // East Kidron Valley Wall (expanded to x = 72 to encompass Pool of Bethesda district)
+  add(72, 0, -15, 1.4, 8, 110, 0xa98b69, "east city wall");
+  // North Wall enclosing the Temple Mount and Bethesda (spans x = -56 to x = 72)
+  add(8, 0, -70, 129.4, 8, 1.4, 0xa98b69, "north city wall");
 
-  // South Wall and Historic Multi-Chambered Gate (d = 0.9 so outside face is at z = 40.45)
-  add(-28, 0, 40, 48, 8, 0.9, 0xa98b69, "south gate wall west");
-  add(28, 0, 40, 48, 8, 0.9, 0xa98b69, "south gate wall east");
+  // South Wall and Historic Multi-Chambered Gate (Seamless non-overlapping geometry)
+  add(-31.6, 0, 40, 48.8, 8, 0.9, 0xa98b69, "south gate wall west");
+  add(-5.6, 0, 40, 3.2, 9.2, 1.8, 0xb89a74, "south gate west tower");
   add(0, 5.6, 40, 8, 2.4, 0.9, 0xa98b69, "south gate lintel");
+  add(5.6, 0, 40, 3.2, 9.2, 1.8, 0xb89a74, "south gate east tower");
+  add(39.6, 0, 40, 64.8, 8, 0.9, 0xa98b69, "south gate wall east");
 
-  // South Gate Bastion Towers
-  add(-5.5, 0, 40, 3.2, 9.2, 0.9, 0xb89a74, "south gate west tower");
-  add(5.5, 0, 40, 3.2, 9.2, 0.9, 0xb89a74, "south gate east tower");
-
-  // Crenellated Battlements across City Walls
+  // Crenellated Battlements across City Walls (Solid obstacles for rooftop parkour)
   for (const x of [
     -52, -48, -44, -40, -34, -30, -26, -22, -18, -14, -10, 10, 14, 18, 22, 26,
-    30, 34, 40, 44, 48, 52,
+    30, 34, 40, 44, 48, 52, 56, 60, 64, 68,
   ]) {
-    decor(x, 8, 40, 2.4, 0.7, 1.3, 0xb89a74, "battlement");
+    add(x, 8, 40, 2.4, 0.7, 1.3, 0xb89a74, "battlement");
   }
   for (const z of [-65, -55, -45, -35, -25, -15, -5, 5, 15, 25, 35]) {
-    decor(-56, 8, z, 1.4, 0.7, 2.4, 0xb89a74, "west battlement");
-    decor(56, 8, z, 1.4, 0.7, 2.4, 0xb89a74, "east battlement");
+    add(-56, 8, z, 1.4, 0.7, 2.4, 0xb89a74, "west battlement");
+    add(72, 8, z, 1.4, 0.7, 2.4, 0xb89a74, "east battlement");
   }
-  label(group, "SOUTH GATE", 0, 6.6, 39.3, 3.5);
 
   // ==========================================
   // NORTHERN PLATEAU: FIRST TEMPLE (SOLOMON'S TEMPLE)
   // ==========================================
   // Elevated Ashlar Limestone Platform on Mount Moriah
   add(23, 0, -58, 44, 1.2, 22, palette.limestone, "temple ashlar platform");
+  // Approach steps ascending north onto the platform
   for (let step = 0; step < 4; step++) {
     add(
       23,
       step * 0.3,
-      -47 + step * 0.35,
+      -45.25 - step * 0.5,
       16,
       0.3,
-      0.35,
+      0.5,
       palette.sandstone,
       "temple approach step",
     );
   }
   // Temple Sanctuary (Debir & Heikhal)
   add(28, 1.2, -61, 16, 7.5, 14, palette.paleStone, "temple sanctuary wall");
-  decor(
+  // Solid cedar roof slab so the player stands firmly on top of the roof at y = 9.0m
+  add(
     28,
     8.7,
     -61,
@@ -502,7 +525,7 @@ export function buildJerusalem(
     0.3,
     14.5,
     palette.timber,
-    "temple cedar cornice frieze",
+    "temple cedar roof slab",
   );
   // Temple Portico (Ulam)
   add(28, 1.2, -52.5, 16, 5.5, 3, palette.limestone, "temple portico");
@@ -521,7 +544,6 @@ export function buildJerusalem(
   decor(12, 2.6, -56, 4.7, 0.2, 4.7, palette.brass, "altar bronze brim");
   oilLamp(group, 8, 2.6, -54);
   oilLamp(group, 16, 2.6, -54);
-  label(group, "TEMPLE PRECINCT", 28, 7.2, -50.8, 4);
 
   // ==========================================
   // LOWER CITY: WATERS OF SHILOAH (POOL OF SILOAM)
@@ -554,7 +576,6 @@ export function buildJerusalem(
   vessel(group, 29.5, 0.5, 18, 1.1, palette.clay);
   vessel(group, 29.5, 0.5, 22, 0.9, palette.clay);
   vessel(group, 44.5, 0.5, 20, 1.0, palette.clay);
-  label(group, "WATERS OF SHILOAH", 37, 2.1, 14.5, 4.2);
 
   // ==========================================
   // CENTRAL BAZAAR & PUBLIC CITY WELL / CISTERN
@@ -589,7 +610,7 @@ export function buildJerusalem(
     { x: -7, z: 10, color: 0x9b3a28, name: "market awning 1 (textiles)" },
     { x: 7, z: 10, color: 0x314c64, name: "market awning 2 (pottery)" },
     { x: -7, z: -2, color: 0xc89b3c, name: "market awning 3 (grain)" },
-    { x: 7, z: -2, color: 0x407b78, name: "market awning 4 (spices)" },
+    { x: 9.2, z: -2, color: 0x407b78, name: "market awning 4 (spices)" },
   ];
   for (const s of stalls) {
     add(s.x, 0, s.z, 3.2, 0.85, 1.6, palette.timber, `stall table at ${s.x}`);
@@ -617,18 +638,18 @@ export function buildJerusalem(
   vessel(group, 7.6, 0.85, 10, 0.7, palette.darkClay);
   decor(-7, 0.85, -2, 0.8, 0.35, 0.6, 0xd4b88a, "grain sack 1");
   decor(-6.2, 0.85, -2, 0.8, 0.35, 0.6, 0xc49a70, "grain sack 2");
-  vessel(group, 6.5, 0.85, -2, 0.75, palette.brass);
-  vessel(group, 7.5, 0.85, -2, 0.65, palette.clay);
+  vessel(group, 8.7, 0.85, -2, 0.75, palette.brass);
+  vessel(group, 9.7, 0.85, -2, 0.65, palette.clay);
 
   // Pack donkeys resting at the market and stables
-  packDonkey(group, -9.5, 0, 8, Math.PI / 4);
-  packDonkey(group, -27, 0, -23, Math.PI / 2);
+  packDonkey(group, -9.5, 0, 8, Math.PI / 4, solids);
+  packDonkey(group, -27, 0, -23, Math.PI / 2, solids);
 
   // ==========================================
   // RESIDENTIAL DISTRICTS: FOUR-ROOM HOUSES
   // ==========================================
   // Western Upper City Quarter (Lehi's neighborhood & authentic Israelite homes)
-  // and Eastern Lower City Quarter (Craftsmen & Weavers)
+  // and Eastern Lower City Quarter (Craftsmen, Weavers & Expanded East Sector)
   for (const [x, z, w, d, h, c] of [
     // Proven core dwellings (tested by follow camera & playtest feedback)
     [-27, 31, 10, 10, 5.1, 0xd1ac84],
@@ -639,7 +660,6 @@ export function buildJerusalem(
     [27, -1, 10, 10, 4.3, 0xb68e69],
     [-27, -15, 10, 10, 5.0, 0xcfad86], // Lehi's house block
     [27, -18, 10, 10, 5.4, 0xc49a70],
-    [0, 18, 14, 8, 4.6, 0xcfad86],
     [-6, 0, 14, 8, 5.2, 0xd1ac84],
     // Expanded Upper City Western Quarter (deepening Lehi's neighborhood)
     [-43, 31, 10, 10, 4.8, 0xc8a278],
@@ -651,6 +671,10 @@ export function buildJerusalem(
     [43, -1, 10, 10, 5.2, 0xd1ac84],
     [43, -18, 10, 10, 4.8, 0xcaa680],
     [43, -32, 10, 10, 5.0, 0xd8b58d],
+    // Additional eastern blocks expanding Jerusalem exploration
+    [59, 14, 10, 10, 4.8, 0xd4b088],
+    [59, -1, 10, 10, 5.2, 0xcfad86],
+    [59, -18, 10, 10, 4.6, 0xc8a278],
   ]) {
     cityBlock(add, decor, group, solids, x, z, w, d, h, c);
   }
@@ -659,6 +683,7 @@ export function buildJerusalem(
   decor(-32.06, 0, -15, 0.12, 2.8, 2.8, palette.indigo, "Lehi indigo doorway");
   decor(-32.15, 2.8, -15, 0.28, 0.2, 3.2, palette.timber, "Lehi door lintel");
   const sign = label(group, "LEHI’S HOUSE", -32.22, 3.5, -15, 2.6);
+  sign.name = "LEHI’S HOUSE plaque";
   sign.rotation.y = -Math.PI / 2;
   oilLamp(group, -32.15, 1.2, -13.2);
   oilLamp(group, -32.15, 1.2, -16.8);
@@ -670,6 +695,8 @@ export function buildJerusalem(
   add(-35, 4.2, 14, 6.0, 0.22, 1.4, palette.timber, "rooftop plank bridge west 1");
   add(-35, 4.4, -1, 6.0, 0.22, 1.4, palette.timber, "rooftop plank bridge west 2");
   add(35, 4.5, 14, 6.0, 0.22, 1.4, palette.timber, "rooftop plank bridge east 1");
+  add(51, 4.5, 14, 6.0, 0.22, 1.4, palette.timber, "rooftop plank bridge east 2");
+  add(51, 4.7, -1, 6.0, 0.22, 1.4, palette.timber, "rooftop plank bridge east 3");
 
   // Rooftop shade arbors (woven reed shelters for sleeping during hot seasons)
   decor(-27, 5.4, 31, 4.5, 0.12, 4.5, 0xcaa680, "rooftop reed canopy 1");
@@ -711,8 +738,8 @@ export function buildJerusalem(
   add(44, 0, 32, 0.25, 1.1, 8, palette.timber, "sheep hurdle east");
   decor(40, 0.02, 32, 7.5, 0.05, 7.5, 0xd4b88a, "sheep fold straw");
   add(37.5, 0, 32, 0.8, 0.45, 1.8, palette.paleStone, "sheep manger");
-  sheepModel(group, 39, 0, 31, Math.PI / 3);
-  sheepModel(group, 41.5, 0, 33, -Math.PI / 4);
+  sheepModel(group, 39, 0, 31, Math.PI / 3, solids);
+  sheepModel(group, 41.5, 0, 33, -Math.PI / 4, solids);
 
   // ==========================================
   // LABAN'S EXPANDED PALACE & FORTIFIED TREASURY
@@ -729,9 +756,9 @@ export function buildJerusalem(
     "palace interior stone paving",
   );
 
-  // Outer palace exterior walls and room partitions
-  add(-18, 0, -19, 0.7, 7, 20, 0xb19472, "palace west exterior");
-  add(18, 0, -19, 0.7, 7, 20, 0xb19472, "palace east exterior");
+  // Outer palace exterior walls and room partitions (aligned seamlessly at z = -28.5)
+  add(-18, 0, -18.75, 0.7, 7, 19.5, 0xb19472, "palace west exterior");
+  add(18, 0, -18.75, 0.7, 7, 19.5, 0xb19472, "palace east exterior");
 
   // Audience Hall dividing partition and corridor walls
   for (const [x, z, w, d] of [
@@ -784,8 +811,6 @@ export function buildJerusalem(
     add(x, 0, -11.5, 2, 0.85, 1.3, palette.timber, "offering table");
     vessel(group, x, 0.85, -11.5, 0.8, palette.brass);
   }
-  label(group, "LABAN’S PALACE", -2, 6, -28.08, 5);
-  label(group, "TREASURY", 14, 4, -18.4, 3);
 
   // Outer Treasury Antechamber Shelves & Chests (central aisle remains open)
   for (const x of [10, 16.8]) {
@@ -800,14 +825,140 @@ export function buildJerusalem(
   add(18, 0, -32.25, 0.7, 6.5, 7.5, 0xc6a780, "vault east wall");
   add(13, 0, -36, 10.7, 6.5, 0.7, 0xb19472, "vault north wall");
   // Stone Pedestal holding the Plates of Brass deep inside the vault
-  add(14, 0, -32, 2.2, 0.9, 1.8, palette.paleStone, "plates stone pedestal");
-  decor(14, 0.9, -32, 2.4, 0.15, 2.0, palette.brass, "plates pedestal trim");
+  add(14, 0, -33.5, 2.2, 0.9, 1.8, palette.paleStone, "plates stone pedestal");
+  decor(14, 0.9, -33.5, 2.4, 0.15, 2.0, palette.brass, "plates pedestal trim");
   // Vault gold & silver treasure chests
   add(10.5, 0, -34, 1.2, 1.1, 2, palette.timber, "vault gold chest");
   vessel(group, 10.5, 1.1, -34, 0.7, palette.brass);
   add(16.5, 0, -34, 1.2, 1.1, 2, palette.timber, "vault silver chest");
   vessel(group, 16.5, 1.1, -34, 0.7, palette.brass);
-  label(group, "INNER VAULT", 14, 3.8, -35.5, 3.2);
+
+  // Palace Inner Peristyle Courtyard Garden (North of Audience Hall)
+  add(-12, 0, -33.25, 0.7, 6.5, 9.5, 0xb19472, "courtyard west wall");
+  add(-3, 0, -38, 18, 6.5, 0.7, 0xb19472, "courtyard north wall");
+  for (const cx of [-9, -3, 3]) {
+    column(group, cx, -34, 4.8, 0.34, palette.paleStone);
+  }
+  // Carved stone palace fountain / water basin
+  add(-3, 0, -34, 2.4, 0.6, 2.4, palette.paleStone, "palace garden basin");
+  decor(-3, 0.5, -34, 1.8, 0.05, 1.8, palette.turquoise, "palace basin water");
+
+  // Palace Stables & Chariot Yard (West Flank of Palace, terminating at z = -18 to keep street clear)
+  add(-25, 0, -32, 14, 2.5, 0.6, palette.limestone, "stable north wall");
+  add(-32, 0, -25, 0.6, 2.5, 14, palette.limestone, "stable west wall");
+  add(-25, 0, -28, 8, 1.4, 0.3, palette.timber, "stable divider 1");
+  add(-25, 0, -22, 8, 1.4, 0.3, palette.timber, "stable divider 2");
+  add(-30, 0, -28, 1.2, 0.6, 2.0, palette.paleStone, "stone manger 1");
+  decor(-30, 0.55, -28, 1.0, 0.15, 1.8, 0xd4b88a, "manger straw 1");
+  add(-30, 0, -22, 1.2, 0.6, 2.0, palette.paleStone, "stone manger 2");
+  decor(-30, 0.55, -22, 1.0, 0.15, 1.8, 0xd4b88a, "manger straw 2");
+
+  // ==========================================
+  // NORTHEAST DISTRICT: POOL OF BETHESDA (JOHN 5:1–9)
+  // ==========================================
+  // Ancient twin stepped reservoir near the Sheep Gate with five colonnaded porches
+  // Retaining limestone perimeter walls
+  add(59, 0, -61.5, 13.6, 0.75, 1.0, palette.limestone, "bethesda north wall");
+  add(59, 0, -44.5, 13.6, 0.75, 1.0, palette.limestone, "bethesda south wall");
+  add(52.5, 0, -53, 1.0, 0.75, 16.0, palette.limestone, "bethesda west wall");
+  add(65.5, 0, -53, 1.0, 0.75, 16.0, palette.limestone, "bethesda east wall");
+
+  // Stepped stone descent into the pool so player can walk into the water
+  add(54.5, 0, -53, 1.2, 0.45, 10, palette.sandstone, "bethesda pool step 1");
+  add(55.7, 0, -53, 1.2, 0.25, 10, palette.sandstone, "bethesda pool step 2");
+  decor(59, 0.02, -53, 12, 0.03, 15, palette.sandstone, "bethesda pool floor");
+
+  // Turquoise pool water surface (walkable shallow wading pool)
+  const bethesdaWater = decor(
+    59,
+    0.22,
+    -53,
+    11.8,
+    0.04,
+    14.8,
+    0x36a9ba,
+    "bethesda pool water surface",
+  );
+  markScenery(bethesdaWater, {
+    kind: "decoration",
+    reason: "Pool of Bethesda water surface; pool floor provides walking support.",
+  });
+
+  // Concentric animated ripple ring meshes when the angel troubles the water
+  let bethesdaTime = 0;
+  const waterBaseY = bethesdaWater.position.y;
+  const bethesdaRipples: THREE.Mesh[] = [];
+  const rippleGeom = new THREE.RingGeometry(0.3, 0.65, 24);
+  rippleGeom.rotateX(-Math.PI / 2);
+  for (let k = 0; k < 3; k++) {
+    const rippleMat = new THREE.MeshBasicMaterial({
+      color: 0xd6f7fd,
+      transparent: true,
+      opacity: 0,
+      side: THREE.DoubleSide,
+    });
+    const ring = new THREE.Mesh(rippleGeom, rippleMat);
+    ring.position.set(59, 0.25, -53);
+    ring.name = `bethesda ripple ring ${k + 1}`;
+    markScenery(ring, {
+      kind: "decoration",
+      reason: "Procedural water ripple ring mesh.",
+    });
+    group.add(ring);
+    bethesdaRipples.push(ring);
+  }
+
+  // Five Colonnaded Porches (John 5:2: "having five porches")
+  // Porch 1: North Colonnade
+  for (const cx of [54, 57.5, 61, 64.5]) {
+    column(group, cx, -63.5, 3.6, 0.3, palette.paleStone);
+    add(cx, 0, -63.5, 0.65, 3.6, 0.65, palette.paleStone, "bethesda north column");
+  }
+  add(59, 3.6, -63.5, 12.5, 0.2, 3.2, palette.timber, "bethesda north porch roof");
+
+  // Porch 2: South Colonnade
+  for (const cx of [54, 57.5, 61, 64.5]) {
+    column(group, cx, -42.5, 3.6, 0.3, palette.paleStone);
+    add(cx, 0, -42.5, 0.65, 3.6, 0.65, palette.paleStone, "bethesda south column");
+  }
+  add(59, 3.6, -42.5, 12.5, 0.2, 3.2, palette.timber, "bethesda south porch roof");
+
+  // Porch 3: West Colonnade
+  for (const cz of [-60, -56, -50, -46]) {
+    column(group, 50.5, cz, 3.6, 0.3, palette.paleStone);
+    add(50.5, 0, cz, 0.65, 3.6, 0.65, palette.paleStone, "bethesda west column");
+  }
+  add(50.5, 3.6, -53, 3.2, 0.2, 16.5, palette.timber, "bethesda west porch roof");
+
+  // Porch 4: East Colonnade
+  for (const cz of [-60, -56, -50, -46]) {
+    column(group, 67.5, cz, 3.6, 0.3, palette.paleStone);
+    add(67.5, 0, cz, 0.65, 3.6, 0.65, palette.paleStone, "bethesda east column");
+  }
+  add(67.5, 3.6, -53, 3.2, 0.2, 16.5, palette.timber, "bethesda east porch roof");
+
+  // Porch 5: Central Dividing Colonnade (dividing upper & lower basins)
+  for (const cx of [55.5, 59, 62.5]) {
+    column(group, cx, -53, 3.6, 0.3, palette.paleStone);
+    add(cx, 0, -53, 0.65, 3.6, 0.65, palette.paleStone, "bethesda central column");
+  }
+  add(59, 0.45, -53, 12, 0.45, 0.85, palette.limestone, "bethesda dividing stylobate");
+  add(59, 3.6, -53, 12, 0.2, 1.2, palette.timber, "bethesda central porch beam");
+
+  // Ambient Waiting Infirm & Disabled Figures under the porches
+  // Figure 1: Infirm man of 38 years lying on a woven sleeping mat under the west porch
+  decor(50.5, 0.03, -49, 1.1, 0.05, 2.1, 0xc4a676, "infirm man sleeping mat");
+  decor(50.5, 0.12, -49.6, 0.7, 0.14, 0.35, 0xd4c2a0, "infirm head pillow");
+  decor(50.5, 0.16, -49, 0.65, 0.22, 1.4, 0x6e5340, "infirm man mantle");
+
+  // Figure 2: Waiting figure seated against column under south porch
+  decor(57.5, 0.03, -42.5, 1.0, 0.03, 1.0, 0x8b5a42, "waiting citizen mat");
+  decor(57.5, 0.22, -42.5, 0.55, 0.4, 0.55, 0x564132, "waiting citizen seated");
+
+  // Figure 3: Waiting blind figure with staff on stone bench under north porch
+  add(61, 0, -63.5, 2.2, 0.5, 0.8, palette.limestone, "bethesda stone bench");
+  decor(61, 0.52, -63.5, 0.55, 0.5, 0.55, 0x7a624d, "seated blind figure");
+  decor(61.35, 0.5, -63.2, 0.06, 0.9, 0.06, palette.timber, "blind walking staff");
 
   // Palace Inner Peristyle Courtyard Garden (North of Audience Hall)
   add(-12, 0, -33.25, 0.7, 6.5, 9.5, 0xb19472, "courtyard west wall");
@@ -945,8 +1096,8 @@ export function buildJerusalem(
         : undefined,
     story: {
       laban,
-      treasury: { x: 14, y: 0, z: -24 },
-      plates: { x: 14, y: 0, z: -32 },
+      treasury: { x: 14, y: 0, z: -21 },
+      plates: { x: 14, y: 0, z: -24 },
       gate: { x: 0, y: 0, z: 40 },
       brothers,
       cave,
@@ -1068,15 +1219,29 @@ export function buildJerusalem(
         radius: 0.35,
       },
     ],
-    tokens:
-      id === "streets"
-        ? [
-            { id: "roof-route", x: 19, y: 5, z: 10 },
-            { id: "west-rooftop-token", x: -35, y: 5.0, z: 14 },
-            { id: "temple-overlook-token", x: 28, y: 8.8, z: -52.5 },
-          ]
-        : undefined,
-    bounds: { minX: -56, maxX: 56, minZ: -72, maxZ: 112 },
+    tokens: undefined,
+    bounds: { minX: -56, maxX: 72, minZ: -72, maxZ: 112 },
+    update: (dt: number) => {
+      bethesdaTime += dt;
+      const cycle = bethesdaTime % 6.0;
+      if (cycle >= 3.8 && cycle <= 5.8) {
+        const prog = (cycle - 3.8) / 2.0;
+        bethesdaWater.position.y = waterBaseY + Math.sin(cycle * 14) * 0.035;
+        for (let k = 0; k < bethesdaRipples.length; k++) {
+          const ring = bethesdaRipples[k];
+          const ringProg = (prog + k * 0.3) % 1.0;
+          const scale = 1.0 + ringProg * 4.2;
+          ring.scale.set(scale, scale, 1);
+          const mat = ring.material as THREE.MeshBasicMaterial;
+          mat.opacity = Math.sin(ringProg * Math.PI) * 0.65;
+        }
+      } else {
+        bethesdaWater.position.y = waterBaseY;
+        for (const ring of bethesdaRipples) {
+          (ring.material as THREE.MeshBasicMaterial).opacity = 0;
+        }
+      }
+    },
     ...finish(),
   };
 }

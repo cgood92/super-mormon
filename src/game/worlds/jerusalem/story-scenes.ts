@@ -691,6 +691,24 @@ export function createStoryScene(
       if (!tradePursuit || pursuitArmed)
         guardGrace = Math.max(0, guardGrace - dt);
       const pursuit = tradePursuit && pursuitArmed;
+      // Mutual separation force to prevent pursuers from merging
+      for (let i = 0; i < guards.length; i++) {
+        for (let j = i + 1; j < guards.length; j++) {
+          const g1 = guards[i].state;
+          const g2 = guards[j].state;
+          const dist = Math.hypot(g1.x - g2.x, g1.z - g2.z);
+          if (dist < 1.35 && dist > 0.001) {
+            const push = (1.35 - dist) * 0.5;
+            const nx = (g1.x - g2.x) / dist;
+            const nz = (g1.z - g2.z) / dist;
+            g1.x += nx * push;
+            g1.z += nz * push;
+            g2.x -= nx * push;
+            g2.z -= nz * push;
+          }
+        }
+      }
+
       for (let i = 0; i < guards.length; i++) {
         const guard = guards[i];
         const active =
@@ -700,8 +718,16 @@ export function createStoryScene(
             near(guard.state, p, 3.5) &&
             near(guardPoints[i], p, 6) &&
             hasLineOfSight(guard.state, player, world.solids));
-        if (active) stepActor(guard, p, dt, id === "night" ? 2.2 : 4.5, world);
-        else {
+        if (active) {
+          const flankSign = i % 2 === 0 ? 1 : -1;
+          const target = {
+            x: p.x + (i === 0 ? 0.6 : -0.6) * flankSign,
+            y: p.y,
+            z: p.z + (i === 0 ? -0.4 : 0.4) * flankSign,
+          };
+          const guardSpeed = (id === "night" ? 2.1 : 4.3) + (i % 2) * 0.35;
+          stepActor(guard, target, dt, guardSpeed, world);
+        } else {
           guard.state.runSpeed = 0;
           guard.state.move = "idle";
           guard.rig.update(dt, guard.state);
