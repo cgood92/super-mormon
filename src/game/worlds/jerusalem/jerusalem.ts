@@ -673,7 +673,6 @@ export function buildJerusalem(
   // ==========================================
   // Western Upper City Quarter (Lehi's neighborhood & authentic Israelite homes)
   // and Eastern Lower City Quarter (Craftsmen, Weavers & Expanded East Sector)
->>>>>>> origin/main
   for (const [x, z, w, d, h, c] of [
     // Proven core dwellings (tested by follow camera & playtest feedback)
     [-27, 31, 10, 10, 5.1, 0xd1ac84],
