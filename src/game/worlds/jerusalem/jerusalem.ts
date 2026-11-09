@@ -3,6 +3,7 @@ import { markScenery, sceneryBox, terracedRock } from "../shared/scenery";
 import * as THREE from "three";
 import type { WorldData, Solid } from "../../runtime/worlds";
 import type { CameraRoom } from "../../camera/camera-rooms";
+import { softBoxGeometry } from "../../rendering/soft-geometry";
 import {
   ambient,
   banner,
@@ -10,6 +11,7 @@ import {
   column,
   datePalm,
   label,
+  material,
   oilLamp,
   palette,
   vessel,
@@ -298,16 +300,35 @@ export function buildJerusalem(
     ground.material.roughness = 0.95;
     ground.material.needsUpdate = true;
   }
+  ground.castShadow = false;
   add(-36, 0, 5.5, 0.9, 8, 69, 0xa98b69, "west city wall");
   add(36, 0, 5.5, 0.9, 8, 69, 0xa98b69, "east city wall");
   add(0, 0, -29, 73, 8, 0.9, 0xa98b69, "north city wall");
   for (const x of [-20, 20])
     add(x, 0, 40, 32, 8, 0.9, 0xa98b69, "south gate wall");
   add(0, 5.6, 40, 8, 2.4, 0.9, 0xa98b69, "south gate lintel");
-  for (const x of [
+  const battlementPositions = [
     -34, -30, -26, -22, -18, -14, -10, 10, 14, 18, 22, 26, 30, 34,
-  ])
-    decor(x, 8, 40, 2.4, 0.7, 1.3, 0xb89a74, "battlement");
+  ];
+  const battlementGeo = softBoxGeometry(2.4, 0.7, 1.3, "battlement");
+  const battlementMat = material(0xb89a74);
+  const battlements = new THREE.InstancedMesh(
+    battlementGeo,
+    battlementMat,
+    battlementPositions.length,
+  );
+  battlements.name = "battlement";
+  battlements.castShadow = true;
+  battlements.receiveShadow = true;
+  const dummy = new THREE.Object3D();
+  battlementPositions.forEach((bx, i) => {
+    dummy.position.set(bx, 8 + 0.7 / 2, 40);
+    dummy.scale.set(2.4, 0.7, 1.3);
+    dummy.updateMatrix();
+    battlements.setMatrixAt(i, dummy.matrix);
+  });
+  battlements.instanceMatrix.needsUpdate = true;
+  group.add(battlements);
   label(group, "SOUTH GATE", 0, 6.6, 39.4, 3.5);
   for (const [x, z, w, d, h, c] of [
     [-27, 31, 10, 10, 5.1, 0xd1ac84],
@@ -353,7 +374,7 @@ export function buildJerusalem(
     [14, -9, 4, 0.65],
   ])
     add(x, 4.8, z, w, 1.7, d, 0xc6a780, "palace doorway lintel");
-  decor(
+  const palacePaving = decor(
     0,
     0.015,
     -18.75,
@@ -363,6 +384,7 @@ export function buildJerusalem(
     0xd0b38a,
     "palace interior stone paving",
   );
+  palacePaving.castShadow = false;
   for (const x of [-9, 5])
     for (const z of [-24, -18, -12]) {
       column(group, x, z, 6.1, 0.48, palette.paleStone);
@@ -397,17 +419,33 @@ export function buildJerusalem(
     add(x, 0, z, 0.32, 4.8, 0.32, palette.timber, "date palm trunk");
     solids.push({ x, y: 4.8, z, w: 2.4, h: 0.25, d: 2.4 });
   }
-  for (let i = 0; i < 12; i++)
-    add(
-      19,
-      i * 0.35,
-      24 - i * 1.1,
-      2.2,
-      0.35,
-      1.1,
-      0xc5a681,
-      "optional roof stair",
-    );
+  const stairGeo = softBoxGeometry(2.2, 0.35, 1.1, "optional roof stair");
+  const stairMat = material(0xc5a681);
+  const stairMesh = new THREE.InstancedMesh(stairGeo, stairMat, 12);
+  stairMesh.name = "optional roof stair";
+  stairMesh.castShadow = true;
+  stairMesh.receiveShadow = true;
+  const stairSolids: Solid[] = [];
+  const stairDummy = new THREE.Object3D();
+  for (let i = 0; i < 12; i++) {
+    const shape = {
+      x: 19,
+      y: i * 0.35,
+      z: 24 - i * 1.1,
+      w: 2.2,
+      h: 0.35,
+      d: 1.1,
+    };
+    solids.push(shape);
+    stairSolids.push(shape);
+    stairDummy.position.set(shape.x, shape.y + shape.h / 2, shape.z);
+    stairDummy.scale.set(shape.w, shape.h, shape.d);
+    stairDummy.updateMatrix();
+    stairMesh.setMatrixAt(i, stairDummy.matrix);
+  }
+  stairMesh.instanceMatrix.needsUpdate = true;
+  markScenery(stairMesh, { kind: "solid", solids: stairSolids });
+  group.add(stairMesh);
   add(20.5, 4.2, 10, 5.2, 0.35, 3.2, 0xd4b690, "roof terrace landing");
   // Place oil lamps on real surfaces (tables, chests, and dais) — no floating candles.
   for (const [x, y, z] of [

@@ -323,9 +323,21 @@ export function buildTreeOfLife(scene: T.Scene): TreeWorldData {
     building = p(67, -27, 15),
     family = p(-13, -46);
   // The entire western bank is gently walkable; obstacles never wall off exploration.
-  box(group, -36, -0.65, 0, 130, 0.65, 210, 0x778366, "wide field");
-  box(group, 67, -0.65, 0, 38, 0.65, 210, 0x7e8176, "far shore");
-  box(group, 37, -0.25, 0, 23, 0.2, 210, 0x354b50, "dark river in the gulf");
+  box(group, -36, -0.65, 0, 130, 0.65, 210, 0x778366, "wide field").castShadow =
+    false;
+  box(group, 67, -0.65, 0, 38, 0.65, 210, 0x7e8176, "far shore").castShadow =
+    false;
+  box(
+    group,
+    37,
+    -0.25,
+    0,
+    23,
+    0.2,
+    210,
+    0x354b50,
+    "dark river in the gulf",
+  ).castShadow = false;
   for (const x of [26, 48])
     for (let z = -100; z < 105; z += 9)
       oval(group, x, -4, z, 3, 5.7, 6, 0x6d6e61, "gulf cliff face");
