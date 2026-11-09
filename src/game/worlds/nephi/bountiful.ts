@@ -428,6 +428,107 @@ export function buildBountiful(scene: T.Scene): WorldData {
   root.add(powerGlow);
   let disposed = false;
   let shipBuilt = false;
+  const movieActors: ReturnType<typeof createCharacter>[] = [];
+  function ensureMovieActors() {
+    if (movieActors.length > 0) return movieActors;
+    const cast = [
+      createCharacter("lehi", { quality: "npc" }),
+      createCharacter("sariah", { quality: "npc" }),
+      createCharacter("wife", { quality: "npc" }),
+      createCharacter("child", { quality: "npc" }),
+    ];
+    for (const actor of cast) {
+      actor.group.name = `${actor.group.name} · boarding`;
+      root.add(actor.group);
+      movieActors.push(actor);
+    }
+    return movieActors;
+  }
+  const BOARDING_DECK_SPOTS = [
+    { x: 0, y: 4.2, z: -23 }, // Lehi (stern / helm)
+    { x: -2.2, y: 4.2, z: -24 }, // Sariah (near Lehi)
+    { x: 2.5, y: 4.2, z: -35 }, // Wife (middeck)
+    { x: 3.5, y: 4.2, z: -35 }, // Child (beside wife)
+    { x: 4.5, y: 4.2, z: -31 }, // Laman (starboard rail)
+    { x: -4.5, y: 4.2, z: -31 }, // Lemuel (port rail)
+    { x: 0, y: 4.2, z: -33 }, // Nephi (player - middeck mast)
+  ];
+  const BOARDING_BEACH_WAITING = [
+    { x: 21.0, y: 0, z: -27 },
+    { x: 22.5, y: 0, z: -27 },
+    { x: 24.0, y: 0, z: -27 },
+    { x: 25.5, y: 0, z: -27 },
+    { x: 27.0, y: 0, z: -27 },
+    { x: 28.5, y: 0, z: -27 },
+    { x: 30.0, y: 0, z: -27 },
+  ];
+  function getBoardingState(index: number, t: number) {
+    const start_i = 3.2 + index * 0.35;
+    const charTime = t - start_i;
+    const waiting = BOARDING_BEACH_WAITING[index];
+    const deckSpot = BOARDING_DECK_SPOTS[index];
+    if (charTime <= 0) {
+      return {
+        x: waiting.x,
+        y: waiting.y,
+        z: waiting.z,
+        yaw: -Math.PI / 2,
+        runSpeed: 0,
+      };
+    }
+    if (charTime >= 2.0) {
+      return {
+        x: deckSpot.x,
+        y: deckSpot.y,
+        z: deckSpot.z,
+        yaw: Math.PI,
+        runSpeed: 0,
+      };
+    }
+    const p = charTime / 2.0;
+    if (p < 0.2) {
+      const frac = p / 0.2;
+      return {
+        x: waiting.x + frac * (19.0 - waiting.x),
+        y: 0,
+        z: -27,
+        yaw: -Math.PI / 2,
+        runSpeed: 1,
+      };
+    }
+    if (p < 0.55) {
+      const frac = (p - 0.2) / 0.35;
+      return {
+        x: 19.0 - frac * 9.75,
+        y: frac * 4.1,
+        z: -27,
+        yaw: -Math.PI / 2,
+        runSpeed: 1,
+      };
+    }
+    if (p < 0.75) {
+      const frac = (p - 0.55) / 0.2;
+      return {
+        x: 9.25 - frac * 6.25,
+        y: 4.1 + frac * 0.1,
+        z: -27,
+        yaw: -Math.PI / 2,
+        runSpeed: 1,
+      };
+    }
+    const frac = (p - 0.75) / 0.25;
+    const targetX = deckSpot.x;
+    const targetZ = deckSpot.z;
+    const dx = targetX - 3.0;
+    const dz = targetZ - -27;
+    return {
+      x: 3.0 + frac * dx,
+      y: 4.2,
+      z: -27 + frac * dz,
+      yaw: Math.atan2(dx, dz),
+      runSpeed: 1,
+    };
+  }
   const data: WorldData = {
     name: "Bountiful",
     initialObjective: "Climb the mountain trail and pray",
@@ -473,6 +574,33 @@ export function buildBountiful(scene: T.Scene): WorldData {
         power = 0,
         reconciliationTime = 0,
         hitTree = -1;
+      let movieTime = 0;
+      let lastAction = false;
+      let cinematicCamera:
+        | {
+            cut?: boolean;
+            position: { x: number; y: number; z: number };
+            focus: { x: number; y: number; z: number };
+          }
+        | undefined;
+      const advance = () => {
+        if (finished) return;
+        if (movieTime < 3.2) movieTime = 3.2;
+        else if (movieTime < 7.5) movieTime = 7.5;
+        else {
+          movieTime = 12.0;
+          if (!finished) {
+            finished = true;
+            hooks.complete();
+          }
+        }
+      };
+      const onPointerDown = () => {
+        if (phase === "movie") advance();
+      };
+      if (typeof window !== "undefined") {
+        window.addEventListener("pointerdown", onPointerDown);
+      }
       const held = new Set<T.Object3D>();
       const equip = (object: T.Object3D, carrying: boolean) => {
         if (!hooks.attachEquipment) return;
@@ -581,9 +709,17 @@ export function buildBountiful(scene: T.Scene): WorldData {
                       ? carrying
                         ? `Carry timber to plan ${count + 1}/4 • face along its length`
                         : `${fallen ? "Pick up the felled timber" : !hasAxe ? "Pick up the axe" : `Cut timber ${trees + 1}/4 • ${strikes}/3 axe blows`}`
-                      : "Explore the ship; climb the stairs and visit the ship’s wheel";
+                      : phase === "movie"
+                        ? movieTime < 3.2
+                          ? "The ship is completed after the manner which the Lord had shown · 1 Nephi 18:1–4"
+                          : movieTime < 7.5
+                            ? "All the family go down into the ship with their provisions · 1 Nephi 18:5–6"
+                            : "The ship puts forth into the sea toward the promised land · 1 Nephi 18:8"
+                        : "The voyage begins · 1 Nephi 18";
       return {
-        movementLocked: () => dialog || phase === "power",
+        movementLocked: () =>
+          dialog || phase === "power" || phase === "movie" || phase === "done",
+        camera: () => cinematicCamera,
         snapshot: () => ({
           phase,
           strikes,
@@ -595,8 +731,147 @@ export function buildBountiful(scene: T.Scene): WorldData {
           fallen,
           target: target(),
           sockets,
+          movieBeat:
+            phase === "movie"
+              ? movieTime < 3.2
+                ? "completed"
+                : movieTime < 7.5
+                  ? "boarding"
+                  : "sailing"
+              : undefined,
+          movieTime: phase === "movie" ? movieTime : undefined,
         }),
         update(dt, player, input) {
+          if (phase === "movie") {
+            const actionPressed = !!(input?.jump || input?.interact);
+            if (actionPressed && !lastAction) {
+              advance();
+            }
+            lastAction = actionPressed;
+            movieTime += Math.max(0, dt);
+            if (movieTime >= 12.0 && !finished) {
+              finished = true;
+              hooks.complete();
+            }
+
+            ensureMovieActors();
+            const actors = [
+              movieActors[0], // Lehi
+              movieActors[1], // Sariah
+              movieActors[2], // Wife
+              movieActors[3], // Child
+              people[0], // Laman
+              people[1], // Lemuel
+            ];
+
+            if (movieTime < 7.5) {
+              ship.group.position.set(0, 0, -40);
+              ship.group.rotation.set(0, 0, 0);
+              for (let i = 0; i < actors.length; i++) {
+                const st = getBoardingState(i, movieTime);
+                actors[i].update(dt, {
+                  x: st.x,
+                  y: st.y,
+                  z: st.z,
+                  vx: 0,
+                  vy: 0,
+                  vz: 0,
+                  yaw: st.yaw,
+                  grounded: true,
+                  runSpeed: st.runSpeed,
+                  move: st.runSpeed > 0 ? "run" : "idle",
+                });
+              }
+              const nephiState = getBoardingState(6, movieTime);
+              player.x = nephiState.x;
+              player.y = nephiState.y;
+              player.z = nephiState.z;
+              player.yaw = nephiState.yaw;
+              player.grounded = true;
+
+              if (movieTime < 3.2) {
+                cinematicCamera = {
+                  position: { x: 25, y: 9.0, z: -15 },
+                  focus: { x: 2, y: 5.5, z: -38 },
+                  cut: movieTime < 0.1,
+                };
+              } else {
+                cinematicCamera = {
+                  position: { x: 18, y: 7.2, z: -17 },
+                  focus: { x: 8, y: 4.5, z: -27 },
+                  cut: Math.abs(movieTime - 3.2) < 0.1,
+                };
+              }
+            } else {
+              const sailT = Math.min(1, (movieTime - 7.5) / 4.5);
+              const ease = sailT * sailT * (3 - 2 * sailT);
+              const shipZ = -40 - ease * 42;
+              const shipY = Math.sin((movieTime - 7.5) * 1.8) * 0.08;
+              const shipRotZ = Math.sin((movieTime - 7.5) * 1.4) * 0.02;
+              const shipRotX = Math.sin((movieTime - 7.5) * 1.0) * 0.012;
+              ship.group.position.set(0, shipY, shipZ);
+              ship.group.rotation.set(shipRotX, 0, shipRotZ);
+
+              for (let i = 0; i < actors.length; i++) {
+                const local = {
+                  x: BOARDING_DECK_SPOTS[i].x,
+                  y: BOARDING_DECK_SPOTS[i].y,
+                  z: BOARDING_DECK_SPOTS[i].z - -40,
+                };
+                const worldPos = new T.Vector3(local.x, local.y, local.z)
+                  .applyEuler(ship.group.rotation)
+                  .add(ship.group.position);
+                actors[i].update(dt, {
+                  x: worldPos.x,
+                  y: worldPos.y,
+                  z: worldPos.z,
+                  vx: 0,
+                  vy: 0,
+                  vz: 0,
+                  yaw: Math.PI,
+                  grounded: true,
+                  runSpeed: 0,
+                  wave: true,
+                });
+              }
+
+              const nephiLocal = {
+                x: BOARDING_DECK_SPOTS[6].x,
+                y: BOARDING_DECK_SPOTS[6].y,
+                z: BOARDING_DECK_SPOTS[6].z - -40,
+              };
+              const nephiWorld = new T.Vector3(
+                nephiLocal.x,
+                nephiLocal.y,
+                nephiLocal.z,
+              )
+                .applyEuler(ship.group.rotation)
+                .add(ship.group.position);
+              player.x = nephiWorld.x;
+              player.y = nephiWorld.y;
+              player.z = nephiWorld.z;
+              player.yaw = Math.PI;
+              player.grounded = true;
+
+              cinematicCamera = {
+                position: { x: 20, y: 8.5, z: -26 - ease * 14 },
+                focus: { x: 0, y: 5.5, z: ship.group.position.z },
+                cut: Math.abs(movieTime - 7.5) < 0.1,
+              };
+            }
+
+            carried.visible = false;
+            marker.visible = false;
+            tool.visible = false;
+            axe.visible = false;
+
+            return {
+              objective: objective(),
+              prompt: "",
+              carrying: false,
+              wave: movieTime >= 7.5,
+            };
+          }
           animationTime += dt;
           swing = Math.max(0, swing - dt);
           spark = Math.max(0, spark - dt);
@@ -867,14 +1142,6 @@ export function buildBountiful(scene: T.Scene): WorldData {
                 placedSolids.forEach((solid) =>
                   solids.splice(solids.indexOf(solid), 1),
                 );
-                Object.assign(player, ship.points.deckArrival, {
-                  vx: 0,
-                  vy: 0,
-                  vz: 0,
-                  grounded: true,
-                  yaw: Math.PI,
-                });
-                solids.push(...ship.solids);
                 for (let i = 0; i < 14; i++)
                   block(
                     19 - i * 0.75,
@@ -898,13 +1165,21 @@ export function buildBountiful(scene: T.Scene): WorldData {
                   true,
                   "Gangway landing",
                 );
+                solids.push(...ship.solids);
                 climbables.push(...ship.climbables);
                 shipBuilt = true;
-                say("A ship completed", "A ship completed.", "explore");
+                phase = "movie";
+                movieTime = 0;
+                cinematicCamera = {
+                  position: { x: 25, y: 9.0, z: -15 },
+                  focus: { x: 2, y: 5.5, z: -38 },
+                  cut: true,
+                };
+                ensureMovieActors();
+                hooks.toast(
+                  "The ship is completed. The family prepares to depart.",
+                );
               }
-            } else if (phase === "explore" && !finished) {
-              finished = true;
-              hooks.complete();
             }
           }
           return {
@@ -914,6 +1189,9 @@ export function buildBountiful(scene: T.Scene): WorldData {
           };
         },
         dispose() {
+          if (typeof window !== "undefined") {
+            window.removeEventListener("pointerdown", onPointerDown);
+          }
           for (const object of held) root.add(object);
           held.clear();
           carried.visible = false;
@@ -921,12 +1199,22 @@ export function buildBountiful(scene: T.Scene): WorldData {
           tool.visible = false;
           sparkMaterial.opacity = 0;
           powerMaterial.opacity = 0;
+          movieActors.forEach((a) => {
+            a.dispose();
+            a.group.removeFromParent();
+          });
+          movieActors.length = 0;
         },
       };
     },
     dispose() {
       if (disposed) return;
       disposed = true;
+      movieActors.forEach((a) => {
+        a.dispose();
+        a.group.removeFromParent();
+      });
+      movieActors.length = 0;
       people.forEach((a) => a.dispose());
       familyCamp.dispose();
       const geometries = new Set<T.BufferGeometry>(),
