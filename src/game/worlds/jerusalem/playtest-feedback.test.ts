@@ -230,3 +230,155 @@ test("Nephi model has clean sculpted face and noble profile", () => {
     nephi.dispose();
   }
 });
+
+test("expanded Jerusalem features Solomon's Temple, Waters of Shiloah, market stalls, and city cistern", () => {
+  const scene = new THREE.Scene();
+  const world = buildJerusalem("streets", scene);
+  try {
+    // 1. Solomon's Temple Precinct
+    const templePlatform = scene.getObjectByName("temple ashlar platform");
+    assert.ok(templePlatform, "temple ashlar platform exists");
+    const boaz = scene.getObjectByName("bronze pillar Boaz");
+    const jachin = scene.getObjectByName("bronze pillar Jachin");
+    assert.ok(boaz, "Boaz pillar exists");
+    assert.ok(jachin, "Jachin pillar exists");
+    const altar = scene.getObjectByName("temple altar base");
+    assert.ok(altar, "great altar exists in temple precinct");
+
+    // 2. Waters of Shiloah (Pool of Siloam)
+    const siloam = scene.getObjectByName("waters of shiloah pool surface");
+    assert.ok(siloam, "waters of shiloah pool surface exists");
+    const conduit = scene.getObjectByName("conduit tunnel mouth");
+    assert.ok(conduit, "conduit tunnel mouth exists");
+
+    // 3. Public City Well / Cistern
+    const wellCurb = scene.getObjectByName("city well curb");
+    assert.ok(wellCurb, "city well curb exists");
+    const trough = scene.getObjectByName("animal water trough");
+    assert.ok(trough, "animal water trough exists");
+
+    // 4. Market Stalls with Walkable Canopy Awnings
+    const awning1 = scene.getObjectByName("market awning 1 (textiles)");
+    const awning2 = scene.getObjectByName("market awning 2 (pottery)");
+    assert.ok(awning1, "market awning 1 exists");
+    assert.ok(awning2, "market awning 2 exists");
+
+    // Player can stand on top of market awning
+    const awningWalker = createPlayer(-7, 3.0, 10);
+    awningWalker.grounded = false;
+    awningWalker.vy = -1;
+    for (let frame = 0; frame < 15; frame++) {
+      stepPlayer(
+        awningWalker,
+        { x: 0, y: 0, jump: false, jumpHeld: false },
+        1 / 60,
+        0,
+        world.solids,
+      );
+    }
+    assert.equal(awningWalker.grounded, true, "player lands on market awning platform");
+    assert.ok(awningWalker.y >= 2.4, `player standing atop awning: y=${awningWalker.y}`);
+
+    // 5. Ambient Animals
+    const donkeys = scene.children[0].children.filter(
+      (c) => c.name === "Jerusalem pack donkey",
+    );
+    assert.ok(donkeys.length >= 2, "at least 2 pack donkeys in Jerusalem");
+    const sheep = scene.children[0].children.filter(
+      (c) => c.name === "Jerusalem flock sheep",
+    );
+    assert.ok(sheep.length >= 2, "flock sheep present in animal pen");
+  } finally {
+    world.dispose?.();
+  }
+});
+
+test("expanded Laban's palace includes audience hall, inner courtyard garden, stables, and fortified inner vault", () => {
+  const scene = new THREE.Scene();
+  const world = buildJerusalem("night", scene);
+  try {
+    // Inner Fortified Vault
+    const vaultWest = scene.getObjectByName("vault west wall");
+    const vaultNorth = scene.getObjectByName("vault north wall");
+    assert.ok(vaultWest, "inner vault west wall exists");
+    assert.ok(vaultNorth, "inner vault north wall exists");
+
+    // Plates pedestal located deep inside vault
+    const pedestal = scene.getObjectByName("plates stone pedestal");
+    assert.ok(pedestal, "plates stone pedestal exists");
+    assert.equal(world.story?.plates.x, 14);
+    assert.equal(world.story?.plates.z, -32);
+    assert.equal(world.story?.treasury.x, 14);
+    assert.equal(world.story?.treasury.z, -24);
+
+    // Inner Courtyard Garden
+    const gardenBasin = scene.getObjectByName("palace garden basin");
+    assert.ok(gardenBasin, "palace garden basin exists");
+
+    // Palace Stables
+    const stableNorth = scene.getObjectByName("stable north wall");
+    const manger = scene.getObjectByName("stone manger 1");
+    assert.ok(stableNorth, "palace stable north wall exists");
+    assert.ok(manger, "palace stable stone manger exists");
+
+    // Player can walk into the inner vault up to the Plates pedestal
+    const infiltrator = createPlayer(14, 0, -20);
+    for (let frame = 0; frame < 120; frame++) {
+      const dz = -32 - infiltrator.z;
+      const d = Math.abs(dz);
+      if (d < 0.2) break;
+      stepPlayer(
+        infiltrator,
+        { x: 0, y: -Math.sign(dz), jump: false, jumpHeld: false },
+        1 / 60,
+        Math.PI, // Facing north
+        world.solids,
+      );
+    }
+    assert.ok(
+      infiltrator.z <= -30,
+      `infiltrator reached inner vault chamber: z=${infiltrator.z}`,
+    );
+  } finally {
+    world.dispose?.();
+  }
+});
+
+test("rooftop platforming provides playable highway across dwellings with plank bridges and tokens", () => {
+  const scene = new THREE.Scene();
+  const world = buildJerusalem("streets", scene);
+  try {
+    // Rooftop plank bridges exist
+    const bridgeWest = scene.getObjectByName("rooftop plank bridge west 1");
+    assert.ok(bridgeWest, "rooftop plank bridge west exists");
+
+    // Tokens rewarding rooftop platforming
+    assert.ok(world.tokens, "tokens exist in streets mode");
+    assert.ok(world.tokens.find((t) => t.id === "roof-route"), "roof-route token exists");
+    assert.ok(world.tokens.find((t) => t.id === "west-rooftop-token"), "west rooftop token exists");
+    assert.ok(world.tokens.find((t) => t.id === "temple-overlook-token"), "temple overlook token exists");
+
+    // Player can walk across western rooftop bridge from x=-27 dwelling toward x=-43 dwelling
+    const bridgeRunner = createPlayer(-28, 4.37, 14);
+    bridgeRunner.grounded = true;
+    for (let frame = 0; frame < 90; frame++) {
+      stepPlayer(
+        bridgeRunner,
+        { x: 1, y: 0, jump: false, jumpHeld: false }, // stickX +1 moves west (-X) when cameraYaw=0
+        1 / 60,
+        0,
+        world.solids,
+      );
+    }
+    assert.ok(
+      bridgeRunner.x < -32,
+      `player crossed rooftop bridge over alley: x=${bridgeRunner.x}`,
+    );
+    assert.ok(
+      bridgeRunner.y >= 4.1,
+      `player stayed on rooftop bridge surface: y=${bridgeRunner.y}`,
+    );
+  } finally {
+    world.dispose?.();
+  }
+});
