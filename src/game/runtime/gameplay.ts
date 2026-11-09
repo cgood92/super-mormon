@@ -761,7 +761,26 @@ export class Gameplay {
 
   private updatePursuers(dt: number, movementLocked: boolean): boolean {
     if (this.guardsActive && !movementLocked && this.levelTime > 1.5) {
-      for (const guard of this.session.guards) {
+      // Guard separation steering: prevent pursuers from converging into a single overlapping mesh
+      for (let i = 0; i < this.session.guards.length; i++) {
+        for (let j = i + 1; j < this.session.guards.length; j++) {
+          const g1 = this.session.guards[i].state;
+          const g2 = this.session.guards[j].state;
+          const dist = Math.hypot(g1.x - g2.x, g1.z - g2.z);
+          if (dist < 1.35 && dist > 0.001) {
+            const push = (1.35 - dist) * 0.5;
+            const nx = (g1.x - g2.x) / dist;
+            const nz = (g1.z - g2.z) / dist;
+            g1.x += nx * push;
+            g1.z += nz * push;
+            g2.x -= nx * push;
+            g2.z -= nz * push;
+          }
+        }
+      }
+
+      for (let i = 0; i < this.session.guards.length; i++) {
+        const guard = this.session.guards[i];
         guard.timer -= dt;
         if (guard.timer <= 0) {
           guard.path = navigateGuard(
@@ -782,11 +801,23 @@ export class Gameplay {
         const dx = target.x - guard.state.x,
           dz = target.z - guard.state.z,
           d = Math.hypot(dx, dz) || 1;
+
+        // Distinct speeds and flanking lateral offset ensure pursuers maintain individual identities
+        const flankSign = i % 2 === 0 ? 1 : -1;
+        const flankX = (-dz / d) * 0.65 * flankSign;
+        const flankZ = (dx / d) * 0.65 * flankSign;
+        const aimX = target.x + flankX;
+        const aimZ = target.z + flankZ;
+        const adx = aimX - guard.state.x;
+        const adz = aimZ - guard.state.z;
+        const ad = Math.hypot(adx, adz) || 1;
+        const speedScale = 0.54 + (i % 2) * 0.08;
+
         stepPlayer(
           guard.state,
           {
-            x: (-dx / d) * 0.58,
-            y: (dz / d) * 0.58,
+            x: (-adx / ad) * speedScale,
+            y: (adz / ad) * speedScale,
             jump: false,
             jumpHeld: false,
             traversal: false,

@@ -672,17 +672,37 @@ export class FollowCamera {
     }
     safeEye.y = Math.max(safeEye.y, player.y + 0.22);
 
-    // When dropping down a stairwell or off a balcony, an overhead floor slab
-    // separates the previous eye from the lower-floor player. Transition directly
-    // to the clear lower-floor view rather than leaving the camera trapped upstairs.
+    // SM64 Lakitu occlusion recovery:
+    // If safeEye cannot see the player (e.g. trapped behind a corner, wall,
+    // narrow gap, or overhead floor slab after dropping down a balcony/stairwell),
+    // or if safeEye has lagged far behind the boom distance due to collision clamping,
+    // transition directly to the clear spring-arm eye.
+    const eyeSeesPlayer = cameraSegmentClear(this.focus, eye, blockers, 0.05);
+    const safeEyeSeesPlayer = cameraSegmentClear(
+      this.focus,
+      safeEye,
+      blockers,
+      0.05,
+    );
     const verticalSeparation = this.lastEye.y - player.y;
-    if (
-      verticalSeparation > 3.0 &&
-      safeEye.y - player.y > 2.0 &&
-      cameraSegmentClear(eye, eye, solids, 0.22) &&
-      cameraSegmentClear(this.focus, eye, solids, 0.05)
-    ) {
-      safeEye.copy(eye);
+
+    const stranded =
+      eyeSeesPlayer &&
+      (!safeEyeSeesPlayer ||
+        (verticalSeparation > 3.0 && safeEye.y - player.y > 2.0) ||
+        this.focus.distanceTo(safeEye) > this.boomDistance + 1.8);
+
+    if (stranded) {
+      safeEye.copy(recoverCameraEye(eye, solids, 0.22));
+      if (room) {
+        const b = room.viewBounds ?? room.bounds;
+        safeEye.x = clamp(safeEye.x, b.minX + 0.55, b.maxX - 0.55);
+        safeEye.z = clamp(safeEye.z, b.minZ + 0.55, b.maxZ - 0.55);
+        if (b.minY !== undefined && b.maxY !== undefined) {
+          safeEye.y = clamp(safeEye.y, b.minY + 0.25, b.maxY - 0.28);
+        }
+      }
+      safeEye.y = Math.max(safeEye.y, player.y + 0.22);
     }
 
     const leadLength = Math.min(1, speed / RUN_SPEED) * 0.29;
