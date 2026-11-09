@@ -86,7 +86,8 @@ function makeWorld(
 
 export function house(scene: THREE.Scene): WorldData {
   const { group, add, decor, finish } = makeWorld(scene, "interior");
-  decor(0, -0.4, 0, 36, 0.4, 42, 0xc9af88, "courtyard paving");
+  const paving = decor(0, -0.4, 0, 36, 0.4, 42, 0xc9af88, "courtyard paving");
+  paving.castShadow = false;
   // Courtyard walls with a 4.4 m front gate and open roof over the center.
   add(-15, 0, 0, 0.9, 5.5, 38, 0xb69772);
   add(15, 0, 0, 0.9, 5.5, 38, 0xb69772);
@@ -114,8 +115,10 @@ export function house(scene: THREE.Scene): WorldData {
     "camera-occludable roof",
   );
   roof.castShadow = true;
-  for (const z of [-4.5, -1, 3.2])
-    decor(-7, 0.01, z, 10, 0.035, 0.11, 0xb89b74, "floor seam");
+  for (const z of [-4.5, -1, 3.2]) {
+    const seam = decor(-7, 0.01, z, 10, 0.035, 0.11, 0xb89b74, "floor seam");
+    seam.castShadow = false;
+  }
   // East gallery: shallow steps lead to the second storey without repeated jumps.
   for (let i = 0; i < 9; i++)
     add(
