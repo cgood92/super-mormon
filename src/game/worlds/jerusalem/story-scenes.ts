@@ -23,7 +23,7 @@ export type StoryHooks = {
   toast(text: string): void;
   complete(): void;
   checkpoint(point: Point): void;
-  setMarker(point: Point): void;
+  setMarker(point: Point & { beamHeight?: number }): void;
   setDisguise(enabled: boolean): void;
   caught(): void;
 };
@@ -404,7 +404,12 @@ export function createStoryScene(
     plates.group.visible = true;
   }
   const marker = () => {
-    if (phase === "offer" || phase === "laban") hooks.setMarker(story.laban);
+    if (phase === "offer" || phase === "laban")
+      hooks.setMarker(
+        id === "night" && phase === "laban"
+          ? { ...story.laban, beamHeight: 0.75 }
+          : story.laban,
+      );
     else if (phase === "flee") hooks.setMarker(story.gate);
     else if (phase === "cave") hooks.setMarker(story.cave ?? story.brothers);
     else if (phase === "zoram")

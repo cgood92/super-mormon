@@ -849,8 +849,12 @@ export class Gameplay {
     prompt: string,
   ): void {
     if (this.session.goalMarker) {
+      const baseHeight =
+        (this.session.goalMarker.userData.beamHeight as number | undefined) ??
+        2.6;
+      const bob = baseHeight < 1.5 ? 0.03 : 0.12;
       this.session.goalMarker.children[1].position.y =
-        2.6 + Math.sin(this.time * 2) * 0.12;
+        baseHeight + Math.sin(this.time * 2) * bob;
       this.session.goalMarker.children[0].rotation.z += dt * 0.25;
     }
     const carrying = this.discoveries.carryObjects.find(

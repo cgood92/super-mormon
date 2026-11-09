@@ -122,8 +122,20 @@ export type WorldData = {
     cave?: Point;
     brothers: Point;
   };
-  goal: { x: number; y: number; z: number; radius?: number };
-  escapeGoal?: { x: number; y: number; z: number; radius?: number };
+  goal: {
+    x: number;
+    y: number;
+    z: number;
+    radius?: number;
+    beamHeight?: number;
+  };
+  escapeGoal?: {
+    x: number;
+    y: number;
+    z: number;
+    radius?: number;
+    beamHeight?: number;
+  };
   pursuers?: { x: number; y: number; z: number }[];
   bounds?: { minX: number; maxX: number; minZ: number; maxZ: number };
   dispose?: () => void;

@@ -1265,7 +1265,7 @@ export function buildJerusalem(
       id === "streets"
         ? home
         : id === "night"
-          ? { ...laban, radius: 3 }
+          ? { ...laban, radius: 3, beamHeight: 0.75 }
           : { x: 0, y: 0.8, z: -18, radius: 3.2 },
     escapeGoal:
       id === "trade" ? { ...cave, radius: 3 } : { ...brothers, radius: 3 },
