@@ -21,6 +21,7 @@ export interface GameUICallbacks {
   toggleSound(): void;
   invalidate(): void;
   setFullscreenPreference?(wants: boolean): void;
+  playApostleKart?(): void;
 }
 
 /** Owns game menus, device-specific hints, and controller setup. */
@@ -167,6 +168,13 @@ export class GameUI {
       "Move with {move}. Use {camera} to look around. Hold {jump} to leap higher.",
       [
         { label: "Keep exploring", run: () => {} },
+        {
+          label: "🏎️ Apostle Kart GP (Konami Code)",
+          run: () => {
+            this.callbacks.playApostleKart?.();
+          },
+          secondary: true,
+        },
         {
           label: "Moves & practice",
           run: () => this.showMoves(),

@@ -37,6 +37,8 @@ import { WorldSession } from "./world-session";
 import { Discoveries } from "./discoveries";
 import { Gameplay } from "./gameplay";
 import { CheckpointRecovery } from "./checkpoint-recovery";
+import { KonamiCodeDetector } from "../apostle-kart/konami";
+import { ApostleKartGame } from "../apostle-kart/apostle-kart";
 
 function parseSlowMoScale(search: string): number | null {
   try {
@@ -93,6 +95,9 @@ export class Game {
     },
     setFullscreenPreference: (wants) => {
       this.setWantsFullscreen(wants);
+    },
+    playApostleKart: () => {
+      this.launchApostleKart();
     },
     invalidate: () => {
       this.view.renderDirty = true;
@@ -157,6 +162,8 @@ export class Game {
   private pendingFullscreenResume = false;
   private loadGeneration = 0;
   private completionSceneSeen = false;
+  private kartGame: ApostleKartGame | null = null;
+  private konamiDetector: KonamiCodeDetector | null = null;
   constructor() {
     this.analytics.setFullscreen(document.fullscreenElement !== null);
     document.addEventListener("fullscreenchange", () => {
@@ -178,6 +185,13 @@ export class Game {
       )
         this.startGame();
     });
+    this.konamiDetector = new KonamiCodeDetector(() =>
+      this.launchApostleKart(),
+    );
+    const shortcut = document.getElementById("konami-shortcut");
+    if (shortcut) {
+      shortcut.addEventListener("click", () => this.launchApostleKart());
+    }
     el("pause").onclick = () => this.ui.pause();
     el("home").onclick = () => {
       if (this.started && !this.transition) {
@@ -600,6 +614,7 @@ export class Game {
   };
 
   private update = (dt: number, activeElapsed = dt) => {
+    if (this.kartGame) return;
     this.ui.refreshControlHints();
     if (
       this.ui.updateControllerSetup(
@@ -676,4 +691,50 @@ export class Game {
     delivery: this.session.world.delivery,
     deliveryDone: this.discoveries.deliveryDone,
   });
+
+  public launchApostleKart = (apostle = "oaks") => {
+    if (this.kartGame) return;
+    this.session.world?.organ?.stop();
+    this.view.suspend();
+    this.sound("win");
+
+    const overlay = document.createElement("div");
+    overlay.id = "konami-announcement";
+    overlay.style.cssText =
+      "position:fixed;inset:0;z-index:99999;background:radial-gradient(circle at center, #1b365d 0%, #090d16 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#ffd700;font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:24px;";
+    overlay.innerHTML = `
+      <div style="font-size:16px;letter-spacing:4px;color:#38bdf8;font-weight:800;margin-bottom:12px;text-transform:uppercase;">
+        ✨ KONAMI CODE UNLOCKED ✨
+      </div>
+      <h1 style="font-size:38px;margin:0 0 16px 0;font-style:italic;color:#ffd700;text-shadow:0 4px 18px rgba(0,0,0,0.8);">
+        🏎️ APOSTLE KART 🏁
+      </h1>
+      <h2 style="font-size:20px;color:#ffffff;margin:0 0 18px 0;font-weight:700;">
+        GENERAL CONFERENCE 500
+      </h2>
+      <p style="font-size:16px;color:#e2e8f0;max-width:480px;line-height:1.6;margin:0 0 24px 0;">
+        You take the wheel of <strong>President Dallin H. Oaks's</strong> Supreme Gavel Kart!<br>
+        Racing against the Quorum of the Twelve & First Presidency around Temple Square & the Conference Center rooftop!
+      </p>
+      <div style="font-size:13px;color:#94a3b8;letter-spacing:1px;">
+        Starting engines...
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    setTimeout(() => {
+      overlay.remove();
+      this.app.style.display = "none";
+      this.kartGame = new ApostleKartGame(
+        document.body,
+        () => {
+          this.kartGame = null;
+          this.app.style.display = "";
+          this.view.resume();
+          this.warp("hub");
+        },
+        apostle,
+      );
+    }, 1400);
+  };
 }
