@@ -16,6 +16,7 @@ export default defineConfig({
         roster: "roster.html",
         variety: "variety.html",
         mormon: "mormon.html",
+        kartRoster: "kart-roster.html",
       },
       output: {
         codeSplitting: {

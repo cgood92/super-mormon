@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Apostle Kart · Character Roster & Likenesses</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <style>
+      :root {
+        --bg-dark: #0a0f1d;
+        --card-bg: #131d31;
+        --card-border: #1e293b;
+        --accent-gold: #ffd700;
+        --accent-blue: #38bdf8;
+        --text-main: #f8fafc;
+        --text-muted: #94a3b8;
+        --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background-color: var(--bg-dark);
+        color: var(--text-main);
+        font-family: var(--font);
+        line-height: 1.5;
+        padding-bottom: 60px;
+        min-height: 100vh;
+      }
+      header {
+        background: linear-gradient(180deg, #101c36 0%, rgba(10, 15, 29, 0.95) 100%);
+        border-bottom: 2px solid rgba(255, 215, 0, 0.3);
+        padding: 24px 32px 20px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        backdrop-filter: blur(12px);
+      }
+      .header-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+      .title-group h1 {
+        font-size: 26px;
+        font-weight: 900;
+        font-style: italic;
+        color: var(--accent-gold);
+        letter-spacing: -0.5px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .title-group p {
+        color: var(--text-muted);
+        font-size: 14px;
+        margin-top: 4px;
+      }
+      .header-actions {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .btn {
+        background: #1e293b;
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 10px 18px;
+        border-radius: 20px;
+        font-weight: 700;
+        font-size: 14px;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+      }
+      .btn:hover {
+        background: #334155;
+        border-color: var(--accent-gold);
+      }
+      .btn-primary {
+        background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);
+        border-color: #f39c12;
+        color: #fff;
+        box-shadow: 0 4px 14px rgba(230, 126, 34, 0.4);
+      }
+      .btn-primary:hover {
+        background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+        transform: translateY(-1px);
+      }
+      .filter-bar {
+        max-width: 1400px;
+        margin: 20px auto 0;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .filter-pill {
+        background: #182234;
+        border: 1px solid #233149;
+        color: var(--text-muted);
+        padding: 6px 14px;
+        border-radius: 14px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .filter-pill.active, .filter-pill:hover {
+        background: #25334c;
+        color: #fff;
+        border-color: var(--accent-blue);
+      }
+      .main-content {
+        max-width: 1400px;
+        margin: 24px auto 0;
+        padding: 0 32px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 24px;
+      }
+      .card {
+        background: var(--card-bg);
+        border: 1.5px solid var(--card-border);
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        display: flex;
+        flex-direction: column;
+        transition: transform 0.2s ease, border-color 0.2s ease;
+      }
+      .card:hover {
+        transform: translateY(-4px);
+        border-color: rgba(255, 215, 0, 0.5);
+      }
+      .card-header-bar {
+        height: 8px;
+        width: 100%;
+      }
+      .portrait-wrapper {
+        position: relative;
+        width: 100%;
+        background: #0d1525;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 16px;
+        border-bottom: 1px solid var(--card-border);
+      }
+      .portrait-canvas {
+        width: 240px;
+        height: 240px;
+        border-radius: 16px;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+        background: #1a2333;
+      }
+      .racer-number-badge {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background: rgba(15, 23, 42, 0.85);
+        border: 1.5px solid var(--accent-gold);
+        color: var(--accent-gold);
+        font-size: 15px;
+        font-weight: 900;
+        padding: 4px 10px;
+        border-radius: 12px;
+        backdrop-filter: blur(4px);
+      }
+      .card-body {
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        gap: 14px;
+      }
+      .name-row {
+        display: flex;
+        flex-direction: column;
+      }
+      .name-row h2 {
+        font-size: 20px;
+        font-weight: 800;
+        color: #fff;
+      }
+      .official-title {
+        color: var(--accent-blue);
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-top: 2px;
+      }
+      .kart-row {
+        background: rgba(255, 255, 255, 0.04);
+        padding: 8px 12px;
+        border-radius: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 13px;
+      }
+      .kart-name-val {
+        color: var(--accent-gold);
+        font-weight: 700;
+      }
+      .stat-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .stat-row {
+        display: flex;
+        align-items: center;
+        font-size: 12px;
+        gap: 8px;
+      }
+      .stat-label {
+        width: 90px;
+        color: var(--text-muted);
+        font-weight: 600;
+      }
+      .stat-bar-track {
+        flex: 1;
+        height: 6px;
+        background: #1e293b;
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      .stat-bar-fill {
+        height: 100%;
+        border-radius: 3px;
+        background: linear-gradient(90deg, #38bdf8 0%, #ffd700 100%);
+      }
+      .features-box {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .feature-tag {
+        background: #1a2538;
+        border: 1px solid #28374d;
+        color: #cbd5e1;
+        font-size: 11px;
+        padding: 3px 8px;
+        border-radius: 8px;
+      }
+      .quote-box {
+        background: rgba(27, 54, 93, 0.4);
+        border-left: 3px solid var(--accent-gold);
+        padding: 8px 12px;
+        border-radius: 0 8px 8px 0;
+        font-size: 12px;
+        font-style: italic;
+        color: #e2e8f0;
+      }
+      .card-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: auto;
+      }
+      .card-actions .btn {
+        flex: 1;
+        justify-content: center;
+        font-size: 13px;
+        padding: 8px 12px;
+      }
+
+      /* 3D Inspect Modal */
+      #inspect-modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(10, 15, 29, 0.95);
+        backdrop-filter: blur(12px);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        padding: 24px;
+      }
+      .modal-card {
+        background: #141e33;
+        border: 2px solid var(--accent-gold);
+        border-radius: 24px;
+        width: 900px;
+        max-width: 96vw;
+        height: 640px;
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.8);
+        position: relative;
+      }
+      .modal-header {
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--card-border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .modal-title-wrap h2 {
+        font-size: 20px;
+        color: var(--accent-gold);
+      }
+      .modal-close-btn {
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        font-size: 24px;
+        cursor: pointer;
+        padding: 4px;
+      }
+      .modal-close-btn:hover {
+        color: #fff;
+      }
+      .modal-body {
+        display: flex;
+        flex: 1;
+        min-height: 0;
+      }
+      #modal-canvas-container {
+        flex: 1;
+        position: relative;
+        background: radial-gradient(circle at center, #1b2842 0%, #0d1424 100%);
+      }
+      .modal-sidebar {
+        width: 320px;
+        border-left: 1px solid var(--card-border);
+        padding: 20px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .hint-drag {
+        position: absolute;
+        bottom: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0,0,0,0.6);
+        color: #fff;
+        font-size: 12px;
+        padding: 4px 12px;
+        border-radius: 12px;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="header-container">
+        <div class="title-group">
+          <h1>🏎️ APOSTLE KART GRAND PRIX · ROSTER</h1>
+          <p>The First Presidency & Quorum of the Twelve Apostles racing lineup and custom karts.</p>
+        </div>
+        <div class="header-actions">
+          <a href="/?kart" class="btn btn-primary">🏁 Play Apostle Kart</a>
+          <a href="/" class="btn">⌂ Return to Gallery</a>
+        </div>
+      </div>
+      <div class="filter-bar">
+        <button class="filter-pill active" data-filter="all">All 15 Apostles</button>
+        <button class="filter-pill" data-filter="first-presidency">First Presidency (3)</button>
+        <button class="filter-pill" data-filter="quorum">Quorum of the Twelve (12)</button>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <div class="grid" id="roster-grid"></div>
+    </main>
+
+    <!-- 3D Inspect Modal -->
+    <div id="inspect-modal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-title-wrap">
+            <h2 id="modal-racer-name">Apostle Kart 3D Inspector</h2>
+            <span id="modal-racer-kart" style="color:var(--text-muted); font-size:13px;"></span>
+          </div>
+          <button class="modal-close-btn" id="modal-close">✕</button>
+        </div>
+        <div class="modal-body">
+          <div id="modal-canvas-container">
+            <div class="hint-drag">🖱️ Click & Drag to Rotate · Scroll to Zoom</div>
+          </div>
+          <div class="modal-sidebar">
+            <h3 style="font-size:15px; color:#fff;">Driver & Vehicle Profile</h3>
+            <p id="modal-desc" style="font-size:13px; color:var(--text-muted);"></p>
+            <div id="modal-stats" class="stat-list"></div>
+            <div id="modal-features" class="features-box"></div>
+            <a id="modal-race-btn" href="#" class="btn btn-primary" style="margin-top:auto; justify-content:center;">🏎️ Race as this Apostle</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/game/apostle-kart/roster-page.ts"></script>
+  </body>
+</html>

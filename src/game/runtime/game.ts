@@ -39,6 +39,7 @@ import { Gameplay } from "./gameplay";
 import { CheckpointRecovery } from "./checkpoint-recovery";
 import { KonamiCodeDetector } from "../apostle-kart/konami";
 import { ApostleKartGame } from "../apostle-kart/apostle-kart";
+import { getApostleById } from "../apostle-kart/roster";
 
 function parseSlowMoScale(search: string): number | null {
   try {
@@ -692,8 +693,15 @@ export class Game {
     deliveryDone: this.discoveries.deliveryDone,
   });
 
-  public launchApostleKart = (apostle = "oaks") => {
+  public launchApostleKart = (apostle?: string) => {
     if (this.kartGame) return;
+    const urlParams =
+      typeof location !== "undefined"
+        ? new URLSearchParams(location.search)
+        : null;
+    const selectedId = apostle || urlParams?.get("apostle") || "oaks";
+    const selectedApostle = getApostleById(selectedId as any);
+
     this.session.world?.organ?.stop();
     this.view.suspend();
     this.sound("win");
@@ -712,8 +720,8 @@ export class Game {
       <h2 style="font-size:20px;color:#ffffff;margin:0 0 18px 0;font-weight:700;">
         GENERAL CONFERENCE 500
       </h2>
-      <p style="font-size:16px;color:#e2e8f0;max-width:480px;line-height:1.6;margin:0 0 24px 0;">
-        You take the wheel of <strong>President Dallin H. Oaks's</strong> Supreme Gavel Kart!<br>
+      <p style="font-size:16px;color:#e2e8f0;max-width:520px;line-height:1.6;margin:0 0 24px 0;">
+        You take the wheel of <strong>${selectedApostle.name}</strong>'s <em>${selectedApostle.kartName}</em>!<br>
         Racing against the Quorum of the Twelve & First Presidency around Temple Square & the Conference Center rooftop!
       </p>
       <div style="font-size:13px;color:#94a3b8;letter-spacing:1px;">
@@ -733,7 +741,7 @@ export class Game {
           this.view.resume();
           this.warp("hub");
         },
-        apostle,
+        selectedApostle.id,
       );
     }, 1400);
   };
