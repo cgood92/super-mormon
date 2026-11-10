@@ -9,6 +9,7 @@ export class KartHUD {
   private readonly timerEl: HTMLElement;
   private readonly speedEl: HTMLElement;
   private readonly itemSlotEl: HTMLElement;
+  private readonly driverBadgeEl: HTMLElement | null = null;
   private readonly quoteBannerEl: HTMLElement;
   private readonly minimapCanvas: HTMLCanvasElement;
   private readonly minimapCtx: CanvasRenderingContext2D | null;
@@ -23,7 +24,7 @@ export class KartHUD {
 
   private quoteTimer = 0;
 
-  constructor(parent: HTMLElement) {
+  constructor(parent: HTMLElement, playerRacer?: ApostleRacer) {
     this.container = document.createElement("div");
     this.container.id = "kart-hud";
     this.container.style.cssText = `
@@ -111,6 +112,33 @@ export class KartHUD {
     `;
     this.itemSlotEl.textContent = "❓";
     this.container.appendChild(this.itemSlotEl);
+
+    // 3b. Player Driver Avatar Badge
+    if (playerRacer) {
+      this.driverBadgeEl = document.createElement("div");
+      this.driverBadgeEl.style.cssText = `
+        position: absolute;
+        top: 24px;
+        left: 116px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(15, 23, 42, 0.85);
+        backdrop-filter: blur(8px);
+        border: 2px solid #ffd700;
+        padding: 6px 14px 6px 6px;
+        border-radius: 28px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+      `;
+      this.driverBadgeEl.innerHTML = `
+        <img src="${playerRacer.photoUrl}" alt="${playerRacer.name}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; object-position: top center; border: 2px solid #ffd700;" />
+        <div>
+          <div style="color: #ffd700; font-weight: 900; font-size: 14px; font-style: italic; line-height: 1.1;">${playerRacer.shortName}</div>
+          <div style="color: #94a3b8; font-size: 11px; font-weight: 700;">#${playerRacer.number} · ${playerRacer.kartName}</div>
+        </div>
+      `;
+      this.container.appendChild(this.driverBadgeEl);
+    }
 
     // 4. Speedometer (Bottom Left)
     this.speedEl = document.createElement("div");
@@ -318,7 +346,15 @@ export class KartHUD {
   }
 
   public showQuote(speaker: ApostleRacer, quote: string) {
-    this.quoteBannerEl.textContent = `💬 ${speaker.shortName}: "${quote}"`;
+    this.quoteBannerEl.innerHTML = `
+      <div style="display:flex; align-items:center; gap:10px;">
+        <img src="${speaker.photoUrl}" alt="${speaker.shortName}" style="width:32px; height:32px; border-radius:50%; object-fit:cover; object-position:top center; border:1.5px solid #ffd700; box-shadow:0 2px 6px rgba(0,0,0,0.6);" />
+        <div>
+          <span style="color:#ffd700; font-weight:800; font-size:12px; display:block;">${speaker.shortName}</span>
+          <span style="font-size:14px; font-style:italic;">"${quote}"</span>
+        </div>
+      </div>
+    `;
     this.quoteBannerEl.style.opacity = "1";
     this.quoteTimer = 3.5;
   }
@@ -500,7 +536,11 @@ export class KartHUD {
               const isPlayer = r.racer.id === "oaks";
               return `
               <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border-bottom:1px solid #1e293b; color:${isPlayer ? "#ffd700" : "#ffffff"}; font-weight:${isPlayer ? "800" : "600"}; font-size:14px;">
-                <span><strong>${rankStr}</strong> ${r.racer.name}</span>
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <span style="width:58px; font-weight:800;">${rankStr}</span>
+                  <img src="${r.racer.photoUrl}" alt="${r.racer.name}" style="width:34px; height:34px; border-radius:50%; object-fit:cover; object-position:top center; border:2px solid ${isPlayer ? "#ffd700" : "rgba(255,255,255,0.25)"}; box-shadow:0 2px 6px rgba(0,0,0,0.5);" />
+                  <span>${r.racer.name}</span>
+                </div>
                 <span style="color:#94a3b8; font-size:12px;">${r.racer.kartName}</span>
               </div>
             `;

@@ -132,7 +132,7 @@ export class ApostleKartGame {
   }
 
   private initHUD() {
-    this.hud = new KartHUD(this.container);
+    this.hud = new KartHUD(this.container, this.playerRacer);
   }
 
   private initRacers() {

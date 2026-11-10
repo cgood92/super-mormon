@@ -17,7 +17,7 @@ export class KartVisualModel {
   private driftSparks: THREE.Points | null = null;
   private exhaustFlames: THREE.Mesh[] = [];
   private starAura: THREE.Mesh | null = null;
-  private faceTexture: THREE.CanvasTexture;
+  private faceTexture: THREE.Texture;
 
   constructor(racer: ApostleRacer) {
     this.racer = racer;
@@ -212,33 +212,45 @@ export class KartVisualModel {
       driver.add(hand);
     });
 
-    // 3D Head with custom Face Texture applied to the front face!
-    const headGeo = new THREE.BoxGeometry(0.55, 0.65, 0.55);
+    // 3D Head with custom photographic Face Texture applied to the front face!
+    const headGeo = new THREE.BoxGeometry(0.62, 0.68, 0.52);
     const skinColor = new THREE.Color(this.racer.skinTone);
+    const hairColor = new THREE.Color(this.racer.hairColor);
+
     const sideMat = new THREE.MeshStandardMaterial({
       color: skinColor,
-      roughness: 0.5,
+      roughness: 0.55,
+    });
+    const hairMat = new THREE.MeshStandardMaterial({
+      color: hairColor,
+      roughness: 0.6,
     });
     const faceMat = new THREE.MeshStandardMaterial({
       map: this.faceTexture,
-      roughness: 0.4,
+      roughness: 0.35,
     });
 
-    // Multi-material head: Front (+Z) is face texture, others are skin
+    const isBald =
+      this.racer.hairStyle === "bald-top" ||
+      this.racer.hairStyle === "tall-bald";
+    const topMat = isBald ? sideMat : hairMat;
+    const backMat = hairMat;
+
+    // Multi-material head: Front (+Z) is face texture, top/back is hair, sides/bottom is skin
     const headMaterials = [
       sideMat, // +X right
       sideMat, // -X left
-      sideMat, // +Y top
+      topMat, // +Y top
       sideMat, // -Y bottom
-      faceMat, // +Z front face!
-      sideMat, // -Z back
+      faceMat, // +Z front face (high-res official likeness!)
+      backMat, // -Z back
     ];
     const head = new THREE.Mesh(headGeo, headMaterials);
-    head.position.set(0, 1.15, 0);
+    head.position.set(0, 1.16, 0);
     this.headMesh = head;
     driver.add(head);
 
-    // 3D Sculpted Hair Geometry
+    // 3D Sculpted Hair Geometry (frames the head while leaving the face crystal-clear)
     this.build3DHair(head);
 
     this.group.add(driver);
@@ -254,73 +266,59 @@ export class KartVisualModel {
 
     if (this.racer.hairStyle === "pompadour") {
       // President Uchtdorf's iconic voluminous silver pompadour!
-      const quiffGeo = new THREE.CylinderGeometry(0.24, 0.28, 0.6, 12);
+      const quiffGeo = new THREE.CylinderGeometry(0.18, 0.22, 0.64, 12);
       const quiff = new THREE.Mesh(quiffGeo, hairMat);
       quiff.rotation.z = Math.PI / 2;
-      quiff.rotation.x = -0.3;
-      quiff.position.set(0, 0.42, 0.08);
+      quiff.rotation.x = -0.25;
+      quiff.position.set(0, 0.38, -0.05);
       hair.add(quiff);
 
       const sideHair = new THREE.Mesh(
-        new THREE.BoxGeometry(0.62, 0.35, 0.58),
+        new THREE.BoxGeometry(0.68, 0.42, 0.36),
         hairMat,
       );
-      sideHair.position.set(0, 0.15, -0.05);
+      sideHair.position.set(0, 0.08, -0.1);
       hair.add(sideHair);
     } else if (
       this.racer.hairStyle === "bald-top" ||
       this.racer.hairStyle === "tall-bald"
     ) {
-      // Oaks & Eyring: Bald dome on top with side curls
+      // Oaks & Eyring: Bald dome on top with side curls & back hair
       const sideHair = new THREE.Mesh(
-        new THREE.BoxGeometry(0.6, 0.3, 0.56),
+        new THREE.BoxGeometry(0.66, 0.32, 0.36),
         hairMat,
       );
-      sideHair.position.set(0, 0.05, -0.05);
+      sideHair.position.set(0, -0.04, -0.1);
       hair.add(sideHair);
-    } else {
-      // Full parted or swept hair
-      const topHair = new THREE.Mesh(
-        new THREE.BoxGeometry(0.6, 0.2, 0.58),
-        hairMat,
-      );
-      topHair.position.set(0, 0.34, 0);
-      hair.add(topHair);
 
       const backHair = new THREE.Mesh(
-        new THREE.BoxGeometry(0.6, 0.45, 0.2),
+        new THREE.BoxGeometry(0.64, 0.44, 0.18),
         hairMat,
       );
-      backHair.position.set(0, 0.1, -0.25);
+      backHair.position.set(0, 0.0, -0.18);
       hair.add(backHair);
-    }
+    } else {
+      // Full parted or swept hair (Bednar, Christofferson, Gong, etc.)
+      const topHair = new THREE.Mesh(
+        new THREE.BoxGeometry(0.66, 0.14, 0.36),
+        hairMat,
+      );
+      topHair.position.set(0, 0.38, -0.08);
+      hair.add(topHair);
 
-    // 3D Spectacle Frames
-    if (this.racer.hasGlasses) {
-      const glassesColor =
-        this.racer.glassesColor === "#silver"
-          ? 0xcccccc
-          : this.racer.glassesColor === "#d4af37"
-            ? 0xd4af37
-            : 0x222222;
-      const glassesMat = new THREE.MeshStandardMaterial({
-        color: glassesColor,
-        metalness: 0.8,
-        roughness: 0.2,
-      });
+      const sideHair = new THREE.Mesh(
+        new THREE.BoxGeometry(0.68, 0.42, 0.36),
+        hairMat,
+      );
+      sideHair.position.set(0, 0.08, -0.1);
+      hair.add(sideHair);
 
-      [-0.14, 0.14].forEach((x) => {
-        const frameGeo = new THREE.TorusGeometry(0.08, 0.015, 6, 12);
-        const frame = new THREE.Mesh(frameGeo, glassesMat);
-        frame.position.set(x, 0.04, 0.3);
-        hair.add(frame);
-      });
-      // Bridge
-      const bridgeGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.1, 6);
-      const bridge = new THREE.Mesh(bridgeGeo, glassesMat);
-      bridge.rotation.z = Math.PI / 2;
-      bridge.position.set(0, 0.04, 0.3);
-      hair.add(bridge);
+      const backHair = new THREE.Mesh(
+        new THREE.BoxGeometry(0.64, 0.48, 0.18),
+        hairMat,
+      );
+      backHair.position.set(0, 0.06, -0.18);
+      hair.add(backHair);
     }
 
     this.hairMesh = hair;

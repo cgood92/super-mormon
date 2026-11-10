@@ -24,6 +24,7 @@ export type ApostleRacer = {
   title: string;
   number: number;
   kartName: string;
+  photoUrl: string;
   kartColor: number;
   kartTrimColor: number;
   suitColor: number;
@@ -69,6 +70,7 @@ export const APOSTLE_ROSTER: readonly ApostleRacer[] = [
     title: "18th President of the Church",
     number: 1,
     kartName: "The Supreme Gavel",
+    photoUrl: "/art/apostles/oaks.jpg",
     kartColor: 0x1b365d, // Deep presidential navy
     kartTrimColor: 0xd4af37, // Gold trim
     suitColor: 0x1e272e,
@@ -107,6 +109,7 @@ export const APOSTLE_ROSTER: readonly ApostleRacer[] = [
     title: "First Counselor, First Presidency",
     number: 2,
     kartName: "Heartfelt Tears",
+    photoUrl: "/art/apostles/eyring.jpg",
     kartColor: 0x2c3e50,
     kartTrimColor: 0x3498db, // Tear blue
     suitColor: 0x222f3e,
@@ -144,6 +147,7 @@ export const APOSTLE_ROSTER: readonly ApostleRacer[] = [
     title: "Second Counselor, First Presidency",
     number: 3,
     kartName: "The Covenant Highway",
+    photoUrl: "/art/apostles/christofferson.jpg",
     kartColor: 0x2f3640,
     kartTrimColor: 0x718093,
     suitColor: 0x192a56,
@@ -179,6 +183,7 @@ export const APOSTLE_ROSTER: readonly ApostleRacer[] = [
     title: "Acting President, Quorum of the Twelve",
     number: 4,
     kartName: "Silver Falcon 747",
+    photoUrl: "/art/apostles/uchtdorf.jpg",
     kartColor: 0xdcdde1, // Gleaming aircraft silver
     kartTrimColor: 0xe84118, // Lufthansa red
     suitColor: 0x130f40,
@@ -216,6 +221,7 @@ export const APOSTLE_ROSTER: readonly ApostleRacer[] = [
     title: "Quorum of the Twelve Apostles",
     number: 5,
     kartName: "Scripture Speedster",
+    photoUrl: "/art/apostles/bednar.jpg",
     kartColor: 0x8b0000, // Crimson leather scriptures
     kartTrimColor: 0xd4af37, // Gilded page ribbon
     suitColor: 0x111111,
@@ -253,6 +259,7 @@ export const APOSTLE_ROSTER: readonly ApostleRacer[] = [
     title: "Quorum of the Twelve Apostles",
     number: 6,
     kartName: "The British Isles Cruiser",
+    photoUrl: "/art/apostles/cook.jpg",
     kartColor: 0x273c75,
     kartTrimColor: 0xe1b12c,
     suitColor: 0x192a56,
@@ -289,6 +296,7 @@ export const APOSTLE_ROSTER: readonly ApostleRacer[] = [
     title: "Quorum of the Twelve Apostles",
     number: 7,
     kartName: "En Avant Express",
+    photoUrl: "/art/apostles/andersen.jpg",
     kartColor: 0x0097e6,
     kartTrimColor: 0xffffff,
     suitColor: 0x2f3640,
@@ -324,6 +332,7 @@ export const APOSTLE_ROSTER: readonly ApostleRacer[] = [
     title: "Quorum of the Twelve Apostles",
     number: 8,
     kartName: "By Divine Design",
+    photoUrl: "/art/apostles/rasband.jpg",
     kartColor: 0x353b48,
     kartTrimColor: 0xc23616,
     suitColor: 0x1e272e,
@@ -359,6 +368,7 @@ export const APOSTLE_ROSTER: readonly ApostleRacer[] = [
     title: "Quorum of the Twelve Apostles",
     number: 9,
     kartName: "Icon Fitness Sprinter",
+    photoUrl: "/art/apostles/stevenson.jpg",
     kartColor: 0x44bd32, // Athletic racing green
     kartTrimColor: 0xffffff,
     suitColor: 0x1b1464,
@@ -394,6 +404,7 @@ export const APOSTLE_ROSTER: readonly ApostleRacer[] = [
     title: "Quorum of the Twelve Apostles",
     number: 10,
     kartName: "The Cardio Pulse",
+    photoUrl: "/art/apostles/renlund.jpg",
     kartColor: 0x00a8ff,
     kartTrimColor: 0x00cec9,
     suitColor: 0x2d3436,
@@ -429,6 +440,7 @@ export const APOSTLE_ROSTER: readonly ApostleRacer[] = [
     title: "Quorum of the Twelve Apostles",
     number: 11,
     kartName: "The Campfire Camper",
+    photoUrl: "/art/apostles/gong.jpg",
     kartColor: 0xe67e22, // Warm campfire orange
     kartTrimColor: 0xf1c40f,
     suitColor: 0x2c3e50,
@@ -465,6 +477,7 @@ export const APOSTLE_ROSTER: readonly ApostleRacer[] = [
     title: "Quorum of the Twelve Apostles",
     number: 12,
     kartName: "The Samba Rocket",
+    photoUrl: "/art/apostles/soares.jpg",
     kartColor: 0xfbc531, // Brazilian bright canary yellow
     kartTrimColor: 0x4cd137, // Brazilian green
     suitColor: 0x1e272e,
@@ -500,6 +513,7 @@ export const APOSTLE_ROSTER: readonly ApostleRacer[] = [
     title: "Quorum of the Twelve Apostles",
     number: 13,
     kartName: "The British Grand Tourer",
+    photoUrl: "/art/apostles/kearon.jpg",
     kartColor: 0x10ac84, // British racing green
     kartTrimColor: 0xf5f6fa,
     suitColor: 0x222f3e,
@@ -536,6 +550,7 @@ export const APOSTLE_ROSTER: readonly ApostleRacer[] = [
     title: "Quorum of the Twelve Apostles",
     number: 14,
     kartName: "Parisian Grand Touring",
+    photoUrl: "/art/apostles/causse.jpg",
     kartColor: 0x487eb0, // French blue
     kartTrimColor: 0xe84118, // French red accent
     suitColor: 0x2d3436,
@@ -571,6 +586,7 @@ export const APOSTLE_ROSTER: readonly ApostleRacer[] = [
     title: "Quorum of the Twelve Apostles",
     number: 15,
     kartName: "BYU-Pathway Rocket",
+    photoUrl: "/art/apostles/gilbert.jpg",
     kartColor: 0x002e5d, // BYU Navy Blue
     kartTrimColor: 0xffffff,
     suitColor: 0x1e272e,
@@ -1110,14 +1126,42 @@ export function createApostleFaceCanvas(
 }
 
 /**
- * Creates a Three.js CanvasTexture for the Apostle's face
+ * Creates a Three.js Texture for the Apostle's face, using their real photographic portrait.
  */
-export function createApostleFaceTexture(
-  racer: ApostleRacer,
-): THREE.CanvasTexture {
+export function createApostleFaceTexture(racer: ApostleRacer): THREE.Texture {
+  if (typeof window !== "undefined" && typeof Image !== "undefined") {
+    const base = import.meta.env?.BASE_URL || "/";
+    const cleanBase = base.endsWith("/") ? base : `${base}/`;
+    const loader = new THREE.TextureLoader();
+    const texture = loader.load(
+      `${cleanBase}art/apostles/faces/${racer.id}.jpg`,
+      undefined,
+      undefined,
+      () => {
+        // Fallback to full portrait or canvas if face crop not loaded
+        const fallbackLoader = new THREE.TextureLoader();
+        fallbackLoader.load(
+          `${cleanBase}art/apostles/${racer.id}.jpg`,
+          (tex) => {
+            texture.image = tex.image;
+            texture.needsUpdate = true;
+          },
+          undefined,
+          () => {
+            const canvas = createApostleFaceCanvas(racer);
+            texture.image = canvas;
+            texture.needsUpdate = true;
+          },
+        );
+      },
+    );
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    return texture;
+  }
   const canvas = createApostleFaceCanvas(racer);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  texture.needsUpdate = true;
   return texture;
 }

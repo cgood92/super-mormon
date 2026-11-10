@@ -17,6 +17,10 @@ const modalClose = document.getElementById("modal-close")!;
 const modalCanvasContainer = document.getElementById("modal-canvas-container")!;
 const modalRacerName = document.getElementById("modal-racer-name")!;
 const modalRacerKart = document.getElementById("modal-racer-kart")!;
+const modalRacerPhoto = document.getElementById(
+  "modal-racer-photo",
+) as HTMLImageElement;
+const modalRacerTitle = document.getElementById("modal-racer-title")!;
 const modalDesc = document.getElementById("modal-desc")!;
 const modalStats = document.getElementById("modal-stats")!;
 const modalFeatures = document.getElementById("modal-features")!;
@@ -72,9 +76,18 @@ function renderRoster() {
     badge.textContent = `#${racer.number}`;
     portraitWrap.appendChild(badge);
 
-    const canvas = createApostleFaceCanvas(racer);
-    canvas.className = "portrait-canvas";
-    portraitWrap.appendChild(canvas);
+    const img = document.createElement("img");
+    img.className = "portrait-photo";
+    img.src = racer.photoUrl;
+    img.alt = racer.name;
+    img.loading = "lazy";
+    portraitWrap.appendChild(img);
+
+    const tag = document.createElement("div");
+    tag.className = "portrait-tag";
+    tag.innerHTML = `<span>📸 Likeness</span>`;
+    portraitWrap.appendChild(tag);
+
     card.appendChild(portraitWrap);
 
     // Body
@@ -173,6 +186,13 @@ filterPills.forEach((pill) => {
 function open3DInspector(racer: ApostleRacer) {
   modalRacerName.textContent = `${racer.name} (#${racer.number})`;
   modalRacerKart.textContent = `Driving: ${racer.kartName}`;
+  if (modalRacerPhoto) {
+    modalRacerPhoto.src = racer.photoUrl;
+    modalRacerPhoto.alt = racer.name;
+  }
+  if (modalRacerTitle) {
+    modalRacerTitle.textContent = racer.title;
+  }
   modalDesc.textContent = `${racer.title}. Known for: ${racer.features.join(", ")}.`;
   modalRaceBtn.href = `/?kart&apostle=${racer.id}`;
   modalRaceBtn.textContent = `🏎️ Race as ${racer.shortName}`;
@@ -257,6 +277,7 @@ function init3DScene(racer: ApostleRacer) {
 
   // Kart Model
   currentKartModel = new KartVisualModel(racer);
+  (window as any).__currentKartModel = currentKartModel;
   dummyPhysics = new KartPhysics(racer, new THREE.Vector3(0, 0, 0), 0);
   modalScene.add(currentKartModel.group);
 
@@ -365,3 +386,13 @@ inspectModal.addEventListener("click", (e) => {
 
 // Initial Render
 renderRoster();
+
+// Auto-open 3D inspector if ?inspect=<id> is in URL
+const urlParams = new URLSearchParams(window.location.search);
+const inspectId = urlParams.get("inspect");
+if (inspectId) {
+  const racer = APOSTLE_ROSTER.find((r) => r.id === inspectId);
+  if (racer) {
+    setTimeout(() => open3DInspector(racer), 150);
+  }
+}
