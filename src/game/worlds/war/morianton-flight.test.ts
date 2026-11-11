@@ -112,16 +112,14 @@ test("scenery passes semantic collision validation", () => {
 test("Teancum chases Morianton through the narrow pass and intercepts him to begin the duel", () => {
   const h = harness();
   assert.equal(h.state().phase, "chase");
-  assert.match(h.toasts[0], /Teancum/i);
+  assert.equal(h.toasts.length, 0, "No duplicate bottom toast during pursuit");
 
   // Initial objective
   const res = h.runtime.update(1 / 60, h.player, idle);
   assert.equal(res.objective, "Cut off their escape · Catch up to Morianton");
   assert.equal(res.prompt, "", "HUD prompt is kept clean during pursuit");
 
-  // Run north toward Morianton
-  h.walk(0, -10);
-  // Intercept Morianton
+  // Chase and intercept Morianton
   let frames = 0;
   while (h.state().phase === "chase" && frames++ < 1200) {
     const enemy = h.state().enemies[0];
@@ -147,7 +145,7 @@ test("Teancum chases Morianton through the narrow pass and intercepts him to beg
 
   // Scoreboard shows only pure scores without "Cut off their escape"
   const duelRes = h.runtime.update(1 / 60, h.player, idle);
-  assert.match(duelRes.objective, /TEANCUM:.*MORIANTON:/);
+  assert.match(duelRes.objective, /Teancum:.*Morianton:/i);
   assert.doesNotMatch(duelRes.objective, /Cut off their escape/);
   assert.match(duelRes.prompt, /Press \{jump\} to begin/);
 
@@ -159,14 +157,13 @@ test("Morianton reaching the northward exit fairly resets the chase", () => {
   assert.equal(h.state().phase, "chase");
 
   // Player stands still and lets Morianton walk to z = 52
-  for (let i = 0; i < 1800 && h.state().escapedCount === 0; i++) {
+  for (let i = 0; i < 2800 && h.state().escapedCount === 0; i++) {
     h.tick(1);
   }
 
   assert.equal(h.state().escapedCount, 1);
   assert.equal(h.state().phase, "chase");
-  assert.match(h.toasts[h.toasts.length - 1], /escap/i);
-  assert.equal(h.player.z, -57, "player resets to spawn");
+  assert.equal(h.player.z, -52, "player resets to spawn");
 
   h.world.dispose?.();
 });
@@ -266,7 +263,7 @@ test("incorrect or missed inputs damage Teancum and five wounds show defeat and 
 
   // Verify defeat scoreboard and prompt demand [A] click to retry
   const defeatRes = h.runtime.update(1 / 60, h.player, idle);
-  assert.match(defeatRes.objective, /FALLEN/);
+  assert.match(defeatRes.objective, /fallen/i);
   assert.match(defeatRes.prompt, /Press \{jump\} to try again/);
 
   // Ticking idle does NOT auto-reset

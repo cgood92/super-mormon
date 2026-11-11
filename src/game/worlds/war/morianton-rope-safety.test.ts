@@ -46,7 +46,7 @@ function shotHarness() {
   const win = () => {
     // Intercept Morianton
     player.x = 0;
-    player.z = -14;
+    player.z = -34;
     runtime.update(1 / 60, player, idle);
 
     // Play through the 5 rounds of duel

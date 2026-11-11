@@ -11,8 +11,8 @@ import type { Point, WorldData } from "../../runtime/worlds";
 
 /** Alma 50:25–36. Single combat between Teancum and Morianton at the narrow pass. */
 export const MORIANTON_ROUTE: Point[] = [
-  { x: 0, y: 0, z: -57 },
-  { x: 0, y: 0, z: -15 },
+  { x: 0, y: 0, z: -52 },
+  { x: 0, y: 0, z: -35 },
   { x: 0, y: 0, z: 52 },
 ];
 export const MORIANTON_POST_HINTS: Point[] = [];
@@ -26,26 +26,26 @@ export const DUEL_ROUNDS: { name: string; sequence: DuelInputType[] }[] = [
   },
   {
     name: "High Parry",
-    sequence: ["jump", "action", "up", "action", "jump"],
+    sequence: ["jump", "action", "jump", "action", "jump"],
   },
   {
     name: "Flank & Thrust",
-    sequence: ["action", "jump", "up", "action", "down", "action"],
+    sequence: ["action", "action", "jump", "action", "jump", "action"],
   },
   {
     name: "Low Sweep",
-    sequence: ["down", "action", "crouch", "action", "jump", "action"],
+    sequence: ["jump", "jump", "action", "action", "jump", "action"],
   },
   {
     name: "Final Clash",
-    sequence: ["action", "jump", "up", "action", "down", "crouch", "action"],
+    sequence: ["action", "jump", "action", "action", "jump", "action", "jump"],
   },
 ];
 
 export const T_LEAD_IN = 1.8;
 export const T_INTERVAL = 0.85;
 export const HIT_WINDOW = 0.25;
-export const ENEMY_WALK_SPEED = 2.8;
+export const ENEMY_WALK_SPEED = 2.0;
 
 const GLYPH_LABELS: Record<DuelInputType, string> = {
   action: "B",
@@ -209,10 +209,10 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
 
   // Enemies: Morianton (index 0) and 3 followers (indices 1..3)
   const enemyStartOffsets = [
-    { x: 0, z: -15 },
-    { x: -2.2, z: -17.5 },
-    { x: 2.2, z: -17.5 },
-    { x: 0, z: -19.5 },
+    { x: 0, z: -35 },
+    { x: -2.2, z: -37.5 },
+    { x: 2.2, z: -37.5 },
+    { x: 0, z: -39.5 },
   ];
   const enemies = enemyStartOffsets.map((p, i) => ({
     rig: actor(
@@ -253,9 +253,22 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
   let phaseTimer = 0;
   let cz = 0;
   const cx = 0;
+  let cameraResetTimer = 0;
 
   // Track node hit/miss states for current round
   let targetsHit: boolean[] = [];
+
+  // Edge triggers and keyboard listeners for duel
+  let duelKeyPressedAction = false;
+  let duelKeyPressedJump = false;
+
+  const onDuelKeyDown = (e: KeyboardEvent) => {
+    if (e.code === "KeyB") duelKeyPressedAction = true;
+    if (e.code === "KeyA") duelKeyPressedJump = true;
+  };
+  if (typeof window !== "undefined") {
+    window.addEventListener("keydown", onDuelKeyDown);
+  }
 
   const prevInputState = {
     interact: false,
@@ -272,7 +285,6 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
   let trackNeedle: HTMLElement | null = null;
   let trackFooter: HTMLElement | null = null;
   let nodeElements: HTMLElement[] = [];
-  let defeatBanner: HTMLElement | null = null;
 
   const removeDomUi = () => {
     trackContainer?.remove();
@@ -282,8 +294,6 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
     trackNeedle = null;
     trackFooter = null;
     nodeElements = [];
-    defeatBanner?.remove();
-    defeatBanner = null;
   };
 
   const ensureDomTrack = (roundSeq: DuelInputType[]) => {
@@ -320,34 +330,33 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
       app.appendChild(trackContainer);
     }
 
-    // Rebuild nodes if sequence length changed or nodes empty
-    if (nodeElements.length !== roundSeq.length) {
-      nodeElements.forEach((el) => el.remove());
-      nodeElements = [];
+    // Always rebuild nodes for the round sequence
+    nodeElements.forEach((el) => el.remove());
+    nodeElements = [];
 
-      roundSeq.forEach((token, i) => {
-        const node = document.createElement("div");
-        node.className = "duel-node";
-        const pct = 22 + (i / Math.max(1, roundSeq.length - 1)) * 72;
-        node.style.left = `${pct}%`;
-        node.textContent = GLYPH_LABELS[token];
-        trackLane?.appendChild(node);
-        nodeElements.push(node);
-      });
-    }
+    roundSeq.forEach((token, i) => {
+      const node = document.createElement("div");
+      const isJump = token === "jump";
+      node.className = `duel-node ${isJump ? "duel-node-a" : "duel-node-b"}`;
+      const pct = 22 + (i / Math.max(1, roundSeq.length - 1)) * 72;
+      node.style.left = `${pct}%`;
+      node.textContent = isJump ? "A" : "B";
+      trackLane?.appendChild(node);
+      nodeElements.push(node);
+    });
   };
 
   const updateDomUi = (
     currentSeq: DuelInputType[],
     needlePct: number,
     activeIdx: number,
-    hintText: string,
+    hintHtml: string,
   ) => {
     if (typeof document === "undefined" || !trackContainer) return;
 
     if (trackHeader) {
       const roundName = DUEL_ROUNDS[round - 1]?.name?.toUpperCase() ?? "";
-      trackHeader.innerHTML = `<span>ROUND ${round} OF 5 · ${roundName}</span><span>HIT ON BEAT!</span>`;
+      trackHeader.innerHTML = `<span>ROUND ${round} OF 5 · ${roundName}</span>`;
     }
 
     if (trackNeedle) {
@@ -364,28 +373,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
     });
 
     if (trackFooter) {
-      trackFooter.textContent = hintText;
-    }
-  };
-
-  const showDefeatBanner = (show: boolean) => {
-    if (typeof document === "undefined") return;
-    const app = document.querySelector("#app");
-    if (!app) return;
-
-    if (show && !defeatBanner) {
-      defeatBanner = document.createElement("div");
-      defeatBanner.id = "duel-defeat-banner";
-      defeatBanner.className = "duel-defeat-banner";
-      defeatBanner.innerHTML = `
-        <div class="duel-defeat-title">💀 DEFEAT</div>
-        <div>Teancum has fallen in single combat.</div>
-        <div>Press <strong>[A] / [Space]</strong> to try again.</div>
-      `;
-      app.appendChild(defeatBanner);
-    } else if (!show && defeatBanner) {
-      defeatBanner.remove();
-      defeatBanner = null;
+      trackFooter.innerHTML = hintHtml;
     }
   };
 
@@ -398,10 +386,12 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
     targetIndex = 0;
     sequenceTimer = 0;
     phaseTimer = 0;
+    cameraResetTimer = 0.4;
     sparkMaterial.opacity = 0;
     removeDomUi();
 
-    Object.assign(player, createPlayer(0, 0, -57));
+    Object.assign(player, createPlayer(0, 0, -52));
+    player.yaw = 0;
     enemyStartOffsets.forEach((p, i) => {
       Object.assign(enemies[i].state, createPlayer(p.x, 0, p.z));
       enemies[i].rig.group.rotation.z = 0;
@@ -417,7 +407,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
   };
 
   const startDuelAt = (meetingZ: number) => {
-    cz = Math.min(36, Math.max(-10, meetingZ));
+    cz = Math.min(36, Math.max(-30, meetingZ));
     phase = "round_gate";
     phaseTimer = 0;
     targetIndex = 0;
@@ -443,17 +433,17 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
     enemies[0].rig.group.rotation.z = 0;
     enemies[0].rig.update(0, enemies[0].state);
 
-    // Position spectators
+    // Position spectators along the east boundary (x = 4.2) clear of the camera view
     patrol.forEach((s, i) => {
       Object.assign(s.state, {
-        x: -4.5,
+        x: 4.2,
         y: 0,
-        z: cz - 2.5 + i * 1.0,
+        z: cz - 3.2 + i * 0.9,
         vx: 0,
         vy: 0,
         vz: 0,
         runSpeed: 0,
-        yaw: Math.PI / 2,
+        yaw: -Math.PI / 2,
         grounded: true,
         move: "idle",
       });
@@ -462,9 +452,9 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
 
     for (let i = 1; i < enemies.length; i++) {
       Object.assign(enemies[i].state, {
-        x: 4.5,
+        x: 4.2,
         y: 0,
-        z: cz - 1.5 + (i - 1) * 1.5,
+        z: cz + 1.2 + (i - 1) * 1.2,
         vx: 0,
         vy: 0,
         vz: 0,
@@ -480,7 +470,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
   return {
     name: "Morianton's Flight",
     subtitle: "Cut off their escape · Alma 50:25–36",
-    spawn: { ...MORIANTON_ROUTE[0], yaw: 0 },
+    spawn: { x: 0, y: 0, z: -52, yaw: 0 },
     solids,
     actorParent: root,
     bounds: { minX: -19, maxX: 19, minZ: -62, maxZ: 61 },
@@ -492,9 +482,6 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
     ],
     adventure(hooks) {
       hooks.setAvatar("teancum");
-      hooks.toast(
-        "You are Teancum. Moroni commanded you to stop Morianton from escaping to the land northward. Catch up to him!",
-      );
 
       // Equip player with a duel sword
       const playerSword = buildDuelSword();
@@ -504,11 +491,6 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
         hooks.avatar.add(playerSword);
       }
 
-      const hearts = (hp: number) =>
-        "❤️".repeat(Math.max(0, hp)) + "🖤".repeat(Math.max(0, 5 - hp));
-      const skulls = (hp: number) =>
-        "💀".repeat(Math.max(0, hp)) + "⚪".repeat(Math.max(0, 5 - hp));
-
       const objective = () => {
         if (phase === "chase") {
           return "Cut off their escape · Catch up to Morianton";
@@ -517,13 +499,14 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
           return "The pass is secured · Morianton's company covenants peace";
         }
         if (phase === "duel_defeat") {
-          return "💀 TEANCUM HAS FALLEN! 💀";
+          return "Single combat · Teancum has fallen";
         }
         if (phase === "duel_win") {
-          return "⚔️ VICTORY! MORIANTON DEFEATED ⚔️";
+          return "Single combat · Morianton defeated";
         }
-        // Scoreboard only — no "Cut off their escape" during duel
-        return `TEANCUM: ${hearts(teancumHp)}   ⚔️ VS ⚔️   MORIANTON: ${skulls(moriantonHp)}`;
+        const teancumMisses = 5 - teancumHp;
+        const moriantonMisses = 5 - moriantonHp;
+        return `Teancum: ${teancumMisses}/5 misses   ·   Morianton: ${moriantonMisses}/5 misses`;
       };
 
       return {
@@ -562,6 +545,13 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
           phase === "duel_win",
 
         camera: () => {
+          if (cameraResetTimer > 0) {
+            return {
+              cut: true,
+              position: { x: 0, y: 2.2, z: -57 },
+              focus: { x: 0, y: 1.4, z: -45 },
+            };
+          }
           if (
             phase === "round_gate" ||
             phase === "duel_sequence" ||
@@ -572,8 +562,8 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
           ) {
             return {
               cut: true,
-              position: { x: cx - 4.2, y: 1.35, z: cz },
-              focus: { x: cx, y: 1.15, z: cz },
+              position: { x: cx - 4.2, y: 1.25, z: cz },
+              focus: { x: cx, y: 0.95, z: cz },
             };
           }
           return undefined;
@@ -586,14 +576,23 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
             return { objective: objective(), prompt: "" };
           }
 
-          // Read and edge-trigger input
+          if (cameraResetTimer > 0) {
+            cameraResetTimer = Math.max(0, cameraResetTimer - dt);
+          }
+
+          // Read and edge-trigger input (supports both standard controls and A/B keys)
           const currentUp = input.y > 0.4;
           const currentDown = input.y < -0.4;
-          const pressedAction = !!input.interact && !prevInputState.interact;
-          const pressedJump = !!input.jump && !prevInputState.jump;
+          const pressedAction =
+            (!!input.interact && !prevInputState.interact) || duelKeyPressedAction;
+          const pressedJump =
+            (!!input.jump && !prevInputState.jump) || duelKeyPressedJump;
           const pressedCrouch = !!input.crouch && !prevInputState.crouch;
           const pressedUp = currentUp && !prevInputState.up;
           const pressedDown = currentDown && !prevInputState.down;
+
+          duelKeyPressedAction = false;
+          duelKeyPressedJump = false;
 
           prevInputState.interact = !!input.interact;
           prevInputState.jump = !!input.jump;
@@ -656,9 +655,6 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
             if (enemies[0].state.z >= 52) {
               escapedCount++;
               resetChase(player);
-              hooks.toast(
-                "Morianton reached the northward exit! Catch up to him before he escapes.",
-              );
               return { objective: objective(), prompt: "" };
             }
 
@@ -669,9 +665,6 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
             );
             if (dist < 2.8) {
               startDuelAt(enemies[0].state.z);
-              hooks.toast(
-                "Single combat! Hit each button in rhythm as the bar sweeps across. Press [A] to begin!",
-              );
             }
 
             return { objective: objective(), prompt: "" };
@@ -708,7 +701,12 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
             enemies[0].rig.update(dt, enemies[0].state);
 
             ensureDomTrack(seq);
-            updateDomUi(seq, 0, 0, "Press [A] to begin round!");
+            updateDomUi(
+              seq,
+              0,
+              0,
+              'Press <span class="duel-inline-badge duel-inline-badge-a">A</span> to begin round',
+            );
 
             if (pressedJump) {
               phase = "duel_sequence";
@@ -741,8 +739,6 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
             enemies[0].state.yaw = Math.PI;
             enemies[0].state.move = "idle";
             enemies[0].rig.update(dt, enemies[0].state);
-
-            ensureDomTrack(seq);
 
             // Compute needle percentage along lane (0% to 100%)
             // 0% to 22%: lead-in period (0 to T_LEAD_IN)
@@ -803,7 +799,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
                   phase = "clash_player";
                   phaseTimer = 0;
                   moriantonHp = Math.max(0, moriantonHp - 1);
-                  updateDomUi(seq, needlePct, targetIndex, "PERFECT! Teancum strikes!");
+                  updateDomUi(seq, needlePct, targetIndex, "Teancum strikes!");
                   return {
                     objective: objective(),
                     prompt: "Sequence Complete! Teancum strikes!",
@@ -825,15 +821,19 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
               }
             }
 
-            let hint = "";
+            let hintHtml = "";
             if (sequenceTimer < T_LEAD_IN) {
               const rem = Math.max(0, T_LEAD_IN - sequenceTimer).toFixed(1);
-              hint = `Get ready... First strike in ${rem}s!`;
+              hintHtml = `Get ready... First strike in ${rem}s!`;
             } else {
-              hint = `STRIKE [${GLYPH_LABELS[seq[targetIndex]]}] NOW!`;
+              const nextBadge =
+                seq[targetIndex] === "jump"
+                  ? '<span class="duel-inline-badge duel-inline-badge-a">A</span>'
+                  : '<span class="duel-inline-badge duel-inline-badge-b">B</span>';
+              hintHtml = `Strike ${nextBadge} now!`;
             }
 
-            updateDomUi(seq, needlePct, targetIndex, hint);
+            updateDomUi(seq, needlePct, targetIndex, hintHtml);
 
             const promptTokens = seq
               .map((token, i) => {
@@ -845,7 +845,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
 
             return {
               objective: objective(),
-              prompt: `Round ${round}/5 · [ ${promptTokens} ] · ${hint}`,
+              prompt: `Round ${round}/5 · [ ${promptTokens} ] · Strike on beat!`,
             };
           }
 
@@ -981,7 +981,6 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
               if (teancumHp <= 0) {
                 phase = "duel_defeat";
                 phaseTimer = 0;
-                showDefeatBanner(true);
               } else {
                 phase = "round_gate";
                 phaseTimer = 0;
@@ -995,12 +994,11 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
           }
 
           // -----------------------------------------------------------
-          // PHASE: DUEL DEFEAT (DRAMATIC LOSS & DEMAND [A] TO RETRY)
+          // PHASE: DUEL DEFEAT (DEMAND [A] TO RETRY)
           // -----------------------------------------------------------
           if (phase === "duel_defeat") {
             sparkMaterial.opacity = 0;
             removeDomUi();
-            showDefeatBanner(true);
 
             player.move = "crouch";
             player.crouching = true;
@@ -1009,7 +1007,6 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
 
             // Demand [A] click to try again
             if (pressedJump) {
-              showDefeatBanner(false);
               player.crouching = false;
               player.move = "idle";
               teancumHp = 5;
@@ -1017,15 +1014,12 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
               round = 1;
               phase = "round_gate";
               phaseTimer = 0;
-              hooks.toast(
-                "The duel restarts. Watch the moving bar and hit each button in rhythm!",
-              );
             }
 
             return {
               objective: objective(),
               prompt:
-                "💥 DEFEAT! Morianton broke away into the land northward. Press {jump} to try again.",
+                "Morianton broke away into the land northward. Press {jump} to try again.",
             };
           }
 
@@ -1083,6 +1077,9 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
           disposed = true;
           pending = false;
           removeDomUi();
+          if (typeof window !== "undefined") {
+            window.removeEventListener("keydown", onDuelKeyDown);
+          }
         },
       };
     },
@@ -1090,6 +1087,9 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
     dispose() {
       disposed = true;
       removeDomUi();
+      if (typeof window !== "undefined") {
+        window.removeEventListener("keydown", onDuelKeyDown);
+      }
       moriantonSword.parent?.remove(moriantonSword);
       clashSpark.parent?.remove(clashSpark);
       land.dispose();
