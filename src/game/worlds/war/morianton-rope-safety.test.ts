@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as T from "three";
-import { buildMoriantonFlight, DUEL_ROUNDS } from "./morianton-flight";
+import {
+  buildMoriantonFlight,
+  DUEL_ROUNDS,
+  T_LEAD_IN,
+  T_INTERVAL,
+} from "./morianton-flight";
 import { createPlayer, stepPlayer } from "../../physics/physics";
 import { createCharacter } from "../../characters/character";
 import { StoryCinematic, type StoryShot } from "../../camera/cinematic";
@@ -46,11 +51,21 @@ function shotHarness() {
 
     // Play through the 5 rounds of duel
     for (let round = 1; round <= 5; round++) {
-      while ((runtime.snapshot() as { phase: string }).phase === "duel_prepare") {
-        runtime.update(1 / 60, player, idle);
-      }
+      // Press [A] to start round at round_gate
+      assert.equal((runtime.snapshot() as { phase: string }).phase, "round_gate");
+      runtime.update(1 / 60, player, { ...idle, jump: true });
+      runtime.update(1 / 60, player, idle);
+
       const seq = DUEL_ROUNDS[round - 1].sequence;
-      for (const token of seq) {
+      let currentSeqFrame = 1;
+
+      for (let i = 0; i < seq.length; i++) {
+        const targetFrame = Math.round((T_LEAD_IN + i * T_INTERVAL) * 60);
+        while (currentSeqFrame < targetFrame) {
+          runtime.update(1 / 60, player, idle);
+          currentSeqFrame++;
+        }
+        const token = seq[i];
         runtime.update(1 / 60, player, {
           x: 0,
           y: token === "up" ? 1 : token === "down" ? -1 : 0,
@@ -59,7 +74,9 @@ function shotHarness() {
           jump: token === "jump",
           crouch: token === "crouch",
         });
+        currentSeqFrame++;
         runtime.update(1 / 60, player, idle);
+        currentSeqFrame++;
       }
       while ((runtime.snapshot() as { phase: string }).phase === "clash_player") {
         runtime.update(1 / 60, player, idle);

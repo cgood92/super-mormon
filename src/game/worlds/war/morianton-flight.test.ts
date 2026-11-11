@@ -1,7 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as T from "three";
-import { buildMoriantonFlight, DUEL_ROUNDS, type DuelInputType } from "./morianton-flight";
+import {
+  buildMoriantonFlight,
+  DUEL_ROUNDS,
+  T_LEAD_IN,
+  T_INTERVAL,
+  type DuelInputType,
+} from "./morianton-flight";
 import { createPlayer, stepPlayer } from "../../physics/physics";
 import { sceneryCollisionErrors } from "../shared/scenery";
 
@@ -36,7 +42,8 @@ function harness() {
       teancumHp: number;
       moriantonHp: number;
       round: number;
-      stepIndex: number;
+      targetIndex: number;
+      sequenceTimer: number;
       cz: number;
       attempts: number;
       escapedCount: number;
@@ -131,9 +138,18 @@ test("Teancum chases Morianton through the narrow pass and intercepts him to beg
     h.runtime.update(1 / 60, h.player, idle);
   }
 
-  assert.equal(h.state().phase, "duel_prepare");
+  assert.equal(h.state().phase, "round_gate");
   assert.equal(h.runtime.movementLocked?.(), true);
-  assert.ok(h.runtime.camera?.() !== undefined, "Camera transitions to cinematic duel angle");
+  assert.ok(
+    h.runtime.camera?.() !== undefined,
+    "Camera transitions to cinematic duel angle",
+  );
+
+  // Scoreboard shows only pure scores without "Cut off their escape"
+  const duelRes = h.runtime.update(1 / 60, h.player, idle);
+  assert.match(duelRes.objective, /TEANCUM:.*MORIANTON:/);
+  assert.doesNotMatch(duelRes.objective, /Cut off their escape/);
+  assert.match(duelRes.prompt, /Press \{jump\} to begin/);
 
   h.world.dispose?.();
 });
@@ -155,7 +171,7 @@ test("Morianton reaching the northward exit fairly resets the chase", () => {
   h.world.dispose?.();
 });
 
-test("duel sequence inputs damage Morianton across five rounds to victory", () => {
+test("guitar hero sequence inputs on beat damage Morianton across five rounds to victory", () => {
   const h = harness();
 
   // Intercept Morianton immediately
@@ -163,30 +179,39 @@ test("duel sequence inputs damage Morianton across five rounds to victory", () =
   h.player.z = h.state().enemies[0].z - 1.0;
   h.tick(5);
 
-  assert.equal(h.state().phase, "duel_prepare");
+  assert.equal(h.state().phase, "round_gate");
   assert.equal(h.state().moriantonHp, 5);
   assert.equal(h.state().teancumHp, 5);
 
   // Play through all 5 rounds
   for (let round = 1; round <= 5; round++) {
-    // Wait for prepare phase to end (0.8s = 48 frames)
-    while (h.state().phase === "duel_prepare") {
-      h.tick(1);
-    }
-    assert.equal(h.state().phase, "duel_sequence");
+    assert.equal(h.state().phase, "round_gate");
     assert.equal(h.state().round, round);
 
+    // Demands [A] click to start
+    h.press("jump");
+    assert.equal(h.state().phase, "duel_sequence");
+
     const seq = DUEL_ROUNDS[round - 1].sequence;
-    for (const token of seq) {
+    let currentSeqFrame = 1;
+
+    // Hit each button on beat
+    for (let i = 0; i < seq.length; i++) {
       assert.equal(h.state().phase, "duel_sequence");
-      h.press(token);
+      const targetFrame = Math.round((T_LEAD_IN + i * T_INTERVAL) * 60);
+      while (currentSeqFrame < targetFrame) {
+        h.tick(1);
+        currentSeqFrame++;
+      }
+      h.press(seq[i]);
+      currentSeqFrame += 2;
     }
 
     // Now in clash_player animation
     assert.equal(h.state().phase, "clash_player");
     assert.equal(h.state().moriantonHp, 5 - round);
 
-    // Wait for clash animation (2.0s = 120 frames)
+    // Wait for clash animation (2.2s = 132 frames)
     while (h.state().phase === "clash_player") {
       h.tick(1);
     }
@@ -206,7 +231,7 @@ test("duel sequence inputs damage Morianton across five rounds to victory", () =
   h.world.dispose?.();
 });
 
-test("incorrect inputs during duel damage Teancum and five wounds reset the duel", () => {
+test("incorrect or missed inputs damage Teancum and five wounds show defeat and demand [A] to retry", () => {
   const h = harness();
 
   // Intercept Morianton
@@ -215,10 +240,13 @@ test("incorrect inputs during duel damage Teancum and five wounds reset the duel
   h.tick(5);
 
   for (let wound = 1; wound <= 5; wound++) {
-    while (h.state().phase === "duel_prepare") {
-      h.tick(1);
-    }
+    assert.equal(h.state().phase, "round_gate");
+    // Press [A] to start round
+    h.press("jump");
     assert.equal(h.state().phase, "duel_sequence");
+
+    // Wait lead-in
+    h.tick(108);
 
     // Intentionally press wrong input
     const target = DUEL_ROUNDS[h.state().round - 1].sequence[0];
@@ -236,12 +264,18 @@ test("incorrect inputs during duel damage Teancum and five wounds reset the duel
   assert.equal(h.state().teancumHp, 0);
   assert.equal(h.state().phase, "duel_defeat");
 
-  // Advance through defeat recovery
-  while (h.state().phase === "duel_defeat") {
-    h.tick(1);
-  }
+  // Verify defeat scoreboard and prompt demand [A] click to retry
+  const defeatRes = h.runtime.update(1 / 60, h.player, idle);
+  assert.match(defeatRes.objective, /FALLEN/);
+  assert.match(defeatRes.prompt, /Press \{jump\} to try again/);
 
-  // Duel restarted
+  // Ticking idle does NOT auto-reset
+  h.tick(60);
+  assert.equal(h.state().phase, "duel_defeat");
+
+  // Press [A] to restart duel
+  h.press("jump");
+  assert.equal(h.state().phase, "round_gate");
   assert.equal(h.state().teancumHp, 5);
   assert.equal(h.state().moriantonHp, 5);
   assert.equal(h.state().round, 1);

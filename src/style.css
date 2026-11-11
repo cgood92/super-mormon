@@ -1506,3 +1506,171 @@ canvas {
 .story-opening .hud {
   z-index: 7;
 }
+
+/* Hide standard HUD prompt while duel rhythm track is active */
+#app:has(.duel-rhythm-track) .prompt {
+  display: none !important;
+}
+
+/* Duel Rhythm Track (Guitar Hero Style) */
+.duel-rhythm-track {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(92vw, 580px);
+  background: rgba(14, 24, 22, 0.95);
+  border: 2px solid #e5c378;
+  border-radius: 16px;
+  padding: 10px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 16px rgba(229, 195, 120, 0.25);
+  z-index: 10;
+  pointer-events: none;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.duel-track-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff0c7;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.duel-track-lane {
+  position: relative;
+  width: 100%;
+  height: 52px;
+  background: #091211;
+  border-radius: 10px;
+  border: 1px solid #3d5852;
+  overflow: visible;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.duel-track-lead {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 20%;
+  height: 100%;
+  background: linear-gradient(90deg, rgba(255, 215, 104, 0.18), rgba(255, 215, 104, 0.02));
+  border-right: 1.5px dashed rgba(255, 215, 104, 0.4);
+  border-radius: 10px 0 0 10px;
+  pointer-events: none;
+}
+
+.duel-track-needle {
+  position: absolute;
+  top: -4px;
+  width: 5px;
+  height: 60px;
+  background: #fff885;
+  box-shadow: 0 0 12px #ffe566, 0 0 24px #ffc107;
+  border-radius: 3px;
+  transform: translateX(-50%);
+  z-index: 5;
+  transition: none;
+}
+
+.duel-node {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 14px;
+  border: 2px solid #758e87;
+  background: #172926;
+  color: #ffffff;
+  z-index: 2;
+  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+  box-sizing: border-box;
+}
+
+.duel-node.duel-node-active {
+  border-color: #ffd74a;
+  transform: translate(-50%, -50%) scale(1.22);
+  box-shadow: 0 0 16px #ffd74a;
+  background: #25443e;
+}
+
+.duel-node.duel-node-hit {
+  border-color: #4ade80;
+  background: #15803d;
+  box-shadow: 0 0 12px #22c55e;
+  transform: translate(-50%, -50%) scale(1.08);
+}
+
+.duel-node.duel-node-miss {
+  border-color: #f87171;
+  background: #b91c1c;
+  box-shadow: 0 0 12px #ef4444;
+}
+
+.duel-track-footer {
+  text-align: center;
+  font-size: 12px;
+  color: #f7ecd7;
+  font-weight: 600;
+}
+
+.duel-defeat-banner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(20, 10, 10, 0.95);
+  border: 2px solid #ef4444;
+  border-radius: 16px;
+  padding: 24px 32px;
+  text-align: center;
+  color: #fff;
+  z-index: 12;
+  box-shadow: 0 0 40px rgba(239, 68, 68, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 90vw;
+}
+
+.duel-defeat-title {
+  font-size: 26px;
+  font-weight: 900;
+  color: #f87171;
+  letter-spacing: 1.5px;
+}
+
+@media (max-width: 700px) {
+  .duel-rhythm-track {
+    width: 94vw;
+    bottom: 85px;
+    padding: 8px 12px;
+  }
+  .duel-track-lane {
+    height: 44px;
+  }
+  .duel-track-needle {
+    height: 52px;
+  }
+  .duel-node {
+    width: 32px;
+    height: 32px;
+    font-size: 12px;
+  }
+}
+

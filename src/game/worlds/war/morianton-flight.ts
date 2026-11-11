@@ -20,15 +20,40 @@ export const MORIANTON_POST_HINTS: Point[] = [];
 export type DuelInputType = "action" | "jump" | "crouch" | "up" | "down";
 
 export const DUEL_ROUNDS: { name: string; sequence: DuelInputType[] }[] = [
-  { name: "First Strike", sequence: ["action", "jump", "action"] },
-  { name: "High Parry", sequence: ["jump", "action", "up"] },
-  { name: "Flank & Thrust", sequence: ["action", "up", "action", "jump"] },
-  { name: "Low Sweep", sequence: ["down", "action", "crouch", "action"] },
-  { name: "Final Clash", sequence: ["action", "jump", "up", "action"] },
+  {
+    name: "First Strike",
+    sequence: ["action", "jump", "action", "jump", "action"],
+  },
+  {
+    name: "High Parry",
+    sequence: ["jump", "action", "up", "action", "jump"],
+  },
+  {
+    name: "Flank & Thrust",
+    sequence: ["action", "jump", "up", "action", "down", "action"],
+  },
+  {
+    name: "Low Sweep",
+    sequence: ["down", "action", "crouch", "action", "jump", "action"],
+  },
+  {
+    name: "Final Clash",
+    sequence: ["action", "jump", "up", "action", "down", "crouch", "action"],
+  },
 ];
 
-const STEP_DURATION = 1.2;
-const ENEMY_WALK_SPEED = 2.8;
+export const T_LEAD_IN = 1.8;
+export const T_INTERVAL = 0.85;
+export const HIT_WINDOW = 0.25;
+export const ENEMY_WALK_SPEED = 2.8;
+
+const GLYPH_LABELS: Record<DuelInputType, string> = {
+  action: "B",
+  jump: "A",
+  crouch: "Z",
+  up: "↑",
+  down: "↓",
+};
 
 function buildDuelSword(tint = 0xc2c7c6, guardTint = 0x8d7443) {
   const sword = new T.Group();
@@ -143,6 +168,35 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
     root.add(arrow);
   }
 
+  // Visual clash spark effect
+  const clashSpark = new T.Group();
+  clashSpark.name = "Sword clash spark effect";
+  const sparkMaterial = new T.MeshBasicMaterial({
+    color: 0xffe070,
+    transparent: true,
+    opacity: 0,
+  });
+  const flashCore = new T.Mesh(
+    new T.SphereGeometry(0.25, 8, 8),
+    sparkMaterial,
+  );
+  clashSpark.add(flashCore);
+  for (let i = 0; i < 6; i++) {
+    const angle = (i * Math.PI) / 3;
+    const ray = new T.Mesh(
+      new T.BoxGeometry(0.035, 0.35, 0.035),
+      sparkMaterial,
+    );
+    ray.position.set(Math.cos(angle) * 0.18, Math.sin(angle) * 0.18, 0);
+    ray.rotation.z = angle + Math.PI / 2;
+    clashSpark.add(ray);
+  }
+  markScenery(clashSpark, {
+    kind: "decoration",
+    reason: "Dynamic sword clash visual effect.",
+  });
+  root.add(clashSpark);
+
   // Patrol: 6 armored soldiers following Teancum
   const patrol = Array.from({ length: 6 }, (_, i) => ({
     rig: actor(
@@ -182,7 +236,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
   // Duel state
   type Phase =
     | "chase"
-    | "duel_prepare"
+    | "round_gate"
     | "duel_sequence"
     | "clash_player"
     | "clash_enemy"
@@ -194,11 +248,14 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
   let teancumHp = 5;
   let moriantonHp = 5;
   let round = 1;
-  let stepIndex = 0;
-  let stepTimer = 0;
+  let targetIndex = 0;
+  let sequenceTimer = 0;
   let phaseTimer = 0;
   let cz = 0;
   const cx = 0;
+
+  // Track node hit/miss states for current round
+  let targetsHit: boolean[] = [];
 
   const prevInputState = {
     interact: false,
@@ -208,15 +265,142 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
     down: false,
   };
 
+  // DOM Rhythm Track Elements
+  let trackContainer: HTMLElement | null = null;
+  let trackHeader: HTMLElement | null = null;
+  let trackLane: HTMLElement | null = null;
+  let trackNeedle: HTMLElement | null = null;
+  let trackFooter: HTMLElement | null = null;
+  let nodeElements: HTMLElement[] = [];
+  let defeatBanner: HTMLElement | null = null;
+
+  const removeDomUi = () => {
+    trackContainer?.remove();
+    trackContainer = null;
+    trackHeader = null;
+    trackLane = null;
+    trackNeedle = null;
+    trackFooter = null;
+    nodeElements = [];
+    defeatBanner?.remove();
+    defeatBanner = null;
+  };
+
+  const ensureDomTrack = (roundSeq: DuelInputType[]) => {
+    if (typeof document === "undefined") return;
+    const app = document.querySelector("#app");
+    if (!app) return;
+
+    if (!trackContainer) {
+      trackContainer = document.createElement("div");
+      trackContainer.id = "duel-rhythm-track";
+      trackContainer.className = "duel-rhythm-track";
+
+      trackHeader = document.createElement("div");
+      trackHeader.className = "duel-track-header";
+      trackContainer.appendChild(trackHeader);
+
+      trackLane = document.createElement("div");
+      trackLane.className = "duel-track-lane";
+
+      const leadZone = document.createElement("div");
+      leadZone.className = "duel-track-lead";
+      trackLane.appendChild(leadZone);
+
+      trackNeedle = document.createElement("div");
+      trackNeedle.className = "duel-track-needle";
+      trackLane.appendChild(trackNeedle);
+
+      trackContainer.appendChild(trackLane);
+
+      trackFooter = document.createElement("div");
+      trackFooter.className = "duel-track-footer";
+      trackContainer.appendChild(trackFooter);
+
+      app.appendChild(trackContainer);
+    }
+
+    // Rebuild nodes if sequence length changed or nodes empty
+    if (nodeElements.length !== roundSeq.length) {
+      nodeElements.forEach((el) => el.remove());
+      nodeElements = [];
+
+      roundSeq.forEach((token, i) => {
+        const node = document.createElement("div");
+        node.className = "duel-node";
+        const pct = 22 + (i / Math.max(1, roundSeq.length - 1)) * 72;
+        node.style.left = `${pct}%`;
+        node.textContent = GLYPH_LABELS[token];
+        trackLane?.appendChild(node);
+        nodeElements.push(node);
+      });
+    }
+  };
+
+  const updateDomUi = (
+    currentSeq: DuelInputType[],
+    needlePct: number,
+    activeIdx: number,
+    hintText: string,
+  ) => {
+    if (typeof document === "undefined" || !trackContainer) return;
+
+    if (trackHeader) {
+      const roundName = DUEL_ROUNDS[round - 1]?.name?.toUpperCase() ?? "";
+      trackHeader.innerHTML = `<span>ROUND ${round} OF 5 · ${roundName}</span><span>HIT ON BEAT!</span>`;
+    }
+
+    if (trackNeedle) {
+      trackNeedle.style.left = `${needlePct}%`;
+    }
+
+    nodeElements.forEach((node, i) => {
+      node.classList.remove("duel-node-active", "duel-node-hit", "duel-node-miss");
+      if (targetsHit[i]) {
+        node.classList.add("duel-node-hit");
+      } else if (i === activeIdx && phase === "duel_sequence") {
+        node.classList.add("duel-node-active");
+      }
+    });
+
+    if (trackFooter) {
+      trackFooter.textContent = hintText;
+    }
+  };
+
+  const showDefeatBanner = (show: boolean) => {
+    if (typeof document === "undefined") return;
+    const app = document.querySelector("#app");
+    if (!app) return;
+
+    if (show && !defeatBanner) {
+      defeatBanner = document.createElement("div");
+      defeatBanner.id = "duel-defeat-banner";
+      defeatBanner.className = "duel-defeat-banner";
+      defeatBanner.innerHTML = `
+        <div class="duel-defeat-title">💀 DEFEAT</div>
+        <div>Teancum has fallen in single combat.</div>
+        <div>Press <strong>[A] / [Space]</strong> to try again.</div>
+      `;
+      app.appendChild(defeatBanner);
+    } else if (!show && defeatBanner) {
+      defeatBanner.remove();
+      defeatBanner = null;
+    }
+  };
+
   const resetChase = (player: PlayerState) => {
     attempts++;
     phase = "chase";
     teancumHp = 5;
     moriantonHp = 5;
     round = 1;
-    stepIndex = 0;
-    stepTimer = 0;
+    targetIndex = 0;
+    sequenceTimer = 0;
     phaseTimer = 0;
+    sparkMaterial.opacity = 0;
+    removeDomUi();
+
     Object.assign(player, createPlayer(0, 0, -57));
     enemyStartOffsets.forEach((p, i) => {
       Object.assign(enemies[i].state, createPlayer(p.x, 0, p.z));
@@ -234,13 +418,14 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
 
   const startDuelAt = (meetingZ: number) => {
     cz = Math.min(36, Math.max(-10, meetingZ));
-    phase = "duel_prepare";
+    phase = "round_gate";
     phaseTimer = 0;
-    stepIndex = 0;
-    stepTimer = 0;
+    targetIndex = 0;
+    sequenceTimer = 0;
     teancumHp = 5;
     moriantonHp = 5;
     round = 1;
+    targetsHit = [];
 
     // Reset Morianton orientation and placement
     Object.assign(enemies[0].state, {
@@ -319,6 +504,11 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
         hooks.avatar.add(playerSword);
       }
 
+      const hearts = (hp: number) =>
+        "❤️".repeat(Math.max(0, hp)) + "🖤".repeat(Math.max(0, 5 - hp));
+      const skulls = (hp: number) =>
+        "💀".repeat(Math.max(0, hp)) + "⚪".repeat(Math.max(0, 5 - hp));
+
       const objective = () => {
         if (phase === "chase") {
           return "Cut off their escape · Catch up to Morianton";
@@ -326,7 +516,14 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
         if (phase === "done") {
           return "The pass is secured · Morianton's company covenants peace";
         }
-        return `Cut off their escape · Teancum ⚔️ ${teancumHp}/5   Morianton 🛡️ ${moriantonHp}/5`;
+        if (phase === "duel_defeat") {
+          return "💀 TEANCUM HAS FALLEN! 💀";
+        }
+        if (phase === "duel_win") {
+          return "⚔️ VICTORY! MORIANTON DEFEATED ⚔️";
+        }
+        // Scoreboard only — no "Cut off their escape" during duel
+        return `TEANCUM: ${hearts(teancumHp)}   ⚔️ VS ⚔️   MORIANTON: ${skulls(moriantonHp)}`;
       };
 
       return {
@@ -335,7 +532,8 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
           teancumHp,
           moriantonHp,
           round,
-          stepIndex,
+          targetIndex,
+          sequenceTimer,
           cz,
           attempts,
           escapedCount,
@@ -356,7 +554,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
         movementLocked: () =>
           pending ||
           ended ||
-          phase === "duel_prepare" ||
+          phase === "round_gate" ||
           phase === "duel_sequence" ||
           phase === "clash_player" ||
           phase === "clash_enemy" ||
@@ -365,7 +563,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
 
         camera: () => {
           if (
-            phase === "duel_prepare" ||
+            phase === "round_gate" ||
             phase === "duel_sequence" ||
             phase === "clash_player" ||
             phase === "clash_enemy" ||
@@ -384,6 +582,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
         update(dt, player, input) {
           dt = Math.max(0, Math.min(dt, 0.1));
           if (disposed || ended) {
+            removeDomUi();
             return { objective: objective(), prompt: "" };
           }
 
@@ -406,6 +605,9 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
           // PHASE: CHASE
           // -----------------------------------------------------------
           if (phase === "chase") {
+            removeDomUi();
+            sparkMaterial.opacity = 0;
+
             // Patrol soldiers follow Teancum in a formation trail
             let ahead = player;
             patrol.forEach((soldier) => {
@@ -468,7 +670,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
             if (dist < 2.8) {
               startDuelAt(enemies[0].state.z);
               hooks.toast(
-                "Single combat! Strike in the correct sequence to defeat Morianton.",
+                "Single combat! Hit each button in rhythm as the bar sweeps across. Press [A] to begin!",
               );
             }
 
@@ -481,11 +683,15 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
             enemies[i].rig.update(dt, enemies[i].state);
           }
 
+          const currentRoundData = DUEL_ROUNDS[round - 1];
+          const seq = currentRoundData.sequence;
+          const numButtons = seq.length;
+
           // -----------------------------------------------------------
-          // PHASE: DUEL PREPARE
+          // PHASE: ROUND GATE (EXPLAIN & DEMAND [A] CLICK TO START)
           // -----------------------------------------------------------
-          if (phase === "duel_prepare") {
-            phaseTimer += dt;
+          if (phase === "round_gate") {
+            sparkMaterial.opacity = 0;
             player.x = cx;
             player.y = 0;
             player.z = cz - 1.4;
@@ -501,28 +707,28 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
             enemies[0].state.move = "idle";
             enemies[0].rig.update(dt, enemies[0].state);
 
-            const roundData = DUEL_ROUNDS[round - 1];
-            const seqTokens = roundData.sequence
-              .map((t) => `{${t}}`)
-              .join("  ");
+            ensureDomTrack(seq);
+            updateDomUi(seq, 0, 0, "Press [A] to begin round!");
 
-            if (phaseTimer >= 0.8) {
+            if (pressedJump) {
               phase = "duel_sequence";
-              stepIndex = 0;
-              stepTimer = 0;
+              sequenceTimer = 0;
+              targetIndex = 0;
+              targetsHit = Array(numButtons).fill(false);
             }
 
+            const promptTokens = seq.map((t) => `{${t}}`).join("  ");
             return {
               objective: objective(),
-              prompt: `Round ${round} of 5 · Get ready!  [ ${seqTokens} ]`,
+              prompt: `Round ${round} of 5 · Strike on beat! [ ${promptTokens} ] · Press {jump} to begin`,
             };
           }
 
           // -----------------------------------------------------------
-          // PHASE: DUEL SEQUENCE (QTE INPUT)
+          // PHASE: DUEL SEQUENCE (GUITAR HERO STYLE TIMING TRACK)
           // -----------------------------------------------------------
           if (phase === "duel_sequence") {
-            stepTimer += dt;
+            sequenceTimer += dt;
             player.x = cx;
             player.y = 0;
             player.z = cz - 1.4;
@@ -536,21 +742,28 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
             enemies[0].state.move = "idle";
             enemies[0].rig.update(dt, enemies[0].state);
 
-            const seq = DUEL_ROUNDS[round - 1].sequence;
-            const target = seq[stepIndex];
+            ensureDomTrack(seq);
 
-            // Check if step timed out
-            if (stepTimer >= STEP_DURATION) {
-              phase = "clash_enemy";
-              phaseTimer = 0;
-              teancumHp = Math.max(0, teancumHp - 1);
-              return {
-                objective: objective(),
-                prompt: "Too late! Morianton strikes!",
-              };
+            // Compute needle percentage along lane (0% to 100%)
+            // 0% to 22%: lead-in period (0 to T_LEAD_IN)
+            // 22% to 94%: button track over (numButtons - 1) intervals
+            const trackTotalTime =
+              T_LEAD_IN + (numButtons - 1) * T_INTERVAL;
+            let needlePct = 0;
+            if (sequenceTimer <= T_LEAD_IN) {
+              needlePct = (sequenceTimer / T_LEAD_IN) * 22;
+            } else {
+              const elapsedAfterLead = sequenceTimer - T_LEAD_IN;
+              needlePct = Math.min(
+                98,
+                22 +
+                  (elapsedAfterLead /
+                    Math.max(0.1, (numButtons - 1) * T_INTERVAL)) *
+                    72,
+              );
             }
 
-            // Identify any button press
+            // Identify pressed button
             let pressed: DuelInputType | null = null;
             if (pressedAction) pressed = "action";
             else if (pressedJump) pressed = "jump";
@@ -558,79 +771,140 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
             else if (pressedUp) pressed = "up";
             else if (pressedDown) pressed = "down";
 
+            // Active target timing
+            const activeTargetTime =
+              T_LEAD_IN + targetIndex * T_INTERVAL;
+            const diff = sequenceTimer - activeTargetTime;
+
+            // Check if player timed out on the current target
+            if (diff > HIT_WINDOW) {
+              // Missed by timing out
+              phase = "clash_enemy";
+              phaseTimer = 0;
+              teancumHp = Math.max(0, teancumHp - 1);
+              updateDomUi(seq, needlePct, targetIndex, "Missed! Morianton strikes!");
+              return {
+                objective: objective(),
+                prompt: "Too late! Morianton strikes!",
+              };
+            }
+
+            // Check player press
             if (pressed !== null) {
-              if (pressed === target) {
-                stepIndex++;
-                stepTimer = 0;
-                if (stepIndex >= seq.length) {
+              const expectedToken = seq[targetIndex];
+              const inWindow = Math.abs(diff) <= HIT_WINDOW;
+
+              if (inWindow && pressed === expectedToken) {
+                // Near perfection hit!
+                targetsHit[targetIndex] = true;
+                targetIndex++;
+                if (targetIndex >= numButtons) {
+                  // Entire sequence completed successfully!
                   phase = "clash_player";
                   phaseTimer = 0;
                   moriantonHp = Math.max(0, moriantonHp - 1);
+                  updateDomUi(seq, needlePct, targetIndex, "PERFECT! Teancum strikes!");
                   return {
                     objective: objective(),
                     prompt: "Sequence Complete! Teancum strikes!",
                   };
                 }
               } else {
+                // Wrong button or pressed outside the hit window
                 phase = "clash_enemy";
                 phaseTimer = 0;
                 teancumHp = Math.max(0, teancumHp - 1);
+                updateDomUi(seq, needlePct, targetIndex, "Missed! Morianton strikes!");
                 return {
                   objective: objective(),
-                  prompt: "Wrong move! Morianton strikes!",
+                  prompt:
+                    diff < -HIT_WINDOW
+                      ? "Too early! Morianton strikes!"
+                      : "Wrong move! Morianton strikes!",
                 };
               }
             }
 
+            let hint = "";
+            if (sequenceTimer < T_LEAD_IN) {
+              const rem = Math.max(0, T_LEAD_IN - sequenceTimer).toFixed(1);
+              hint = `Get ready... First strike in ${rem}s!`;
+            } else {
+              hint = `STRIKE [${GLYPH_LABELS[seq[targetIndex]]}] NOW!`;
+            }
+
+            updateDomUi(seq, needlePct, targetIndex, hint);
+
             const promptTokens = seq
               .map((token, i) => {
-                if (i < stepIndex) return `✓ {${token}}`;
-                if (i === stepIndex) return `▶ {${token}} ◀`;
+                if (targetsHit[i]) return `✓ {${token}}`;
+                if (i === targetIndex) return `▶ {${token}} ◀`;
                 return `{${token}}`;
               })
               .join("  ");
-            const rem = Math.max(0, STEP_DURATION - stepTimer).toFixed(1);
 
             return {
               objective: objective(),
-              prompt: `Round ${round}/5 · Hit:  ${promptTokens}  (${rem}s)`,
+              prompt: `Round ${round}/5 · [ ${promptTokens} ] · ${hint}`,
             };
           }
 
           // -----------------------------------------------------------
-          // PHASE: CLASH PLAYER (TEANCUM HITS MORIANTON)
+          // PHASE: CLASH PLAYER (TEANCUM HITS MORIANTON - REALISTIC CLOSE COMBAT)
           // -----------------------------------------------------------
           if (phase === "clash_player") {
             phaseTimer += dt;
             const t = phaseTimer;
 
-            if (t < 0.7) {
-              // Teancum lunges forward
-              player.z = cz - 1.4 + (t / 0.7) * 1.0;
+            if (t < 0.6) {
+              // Both sprint into sword contact range!
+              const lunge = t / 0.6;
+              player.z = cz - 1.4 + lunge * 0.98; // Reaches cz - 0.42
               player.move = "run";
-              player.runSpeed = 6;
+              player.runSpeed = 7;
               player.yaw = 0;
-              enemies[0].state.move = "turnSkid";
+
+              enemies[0].state.z = cz + 1.4 - lunge * 0.98; // Reaches cz + 0.42
+              enemies[0].state.move = "run";
+              enemies[0].state.runSpeed = 7;
+
+              // Spark burst on blade contact
+              if (t >= 0.5) {
+                sparkMaterial.opacity = 0.95;
+                clashSpark.position.set(cx, 1.05, cz);
+                clashSpark.scale.setScalar(1 + (t - 0.5) * 4);
+              }
             } else if (t < 1.3) {
-              // Slash impact knocks Morianton back
-              player.move = "turnSkid";
-              enemies[0].state.z = cz + 1.4 + ((t - 0.7) / 0.6) * 0.8;
+              // Teancum breaks Morianton's guard and slashes across torso
+              const drive = (t - 0.6) / 0.7;
+              player.z = cz - 0.42 + drive * 0.57; // Steps right up to cz + 0.15 (0.45m close!)
+              player.move = "tripleJump";
+              player.yaw = 0.2;
+
+              // Morianton gets hit and violently recoils backward
+              enemies[0].state.z = cz + 0.42 + drive * 1.98; // Knocked back to cz + 2.4
               enemies[0].state.move = "crouch";
-              enemies[0].state.yaw = Math.PI - 0.35;
+              enemies[0].state.yaw = Math.PI - 0.45;
+
+              sparkMaterial.opacity = Math.max(0, 0.95 - (t - 0.6) * 2);
             } else {
-              // Return to ready stance
-              const returnT = (t - 1.3) / 0.7;
-              player.z = cz - 0.4 - returnT * 1.0;
+              // Both return smoothly to their ready stances
+              const returnT = (t - 1.3) / 0.9;
+              player.z = cz + 0.15 - returnT * 1.55;
               player.move = "idle";
               player.yaw = 0;
-              enemies[0].state.z = cz + 2.2 - returnT * 0.8;
+
+              enemies[0].state.z = cz + 2.4 - returnT * 1.0;
               enemies[0].state.move = "idle";
               enemies[0].state.yaw = Math.PI;
+
+              sparkMaterial.opacity = 0;
             }
 
             enemies[0].rig.update(dt, enemies[0].state);
 
-            if (phaseTimer >= 2.0) {
+            if (phaseTimer >= 2.2) {
+              sparkMaterial.opacity = 0;
               player.z = cz - 1.4;
               enemies[0].state.z = cz + 1.4;
               if (moriantonHp <= 0) {
@@ -638,7 +912,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
                 phaseTimer = 0;
               } else {
                 round = Math.min(DUEL_ROUNDS.length, round + 1);
-                phase = "duel_prepare";
+                phase = "round_gate";
                 phaseTimer = 0;
               }
             }
@@ -650,45 +924,66 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
           }
 
           // -----------------------------------------------------------
-          // PHASE: CLASH ENEMY (MORIANTON HITS TEANCUM)
+          // PHASE: CLASH ENEMY (MORIANTON HITS TEANCUM - REALISTIC CLOSE COMBAT)
           // -----------------------------------------------------------
           if (phase === "clash_enemy") {
             phaseTimer += dt;
             const t = phaseTimer;
 
-            if (t < 0.7) {
-              // Morianton lunges forward
-              enemies[0].state.z = cz + 1.4 - (t / 0.7) * 1.0;
+            if (t < 0.6) {
+              // Both rush into sword contact range!
+              const lunge = t / 0.6;
+              enemies[0].state.z = cz + 1.4 - lunge * 0.98; // Reaches cz + 0.42
               enemies[0].state.move = "run";
-              enemies[0].state.runSpeed = 6;
-              player.move = "turnSkid";
+              enemies[0].state.runSpeed = 7;
+
+              player.z = cz - 1.4 + lunge * 0.98; // Reaches cz - 0.42
+              player.move = "run";
+              player.runSpeed = 7;
+
+              if (t >= 0.5) {
+                sparkMaterial.opacity = 0.95;
+                clashSpark.position.set(cx, 1.05, cz);
+                clashSpark.scale.setScalar(1 + (t - 0.5) * 4);
+              }
             } else if (t < 1.3) {
-              // Strike knocks Teancum back
+              // Morianton overpowers guard and slashes Teancum
+              const drive = (t - 0.6) / 0.7;
+              enemies[0].state.z = cz + 0.42 - drive * 0.57; // Steps up to cz - 0.15
               enemies[0].state.move = "turnSkid";
-              player.z = cz - 1.4 - ((t - 0.7) / 0.6) * 0.8;
+
+              // Teancum is hit and violently knocked backward
+              player.z = cz - 0.42 - drive * 1.98; // Knocked back to cz - 2.4
               player.move = "crouch";
-              player.yaw = 0.35;
+              player.yaw = 0.45;
+
+              sparkMaterial.opacity = Math.max(0, 0.95 - (t - 0.6) * 2);
             } else {
               // Both return to stance
-              const returnT = (t - 1.3) / 0.7;
-              enemies[0].state.z = cz + 0.4 + returnT * 1.0;
+              const returnT = (t - 1.3) / 0.9;
+              enemies[0].state.z = cz - 0.15 + returnT * 1.55;
               enemies[0].state.move = "idle";
               enemies[0].state.yaw = Math.PI;
-              player.z = cz - 2.2 + returnT * 0.8;
+
+              player.z = cz - 2.4 + returnT * 1.0;
               player.move = "idle";
               player.yaw = 0;
+
+              sparkMaterial.opacity = 0;
             }
 
             enemies[0].rig.update(dt, enemies[0].state);
 
-            if (phaseTimer >= 2.0) {
+            if (phaseTimer >= 2.2) {
+              sparkMaterial.opacity = 0;
               player.z = cz - 1.4;
               enemies[0].state.z = cz + 1.4;
               if (teancumHp <= 0) {
                 phase = "duel_defeat";
                 phaseTimer = 0;
+                showDefeatBanner(true);
               } else {
-                phase = "duel_prepare";
+                phase = "round_gate";
                 phaseTimer = 0;
               }
             }
@@ -700,31 +995,37 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
           }
 
           // -----------------------------------------------------------
-          // PHASE: DUEL DEFEAT
+          // PHASE: DUEL DEFEAT (DRAMATIC LOSS & DEMAND [A] TO RETRY)
           // -----------------------------------------------------------
           if (phase === "duel_defeat") {
-            phaseTimer += dt;
+            sparkMaterial.opacity = 0;
+            removeDomUi();
+            showDefeatBanner(true);
+
             player.move = "crouch";
             player.crouching = true;
             enemies[0].state.move = "idle";
             enemies[0].rig.update(dt, enemies[0].state);
 
-            if (phaseTimer >= 2.2) {
+            // Demand [A] click to try again
+            if (pressedJump) {
+              showDefeatBanner(false);
               player.crouching = false;
               player.move = "idle";
               teancumHp = 5;
               moriantonHp = 5;
               round = 1;
-              phase = "duel_prepare";
+              phase = "round_gate";
               phaseTimer = 0;
               hooks.toast(
-                "The duel restarts. Watch the sequence and hit each control on beat!",
+                "The duel restarts. Watch the moving bar and hit each button in rhythm!",
               );
             }
 
             return {
               objective: objective(),
-              prompt: "Teancum was wounded! Prepare to try again.",
+              prompt:
+                "💥 DEFEAT! Morianton broke away into the land northward. Press {jump} to try again.",
             };
           }
 
@@ -733,6 +1034,9 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
           // -----------------------------------------------------------
           if (phase === "duel_win") {
             phaseTimer += dt;
+            removeDomUi();
+            sparkMaterial.opacity = 0;
+
             player.move = "idle";
             player.yaw = -Math.PI / 2;
 
@@ -778,13 +1082,16 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
         dispose() {
           disposed = true;
           pending = false;
+          removeDomUi();
         },
       };
     },
 
     dispose() {
       disposed = true;
+      removeDomUi();
       moriantonSword.parent?.remove(moriantonSword);
+      clashSpark.parent?.remove(clashSpark);
       land.dispose();
     },
   };
