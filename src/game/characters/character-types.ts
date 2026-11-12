@@ -81,6 +81,7 @@ export type CharacterState = {
   carrying?: boolean;
   holdingBanner?: boolean;
   holdingBow?: boolean;
+  holdingSword?: boolean;
   wave?: boolean;
   pointing?: boolean;
   aiming?: boolean;

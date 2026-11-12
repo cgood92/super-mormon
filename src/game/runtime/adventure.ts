@@ -47,6 +47,7 @@ export type AdventureRuntime = {
     aiming?: boolean;
     draw?: number;
     holdingBow?: boolean;
+    holdingSword?: boolean;
   };
   movementLocked?: () => boolean;
   camera?: () =>

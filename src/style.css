@@ -1601,7 +1601,7 @@ canvas {
   transition: transform 0.1s ease;
 }
 
-/* Button node colors: A is blue, B is green */
+/* Button node colors: A is blue, B is green, Z is purple */
 .duel-node.duel-node-a {
   background: #2563eb;
   border: 2px solid #60a5fa;
@@ -1612,6 +1612,11 @@ canvas {
   border: 2px solid #4ade80;
 }
 
+.duel-node.duel-node-z {
+  background: #7c3aed;
+  border: 2px solid #c084fc;
+}
+
 .duel-node.duel-node-active {
   transform: translate(-50%, -50%) scale(1.22);
   filter: brightness(1.25);
@@ -1619,16 +1624,14 @@ canvas {
 }
 
 .duel-node.duel-node-hit {
-  background: #15803d;
-  border-color: #86efac;
-  transform: translate(-50%, -50%) scale(1.05);
-  opacity: 0.6;
+  transform: translate(-50%, -50%) scale(1.12);
+  filter: brightness(1.35) drop-shadow(0 0 6px rgba(255, 255, 255, 0.75));
+  opacity: 0.95;
 }
 
 .duel-node.duel-node-miss {
-  background: #991b1b;
-  border-color: #fca5a5;
-  opacity: 0.5;
+  filter: grayscale(0.85) brightness(0.6);
+  opacity: 0.4;
 }
 
 .duel-track-footer {
@@ -1663,6 +1666,11 @@ canvas {
 .duel-inline-badge-b {
   background: #16a34a;
   border: 1.5px solid #4ade80;
+}
+
+.duel-inline-badge-z {
+  background: #7c3aed;
+  border: 1.5px solid #c084fc;
 }
 
 @media (max-width: 700px) {

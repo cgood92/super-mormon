@@ -26,19 +26,19 @@ export const DUEL_ROUNDS: { name: string; sequence: DuelInputType[] }[] = [
   },
   {
     name: "High Parry",
-    sequence: ["jump", "action", "jump", "action", "jump"],
+    sequence: ["jump", "action", "crouch", "action", "jump"],
   },
   {
     name: "Flank & Thrust",
-    sequence: ["action", "action", "jump", "action", "jump", "action"],
+    sequence: ["action", "jump", "crouch", "action", "crouch", "jump"],
   },
   {
     name: "Low Sweep",
-    sequence: ["jump", "jump", "action", "action", "jump", "action"],
+    sequence: ["crouch", "action", "jump", "crouch", "action", "jump"],
   },
   {
     name: "Final Clash",
-    sequence: ["action", "jump", "action", "action", "jump", "action", "jump"],
+    sequence: ["action", "jump", "crouch", "action", "jump", "crouch", "action"],
   },
 ];
 
@@ -221,6 +221,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
       i === 0 ? "Morianton · fleeing leader" : `Morianton follower ${i}`,
     ),
     state: createPlayer(p.x, 0, p.z),
+    holdingSword: false,
   }));
 
   // Attach weapon to Morianton's hand
@@ -261,10 +262,14 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
   // Edge triggers and keyboard listeners for duel
   let duelKeyPressedAction = false;
   let duelKeyPressedJump = false;
+  let duelKeyPressedCrouch = false;
 
   const onDuelKeyDown = (e: KeyboardEvent) => {
     if (e.code === "KeyB") duelKeyPressedAction = true;
     if (e.code === "KeyA") duelKeyPressedJump = true;
+    if (e.code === "KeyZ" || e.code === "ShiftLeft" || e.code === "ShiftRight") {
+      duelKeyPressedCrouch = true;
+    }
   };
   if (typeof window !== "undefined") {
     window.addEventListener("keydown", onDuelKeyDown);
@@ -336,11 +341,19 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
 
     roundSeq.forEach((token, i) => {
       const node = document.createElement("div");
-      const isJump = token === "jump";
-      node.className = `duel-node ${isJump ? "duel-node-a" : "duel-node-b"}`;
+      let nodeClass = "duel-node-b";
+      let label = "B";
+      if (token === "jump") {
+        nodeClass = "duel-node-a";
+        label = "A";
+      } else if (token === "crouch") {
+        nodeClass = "duel-node-z";
+        label = "Z";
+      }
+      node.className = `duel-node ${nodeClass}`;
       const pct = 22 + (i / Math.max(1, roundSeq.length - 1)) * 72;
       node.style.left = `${pct}%`;
-      node.textContent = isJump ? "A" : "B";
+      node.textContent = label;
       trackLane?.appendChild(node);
       nodeElements.push(node);
     });
@@ -365,7 +378,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
 
     nodeElements.forEach((node, i) => {
       node.classList.remove("duel-node-active", "duel-node-hit", "duel-node-miss");
-      if (targetsHit[i]) {
+      if (targetsHit[i] && phase === "duel_sequence") {
         node.classList.add("duel-node-hit");
       } else if (i === activeIdx && phase === "duel_sequence") {
         node.classList.add("duel-node-active");
@@ -426,12 +439,16 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
       vy: 0,
       vz: 0,
       runSpeed: 0,
-      yaw: Math.PI,
+      yaw: Math.PI - 0.22,
       grounded: true,
       move: "idle",
     });
+    enemies[0].holdingSword = true;
     enemies[0].rig.group.rotation.z = 0;
-    enemies[0].rig.update(0, enemies[0].state);
+    enemies[0].rig.update(0, {
+      ...enemies[0].state,
+      holdingSword: enemies[0].holdingSword,
+    });
 
     // Position spectators along the east boundary (x = 4.2) clear of the camera view
     patrol.forEach((s, i) => {
@@ -587,12 +604,14 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
             (!!input.interact && !prevInputState.interact) || duelKeyPressedAction;
           const pressedJump =
             (!!input.jump && !prevInputState.jump) || duelKeyPressedJump;
-          const pressedCrouch = !!input.crouch && !prevInputState.crouch;
+          const pressedCrouch =
+            (!!input.crouch && !prevInputState.crouch) || duelKeyPressedCrouch;
           const pressedUp = currentUp && !prevInputState.up;
           const pressedDown = currentDown && !prevInputState.down;
 
           duelKeyPressedAction = false;
           duelKeyPressedJump = false;
+          duelKeyPressedCrouch = false;
 
           prevInputState.interact = !!input.interact;
           prevInputState.jump = !!input.jump;
@@ -684,11 +703,12 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
           // PHASE: ROUND GATE (EXPLAIN & DEMAND [A] CLICK TO START)
           // -----------------------------------------------------------
           if (phase === "round_gate") {
+            targetsHit = Array(numButtons).fill(false);
             sparkMaterial.opacity = 0;
             player.x = cx;
             player.y = 0;
             player.z = cz - 1.4;
-            player.yaw = 0;
+            player.yaw = -0.22;
             player.move = "idle";
             player.vx = 0;
             player.vz = 0;
@@ -696,9 +716,13 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
             enemies[0].state.x = cx;
             enemies[0].state.y = 0;
             enemies[0].state.z = cz + 1.4;
-            enemies[0].state.yaw = Math.PI;
+            enemies[0].state.yaw = Math.PI - 0.22;
             enemies[0].state.move = "idle";
-            enemies[0].rig.update(dt, enemies[0].state);
+            enemies[0].holdingSword = true;
+            enemies[0].rig.update(dt, {
+              ...enemies[0].state,
+              holdingSword: enemies[0].holdingSword,
+            });
 
             ensureDomTrack(seq);
             updateDomUi(
@@ -719,6 +743,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
             return {
               objective: objective(),
               prompt: `Round ${round} of 5 · Strike on beat! [ ${promptTokens} ] · Press {jump} to begin`,
+              holdingSword: true,
             };
           }
 
@@ -730,15 +755,19 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
             player.x = cx;
             player.y = 0;
             player.z = cz - 1.4;
-            player.yaw = 0;
+            player.yaw = -0.22;
             player.move = "idle";
 
             enemies[0].state.x = cx;
             enemies[0].state.y = 0;
             enemies[0].state.z = cz + 1.4;
-            enemies[0].state.yaw = Math.PI;
+            enemies[0].state.yaw = Math.PI - 0.22;
             enemies[0].state.move = "idle";
-            enemies[0].rig.update(dt, enemies[0].state);
+            enemies[0].holdingSword = true;
+            enemies[0].rig.update(dt, {
+              ...enemies[0].state,
+              holdingSword: enemies[0].holdingSword,
+            });
 
             // Compute needle percentage along lane (0% to 100%)
             // 0% to 22%: lead-in period (0 to T_LEAD_IN)
@@ -829,6 +858,8 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
               const nextBadge =
                 seq[targetIndex] === "jump"
                   ? '<span class="duel-inline-badge duel-inline-badge-a">A</span>'
+                  : seq[targetIndex] === "crouch"
+                  ? '<span class="duel-inline-badge duel-inline-badge-z">Z</span>'
                   : '<span class="duel-inline-badge duel-inline-badge-b">B</span>';
               hintHtml = `Strike ${nextBadge} now!`;
             }
@@ -846,6 +877,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
             return {
               objective: objective(),
               prompt: `Round ${round}/5 · [ ${promptTokens} ] · Strike on beat!`,
+              holdingSword: true,
             };
           }
 
@@ -856,57 +888,72 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
             phaseTimer += dt;
             const t = phaseTimer;
 
-            if (t < 0.6) {
-              // Both sprint into sword contact range!
-              const lunge = t / 0.6;
-              player.z = cz - 1.4 + lunge * 0.98; // Reaches cz - 0.42
+            if (t < 0.55) {
+              // Both step forward into sword contact range!
+              const lunge = t / 0.55;
+              player.z = cz - 1.4 + lunge * 0.95; // Reaches cz - 0.45
               player.move = "run";
-              player.runSpeed = 7;
+              player.runSpeed = 4.5;
               player.yaw = 0;
 
-              enemies[0].state.z = cz + 1.4 - lunge * 0.98; // Reaches cz + 0.42
+              enemies[0].state.z = cz + 1.4 - lunge * 0.95; // Reaches cz + 0.45
               enemies[0].state.move = "run";
-              enemies[0].state.runSpeed = 7;
+              enemies[0].state.runSpeed = 4.5;
+              enemies[0].holdingSword = true;
+              enemies[0].state.yaw = Math.PI;
 
-              // Spark burst on blade contact
-              if (t >= 0.5) {
+              if (t >= 0.45) {
                 sparkMaterial.opacity = 0.95;
                 clashSpark.position.set(cx, 1.05, cz);
-                clashSpark.scale.setScalar(1 + (t - 0.5) * 4);
+                clashSpark.scale.setScalar(1 + (t - 0.45) * 4);
               }
-            } else if (t < 1.3) {
-              // Teancum breaks Morianton's guard and slashes across torso
-              const drive = (t - 0.6) / 0.7;
-              player.z = cz - 0.42 + drive * 0.57; // Steps right up to cz + 0.15 (0.45m close!)
-              player.move = "tripleJump";
-              player.yaw = 0.2;
+            } else if (t < 1.25) {
+              // Teancum PLANTS his feet firmly on strike impact (no drifting!)
+              player.z = cz - 0.45;
+              player.move = "turnSkid";
+              player.runSpeed = 0;
+              player.yaw = -0.15;
 
-              // Morianton gets hit and violently recoils backward
-              enemies[0].state.z = cz + 0.42 + drive * 1.98; // Knocked back to cz + 2.4
+              // Morianton gets hit and recoils backward
+              const recoil = (t - 0.55) / 0.7;
+              enemies[0].state.z = cz + 0.45 + Math.sin(recoil * (Math.PI / 2)) * 1.5;
               enemies[0].state.move = "crouch";
-              enemies[0].state.yaw = Math.PI - 0.45;
+              enemies[0].holdingSword = false;
+              enemies[0].state.yaw = Math.PI - 0.35;
 
-              sparkMaterial.opacity = Math.max(0, 0.95 - (t - 0.6) * 2);
+              sparkMaterial.opacity = Math.max(0, 0.95 - (t - 0.55) * 2.2);
             } else {
-              // Both return smoothly to their ready stances
-              const returnT = (t - 1.3) / 0.9;
-              player.z = cz + 0.15 - returnT * 1.55;
-              player.move = "idle";
-              player.yaw = 0;
+              // Both step back to ready stance with active footsteps (no sliding on ice!)
+              const returnT = (t - 1.25) / 0.8;
+              player.z = cz - 0.45 - returnT * 0.95;
+              player.move = "run";
+              player.runSpeed = 2.4;
+              player.yaw = -0.22;
 
-              enemies[0].state.z = cz + 2.4 - returnT * 1.0;
-              enemies[0].state.move = "idle";
-              enemies[0].state.yaw = Math.PI;
+              enemies[0].state.z = cz + 1.95 - returnT * 0.55;
+              enemies[0].state.move = "run";
+              enemies[0].state.runSpeed = 1.8;
+              enemies[0].holdingSword = true;
+              enemies[0].state.yaw = Math.PI - 0.22;
 
               sparkMaterial.opacity = 0;
             }
 
-            enemies[0].rig.update(dt, enemies[0].state);
+            enemies[0].rig.update(dt, {
+              ...enemies[0].state,
+              holdingSword: enemies[0].holdingSword,
+            });
 
-            if (phaseTimer >= 2.2) {
+            if (phaseTimer >= 2.05) {
               sparkMaterial.opacity = 0;
               player.z = cz - 1.4;
+              player.move = "idle";
+              player.runSpeed = 0;
               enemies[0].state.z = cz + 1.4;
+              enemies[0].state.move = "idle";
+              enemies[0].state.runSpeed = 0;
+              enemies[0].holdingSword = true;
+              targetsHit = Array(numButtons).fill(false);
               if (moriantonHp <= 0) {
                 phase = "duel_win";
                 phaseTimer = 0;
@@ -920,6 +967,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
             return {
               objective: objective(),
               prompt: "Sequence Complete! Teancum strikes!",
+              holdingSword: true,
             };
           }
 
@@ -930,54 +978,73 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
             phaseTimer += dt;
             const t = phaseTimer;
 
-            if (t < 0.6) {
-              // Both rush into sword contact range!
-              const lunge = t / 0.6;
-              enemies[0].state.z = cz + 1.4 - lunge * 0.98; // Reaches cz + 0.42
+            if (t < 0.55) {
+              // Morianton advances into strike contact range!
+              const lunge = t / 0.55;
+              enemies[0].state.z = cz + 1.4 - lunge * 0.95; // Reaches cz + 0.45
               enemies[0].state.move = "run";
-              enemies[0].state.runSpeed = 7;
-
-              player.z = cz - 1.4 + lunge * 0.98; // Reaches cz - 0.42
-              player.move = "run";
-              player.runSpeed = 7;
-
-              if (t >= 0.5) {
-                sparkMaterial.opacity = 0.95;
-                clashSpark.position.set(cx, 1.05, cz);
-                clashSpark.scale.setScalar(1 + (t - 0.5) * 4);
-              }
-            } else if (t < 1.3) {
-              // Morianton overpowers guard and slashes Teancum
-              const drive = (t - 0.6) / 0.7;
-              enemies[0].state.z = cz + 0.42 - drive * 0.57; // Steps up to cz - 0.15
-              enemies[0].state.move = "turnSkid";
-
-              // Teancum is hit and violently knocked backward
-              player.z = cz - 0.42 - drive * 1.98; // Knocked back to cz - 2.4
-              player.move = "crouch";
-              player.yaw = 0.45;
-
-              sparkMaterial.opacity = Math.max(0, 0.95 - (t - 0.6) * 2);
-            } else {
-              // Both return to stance
-              const returnT = (t - 1.3) / 0.9;
-              enemies[0].state.z = cz - 0.15 + returnT * 1.55;
-              enemies[0].state.move = "idle";
+              enemies[0].state.runSpeed = 4.5;
+              enemies[0].holdingSword = true;
               enemies[0].state.yaw = Math.PI;
 
-              player.z = cz - 2.4 + returnT * 1.0;
-              player.move = "idle";
+              player.z = cz - 1.4 + lunge * 0.95; // Reaches cz - 0.45
+              player.move = "run";
+              player.runSpeed = 4.5;
               player.yaw = 0;
+
+              if (t >= 0.45) {
+                sparkMaterial.opacity = 0.95;
+                clashSpark.position.set(cx, 1.05, cz);
+                clashSpark.scale.setScalar(1 + (t - 0.45) * 4);
+              }
+            } else if (t < 1.25) {
+              // Morianton plants his feet firmly on strike impact
+              enemies[0].state.z = cz + 0.45;
+              enemies[0].state.move = "turnSkid";
+              enemies[0].state.runSpeed = 0;
+              enemies[0].holdingSword = true;
+              enemies[0].state.yaw = Math.PI;
+
+              // Teancum is struck and recoils backward
+              const recoil = (t - 0.55) / 0.7;
+              player.z = cz - 0.45 - Math.sin(recoil * (Math.PI / 2)) * 1.5;
+              player.move = "crouch";
+              player.runSpeed = 0;
+              player.yaw = 0.35;
+
+              sparkMaterial.opacity = Math.max(0, 0.95 - (t - 0.55) * 2.2);
+            } else {
+              // Both step back to ready stance with active footsteps (no sliding on ice!)
+              const returnT = (t - 1.25) / 0.8;
+              enemies[0].state.z = cz + 0.45 + returnT * 0.95;
+              enemies[0].state.move = "run";
+              enemies[0].state.runSpeed = 2.4;
+              enemies[0].holdingSword = true;
+              enemies[0].state.yaw = Math.PI - 0.22;
+
+              player.z = cz - 1.95 + returnT * 0.55;
+              player.move = "run";
+              player.runSpeed = 1.8;
+              player.yaw = -0.22;
 
               sparkMaterial.opacity = 0;
             }
 
-            enemies[0].rig.update(dt, enemies[0].state);
+            enemies[0].rig.update(dt, {
+              ...enemies[0].state,
+              holdingSword: enemies[0].holdingSword,
+            });
 
-            if (phaseTimer >= 2.2) {
+            if (phaseTimer >= 2.05) {
               sparkMaterial.opacity = 0;
               player.z = cz - 1.4;
+              player.move = "idle";
+              player.runSpeed = 0;
               enemies[0].state.z = cz + 1.4;
+              enemies[0].state.move = "idle";
+              enemies[0].state.runSpeed = 0;
+              enemies[0].holdingSword = true;
+              targetsHit = Array(numButtons).fill(false);
               if (teancumHp <= 0) {
                 phase = "duel_defeat";
                 phaseTimer = 0;
@@ -990,6 +1057,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
             return {
               objective: objective(),
               prompt: "Morianton lands a strike! Stay on beat.",
+              holdingSword: true,
             };
           }
 

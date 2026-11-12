@@ -766,6 +766,12 @@ export function createMotionDriver(role: CharacterRole): {
         body.rotation.x = 0.1;
         head.rotation.x = 0.12;
       }
+      if (state.holdingSword && move !== "crawl" && move !== "ledgeHang" && move !== "climb") {
+        // En-garde combat stance: right arm holds sword forward and angled up in guard,
+        // left arm held back for combat balance.
+        arms[1].rotation.set(-1.25, -0.2, 0.3);
+        arms[0].rotation.set(-0.4, 0.15, -0.35);
+      }
       if (state.holdingBow && move !== "crawl") {
         // Keep both hands on the equipment while the legs follow the gait.
         // Aiming below replaces this ready pose with a full draw.
