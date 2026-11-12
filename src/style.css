@@ -1677,10 +1677,15 @@ canvas {
 .duel-defeat-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(240, 223, 188, 0.72);
+  background: radial-gradient(
+    ellipse at center,
+    rgba(240, 223, 188, 0.88) 0%,
+    rgba(224, 202, 158, 0.92) 65%,
+    rgba(165, 128, 80, 0.96) 100%
+  );
   pointer-events: none;
-  z-index: 12;
-  animation: duelDefeatFade 0.5s ease forwards;
+  z-index: 2;
+  animation: duelDefeatFade 0.4s ease forwards;
 }
 
 @keyframes duelDefeatFade {

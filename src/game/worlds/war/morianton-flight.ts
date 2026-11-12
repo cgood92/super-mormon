@@ -294,12 +294,12 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
 
   const ensureDefeatOverlay = () => {
     if (typeof document === "undefined" || defeatOverlay) return;
-    const app = document.querySelector("#app");
-    if (!app) return;
+    const container = document.querySelector("#app") ?? document.body;
+    if (!container) return;
     defeatOverlay = document.createElement("div");
     defeatOverlay.className = "duel-defeat-overlay";
     defeatOverlay.setAttribute("aria-hidden", "true");
-    app.appendChild(defeatOverlay);
+    container.appendChild(defeatOverlay);
   };
 
   const removeDefeatOverlay = () => {
@@ -315,7 +315,6 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
     trackNeedle = null;
     trackFooter = null;
     nodeElements = [];
-    removeDefeatOverlay();
     moriantonSword.position.set(0, 0, 0);
     moriantonSword.rotation.set(Math.PI / 2, 0, 0);
   };
@@ -420,6 +419,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
     cameraResetTimer = 0.4;
     sparkMaterial.opacity = 0;
     removeDomUi();
+    removeDefeatOverlay();
 
     Object.assign(player, createPlayer(0, 0, -52));
     player.yaw = 0;
@@ -1217,6 +1217,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
           disposed = true;
           pending = false;
           removeDomUi();
+          removeDefeatOverlay();
           if (typeof window !== "undefined") {
             window.removeEventListener("keydown", onDuelKeyDown);
           }
@@ -1227,6 +1228,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
     dispose() {
       disposed = true;
       removeDomUi();
+      removeDefeatOverlay();
       if (typeof window !== "undefined") {
         window.removeEventListener("keydown", onDuelKeyDown);
       }
