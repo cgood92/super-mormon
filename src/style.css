@@ -1563,7 +1563,11 @@ canvas {
   top: 0;
   width: 22%;
   height: 100%;
-  background: linear-gradient(90deg, rgba(200, 171, 109, 0.15), rgba(200, 171, 109, 0.02));
+  background: linear-gradient(
+    90deg,
+    rgba(200, 171, 109, 0.15),
+    rgba(200, 171, 109, 0.02)
+  );
   border-right: 1.5px dashed rgba(200, 171, 109, 0.45);
   border-radius: 8px 0 0 8px;
   pointer-events: none;
@@ -1715,4 +1719,3 @@ canvas {
     font-size: 11px;
   }
 }
-

@@ -766,7 +766,12 @@ export function createMotionDriver(role: CharacterRole): {
         body.rotation.x = 0.1;
         head.rotation.x = 0.12;
       }
-      if (state.holdingSword && move !== "crawl" && move !== "ledgeHang" && move !== "climb") {
+      if (
+        state.holdingSword &&
+        move !== "crawl" &&
+        move !== "ledgeHang" &&
+        move !== "climb"
+      ) {
         if (state.swordSlash !== undefined) {
           const s = Math.max(0, Math.min(1, state.swordSlash));
           if (s < 0.35) {
@@ -778,7 +783,11 @@ export function createMotionDriver(role: CharacterRole): {
           } else if (s < 0.65) {
             // Downward cleaving slash across the body
             const p = (s - 0.35) / 0.3;
-            arms[1].rotation.set(-2.15 + p * 1.55, -0.2 + p * 0.55, 0.65 - p * 1.1);
+            arms[1].rotation.set(
+              -2.15 + p * 1.55,
+              -0.2 + p * 0.55,
+              0.65 - p * 1.1,
+            );
             arms[0].rotation.set(-0.4 + p * 0.75, 0.15, -0.35 - p * 0.15);
             body.rotation.y = 0.15 - p * 0.35;
           } else {

@@ -52,7 +52,10 @@ function shotHarness() {
     // Play through the 5 rounds of duel
     for (let round = 1; round <= 5; round++) {
       // Press [A] to start round at round_gate
-      assert.equal((runtime.snapshot() as { phase: string }).phase, "round_gate");
+      assert.equal(
+        (runtime.snapshot() as { phase: string }).phase,
+        "round_gate",
+      );
       runtime.update(1 / 60, player, { ...idle, jump: true });
       runtime.update(1 / 60, player, idle);
 
@@ -78,7 +81,9 @@ function shotHarness() {
         runtime.update(1 / 60, player, idle);
         currentSeqFrame++;
       }
-      while ((runtime.snapshot() as { phase: string }).phase === "clash_player") {
+      while (
+        (runtime.snapshot() as { phase: string }).phase === "clash_player"
+      ) {
         runtime.update(1 / 60, player, idle);
       }
     }

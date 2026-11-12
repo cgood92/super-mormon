@@ -38,7 +38,15 @@ export const DUEL_ROUNDS: { name: string; sequence: DuelInputType[] }[] = [
   },
   {
     name: "Final Clash",
-    sequence: ["action", "jump", "crouch", "action", "jump", "crouch", "action"],
+    sequence: [
+      "action",
+      "jump",
+      "crouch",
+      "action",
+      "jump",
+      "crouch",
+      "action",
+    ],
   },
 ];
 
@@ -176,10 +184,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
     transparent: true,
     opacity: 0,
   });
-  const flashCore = new T.Mesh(
-    new T.SphereGeometry(0.25, 8, 8),
-    sparkMaterial,
-  );
+  const flashCore = new T.Mesh(new T.SphereGeometry(0.25, 8, 8), sparkMaterial);
   clashSpark.add(flashCore);
   for (let i = 0; i < 6; i++) {
     const angle = (i * Math.PI) / 3;
@@ -267,7 +272,11 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
   const onDuelKeyDown = (e: KeyboardEvent) => {
     if (e.code === "KeyB") duelKeyPressedAction = true;
     if (e.code === "KeyA") duelKeyPressedJump = true;
-    if (e.code === "KeyZ" || e.code === "ShiftLeft" || e.code === "ShiftRight") {
+    if (
+      e.code === "KeyZ" ||
+      e.code === "ShiftLeft" ||
+      e.code === "ShiftRight"
+    ) {
       duelKeyPressedCrouch = true;
     }
   };
@@ -394,7 +403,11 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
     }
 
     nodeElements.forEach((node, i) => {
-      node.classList.remove("duel-node-active", "duel-node-hit", "duel-node-miss");
+      node.classList.remove(
+        "duel-node-active",
+        "duel-node-hit",
+        "duel-node-miss",
+      );
       if (targetsHit[i] && phase === "duel_sequence") {
         node.classList.add("duel-node-hit");
       } else if (i === activeIdx && phase === "duel_sequence") {
@@ -619,7 +632,8 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
           const currentUp = input.y > 0.4;
           const currentDown = input.y < -0.4;
           const pressedAction =
-            (!!input.interact && !prevInputState.interact) || duelKeyPressedAction;
+            (!!input.interact && !prevInputState.interact) ||
+            duelKeyPressedAction;
           const pressedJump =
             (!!input.jump && !prevInputState.jump) || duelKeyPressedJump;
           const pressedCrouch =
@@ -790,8 +804,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
             // Compute needle percentage along lane (0% to 100%)
             // 0% to 22%: lead-in period (0 to T_LEAD_IN)
             // 22% to 94%: button track over (numButtons - 1) intervals
-            const trackTotalTime =
-              T_LEAD_IN + (numButtons - 1) * T_INTERVAL;
+            const trackTotalTime = T_LEAD_IN + (numButtons - 1) * T_INTERVAL;
             let needlePct = 0;
             if (sequenceTimer <= T_LEAD_IN) {
               needlePct = (sequenceTimer / T_LEAD_IN) * 22;
@@ -815,8 +828,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
             else if (pressedDown) pressed = "down";
 
             // Active target timing
-            const activeTargetTime =
-              T_LEAD_IN + targetIndex * T_INTERVAL;
+            const activeTargetTime = T_LEAD_IN + targetIndex * T_INTERVAL;
             const diff = sequenceTimer - activeTargetTime;
 
             // Check if player timed out on the current target
@@ -825,7 +837,12 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
               phase = "clash_enemy";
               phaseTimer = 0;
               teancumHp = Math.max(0, teancumHp - 1);
-              updateDomUi(seq, needlePct, targetIndex, "Missed! Morianton strikes!");
+              updateDomUi(
+                seq,
+                needlePct,
+                targetIndex,
+                "Missed! Morianton strikes!",
+              );
               return {
                 objective: objective(),
                 prompt: "Too late! Morianton strikes!",
@@ -857,7 +874,12 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
                 phase = "clash_enemy";
                 phaseTimer = 0;
                 teancumHp = Math.max(0, teancumHp - 1);
-                updateDomUi(seq, needlePct, targetIndex, "Missed! Morianton strikes!");
+                updateDomUi(
+                  seq,
+                  needlePct,
+                  targetIndex,
+                  "Missed! Morianton strikes!",
+                );
                 return {
                   objective: objective(),
                   prompt:
@@ -876,8 +898,8 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
                 seq[targetIndex] === "jump"
                   ? '<span class="duel-inline-badge duel-inline-badge-a">A</span>'
                   : seq[targetIndex] === "crouch"
-                  ? '<span class="duel-inline-badge duel-inline-badge-z">Z</span>'
-                  : '<span class="duel-inline-badge duel-inline-badge-b">B</span>';
+                    ? '<span class="duel-inline-badge duel-inline-badge-z">Z</span>'
+                    : '<span class="duel-inline-badge duel-inline-badge-b">B</span>';
               hintHtml = `Strike ${nextBadge} now!`;
             }
 
@@ -943,19 +965,29 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
               if (isFatal) {
                 // 5th STRIKE: Morianton dies immediately on impact!
                 const fall = Math.min(1, (t - 0.45) / 0.7);
-                enemies[0].state.z = cz + 0.45 + Math.sin(fall * (Math.PI / 2)) * 0.9;
+                enemies[0].state.z =
+                  cz + 0.45 + Math.sin(fall * (Math.PI / 2)) * 0.9;
                 enemies[0].state.move = "crouch";
                 enemies[0].holdingSword = false;
                 enemies[0].rig.group.rotation.z = (-Math.PI / 2) * fall;
                 enemies[0].state.y = 0.15 * fall;
 
                 // Sword knocked away to the side
-                moriantonSword.position.set(0.35 * fall, -0.6 * fall, -0.25 * fall);
-                moriantonSword.rotation.set(0, (Math.PI / 3) * fall, (Math.PI / 2) * fall);
+                moriantonSword.position.set(
+                  0.35 * fall,
+                  -0.6 * fall,
+                  -0.25 * fall,
+                );
+                moriantonSword.rotation.set(
+                  0,
+                  (Math.PI / 3) * fall,
+                  (Math.PI / 2) * fall,
+                );
               } else {
                 // Rounds 1-4: Morianton recoils backward in pain
                 const recoil = (t - 0.45) / 0.7;
-                enemies[0].state.z = cz + 0.45 + Math.sin(recoil * (Math.PI / 2)) * 1.5;
+                enemies[0].state.z =
+                  cz + 0.45 + Math.sin(recoil * (Math.PI / 2)) * 1.5;
                 enemies[0].state.move = "crouch";
                 enemies[0].holdingSword = false;
                 enemies[0].state.yaw = Math.PI - 0.35;
