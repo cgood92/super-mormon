@@ -8,7 +8,7 @@ export function conferenceLocation(p: { x: number; y: number; z: number }) {
   if (Math.abs(p.x) < 66 && p.z < 0)
     return {
       name: "The Auditorium",
-      hint: "Take your time. Explore the auditorium and its balconies.",
+      hint: "",
     };
   if (p.y < 3 && p.x >= -87 && p.x <= -69 && p.z >= 4 && p.z <= 39)
     return { name: "Movement Studio", hint: "Practice at your own pace." };
