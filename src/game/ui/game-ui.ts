@@ -162,11 +162,11 @@ export class GameUI {
       return;
     }
     this.modal(
-      "TAKE YOUR TIME",
-      "A little pause.",
+      "SUPER MORMON",
+      "Paused",
       "Move with {move}. Use {camera} to look around. Hold {jump} to leap higher.",
       [
-        { label: "Keep exploring", run: () => {} },
+        { label: "Continue", run: () => {} },
         {
           label: "Moves & practice",
           run: () => this.showMoves(),

@@ -183,8 +183,8 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
   ];
   for (const side of [-1, 1]) {
     for (const [x, z] of [
-      [18 * side, -95],
-      [18 * side, 51],
+      [14.5 * side, -95],
+      [14.5 * side, 51],
       [18 * side, -23],
     ]) {
       const base = (side * Math.PI) / 2;
@@ -201,15 +201,83 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
       });
     }
   }
+  for (const [x, z, base, phase, label] of [
+    [-7, -41, -Math.PI * 0.45, 1.1, "Western pass southern sentry"],
+    [-7, 32, -Math.PI * 0.55, 2.6, "Western pass northern sentry"],
+    [-6, 81, Math.PI * 0.25, 0.9, "Royal tent approach sentry"],
+  ] as const) {
+    sentries.push({
+      x,
+      z,
+      base,
+      phase,
+      rig: actor("spy", { x, y: 0, z, yaw: base }, label),
+    });
+  }
+  const MAX_WEDGE_RAYS = 64;
+  const WEDGE_SLICES = 20;
+  const sightBlockers = solids
+    .filter((solid) => solid.y <= 1.48 && solid.y + solid.h >= 1.62)
+    .map((solid) => ({
+      minX: solid.x - solid.w / 2,
+      maxX: solid.x + solid.w / 2,
+      minZ: solid.z - solid.d / 2,
+      maxZ: solid.z + solid.d / 2,
+    }));
+  const sentryOccluders = sentries.map((s) =>
+    sightBlockers.filter((box) => {
+      const cx = Math.max(box.minX, Math.min(s.x, box.maxX));
+      const cz = Math.max(box.minZ, Math.min(s.z, box.maxZ));
+      return Math.hypot(cx - s.x, cz - s.z) <= SENTRY_RANGE + 0.5;
+    }),
+  );
+  const castWedgeRay = (
+    sx: number,
+    sz: number,
+    dirX: number,
+    dirZ: number,
+    occluders: typeof sightBlockers,
+  ) => {
+    let best = SENTRY_RANGE;
+    for (const box of occluders) {
+      let tEnter = 0;
+      let tExit = best;
+      if (Math.abs(dirX) < 1e-8) {
+        if (sx < box.minX || sx > box.maxX) continue;
+      } else {
+        const a = (box.minX - sx) / dirX;
+        const b = (box.maxX - sx) / dirX;
+        tEnter = Math.max(tEnter, Math.min(a, b));
+        tExit = Math.min(tExit, Math.max(a, b));
+        if (tEnter > tExit) continue;
+      }
+      if (Math.abs(dirZ) < 1e-8) {
+        if (sz < box.minZ || sz > box.maxZ) continue;
+      } else {
+        const a = (box.minZ - sz) / dirZ;
+        const b = (box.maxZ - sz) / dirZ;
+        tEnter = Math.max(tEnter, Math.min(a, b));
+        tExit = Math.min(tExit, Math.max(a, b));
+        if (tEnter > tExit) continue;
+      }
+      if (tExit > 0 && tEnter < best) best = tEnter;
+    }
+    return best;
+  };
+  const wedgeIndices: number[] = [];
+  for (let i = 1; i < MAX_WEDGE_RAYS; i++) wedgeIndices.push(0, i, i + 1);
   const sightWedges = sentries.map((s) => {
     const geometry = new T.BufferGeometry();
-    const half = Math.tan(SENTRY_HALF_ANGLE) * SENTRY_RANGE;
-    geometry.setAttribute(
-      "position",
-      new T.Float32BufferAttribute(
-        [0, 0, 0, -half, 0, SENTRY_RANGE, half, 0, SENTRY_RANGE],
-        3,
-      ),
+    const positions = new Float32Array((MAX_WEDGE_RAYS + 1) * 3);
+    geometry.setAttribute("position", new T.BufferAttribute(positions, 3));
+    geometry.setIndex(wedgeIndices);
+    geometry.boundingSphere = new T.Sphere(
+      new T.Vector3(0, 0, 0),
+      SENTRY_RANGE + 0.5,
+    );
+    geometry.boundingBox = new T.Box3(
+      new T.Vector3(-SENTRY_RANGE, -0.1, -SENTRY_RANGE),
+      new T.Vector3(SENTRY_RANGE, 0.1, SENTRY_RANGE),
     );
     const wedge = new T.Mesh(
       geometry,
@@ -226,13 +294,77 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
     markScenery(wedge, {
       kind: "decoration",
       reason:
-        "Transparent full-range sentry sight cue; cover can block sight within it.",
+        "Transparent full-range sentry sight cue; walls and cover clip sight within it.",
     });
     root.add(wedge);
     return wedge;
   });
+  const updateSightWedge = (index: number, yaw: number) => {
+    const s = sentries[index];
+    const occluders = sentryOccluders[index];
+    const wedge = sightWedges[index];
+    const rawAngles: number[] = [];
+    for (let i = 0; i <= WEDGE_SLICES; i++) {
+      rawAngles.push(
+        -SENTRY_HALF_ANGLE + (2 * SENTRY_HALF_ANGLE * i) / WEDGE_SLICES,
+      );
+    }
+    for (const box of occluders) {
+      for (const cx of [box.minX, box.maxX]) {
+        for (const cz of [box.minZ, box.maxZ]) {
+          const angle = Math.atan2(cx - s.x, cz - s.z);
+          const diff = Math.atan2(Math.sin(angle - yaw), Math.cos(angle - yaw));
+          if (Math.abs(diff) < SENTRY_HALF_ANGLE) {
+            rawAngles.push(
+              Math.max(-SENTRY_HALF_ANGLE, diff - 1e-4),
+              diff,
+              Math.min(SENTRY_HALF_ANGLE, diff + 1e-4),
+            );
+          }
+        }
+      }
+    }
+    rawAngles.sort((a, b) => a - b);
+    const angles: number[] = [];
+    for (const a of rawAngles) {
+      if (
+        angles.length === 0 ||
+        a - angles[angles.length - 1] > 1e-5 ||
+        a === SENTRY_HALF_ANGLE
+      ) {
+        if (angles.length < MAX_WEDGE_RAYS) angles.push(a);
+      }
+    }
+    const attr = wedge.geometry.getAttribute("position") as T.BufferAttribute;
+    const arr = attr.array as Float32Array;
+    for (let i = 0; i < angles.length; i++) {
+      const a = yaw + angles[i];
+      const dirX = Math.sin(a);
+      const dirZ = Math.cos(a);
+      const dist = castWedgeRay(s.x, s.z, dirX, dirZ, occluders);
+      const offset = (i + 1) * 3;
+      arr[offset] = dirX * dist;
+      arr[offset + 1] = 0;
+      arr[offset + 2] = dirZ * dist;
+    }
+    attr.needsUpdate = true;
+    wedge.geometry.setDrawRange(0, Math.max(0, (angles.length - 1) * 3));
+  };
+  const updateSentriesVisuals = (dt: number, currentTime: number) => {
+    for (const [index, s] of sentries.entries()) {
+      const yaw = s.base + Math.sin(currentTime * 0.7 + s.phase) * 1.0;
+      updateSightWedge(index, yaw);
+      s.rig.update(dt, {
+        ...createPlayer(s.x, 0, s.z),
+        yaw: s.base,
+        lookYaw: yaw,
+        lookPitch: 0,
+      });
+    }
+  };
+  updateSentriesVisuals(0, 0);
   const objectives = [
-    "Leave camp with your servant · keep both of you out of sight",
+    "Enter the Lamanite camp with your servant. Keep both of you out of sight.",
     "Cross the outer watch · use stone screens and watch both flanks",
     "Pass the camp watch lines · the royal tent is to the north",
     "Enter the royal tent and approach sleeping Amalickiah",
@@ -270,9 +402,6 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
     ],
     adventure(hooks) {
       hooks.setAvatar("teancum");
-      hooks.toast(
-        "Keep both companions out of the full-length amber sight cones. Stone cover blocks sight; time your passage through the mountain pass.",
-      );
       let introTime = 0;
       let plannedBeat = -1,
         plannedAspect = 0;
@@ -288,12 +417,14 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
       let trail: Point[] = [];
       let lastTrail: Point = { ...TEANCUM_ROUTE[0] };
       let lastJumpTarget: Point | null = null;
+      let companionStallTime = 0;
       const reset = (player: PlayerState) => {
         detections++;
         stage = 0;
         pending = false;
         time = 0;
         lastJumpTarget = null;
+        companionStallTime = 0;
         servantX = TEANCUM_ROUTE[1].x;
         servantZ = TEANCUM_ROUTE[1].z;
         king.group.visible = true;
@@ -316,9 +447,9 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
             introTime < 4
               ? "sleeping-king"
               : introTime < 8
-                ? "watchful-guards"
+                ? "teancum-plan"
                 : introTime < 12
-                  ? "companions"
+                  ? "watchful-guards"
                   : undefined,
           servant: { x: companion.x, y: companion.y, z: companion.z },
           time,
@@ -336,46 +467,64 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
           dt = Math.max(0, Math.min(dt, 0.1));
           if (introTime < 12) {
             introTime = Math.min(12, introTime + dt);
+            updateSentriesVisuals(dt, time);
             const beat = introTime < 4 ? 0 : introTime < 8 ? 1 : 2;
-            const anchor =
-              beat === 0
-                ? king.group
-                : beat === 1
-                  ? sentries[0].rig.group
-                  : servant.group;
             const aspect = hooks.viewAspect?.() ?? 16 / 9;
             if (beat !== plannedBeat || aspect !== plannedAspect) {
               plannedBeat = beat;
               plannedAspect = aspect;
-              const camera = new T.PerspectiveCamera(58, aspect, 0.08, 320);
-              camera.position
-                .copy(anchor.position)
-                .add(new T.Vector3(4, 3, -5));
-              camera.lookAt(anchor.position);
-              const plan = planStoryCamera(
-                camera,
-                {
-                  cutaway: true,
-                  actors: [{ group: anchor }],
-                  wide: beat === 0 ? 3 : 5,
-                },
-                solids,
-                cameraObstacles,
-              );
-              cinematicCamera = {
-                position: plan.wide,
-                focus: plan.focus,
-                cut: true,
-              };
+              if (beat === 0) {
+                cinematicCamera = {
+                  position: new T.Vector3(1.5, 1.9, 92.2),
+                  focus: new T.Vector3(bedCenter.x, 0.45, bedCenter.z),
+                  cut: true,
+                };
+              } else if (beat === 1) {
+                const fx = Math.sin(player.yaw);
+                const fz = Math.cos(player.yaw);
+                const sx = Math.cos(player.yaw);
+                const sz = -Math.sin(player.yaw);
+                cinematicCamera = {
+                  position: new T.Vector3(
+                    player.x + fx * 3.6 + sx * 0.4,
+                    player.y + 1.38,
+                    player.z + fz * 3.6 + sz * 0.4,
+                  ),
+                  focus: new T.Vector3(player.x, player.y + 1.0, player.z),
+                  cut: true,
+                };
+              } else {
+                const anchor = sentries[0].rig.group;
+                const camera = new T.PerspectiveCamera(58, aspect, 0.08, 320);
+                camera.position
+                  .copy(anchor.position)
+                  .add(new T.Vector3(5, 3.5, -7));
+                camera.lookAt(anchor.position);
+                const plan = planStoryCamera(
+                  camera,
+                  {
+                    cutaway: true,
+                    actors: [{ group: anchor }],
+                    wide: 6.5,
+                  },
+                  solids,
+                  cameraObstacles,
+                );
+                cinematicCamera = {
+                  position: plan.wide,
+                  focus: plan.focus,
+                  cut: true,
+                };
+              }
             }
             if (introTime >= 12) cinematicCamera = undefined;
             return {
               objective:
                 beat === 0
-                  ? "Amalickiah sleeps after the day's fighting · Alma 51:32–34"
+                  ? "Amalickiah is sleeping in his tent after a hard day of battle."
                   : beat === 1
-                    ? "Keep both companions unseen · a sentry's sight means capture and a restart"
-                    : "Keep both companions out of the amber sight cones · stone cover blocks sight",
+                    ? "Teancum has a secret plan to kill Amalickiah in the dead of the night."
+                    : "Avoid being seen by guards along the way.",
               prompt: "",
             };
           }
@@ -408,13 +557,31 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
             const follow =
               trail.length > 0 ||
               Math.hypot(player.x - companion.x, player.z - companion.z) > 1.8;
-            companion.crouching = player.crouching;
+            if (
+              target &&
+              target === lastJumpTarget &&
+              target.y > companion.y + 0.25 &&
+              companion.grounded &&
+              distance > 0.35 &&
+              companion.runSpeed < 0.6
+            ) {
+              companionStallTime += dt;
+              if (companionStallTime > 0.3) {
+                lastJumpTarget = null;
+                companionStallTime = 0;
+              }
+            } else {
+              companionStallTime = 0;
+            }
             const shouldJump =
               !!target &&
               target !== lastJumpTarget &&
               target.y > companion.y + 0.25 &&
               companion.grounded;
             if (shouldJump) lastJumpTarget = target;
+            const companionCrouch =
+              shouldJump || !companion.grounded ? false : player.crouching;
+            companion.crouching = companionCrouch;
             stepPlayer(
               companion,
               {
@@ -430,7 +597,8 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
                 jumpHeld:
                   !!target &&
                   (target.y > companion.y + 0.1 || !companion.grounded),
-                crouch: player.crouching,
+                crouch: companionCrouch,
+                traversal: false,
               },
               dt,
               0,
@@ -440,16 +608,7 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
             servantZ = companion.z;
             servant.update(dt, companion);
           }
-          for (const [index, s] of sentries.entries()) {
-            const yaw = s.base + Math.sin(time * 0.7 + s.phase) * 1.0;
-            sightWedges[index].rotation.y = yaw;
-            s.rig.update(dt, {
-              ...createPlayer(s.x, 0, s.z),
-              yaw: s.base,
-              lookYaw: yaw,
-              lookPitch: 0,
-            });
-          }
+          updateSentriesVisuals(dt, time);
           if (stage >= 1 && stage <= 4 && !pending) {
             for (const s of sentries) {
               // Player-facing visual gaze and sight-line share the same yaw; cover is physical.
@@ -503,64 +662,62 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
               : nearWarPoint(player, target, 3));
           const actionable = stage === 0 || stage === 3 || stage === 4;
           if (!pending && !finished && actionable && close && input.interact) {
-            pending = true;
-            const next = () => {
-              pending = false;
-              stage++;
-              if (stage === 4) {
-                king.group.visible = false;
-              }
-              if (stage === 5) {
-                finished = true;
-                hooks.complete();
-              }
-            };
-            const dialog = [
-              [
-                "Alma 51:32–33",
-                "After a hard day",
-                "Teancum and his servant go out by night. The enemy camp has fallen asleep after the heat and labor of the day.",
-              ],
-              [
-                "Alma 51:33",
-                "Past the outer watch",
-                "Use the stone and trees as cover. A few imagined sentries still scan the approach; the tents ahead are quiet.",
-              ],
-              [
-                "Alma 51:33",
-                "The camp sleeps",
-                "You and your servant reach the silent camp. Amalickiah's tent stands ahead; stay unseen.",
-              ],
-              [
-                "Alma 51:34–35",
-                "In the king's tent",
-                "Teancum enters privately and strikes Amalickiah with a javelin. The scene cuts away without a graphic view. He and his servant turn back toward their own camp.",
-              ],
-              [
-                "Alma 51:35–36",
-                "Stand in readiness",
-                "Teancum wakes his own men, tells them what happened to Amalickiah, and commands the guards to stand in readiness in case the Lamanites attack.",
-              ],
-            ][stage];
-            hooks.dialog(dialog[0], dialog[1], dialog[2], next, {
-              focus: { x: target.x, y: 1.1, z: target.z },
-              wide: 5,
-              playerGesture: stage === 4 ? "point" : "talk",
-              actors:
-                stage === 0
-                  ? [{ group: servant.group, gesture: "talk" }]
-                  : stage === 3
+            if (stage === 0) {
+              stage = 1;
+            } else {
+              pending = true;
+              const next = () => {
+                pending = false;
+                stage++;
+                if (stage === 4) {
+                  king.group.visible = false;
+                }
+                if (stage === 5) {
+                  finished = true;
+                  hooks.complete();
+                }
+              };
+              const dialog = [
+                [],
+                [
+                  "Alma 51:33",
+                  "Past the outer watch",
+                  "Use the stone and trees as cover. A few imagined sentries still scan the approach; the tents ahead are quiet.",
+                ],
+                [
+                  "Alma 51:33",
+                  "The camp sleeps",
+                  "You and your servant reach the silent camp. Amalickiah's tent stands ahead; stay unseen.",
+                ],
+                [
+                  "Alma 51:34–35",
+                  "In the king's tent",
+                  "Teancum enters privately and strikes Amalickiah with a javelin. He and his servant turn back toward their own camp.",
+                ],
+                [
+                  "Alma 51:35–36",
+                  "Stand in readiness",
+                  "Teancum wakes his own men, tells them what happened to Amalickiah, and commands the guards to stand in readiness in case the Lamanites attack.",
+                ],
+              ][stage];
+              hooks.dialog(dialog[0], dialog[1], dialog[2], next, {
+                focus: { x: target.x, y: 1.1, z: target.z },
+                wide: 5,
+                playerGesture: stage === 4 ? "point" : "talk",
+                actors:
+                  stage === 3
                     ? [{ group: king.group }]
                     : stage === 4
                       ? [{ group: captain.group, gesture: "talk" }]
                       : [],
-            });
+              });
+            }
           }
           return {
             objective: objectives[stage],
             prompt:
               actionable && close && !pending && !finished
-                ? `{action} · ${stage === 3 ? "Use javelin · Amalickiah" : objectives[stage]}`
+                ? `{action} · ${stage === 0 ? "Take servant with you" : stage === 3 ? "Use javelin · Amalickiah" : objectives[stage]}`
                 : "",
           };
         },
