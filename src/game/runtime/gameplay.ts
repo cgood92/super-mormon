@@ -311,6 +311,7 @@ export class Gameplay {
     let adventureAiming = false;
     let holdingBow = false;
     let holdingSword = false;
+    let adventureSwordSlash: number | undefined;
     let adventureDraw = 0;
     let treePrompt = "";
     if (this.session.adventure) {
@@ -330,6 +331,7 @@ export class Gameplay {
       adventureAiming = !!result.aiming;
       holdingBow = !!result.holdingBow;
       holdingSword = !!result.holdingSword;
+      adventureSwordSlash = result.swordSlash;
       adventureDraw = result.draw ?? 0;
       this.updateStoryObjective(result.objective, this.session.adventure);
       if (this.ui.paused || this.hooks.isTransitioning()) return null;
@@ -461,6 +463,7 @@ export class Gameplay {
       crouching: this.organSeated || this.session.player.crouching,
       holdingBow,
       holdingSword,
+      swordSlash: adventureSwordSlash,
       holdingBanner,
       wave: wavingBanner,
       pointing,

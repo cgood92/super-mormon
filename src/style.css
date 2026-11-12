@@ -1601,7 +1601,7 @@ canvas {
   transition: transform 0.1s ease;
 }
 
-/* Button node colors: A is blue, B is green, Z is purple */
+/* Button node colors: A is blue, B is green, Z is gray */
 .duel-node.duel-node-a {
   background: #2563eb;
   border: 2px solid #60a5fa;
@@ -1613,8 +1613,8 @@ canvas {
 }
 
 .duel-node.duel-node-z {
-  background: #7c3aed;
-  border: 2px solid #c084fc;
+  background: #475569;
+  border: 2px solid #94a3b8;
 }
 
 .duel-node.duel-node-active {
@@ -1669,8 +1669,27 @@ canvas {
 }
 
 .duel-inline-badge-z {
-  background: #7c3aed;
-  border: 1.5px solid #c084fc;
+  background: #475569;
+  border: 1.5px solid #94a3b8;
+}
+
+/* Defeat warm parchment screen wash matching Jerusalem */
+.duel-defeat-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(240, 223, 188, 0.72);
+  pointer-events: none;
+  z-index: 12;
+  animation: duelDefeatFade 0.5s ease forwards;
+}
+
+@keyframes duelDefeatFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @media (max-width: 700px) {

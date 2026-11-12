@@ -290,6 +290,22 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
   let trackNeedle: HTMLElement | null = null;
   let trackFooter: HTMLElement | null = null;
   let nodeElements: HTMLElement[] = [];
+  let defeatOverlay: HTMLElement | null = null;
+
+  const ensureDefeatOverlay = () => {
+    if (typeof document === "undefined" || defeatOverlay) return;
+    const app = document.querySelector("#app");
+    if (!app) return;
+    defeatOverlay = document.createElement("div");
+    defeatOverlay.className = "duel-defeat-overlay";
+    defeatOverlay.setAttribute("aria-hidden", "true");
+    app.appendChild(defeatOverlay);
+  };
+
+  const removeDefeatOverlay = () => {
+    defeatOverlay?.remove();
+    defeatOverlay = null;
+  };
 
   const removeDomUi = () => {
     trackContainer?.remove();
@@ -299,6 +315,9 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
     trackNeedle = null;
     trackFooter = null;
     nodeElements = [];
+    removeDefeatOverlay();
+    moriantonSword.position.set(0, 0, 0);
+    moriantonSword.rotation.set(Math.PI / 2, 0, 0);
   };
 
   const ensureDomTrack = (roundSeq: DuelInputType[]) => {
@@ -368,8 +387,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
     if (typeof document === "undefined" || !trackContainer) return;
 
     if (trackHeader) {
-      const roundName = DUEL_ROUNDS[round - 1]?.name?.toUpperCase() ?? "";
-      trackHeader.innerHTML = `<span>ROUND ${round} OF 5 · ${roundName}</span>`;
+      trackHeader.innerHTML = `<span>ROUND ${round} OF 5</span>`;
     }
 
     if (trackNeedle) {
@@ -852,8 +870,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
 
             let hintHtml = "";
             if (sequenceTimer < T_LEAD_IN) {
-              const rem = Math.max(0, T_LEAD_IN - sequenceTimer).toFixed(1);
-              hintHtml = `Get ready... First strike in ${rem}s!`;
+              hintHtml = "Get ready...";
             } else {
               const nextBadge =
                 seq[targetIndex] === "jump"
@@ -887,14 +904,18 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
           if (phase === "clash_player") {
             phaseTimer += dt;
             const t = phaseTimer;
+            const isFatal = moriantonHp <= 0;
+            let slashProg = 0;
 
-            if (t < 0.55) {
+            if (t < 0.45) {
               // Both step forward into sword contact range!
-              const lunge = t / 0.55;
+              const lunge = t / 0.45;
               player.z = cz - 1.4 + lunge * 0.95; // Reaches cz - 0.45
               player.move = "run";
               player.runSpeed = 4.5;
               player.yaw = 0;
+              // Windup sword high above shoulder
+              slashProg = (t / 0.45) * 0.35;
 
               enemies[0].state.z = cz + 1.4 - lunge * 0.95; // Reaches cz + 0.45
               enemies[0].state.move = "run";
@@ -902,41 +923,75 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
               enemies[0].holdingSword = true;
               enemies[0].state.yaw = Math.PI;
 
-              if (t >= 0.45) {
+              if (t >= 0.35) {
                 sparkMaterial.opacity = 0.95;
                 clashSpark.position.set(cx, 1.05, cz);
-                clashSpark.scale.setScalar(1 + (t - 0.45) * 4);
+                clashSpark.scale.setScalar(1 + (t - 0.35) * 4);
               }
-            } else if (t < 1.25) {
-              // Teancum PLANTS his feet firmly on strike impact (no drifting!)
+            } else if (t < 1.15) {
+              // Teancum cleaves downward and drives through decisively into heroic stance
+              if (t < 0.72) {
+                slashProg = 0.35 + ((t - 0.45) / 0.27) * 0.3; // Cleaving down-slash arc
+              } else {
+                slashProg = 0.65 + ((t - 0.72) / 0.43) * 0.35; // Follow-through heroic hold
+              }
               player.z = cz - 0.45;
               player.move = "turnSkid";
               player.runSpeed = 0;
               player.yaw = -0.15;
 
-              // Morianton gets hit and recoils backward
-              const recoil = (t - 0.55) / 0.7;
-              enemies[0].state.z = cz + 0.45 + Math.sin(recoil * (Math.PI / 2)) * 1.5;
-              enemies[0].state.move = "crouch";
-              enemies[0].holdingSword = false;
-              enemies[0].state.yaw = Math.PI - 0.35;
+              if (isFatal) {
+                // 5th STRIKE: Morianton dies immediately on impact!
+                const fall = Math.min(1, (t - 0.45) / 0.7);
+                enemies[0].state.z = cz + 0.45 + Math.sin(fall * (Math.PI / 2)) * 0.9;
+                enemies[0].state.move = "crouch";
+                enemies[0].holdingSword = false;
+                enemies[0].rig.group.rotation.z = (-Math.PI / 2) * fall;
+                enemies[0].state.y = 0.15 * fall;
 
-              sparkMaterial.opacity = Math.max(0, 0.95 - (t - 0.55) * 2.2);
+                // Sword knocked away to the side
+                moriantonSword.position.set(0.35 * fall, -0.6 * fall, -0.25 * fall);
+                moriantonSword.rotation.set(0, (Math.PI / 3) * fall, (Math.PI / 2) * fall);
+              } else {
+                // Rounds 1-4: Morianton recoils backward in pain
+                const recoil = (t - 0.45) / 0.7;
+                enemies[0].state.z = cz + 0.45 + Math.sin(recoil * (Math.PI / 2)) * 1.5;
+                enemies[0].state.move = "crouch";
+                enemies[0].holdingSword = false;
+                enemies[0].state.yaw = Math.PI - 0.35;
+              }
+
+              sparkMaterial.opacity = Math.max(0, 0.95 - (t - 0.45) * 2.2);
             } else {
-              // Both step back to ready stance with active footsteps (no sliding on ice!)
-              const returnT = (t - 1.25) / 0.8;
-              player.z = cz - 0.45 - returnT * 0.95;
-              player.move = "run";
-              player.runSpeed = 2.4;
-              player.yaw = -0.22;
+              if (isFatal) {
+                // Morianton has fallen dead; Teancum holds heroic stance over him
+                slashProg = 0.98;
+                player.z = cz - 0.45;
+                player.move = "turnSkid";
+                player.yaw = -0.15;
 
-              enemies[0].state.z = cz + 1.95 - returnT * 0.55;
-              enemies[0].state.move = "run";
-              enemies[0].state.runSpeed = 1.8;
-              enemies[0].holdingSword = true;
-              enemies[0].state.yaw = Math.PI - 0.22;
+                enemies[0].state.z = cz + 1.35;
+                enemies[0].state.move = "crouch";
+                enemies[0].holdingSword = false;
+                enemies[0].rig.group.rotation.z = -Math.PI / 2;
+                enemies[0].state.y = 0.15;
+                sparkMaterial.opacity = 0;
+              } else {
+                // Both step back to ready stance with active footsteps
+                const returnT = (t - 1.15) / 0.8;
+                slashProg = Math.max(0, 1 - returnT * 1.8);
+                player.z = cz - 0.45 - returnT * 0.95;
+                player.move = "run";
+                player.runSpeed = 2.4;
+                player.yaw = -0.22;
 
-              sparkMaterial.opacity = 0;
+                enemies[0].state.z = cz + 1.95 - returnT * 0.55;
+                enemies[0].state.move = "run";
+                enemies[0].state.runSpeed = 1.8;
+                enemies[0].holdingSword = true;
+                enemies[0].state.yaw = Math.PI - 0.22;
+                sparkMaterial.opacity = 0;
+              }
             }
 
             enemies[0].rig.update(dt, {
@@ -944,20 +999,21 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
               holdingSword: enemies[0].holdingSword,
             });
 
-            if (phaseTimer >= 2.05) {
+            const finishTime = isFatal ? 1.55 : 1.95;
+            if (phaseTimer >= finishTime) {
               sparkMaterial.opacity = 0;
-              player.z = cz - 1.4;
-              player.move = "idle";
-              player.runSpeed = 0;
-              enemies[0].state.z = cz + 1.4;
-              enemies[0].state.move = "idle";
-              enemies[0].state.runSpeed = 0;
-              enemies[0].holdingSword = true;
               targetsHit = Array(numButtons).fill(false);
-              if (moriantonHp <= 0) {
+              if (isFatal) {
                 phase = "duel_win";
                 phaseTimer = 0;
               } else {
+                player.z = cz - 1.4;
+                player.move = "idle";
+                player.runSpeed = 0;
+                enemies[0].state.z = cz + 1.4;
+                enemies[0].state.move = "idle";
+                enemies[0].state.runSpeed = 0;
+                enemies[0].holdingSword = true;
                 round = Math.min(DUEL_ROUNDS.length, round + 1);
                 phase = "round_gate";
                 phaseTimer = 0;
@@ -966,8 +1022,11 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
 
             return {
               objective: objective(),
-              prompt: "Sequence Complete! Teancum strikes!",
+              prompt: isFatal
+                ? "Teancum strikes down Morianton in single combat!"
+                : "Sequence Complete! Teancum strikes!",
               holdingSword: true,
+              swordSlash: slashProg,
             };
           }
 
@@ -1067,14 +1126,20 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
           if (phase === "duel_defeat") {
             sparkMaterial.opacity = 0;
             removeDomUi();
+            ensureDefeatOverlay();
 
             player.move = "crouch";
             player.crouching = true;
             enemies[0].state.move = "idle";
-            enemies[0].rig.update(dt, enemies[0].state);
+            enemies[0].holdingSword = true;
+            enemies[0].rig.update(dt, {
+              ...enemies[0].state,
+              holdingSword: true,
+            });
 
             // Demand [A] click to try again
             if (pressedJump) {
+              removeDefeatOverlay();
               player.crouching = false;
               player.move = "idle";
               teancumHp = 5;
@@ -1087,7 +1152,7 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
             return {
               objective: objective(),
               prompt:
-                "Morianton broke away into the land northward. Press {jump} to try again.",
+                "Teancum has fallen in single combat. Press {jump} to try again.",
             };
           }
 
@@ -1097,18 +1162,23 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
           if (phase === "duel_win") {
             phaseTimer += dt;
             removeDomUi();
+            removeDefeatOverlay();
             sparkMaterial.opacity = 0;
 
             player.move = "idle";
             player.yaw = -Math.PI / 2;
 
-            // Morianton collapses
+            // Morianton has fallen dead on the field
             enemies[0].state.move = "crouch";
             enemies[0].rig.group.rotation.z = -Math.PI / 2;
-            enemies[0].state.y = 0.2;
-            enemies[0].rig.update(dt, enemies[0].state);
+            enemies[0].state.y = 0.15;
+            enemies[0].holdingSword = false;
+            enemies[0].rig.update(dt, {
+              ...enemies[0].state,
+              holdingSword: false,
+            });
 
-            if (phaseTimer >= 1.5 && !pending) {
+            if (phaseTimer >= 0.5 && !pending) {
               pending = true;
               hooks.dialog(
                 "Alma 50:35–36",
@@ -1135,6 +1205,8 @@ export function buildMoriantonFlight(scene: T.Scene): WorldData {
             return {
               objective: objective(),
               prompt: "Morianton is defeated! The pass is secured.",
+              holdingSword: true,
+              swordSlash: 0.95,
             };
           }
 
