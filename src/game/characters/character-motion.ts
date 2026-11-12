@@ -766,6 +766,44 @@ export function createMotionDriver(role: CharacterRole): {
         body.rotation.x = 0.1;
         head.rotation.x = 0.12;
       }
+      if (
+        state.holdingSword &&
+        move !== "crawl" &&
+        move !== "ledgeHang" &&
+        move !== "climb"
+      ) {
+        if (state.swordSlash !== undefined) {
+          const s = Math.max(0, Math.min(1, state.swordSlash));
+          if (s < 0.35) {
+            // Windup: right arm draws high and back above shoulder
+            const w = s / 0.35;
+            arms[1].rotation.set(-1.25 - w * 0.9, -0.2, 0.3 + w * 0.35);
+            arms[0].rotation.set(-0.4, 0.15, -0.35);
+            body.rotation.y = w * 0.15;
+          } else if (s < 0.65) {
+            // Downward cleaving slash across the body
+            const p = (s - 0.35) / 0.3;
+            arms[1].rotation.set(
+              -2.15 + p * 1.55,
+              -0.2 + p * 0.55,
+              0.65 - p * 1.1,
+            );
+            arms[0].rotation.set(-0.4 + p * 0.75, 0.15, -0.35 - p * 0.15);
+            body.rotation.y = 0.15 - p * 0.35;
+          } else {
+            // Heroic resolute follow-through presentation
+            const f = (s - 0.65) / 0.35;
+            arms[1].rotation.set(-0.6 - f * 0.3, 0.35, -0.45);
+            arms[0].rotation.set(0.35 - f * 0.4, 0.15, -0.5);
+            body.rotation.y = -0.2;
+          }
+        } else {
+          // En-garde combat stance: right arm holds sword forward and angled up in guard,
+          // left arm held back for combat balance.
+          arms[1].rotation.set(-1.25, -0.2, 0.3);
+          arms[0].rotation.set(-0.4, 0.15, -0.35);
+        }
+      }
       if (state.holdingBow && move !== "crawl") {
         // Keep both hands on the equipment while the legs follow the gait.
         // Aiming below replaces this ready pose with a full draw.
