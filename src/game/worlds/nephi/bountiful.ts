@@ -128,7 +128,7 @@ export function buildBountiful(scene: T.Scene): WorldData {
     const side = i % 2 ? -1 : 1,
       x = side * (24 + (i % 5) * 8),
       z = -44 + (i % 7) * 5;
-    const dune = mesh(sphere, 0xc6b686, x, 0.15, z, 5, 1.1, 4, "Shore dunes");
+    const dune = mesh(sphere, 0xc6b686, x, 0, z, 5, 1.1, 4, "Shore dunes");
     const duneSolid: Solid = { x, y: 0, z, w: 4.6, h: 1.1, d: 3.6 };
     solids.push(duneSolid);
     markScenery(dune, { kind: "solid", solids: [duneSolid] });
@@ -136,7 +136,7 @@ export function buildBountiful(scene: T.Scene): WorldData {
       sphere,
       0x78874d,
       x + 2,
-      0.5,
+      0,
       z + 2,
       1.3,
       0.7,

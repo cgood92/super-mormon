@@ -218,16 +218,19 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
     for (const z of [14.4, 17.0]) {
       // Solid timber bed frame
       addBox(x, 0, z, 1.45, 0.38, 2.3, darkWood, true);
-      // Pale mattress
-      addBox(x, 0.38, z, 1.3, 0.12, 2.15, paleWood, false);
-      // Raised pillow at head of bed (rests on mattress, non-coplanar)
-      addBox(x, 0.502, z + 0.8, 1.1, 0.1, 0.45, paleWood, false);
-      // Folded blanket across lower bed (rests on mattress, non-coplanar)
-      addBox(x, 0.502, z - 0.3, 1.32, 0.06, 1.5, darkWood, false);
+      // Pale mattress exposed at head of bed (meets lower blanket edge-to-edge without overlap)
+      addBox(x, 0.38, z + 0.76, 1.3, 0.12, 0.62, paleWood, true);
+      // Raised pillow at head of bed (rests on pale mattress, same material)
+      addBox(x, 0.5, z + 0.8, 1.1, 0.1, 0.44, paleWood, false);
+      // Folded blanket across lower bed (rests directly on darkWood frame; no hidden paleWood underneath)
+      addBox(x, 0.38, z - 0.31, 1.32, 0.15, 1.52, darkWood, true);
     }
   }
-  for (const z of [-12, -8, -4])
-    addBox(-6.6, 0, z, 1.2, 0.5, 2.6, darkWood, true);
+  for (const z of [-12, -8, -4]) {
+    addBox(-6.6, 0, z, 1.2, 0.38, 2.6, darkWood, true);
+    addBox(-6.6, 0.38, z + 0.85, 1.1, 0.12, 0.7, paleWood, true);
+    addBox(-6.6, 0.38, z - 0.35, 1.12, 0.15, 1.7, darkWood, true);
+  }
   // Connected fore-cabins share a clear two-metre central passage. Doorways
   // face that passage, so each room is reachable from the existing stairs.
   for (const x of [-2.8, 2.8]) {
@@ -245,12 +248,11 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
   }
   // Pantry shelves and jars, low workbench and folded bedding make the rooms legible.
   addBox(3.65, 0, -15.2, 1.1, 1.5, 1, darkWood, true);
-  addBox(3.65, 1.5, -15.2, 1.15, 0.12, 1.1, paleWood);
+  addBox(3.65, 1.5, -15.2, 1.15, 0.12, 1.1, paleWood, true);
   addBox(-5.4, 0, 3.9, 2.5, 0.8, 1, darkWood, true);
-  addBox(-5.4, 0.8, 3.9, 1.3, 0.12, 0.6, paleWood);
-  for (const z of [-15.8, -13.6]) {
-    addBox(-5.8, 0.5, z, 1.4, 0.1, 1.5, paleWood);
-  }
+  addBox(-5.4, 0.8, 3.9, 1.3, 0.12, 0.6, paleWood, true);
+  addBox(-5.8, 0, -15.8, 1.35, 0.5, 1.4, darkWood, true);
+  addBox(-5.8, 0.5, -15.8, 1.25, 0.12, 1.3, paleWood, true);
   // Repeated ribs expose the structure below deck. Rails follow the changing hull width.
   for (let z = -19; z <= 19; z += 2) {
     const w = halfWidth(z);
@@ -278,9 +280,8 @@ export function buildShip(parent: T.Group, origin: Point): ShipBuild {
     spoke.rotation.z = (i * Math.PI) / 4;
     wheel.add(spoke);
   }
-  // Low table, bedding and stores make distinct living spaces below deck.
+  // Low tables and stores make distinct living spaces below deck.
   for (const z of [-12, -8, -4]) {
-    addBox(-5.5, 0.5, z, 1.2, 0.12, 2.3, paleWood);
     addBox(3.4, 0, z, 1.3, 0.7, 1.1, timber, true);
   }
   for (const z of [-7, 6]) {

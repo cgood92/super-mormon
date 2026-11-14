@@ -416,11 +416,16 @@ function ceilingAbovePath(
  * Solids that block the camera boom. Slender posts and low props are skipped,
  * as SM64 lets poles and trees pass between Lakitu and Mario without zooming.
  */
-function isBoomBlocker(s: Solid, focusY: number): boolean {
+function isBoomBlocker(
+  s: Solid,
+  focusY: number,
+  playerY = focusY - 1.15,
+): boolean {
   const maxDim = Math.max(s.w, s.d);
   const minDim = Math.min(s.w, s.d);
   if (maxDim <= 1.8 && minDim >= 0.5 * maxDim) return false; // column / trunk
   if (s.h <= 0.8 && maxDim <= 2.5) return false; // bench / crate
+  if (s.y + s.h <= playerY + 1.55 && maxDim <= 8) return false; // waist/chest-high stealth cover
   return s.y < focusY + 3; // ignore geometry far overhead
 }
 
@@ -554,7 +559,12 @@ export class FollowCamera {
     if (this.firstUpdate) {
       this.firstUpdate = false;
       if (!cameraSegmentClear(this.lastEye, this.lastEye, solids, EYE_RADIUS)) {
-        const initialLimit = this.springArmLimit(solids, room);
+        const initialLimit = this.springArmLimit(
+          solids,
+          room,
+          this.yaw,
+          player.y,
+        );
         if (initialLimit < this.boomDistance) {
           this.boomDistance = initialLimit;
           this.place(this.eyeAt(this.boomDistance));
@@ -564,7 +574,9 @@ export class FollowCamera {
 
     // 1. Focus -------------------------------------------------------------
     const idealEyeBefore = this.eyeAt(this.idealDistance);
-    const moved = Math.hypot(player.x - this.focus.x, player.z - this.focus.z);
+    const moveDx = player.x - this.focus.x;
+    const moveDz = player.z - this.focus.z;
+    const moved = Math.hypot(moveDx, moveDz);
     this.focus.x = player.x;
     this.focus.z = player.z;
     const wantY = player.y + focusHeight(player, preset);
@@ -574,11 +586,30 @@ export class FollowCamera {
     if (Math.abs(wantY - this.focus.y) > 2.5) this.focus.y = wantY;
 
     // 2. Yaw ---------------------------------------------------------------
-    // Trailing: keep the previous ideal eye where it was and re-aim at the
-    // player. Forward input pulls the camera along; sideways input arcs.
-    const dx = this.focus.x - idealEyeBefore.x;
-    const dz = this.focus.z - idealEyeBefore.z;
-    if (Math.hypot(dx, dz) > 0.1) this.yaw = Math.atan2(dx, dz);
+    // Project horizontal player travel onto the current camera look frame.
+    const lookX = Math.sin(this.yaw);
+    const lookZ = Math.cos(this.yaw);
+    const alongLook = moveDx * lookX + moveDz * lookZ;
+    const acrossLook = moveDx * lookZ - moveDz * lookX;
+
+    if (alongLook >= -1e-5) {
+      // Forward or lateral motion: keep the previous ideal eye where it was
+      // and re-aim at the player. Forward input pulls the camera along; sideways arcs.
+      const dx = this.focus.x - idealEyeBefore.x;
+      const dz = this.focus.z - idealEyeBefore.z;
+      if (Math.hypot(dx, dz) > 0.1) this.yaw = Math.atan2(dx, dz);
+    } else if (moved > 1e-5) {
+      // Walking toward the camera (e.g. backing out of a tent or doorway):
+      // Retreat the ideal eye with the player so the boom never jackknifes or
+      // flips 180°. Only pivot gently when motion is predominantly lateral.
+      const lateralRatio = Math.abs(acrossLook) / moved;
+      if (lateralRatio > 0.35) {
+        const effectiveCross =
+          Math.sign(acrossLook) * (Math.abs(acrossLook) - 0.35 * moved);
+        const planar = Math.max(1.0, Math.cos(this.pitch) * this.idealDistance);
+        this.yaw += Math.atan2(effectiveCross, planar);
+      }
+    }
 
     const speed = player.runSpeed ?? 0;
     if (speed > 0.2) this.manualIdleView = false;
@@ -588,7 +619,14 @@ export class FollowCamera {
       !this.manualIdleView &&
       this.orbitTarget === null &&
       this.recenterTime === 0;
-    if (automatic && player.grounded !== false) {
+    const headingDiff = angleDiff(player.yaw, this.yaw);
+    const facingAwayFromCamera = Math.abs(headingDiff) < Math.PI * 0.65;
+    if (
+      automatic &&
+      player.grounded !== false &&
+      alongLook >= -1e-5 &&
+      facingAwayFromCamera
+    ) {
       const dps =
         speed >= 0.05
           ? RUN_CENTER_DPS * clamp(speed / RUN_SPEED, 0.35, 1)
@@ -596,17 +634,23 @@ export class FollowCamera {
             ? IDLE_PUSHING_DPS
             : IDLE_CENTER_DPS;
       const step = ((dps * Math.PI) / 180) * dt;
-      this.yaw += clamp(angleDiff(player.yaw, this.yaw), -step, step);
+      const deltaYaw = clamp(headingDiff, -step, step);
+      if (
+        speed >= 0.05 ||
+        orbit.movementIntent ||
+        this.springArmLimit(solids, room, this.yaw + deltaYaw, player.y) >=
+          this.boomDistance - 0.05
+      ) {
+        this.yaw += deltaYaw;
+      }
     }
-    if (automatic && (moved > 0.0001 || speed > 0.1))
-      this.avoidWalls(solids, dt);
+    if (automatic && (moved > 0.0001 || speed > 0.1) && alongLook >= -1e-5)
+      this.avoidWalls(solids, player.yaw, player.y, dt);
 
     // 3. Pitch -------------------------------------------------------------
-    this.speedPullback +=
-      (Math.min(1, speed / RUN_SPEED) * 0.7 - this.speedPullback) * ease(2, dt);
+    this.speedPullback = 0;
     this.idealDistance +=
-      ((preset.distance + this.speedPullback) * ZOOM_DISTANCES[this.zoomLevel] -
-        this.idealDistance) *
+      (preset.distance * ZOOM_DISTANCES[this.zoomLevel] - this.idealDistance) *
       ease(11, dt);
     const maxPitch = this.ceilingPitch(player, preset, solids);
     if (this.pitch > maxPitch) {
@@ -621,8 +665,10 @@ export class FollowCamera {
     }
 
     // 4–5. Distance and spring arm ----------------------------------------
-    const blockers = solids.filter((s) => isBoomBlocker(s, this.focus.y));
-    const limit = this.springArmLimit(solids, room);
+    const blockers = solids.filter((s) =>
+      isBoomBlocker(s, this.focus.y, player.y),
+    );
+    const limit = this.springArmLimit(solids, room, this.yaw, player.y);
     const moving = moved > 0.0001 || speed >= 0.05;
     const orbiting =
       Math.abs(orbit.orbitX) + Math.abs(orbit.orbitY) > 0.0001 ||
@@ -641,8 +687,21 @@ export class FollowCamera {
     // Shortening inward occurs when moving, orbiting, or when the eye is trapped.
     // A stationary sightline obstruction does not collapse chosen zoom.
     if (expanding || moving || orbiting || !eyeClear) {
-      if (limit < this.boomDistance) this.boomDistance = limit;
-      else this.boomDistance += (limit - this.boomDistance) * ease(8, dt);
+      if (limit < this.boomDistance) {
+        const candidateEye = this.eyeAt(this.boomDistance);
+        const eyeTouchesWall =
+          !eyeClear ||
+          !cameraSegmentClear(candidateEye, candidateEye, solids, EYE_RADIUS) ||
+          !cameraSegmentClear(this.lastEye, candidateEye, blockers, EYE_RADIUS);
+        if (eyeTouchesWall || room !== undefined) {
+          this.boomDistance = limit;
+        } else {
+          const maxInward = Math.max(0.32, 11 * dt);
+          this.boomDistance = Math.max(limit, this.boomDistance - maxInward);
+        }
+      } else {
+        this.boomDistance += (limit - this.boomDistance) * ease(8, dt);
+      }
     }
 
     const eye = this.eyeAt(this.boomDistance);
@@ -764,8 +823,15 @@ export class FollowCamera {
    * side. This swings the camera around building corners *before* the main
    * boom has to tuck in, which is what keeps corner turns smooth.
    */
-  private avoidWalls(solids: readonly Solid[], dt: number): void {
-    const blockers = solids.filter((s) => isBoomBlocker(s, this.focus.y));
+  private avoidWalls(
+    solids: readonly Solid[],
+    playerYaw: number,
+    playerY: number,
+    dt: number,
+  ): void {
+    const blockers = solids.filter((s) =>
+      isBoomBlocker(s, this.focus.y, playerY),
+    );
     const reach = (yaw: number) =>
       boomFraction(
         this.focus,
@@ -773,11 +839,18 @@ export class FollowCamera {
         blockers,
         EYE_RADIUS,
       );
+    if (reach(this.yaw) >= 0.96) return;
     const left = reach(this.yaw - WHISKER_ANGLE);
     const right = reach(this.yaw + WHISKER_ANGLE);
     const imbalance = right - left; // >0: right side is more open
     if (Math.abs(imbalance) < 0.05) return;
-    this.yaw += imbalance * WALL_AVOID_RATE * dt;
+    const turn = imbalance * WALL_AVOID_RATE * dt;
+    if (
+      Math.abs(angleDiff(playerYaw, this.yaw + turn)) >=
+      Math.abs(angleDiff(playerYaw, this.yaw)) - 1e-6
+    )
+      return;
+    this.yaw += turn;
   }
 
   /** Highest pitch that keeps the eye under any low ceiling on the boom. */
@@ -804,9 +877,13 @@ export class FollowCamera {
   private springArmLimit(
     solids: readonly Solid[],
     room: CameraRoom | undefined,
+    yaw = this.yaw,
+    playerY = this.focus.y - 1.15,
   ): number {
-    const ideal = this.eyeAt(this.idealDistance);
-    const blockers = solids.filter((s) => isBoomBlocker(s, this.focus.y));
+    const ideal = this.eyeAt(this.idealDistance, yaw);
+    const blockers = solids.filter((s) =>
+      isBoomBlocker(s, this.focus.y, playerY),
+    );
     let fraction = boomFraction(this.focus, ideal, blockers, 0.08);
     const bounds = room?.viewBounds ?? room?.bounds;
     if (bounds)
@@ -814,10 +891,18 @@ export class FollowCamera {
     let distance =
       fraction < 1 ? this.idealDistance * fraction - 0.05 : this.idealDistance;
     // A skipped post/prop may still sit exactly where the eye lands: keep the
-    // lens physically outside it.
-    const eye = this.eyeAt(Math.max(distance, 0));
-    if (!cameraSegmentClear(eye, eye, solids, EYE_RADIUS)) {
-      const solidFraction = boomFraction(this.focus, ideal, solids, EYE_RADIUS);
+    // lens physically outside tall props while letting low cover support it vertically.
+    const eye = this.eyeAt(Math.max(distance, 0), yaw);
+    const tallSolids = solids.filter(
+      (s) => s.y + s.h > playerY + 1.55 || Math.max(s.w, s.d) > 8,
+    );
+    if (!cameraSegmentClear(eye, eye, tallSolids, EYE_RADIUS)) {
+      const solidFraction = boomFraction(
+        this.focus,
+        ideal,
+        tallSolids,
+        EYE_RADIUS,
+      );
       if (solidFraction < 1) {
         distance = Math.min(
           distance,

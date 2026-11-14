@@ -546,7 +546,7 @@ export function buildJerusalem(
   }
   // Great Bronze Altar of Burnt Offering
   add(12, 1.2, -56, 4.5, 1.4, 4.5, palette.limestone, "temple altar base");
-  decor(12, 2.6, -56, 4.7, 0.2, 4.7, palette.brass, "altar bronze brim");
+  add(12, 2.6, -56, 4.7, 0.2, 4.7, palette.brass, "altar bronze brim");
   oilLamp(group, 8, 2.6, -54);
   oilLamp(group, 16, 2.6, -54);
 
