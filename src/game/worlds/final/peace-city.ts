@@ -57,7 +57,7 @@ export function buildPeaceCity(scene: T.Scene): WorldData {
   for (const x of [-3.5, 3.5])
     for (const z of [-1.7, 1.7])
       solid(
-        { x, y: -1.2, z, w: 0.7, h: 1.2, d: 0.7 },
+        { x, y: -1.2, z, w: 0.7, h: 1.28, d: 0.7 },
         0xc7c4a6,
         "Bridge stone abutment",
       );

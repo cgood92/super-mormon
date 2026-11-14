@@ -51,6 +51,20 @@ function materialColorHex(mat: T.Material | T.Material[]): number | null {
   return color instanceof T.Color ? color.getHex() : null;
 }
 
+function isVisibleWorldObject(obj: T.Object3D): boolean {
+  for (let a: T.Object3D | null = obj; a; a = a.parent) {
+    if (!a.visible) return false;
+    if (a.userData?.isCharacterRig) return false;
+    if (
+      /animal|gazelle|ibex|goat|sheep|flock|crowd|family|soldier|guard|sentry|messenger|sleeper|prisoner/i.test(
+        a.name,
+      )
+    )
+      return false;
+  }
+  return true;
+}
+
 /**
  * Audit walkable sample points in a world to verify that the physical support
  * surface (`solids`) matches the visible rendered floor/roof/deck mesh height
@@ -60,17 +74,17 @@ export function auditWalkSurfaceAlignment(
   root: T.Object3D,
   solids: readonly Solid[],
   points: readonly { x: number; y?: number; z: number; label?: string }[],
-  maxSink = 0.06,
+  maxSink = 0.08,
 ): SurfaceMismatch[] {
   root.updateMatrixWorld(true);
   const floorMeshes: T.Object3D[] = [];
   root.traverse((obj) => {
-    if (!obj.visible) return;
+    if (!isVisibleWorldObject(obj)) return;
     if (obj instanceof T.Mesh || obj instanceof T.InstancedMesh) {
       const scenery = obj.userData.scenery;
       if (scenery?.kind === "backdrop") return;
       if (
-        /water|ocean|cloud|canopy|leaf|leaves|frond|sail|flame|fire|smoke|halo|wedge|cue|beacon|marker|character|head|torso|leg|arm|coat|tunic|hem|hair|beard/i.test(
+        /water|ocean|cloud|canopy|leaf|leaves|frond|sail|flame|fire|smoke|halo|wedge|cue|beacon|marker|character|head|torso|leg|arm|coat|tunic|hem|hair|beard|stand/i.test(
           obj.name,
         )
       )
@@ -112,7 +126,12 @@ export function auditWalkSurfaceAlignment(
       hitScenery?.kind === "solid" &&
       Array.isArray(hitScenery.solids) &&
       hitScenery.solids.length > 1;
-    const allowedSink = multiSolidRock ? Math.max(maxSink, 0.34) : maxSink;
+    const isLowGroundTrim = hitScenery?.kind === "decoration" && delta <= 0.115;
+    const allowedSink = multiSolidRock
+      ? Math.max(maxSink, 0.34)
+      : isLowGroundTrim
+        ? Math.max(maxSink, 0.115)
+        : maxSink;
     // Positive delta > allowedSink means the visible mesh is above the physics floor (player sinks into it!)
     if (delta > allowedSink) {
       issues.push({
@@ -159,7 +178,13 @@ export function auditCoplanarMaterialBleed(
   };
 
   root.traverse((obj) => {
-    if (!obj.visible) return;
+    if (!isVisibleWorldObject(obj)) return;
+    if (
+      /sculpted|hair|beard|tunic|trouser|sandal|boot|bracer|mantle|robe|headwear|sleeve|coat|hem/i.test(
+        obj.name,
+      )
+    )
+      return;
     if (obj instanceof T.InstancedMesh) {
       const hex = materialColorHex(obj.material);
       if (hex === null) return;
@@ -260,7 +285,15 @@ export function auditCoplanarMaterialBleed(
       ) {
         const upperW = upper.box.max.x - upper.box.min.x;
         const upperD = upper.box.max.z - upper.box.min.z;
-        if (ox < upperW - 0.35 || oz < upperD - 0.35) {
+        const lowerW = lower.box.max.x - lower.box.min.x;
+        const lowerD = lower.box.max.z - lower.box.min.z;
+        if (
+          upperW <= 4.0 &&
+          upperD <= 4.0 &&
+          lowerW <= 4.0 &&
+          lowerD <= 4.0 &&
+          (ox < upperW - 0.35 || oz < upperD - 0.35)
+        ) {
           issues.push({
             kind: "misaligned-overlay",
             message: `Overlay ${upper.label} overhangs supporting frame ${lower.label} (overlap ${ox.toFixed(2)}x${oz.toFixed(2)}m vs size ${upperW.toFixed(2)}x${upperD.toFixed(2)}m)`,

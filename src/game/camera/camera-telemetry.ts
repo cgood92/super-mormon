@@ -231,14 +231,18 @@ export class CameraTelemetry {
       !!input.cameraZoom;
 
     // 3. Sudden 3D position jump (unless recovering from a multi-meter floor drop)
-    const playerDrop = Math.abs(player.y - prev.player.y);
+    const recentWindow = this.samples.slice(-30);
+    const playerDrop = recentWindow.reduce(
+      (max, s) => Math.max(max, Math.abs(player.y - s.player.y)),
+      0,
+    );
     const eyeStep = Math.hypot(
       eye.x - prev.eye.x,
       eye.y - prev.eye.y,
       eye.z - prev.eye.z,
     );
     const maxEyeStep = Math.max(0.55, 16 * dt);
-    if (!manualOrbit && playerDrop < 1.5 && eyeStep > maxEyeStep) {
+    if (!manualOrbit && playerDrop < 1.2 && eyeStep > maxEyeStep) {
       this.flag(
         "sudden-eye-jump",
         sample,
@@ -260,7 +264,7 @@ export class CameraTelemetry {
     // 5. Sudden inward zoom snap
     const zoomCollapse = prev.planarDistance - sample.planarDistance;
     const maxZoomCollapse = Math.max(0.4, 13 * dt);
-    if (!manualOrbit && playerDrop < 1.5 && zoomCollapse > maxZoomCollapse) {
+    if (!manualOrbit && playerDrop < 1.2 && zoomCollapse > maxZoomCollapse) {
       this.flag(
         "sudden-zoom-snap",
         sample,

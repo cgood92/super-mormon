@@ -309,62 +309,159 @@ test("hiding behind Teancum's 1.5m stealth cover stones preserves a wide overvie
   }
 });
 
-test("multi-persona exploration bots traverse Jerusalem streets and palace without camera jerks or wall-pinning", () => {
-  const scene = new T.Scene();
-  const world = buildJerusalem("streets", scene);
-  try {
-    const player = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
-    player.yaw = world.spawn.yaw ?? Math.PI;
-    const camera = new T.PerspectiveCamera(58, 16 / 9, 0.08, 200);
-    const follow = new FollowCamera(camera);
-    follow.reset(player, player.yaw, "streets");
-    const telemetry = new CameraTelemetry();
+test("multi-persona exploration bots traverse all 32 distinct worlds without camera jerks, flips, or wall-pinning", async () => {
+  const { prepareWorld } = await import("../runtime/world-loading");
+  const { cameraModeForWorld } = await import("../runtime/scene-entry");
+  const { selectCameraRoom } = await import("./camera-rooms");
+  const { collectCharacterActors } = await import("./camera-telemetry");
 
-    const segments = [
-      { x: 0, y: 1, frames: 90 },
-      { x: 0, y: 0, frames: 30 },
-      { x: -0.5, y: 0.85, frames: 60 },
-      { x: 0, y: 0, frames: 25 },
-      { x: 0, y: 1, frames: 90 },
-      { x: 0, y: -1, frames: 60 },
-    ];
+  const worldIds = [
+    "hub",
+    "missionary",
+    "streets",
+    "palace",
+    "house",
+    "tree",
+    "broken-bow",
+    "bountiful",
+    "voyage",
+    "promised",
+    "vineyard",
+    "jacob",
+    "waters",
+    "ammon",
+    "title-liberty",
+    "lehonti",
+    "morianton",
+    "teancum",
+    "gid",
+    "nephihah",
+    "samuel",
+    "signs",
+    "gathering",
+    "christ-bountiful",
+    "peace-city",
+    "mormon-records",
+    "moroni-farewell",
+    "jared-expedition",
+    "jared-barges",
+    "shelem-stones",
+    "jared-crossing",
+    "ether-refuge",
+  ] as const;
 
-    for (const seg of segments) {
-      for (let i = 0; i < seg.frames; i++) {
-        const input = {
-          x: seg.x,
-          y: seg.y,
-          jump: false,
-          jumpHeld: false,
-        };
-        stepPlayer(player, input, 1 / 60, follow.yaw, world.solids);
+  const segments = [
+    { x: 0, y: 1, frames: 65 },
+    { x: 0, y: 0, frames: 25 },
+    { x: -0.45, y: 0.85, frames: 45 },
+    { x: 0, y: 0, frames: 20 },
+    { x: 0, y: 1, frames: 55 },
+    { x: 0, y: 0, frames: 25 },
+    { x: 0, y: 0.55, frames: 18 },
+    { x: 0, y: 0, frames: 25 },
+    { x: 0, y: -1, frames: 50 },
+  ];
+
+  const allFailures: string[] = [];
+
+  for (const id of worldIds) {
+    const scene = new T.Scene();
+    const prep = await prepareWorld(id);
+    const world = prep.buildWorld(id, scene);
+    try {
+      const mode = cameraModeForWorld(id);
+      const player = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
+      player.yaw = world.spawn.yaw ?? 0;
+      const camera = new T.PerspectiveCamera(58, 16 / 9, 0.08, 200);
+      const follow = new FollowCamera(camera);
+      follow.reset(player, player.yaw, mode);
+      const telemetry = new CameraTelemetry();
+      const actors = collectCharacterActors(scene);
+
+      // Settle spawn for 8 frames before recording
+      for (let i = 0; i < 8; i++) {
+        stepPlayer(
+          player,
+          { x: 0, y: 0, jump: false, jumpHeld: false },
+          1 / 60,
+          follow.yaw,
+          world.solids,
+          world.climbables,
+          world.water,
+        );
+        const room = selectCameraRoom(
+          world.cameraRooms ?? [],
+          player,
+          follow.roomId,
+        );
         follow.update(
           1 / 60,
           player,
           world.solids,
-          {
-            orbitX: 0,
-            orbitY: 0,
-            recenter: false,
-            movementIntent: Math.hypot(seg.x, seg.y) > 0.05,
-          },
-          "streets",
+          { orbitX: 0, orbitY: 0, recenter: false, movementIntent: false },
+          mode,
+          room,
         );
-        telemetry.record({
-          dt: 1 / 60,
-          input,
-          player,
-          follow,
-          solids: world.solids,
-        });
+        updateActorCameraClearance(camera.position, actors, false);
       }
-    }
+      telemetry.reset();
 
-    assert.deepEqual(
-      telemetry.anomalies.map((a) => `${a.kind}@f${a.frame}: ${a.message}`),
-      [],
-    );
-  } finally {
-    world.dispose?.();
+      for (const seg of segments) {
+        for (let i = 0; i < seg.frames; i++) {
+          const input = {
+            x: seg.x,
+            y: seg.y,
+            jump: false,
+            jumpHeld: false,
+          };
+          const prevRoom = follow.roomId;
+          stepPlayer(
+            player,
+            input,
+            1 / 60,
+            follow.yaw,
+            world.solids,
+            world.climbables,
+            world.water,
+          );
+          const room = selectCameraRoom(
+            world.cameraRooms ?? [],
+            player,
+            follow.roomId,
+          );
+          follow.update(
+            1 / 60,
+            player,
+            world.solids,
+            {
+              orbitX: 0,
+              orbitY: 0,
+              recenter: false,
+              movementIntent: Math.hypot(seg.x, seg.y) > 0.05,
+            },
+            mode,
+            room,
+          );
+          updateActorCameraClearance(camera.position, actors, false);
+          telemetry.record({
+            dt: 1 / 60,
+            input,
+            player,
+            follow,
+            solids: world.solids,
+            actors,
+            cut: prevRoom !== follow.roomId,
+          });
+        }
+      }
+
+      for (const a of telemetry.anomalies) {
+        allFailures.push(`${id} ${a.kind}@f${a.frame}: ${a.message}`);
+      }
+    } finally {
+      world.dispose?.();
+    }
   }
+
+  assert.deepEqual(allFailures, []);
 });

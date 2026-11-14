@@ -6,10 +6,43 @@ import {
   auditCoplanarMaterialBleed,
 } from "./surface-audit";
 import { buildShip } from "../nephi/ship";
-import { buildTeancumNight } from "../war/teancum-night";
-import { buildJerusalem } from "../jerusalem/jerusalem";
-import { buildBountiful } from "../nephi/bountiful";
-import { gallery } from "../conference/conference-center";
+import { prepareWorld } from "../../runtime/world-loading";
+import type { WorldId } from "../../runtime/worlds";
+
+const ALL_DISTINCT_WORLDS: readonly WorldId[] = [
+  "hub",
+  "missionary",
+  "streets",
+  "palace",
+  "house",
+  "tree",
+  "broken-bow",
+  "bountiful",
+  "voyage",
+  "promised",
+  "vineyard",
+  "jacob",
+  "waters",
+  "ammon",
+  "title-liberty",
+  "lehonti",
+  "morianton",
+  "teancum",
+  "gid",
+  "nephihah",
+  "samuel",
+  "signs",
+  "gathering",
+  "christ-bountiful",
+  "peace-city",
+  "mormon-records",
+  "moroni-farewell",
+  "jared-expedition",
+  "jared-barges",
+  "shelem-stones",
+  "jared-crossing",
+  "ether-refuge",
+];
 
 test("ship beds, bunks, and furniture have no coplanar bleed, micro-gap Z-fighting, or overhanging bedding", () => {
   const root = new T.Group();
@@ -37,45 +70,27 @@ test("ship decks, stairs, and cabin floors align with physical walk support with
   assert.deepEqual(sinkIssues, []);
 });
 
-test("world walk surfaces and roofs align with physical support across Jerusalem, Conference, Bountiful, and Teancum", () => {
-  const worlds = [
-    () => {
-      const scene = new T.Scene();
-      const w = buildJerusalem("streets", scene);
-      return { name: "jerusalem-streets", scene, world: w };
-    },
-    () => {
-      const scene = new T.Scene();
-      const w = buildTeancumNight(scene);
-      return { name: "teancum-night", scene, world: w };
-    },
-    () => {
-      const scene = new T.Scene();
-      const w = buildBountiful(scene);
-      return { name: "bountiful", scene, world: w };
-    },
-    () => {
-      const scene = new T.Scene();
-      const w = gallery(scene);
-      return { name: "conference", scene, world: w };
-    },
-  ];
+test("all 32 distinct worlds align walk surfaces and roofs with physical support and have no coplanar Z-fighting", async () => {
+  const allSinkFailures: string[] = [];
+  const allBleedFailures: string[] = [];
 
-  for (const create of worlds) {
-    const { name, scene, world } = create();
+  for (const id of ALL_DISTINCT_WORLDS) {
+    const scene = new T.Scene();
+    const prep = await prepareWorld(id);
+    const world = prep.buildWorld(id, scene);
     try {
       const points = [
-        { ...world.spawn, label: `${name}:spawn` },
-        { ...world.goal, label: `${name}:goal` },
+        { ...world.spawn, label: `${id}:spawn` },
+        { ...world.goal, label: `${id}:goal` },
         ...(world.landmarks ?? []).map((l) => ({
           ...l,
-          label: `${name}:${l.name}`,
+          label: `${id}:${l.name}`,
         })),
       ];
-      // Also sample top surfaces of walkable elevated solids (roofs, terraces, platforms)
+      // Sample top surfaces of walkable elevated solids (roofs, terraces, platforms, beds)
       for (const s of world.solids) {
         const top = s.y + s.h;
-        if (s.w >= 3 && s.d >= 3 && s.h >= 0.2 && top <= 18) {
+        if (s.w >= 2.5 && s.d >= 2.5 && s.h >= 0.15 && top <= 22) {
           const buriedUnderTaller = world.solids.some(
             (other) =>
               other !== s &&
@@ -89,7 +104,7 @@ test("world walk surfaces and roofs align with physical support across Jerusalem
               x: s.x,
               y: top,
               z: s.z,
-              label: `${name}:solid(${s.x.toFixed(1)},${top.toFixed(1)},${s.z.toFixed(1)})`,
+              label: `${id}:solid(${s.x.toFixed(1)},${top.toFixed(1)},${s.z.toFixed(1)})`,
             });
           }
         }
@@ -100,15 +115,21 @@ test("world walk surfaces and roofs align with physical support across Jerusalem
         points,
         0.08,
       );
-      assert.deepEqual(
-        sinkIssues.map(
-          (i) =>
-            `${name} (${i.x.toFixed(1)}, ${i.z.toFixed(1)}) support=${i.supportY.toFixed(2)} visual=${i.visualY.toFixed(2)} (${i.meshName})`,
-        ),
-        [],
-      );
+      for (const i of sinkIssues) {
+        allSinkFailures.push(
+          `${id} (${i.x.toFixed(1)}, ${i.z.toFixed(1)}) support=${i.supportY.toFixed(2)} visual=${i.visualY.toFixed(2)} (${i.meshName})`,
+        );
+      }
+
+      const bleedIssues = auditCoplanarMaterialBleed(scene, world.solids);
+      for (const b of bleedIssues) {
+        allBleedFailures.push(`${id} [${b.kind}]: ${b.message}`);
+      }
     } finally {
       world.dispose?.();
     }
   }
+
+  assert.deepEqual(allSinkFailures, []);
+  assert.deepEqual(allBleedFailures, []);
 });

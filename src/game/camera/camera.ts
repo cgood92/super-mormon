@@ -385,8 +385,9 @@ function ceilingAbovePath(
   const maxY = Math.max(target.y, eye.y) + radius;
   for (const s of solids) {
     if (s.y < minY || s.y > maxY || s.y >= ceiling) continue;
-    // Thin rails/treads are not ceilings.
-    if (s.h <= 0.35 && (s.d < 1 || s.w < 1)) continue;
+    // Thin narrow rails/treads are not ceilings, but wide deck planks (maxDim > 3.2) are.
+    if (s.h <= 0.35 && (s.d < 1 || s.w < 1) && Math.max(s.w, s.d) <= 3.2)
+      continue;
     if (s.w < 0.5 && s.h < 0.5) continue;
     const flat = { ...s, y: -1e6, h: 2e6 };
     const a = new T.Vector3(target.x, 0, target.z);
@@ -426,6 +427,7 @@ function isBoomBlocker(
   if (maxDim <= 1.8 && minDim >= 0.5 * maxDim) return false; // column / trunk
   if (s.h <= 0.8 && maxDim <= 2.5) return false; // bench / crate
   if (s.y + s.h <= playerY + 1.55 && maxDim <= 8) return false; // waist/chest-high stealth cover
+  if (s.y >= playerY + 1.4 && s.h <= 0.65 && maxDim <= 4.5) return false; // elevated jumping platform
   return s.y < focusY + 3; // ignore geometry far overhead
 }
 
@@ -581,8 +583,10 @@ export class FollowCamera {
     this.focus.z = player.z;
     const wantY = player.y + focusHeight(player, preset);
     const rising = player.grounded === false && wantY > this.focus.y;
+    const falling = wantY < this.focus.y - 0.25;
     // Hang back during jumps (SM64 keeps the horizon steady), keep up otherwise.
-    this.focus.y += (wantY - this.focus.y) * ease(rising ? 3 : 10, dt);
+    this.focus.y +=
+      (wantY - this.focus.y) * ease(rising ? 3 : falling ? 22 : 10, dt);
     if (Math.abs(wantY - this.focus.y) > 2.5) this.focus.y = wantY;
 
     // 2. Yaw ---------------------------------------------------------------
@@ -861,7 +865,7 @@ export class FollowCamera {
   ): number {
     const natural = this.eyeAt(this.idealDistance, this.yaw, preset.elevation);
     const headY =
-      player.y + (player.crouching || player.role === "child" ? 0.9 : 1.75);
+      player.y + (player.crouching || player.role === "child" ? 0.9 : 1.55);
     const ceiling = ceilingAbovePath(this.focus, natural, solids, headY);
     if (ceiling === Infinity) return MAX_PITCH;
     return Math.asin(
