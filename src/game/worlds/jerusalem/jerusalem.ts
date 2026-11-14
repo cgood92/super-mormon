@@ -895,7 +895,7 @@ export function buildJerusalem(
   add(13, 0, -36, 10.7, 6.5, 0.7, 0xb19472, "vault north wall");
   // Stone Pedestal holding the Plates of Brass deep inside the vault
   add(14, 0, -33.5, 2.2, 0.9, 1.8, palette.paleStone, "plates stone pedestal");
-  decor(14, 0.9, -33.5, 2.4, 0.15, 2.0, palette.brass, "plates pedestal trim");
+  add(14, 0.9, -33.5, 2.4, 0.15, 2.0, palette.brass, "plates pedestal trim");
   // Vault gold & silver treasure chests
   add(10.5, 0, -34, 1.2, 1.1, 2, palette.timber, "vault gold chest");
   vessel(group, 10.5, 1.1, -34, 0.7, palette.brass);
@@ -918,9 +918,9 @@ export function buildJerusalem(
   add(-25, 0, -28, 8, 1.4, 0.3, palette.timber, "stable divider 1");
   add(-25, 0, -22, 8, 1.4, 0.3, palette.timber, "stable divider 2");
   add(-30, 0, -28, 1.2, 0.6, 2.0, palette.paleStone, "stone manger 1");
-  decor(-30, 0.55, -28, 1.0, 0.15, 1.8, 0xd4b88a, "manger straw 1");
+  decor(-30, 0.55, -28, 1.0, 0.08, 1.8, 0xd4b88a, "manger straw 1");
   add(-30, 0, -22, 1.2, 0.6, 2.0, palette.paleStone, "stone manger 2");
-  decor(-30, 0.55, -22, 1.0, 0.15, 1.8, 0xd4b88a, "manger straw 2");
+  decor(-30, 0.55, -22, 1.0, 0.08, 1.8, 0xd4b88a, "manger straw 2");
   // Straw bedding on the stall floors and fallen wine goblet behind the 2nd slat
   decor(-26.5, 0.015, -30, 3.2, 0.03, 2.6, 0xd4b88a, "stable stall straw 1");
   decor(-26.5, 0.015, -25, 3.2, 0.03, 2.6, 0xd4b88a, "stable stall straw 2");

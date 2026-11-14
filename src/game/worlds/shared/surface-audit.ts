@@ -84,11 +84,20 @@ export function auditWalkSurfaceAlignment(
       const scenery = obj.userData.scenery;
       if (scenery?.kind === "backdrop") return;
       if (
-        /water|ocean|cloud|canopy|leaf|leaves|frond|sail|flame|fire|smoke|halo|wedge|cue|beacon|marker|character|head|torso|leg|arm|coat|tunic|hem|hair|beard|stand/i.test(
+        /water|ocean|cloud|canopy|leaf|leaves|frond|sail|flame|fire|smoke|halo|wedge|cue|beacon|marker|character|head|torso|leg|arm|coat|tunic|hem|hair|beard|stand|vessel|lamp|pottery|earthenware|foliage|thicket|dune/i.test(
           obj.name,
         )
       )
         return;
+      if (obj instanceof T.Mesh && !(obj instanceof T.InstancedMesh)) {
+        obj.geometry.computeBoundingBox();
+        const bb = obj.geometry.boundingBox;
+        if (bb) {
+          const sx = (bb.max.x - bb.min.x) * Math.abs(obj.scale.x);
+          const sz = (bb.max.z - bb.min.z) * Math.abs(obj.scale.z);
+          if (Math.max(sx, sz) < 0.75) return;
+        }
+      }
       const hex = materialColorHex(obj.material);
       if (hex === null) return;
       floorMeshes.push(obj);

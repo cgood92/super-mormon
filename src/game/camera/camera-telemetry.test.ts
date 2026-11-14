@@ -370,54 +370,60 @@ test("multi-persona exploration bots traverse all 32 distinct worlds without cam
     const world = prep.buildWorld(id, scene);
     try {
       const mode = cameraModeForWorld(id);
-      const player = createPlayer(world.spawn.x, world.spawn.y, world.spawn.z);
-      player.yaw = world.spawn.yaw ?? 0;
-      const camera = new T.PerspectiveCamera(58, 16 / 9, 0.08, 200);
-      const follow = new FollowCamera(camera);
-      follow.reset(player, player.yaw, mode);
-      const telemetry = new CameraTelemetry();
       const actors = collectCharacterActors(scene);
-
-      // Settle spawn for 8 frames before recording
-      for (let i = 0; i < 8; i++) {
-        stepPlayer(
-          player,
-          { x: 0, y: 0, jump: false, jumpHeld: false },
-          1 / 60,
-          follow.yaw,
-          world.solids,
-          world.climbables,
-          world.water,
-        );
-        const room = selectCameraRoom(
-          world.cameraRooms ?? [],
-          player,
-          follow.roomId,
-        );
-        follow.update(
-          1 / 60,
-          player,
-          world.solids,
-          { orbitX: 0, orbitY: 0, recenter: false, movementIntent: false },
-          mode,
-          room,
-        );
-        updateActorCameraClearance(camera.position, actors, false);
+      const starts = [
+        {
+          label: "spawn",
+          x: world.spawn.x,
+          y: world.spawn.y,
+          z: world.spawn.z,
+          yaw: world.spawn.yaw ?? 0,
+        },
+      ];
+      if (world.goal) {
+        starts.push({
+          label: "goal",
+          x: world.goal.x,
+          y: world.goal.y,
+          z: world.goal.z,
+          yaw: 0,
+        });
       }
-      telemetry.reset();
+      for (const lm of (world.landmarks ?? []).slice(0, 3)) {
+        starts.push({
+          label: `lm:${lm.name}`,
+          x: lm.x,
+          y: lm.y,
+          z: lm.z,
+          yaw: 0,
+        });
+      }
+      for (const rm of (world.cameraRooms ?? []).slice(0, 2)) {
+        const cx = (rm.bounds.minX + rm.bounds.maxX) / 2;
+        const cz = (rm.bounds.minZ + rm.bounds.maxZ) / 2;
+        const cy = rm.bounds.minY ?? world.spawn.y;
+        starts.push({
+          label: `room:${rm.id}`,
+          x: cx,
+          y: cy,
+          z: cz,
+          yaw: rm.yaw ?? 0,
+        });
+      }
 
-      for (const seg of segments) {
-        for (let i = 0; i < seg.frames; i++) {
-          const input = {
-            x: seg.x,
-            y: seg.y,
-            jump: false,
-            jumpHeld: false,
-          };
-          const prevRoom = follow.roomId;
+      for (const st of starts) {
+        const player = createPlayer(st.x, st.y, st.z);
+        player.yaw = st.yaw;
+        const camera = new T.PerspectiveCamera(58, 16 / 9, 0.08, 200);
+        const follow = new FollowCamera(camera);
+        follow.reset(player, player.yaw, mode);
+        const telemetry = new CameraTelemetry();
+
+        // Settle start point for 18 frames before recording
+        for (let i = 0; i < 18; i++) {
           stepPlayer(
             player,
-            input,
+            { x: 0, y: 0, jump: false, jumpHeld: false },
             1 / 60,
             follow.yaw,
             world.solids,
@@ -431,32 +437,79 @@ test("multi-persona exploration bots traverse all 32 distinct worlds without cam
           );
           follow.update(
             1 / 60,
-            player,
+            st.label !== "spawn" ? { ...player, runSpeed: 0.2 } : player,
             world.solids,
             {
               orbitX: 0,
               orbitY: 0,
               recenter: false,
-              movementIntent: Math.hypot(seg.x, seg.y) > 0.05,
+              movementIntent: st.label !== "spawn",
             },
             mode,
             room,
           );
           updateActorCameraClearance(camera.position, actors, false);
-          telemetry.record({
-            dt: 1 / 60,
-            input,
-            player,
-            follow,
-            solids: world.solids,
-            actors,
-            cut: prevRoom !== follow.roomId,
-          });
         }
-      }
+        telemetry.reset();
 
-      for (const a of telemetry.anomalies) {
-        allFailures.push(`${id} ${a.kind}@f${a.frame}: ${a.message}`);
+        for (const seg of segments) {
+          for (let i = 0; i < seg.frames; i++) {
+            const input = {
+              x: seg.x,
+              y: seg.y,
+              jump: false,
+              jumpHeld: false,
+            };
+            const prevRoom = follow.roomId;
+            const prevPos = { x: player.x, y: player.y, z: player.z };
+            stepPlayer(
+              player,
+              input,
+              1 / 60,
+              follow.yaw,
+              world.solids,
+              world.climbables,
+              world.water,
+            );
+            const playerTeleported =
+              Math.hypot(player.x - prevPos.x, player.z - prevPos.z) > 1.5 ||
+              Math.abs(player.y - prevPos.y) > 1.5;
+            const room = selectCameraRoom(
+              world.cameraRooms ?? [],
+              player,
+              follow.roomId,
+            );
+            follow.update(
+              1 / 60,
+              player,
+              world.solids,
+              {
+                orbitX: 0,
+                orbitY: 0,
+                recenter: false,
+                movementIntent: Math.hypot(seg.x, seg.y) > 0.05,
+              },
+              mode,
+              room,
+            );
+            updateActorCameraClearance(camera.position, actors, false);
+            telemetry.record({
+              dt: 1 / 60,
+              input,
+              player,
+              follow,
+              solids: world.solids,
+              actors,
+              cut: prevRoom !== follow.roomId || playerTeleported,
+            });
+          }
+        }
+
+        for (const a of telemetry.anomalies) {
+          allFailures.push(
+            `${id}[${st.label}] ${a.kind}@f${a.frame}: ${a.message}`,
+          );
+        }
       }
     } finally {
       world.dispose?.();

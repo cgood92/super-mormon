@@ -317,7 +317,7 @@ export function buildPromisedLand(scene: T.Scene): WorldData {
     landmarks: [
       { name: "Shore camp", x: 0, y: 0, z: 43 },
       { name: "Memorial grove", ...grave },
-      { name: "Mountain valleys", x: 0, y: 0, z: -36 },
+      { name: "Mountain valleys", x: -26, y: 0, z: -36 },
       { name: "New settlement", ...settlement },
     ],
     update(dt, player) {

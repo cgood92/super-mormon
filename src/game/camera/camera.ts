@@ -234,6 +234,7 @@ function recoverCameraEye(
 ): T.Vector3 {
   if (cameraSegmentClear(eye, eye, solids, radius)) return eye.clone();
   let nearest: T.Vector3 | undefined;
+  let bestDistance = Infinity;
   for (const axis of [0, 1, 2]) {
     for (const direction of [-1, 1]) {
       const trial = eye.clone();
@@ -255,12 +256,13 @@ function recoverCameraEye(
           center + direction * (size / 2 + radius + 0.001),
         );
       }
-      if (
-        cameraSegmentClear(trial, trial, solids, radius) &&
-        (!nearest ||
-          trial.distanceToSquared(eye) < nearest.distanceToSquared(eye))
-      )
-        nearest = trial;
+      if (cameraSegmentClear(trial, trial, solids, radius)) {
+        const distance = trial.distanceToSquared(eye);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          nearest = trial;
+        }
+      }
     }
   }
   return nearest ?? eye.clone();
@@ -424,7 +426,7 @@ function isBoomBlocker(
 ): boolean {
   const maxDim = Math.max(s.w, s.d);
   const minDim = Math.min(s.w, s.d);
-  if (maxDim <= 1.8 && minDim >= 0.5 * maxDim) return false; // column / trunk
+  if (maxDim <= 1.55 && minDim >= 0.75 * maxDim) return false; // column / trunk
   if (s.h <= 0.8 && maxDim <= 2.5) return false; // bench / crate
   if (s.y + s.h <= playerY + 1.55 && maxDim <= 8) return false; // waist/chest-high stealth cover
   if (s.y >= playerY + 1.4 && s.h <= 0.65 && maxDim <= 4.5) return false; // elevated jumping platform
@@ -569,18 +571,27 @@ export class FollowCamera {
         );
         if (initialLimit < this.boomDistance) {
           this.boomDistance = initialLimit;
-          this.place(this.eyeAt(this.boomDistance));
+          this.place(
+            recoverCameraEye(this.eyeAt(this.boomDistance), solids, EYE_RADIUS),
+          );
         }
       }
     }
 
     // 1. Focus -------------------------------------------------------------
     const idealEyeBefore = this.eyeAt(this.idealDistance);
-    const moveDx = player.x - this.focus.x;
-    const moveDz = player.z - this.focus.z;
+    const rawMoveDx = player.x - this.focus.x;
+    const rawMoveDz = player.z - this.focus.z;
+    const rawMoved = Math.hypot(rawMoveDx, rawMoveDz);
+    // Smooth single-frame horizontal snaps (such as ledge-mantle completion)
+    // while keeping normal running/jumping (<= 0.24m/frame) exact.
+    const focusStepScale =
+      rawMoved > 0.24 && rawMoved < 2.5 ? 0.24 / rawMoved : 1;
+    const moveDx = rawMoveDx * focusStepScale;
+    const moveDz = rawMoveDz * focusStepScale;
     const moved = Math.hypot(moveDx, moveDz);
-    this.focus.x = player.x;
-    this.focus.z = player.z;
+    this.focus.x += moveDx;
+    this.focus.z += moveDz;
     const wantY = player.y + focusHeight(player, preset);
     const rising = player.grounded === false && wantY > this.focus.y;
     const falling = wantY < this.focus.y - 0.25;
@@ -692,19 +703,14 @@ export class FollowCamera {
     // A stationary sightline obstruction does not collapse chosen zoom.
     if (expanding || moving || orbiting || !eyeClear) {
       if (limit < this.boomDistance) {
-        const candidateEye = this.eyeAt(this.boomDistance);
-        const eyeTouchesWall =
-          !eyeClear ||
-          !cameraSegmentClear(candidateEye, candidateEye, solids, EYE_RADIUS) ||
-          !cameraSegmentClear(this.lastEye, candidateEye, blockers, EYE_RADIUS);
-        if (eyeTouchesWall || room !== undefined) {
-          this.boomDistance = limit;
-        } else {
-          const maxInward = Math.max(0.32, 11 * dt);
-          this.boomDistance = Math.max(limit, this.boomDistance - maxInward);
-        }
+        const maxInward = Math.max(0.32, 14 * dt);
+        this.boomDistance = Math.max(limit, this.boomDistance - maxInward);
       } else {
-        this.boomDistance += (limit - this.boomDistance) * ease(8, dt);
+        const maxOutward = Math.max(0.35, 16 * dt);
+        this.boomDistance += Math.min(
+          maxOutward,
+          (limit - this.boomDistance) * ease(8, dt),
+        );
       }
     }
 
@@ -724,6 +730,7 @@ export class FollowCamera {
         )
       : 0;
 
+    const verticalSeparation = this.lastEye.y - player.y;
     const safeEye = moveCameraEye(this.lastEye, eye, solids, blockers, 0.22);
     if (room) {
       const b = room.viewBounds ?? room.bounds;
@@ -747,7 +754,6 @@ export class FollowCamera {
       blockers,
       0.05,
     );
-    const verticalSeparation = this.lastEye.y - player.y;
 
     const stranded =
       eyeSeesPlayer &&
@@ -756,17 +762,34 @@ export class FollowCamera {
         this.focus.distanceTo(safeEye) > this.boomDistance + 1.8);
 
     if (stranded) {
-      safeEye.copy(recoverCameraEye(eye, solids, 0.22));
-      if (room) {
-        const b = room.viewBounds ?? room.bounds;
-        safeEye.x = clamp(safeEye.x, b.minX + 0.55, b.maxX - 0.55);
-        safeEye.z = clamp(safeEye.z, b.minZ + 0.55, b.maxZ - 0.55);
-        if (b.minY !== undefined && b.maxY !== undefined) {
-          safeEye.y = clamp(safeEye.y, b.minY + 0.25, b.maxY - 0.28);
-        }
-      }
-      safeEye.y = Math.max(safeEye.y, player.y + 0.22);
+      const recoveredGoal = recoverCameraEye(eye, solids, 0.22);
+      safeEye.copy(recoveredGoal);
     }
+
+    const finalStep = this.lastEye.distanceTo(safeEye);
+    if (!orbiting && finalStep > 0.34 && verticalSeparation <= 2.2) {
+      const stepped = this.lastEye.clone().lerp(safeEye, 0.34 / finalStep);
+      const recoveredStep = recoverCameraEye(stepped, solids, EYE_RADIUS);
+      const stepMade = recoveredStep.distanceTo(this.lastEye);
+      if (
+        cameraSegmentClear(recoveredStep, recoveredStep, solids, EYE_RADIUS) &&
+        stepMade >= 0.04 &&
+        stepMade <= 0.48 &&
+        recoveredStep.distanceTo(safeEye) < finalStep - 0.015
+      ) {
+        safeEye.copy(recoveredStep);
+      }
+    }
+
+    if (room) {
+      const b = room.viewBounds ?? room.bounds;
+      safeEye.x = clamp(safeEye.x, b.minX + 0.55, b.maxX - 0.55);
+      safeEye.z = clamp(safeEye.z, b.minZ + 0.55, b.maxZ - 0.55);
+      if (b.minY !== undefined && b.maxY !== undefined) {
+        safeEye.y = clamp(safeEye.y, b.minY + 0.25, b.maxY - 0.28);
+      }
+    }
+    safeEye.y = Math.max(safeEye.y, player.y + 0.22);
 
     const leadLength = Math.min(1, speed / RUN_SPEED) * 0.29;
     this.lead.lerp(
@@ -895,16 +918,20 @@ export class FollowCamera {
     let distance =
       fraction < 1 ? this.idealDistance * fraction - 0.05 : this.idealDistance;
     // A skipped post/prop may still sit exactly where the eye lands: keep the
-    // lens physically outside tall props while letting low cover support it vertically.
+    // lens physically outside tall props while only raycasting against the
+    // specific prop(s) the eye actually touches (never unrelated columns).
     const eye = this.eyeAt(Math.max(distance, 0), yaw);
-    const tallSolids = solids.filter(
-      (s) => s.y + s.h > playerY + 1.55 || Math.max(s.w, s.d) > 8,
+    const touched = solids.filter(
+      (s) =>
+        Math.max(s.w, s.d) > 0.75 &&
+        (s.y + s.h > playerY + 1.55 || Math.max(s.w, s.d) > 8) &&
+        !cameraSegmentClear(eye, eye, [s], EYE_RADIUS),
     );
-    if (!cameraSegmentClear(eye, eye, tallSolids, EYE_RADIUS)) {
+    if (touched.length > 0) {
       const solidFraction = boomFraction(
         this.focus,
         ideal,
-        tallSolids,
+        touched,
         EYE_RADIUS,
       );
       if (solidFraction < 1) {

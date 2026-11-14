@@ -87,25 +87,41 @@ test("all 32 distinct worlds align walk surfaces and roofs with physical support
           label: `${id}:${l.name}`,
         })),
       ];
-      // Sample top surfaces of walkable elevated solids (roofs, terraces, platforms, beds)
+      // Sample 3x3 grid across top surfaces of walkable solids (roofs, terraces, platforms, beds, tables)
       for (const s of world.solids) {
         const top = s.y + s.h;
-        if (s.w >= 2.5 && s.d >= 2.5 && s.h >= 0.15 && top <= 22) {
-          const buriedUnderTaller = world.solids.some(
-            (other) =>
-              other !== s &&
-              Math.abs(s.x - other.x) <= other.w / 2 &&
-              Math.abs(s.z - other.z) <= other.d / 2 &&
-              other.y <= top + 0.05 &&
-              other.y + other.h > top + 0.05,
-          );
-          if (!buriedUnderTaller) {
-            points.push({
-              x: s.x,
-              y: top,
-              z: s.z,
-              label: `${id}:solid(${s.x.toFixed(1)},${top.toFixed(1)},${s.z.toFixed(1)})`,
-            });
+        const isTallColumn = s.h > 4.5 && Math.max(s.w, s.d) <= 2.2;
+        if (
+          !isTallColumn &&
+          s.w >= 1.2 &&
+          s.d >= 1.2 &&
+          s.h >= 0.12 &&
+          top <= 24
+        ) {
+          const offsets = s.w >= 2.6 && s.d >= 2.6 ? [-0.3, 0, 0.3] : [0];
+          for (const ox of offsets) {
+            for (const oz of offsets) {
+              const px = s.x + ox * s.w;
+              const pz = s.z + oz * s.d;
+              const buriedUnderTaller = world.solids.some(
+                (other) =>
+                  other !== s &&
+                  px >= other.x - other.w / 2 - 0.1 &&
+                  px <= other.x + other.w / 2 + 0.1 &&
+                  pz >= other.z - other.d / 2 - 0.1 &&
+                  pz <= other.z + other.d / 2 + 0.1 &&
+                  other.y <= top + 0.05 &&
+                  other.y + other.h > top + 0.05,
+              );
+              if (!buriedUnderTaller) {
+                points.push({
+                  x: px,
+                  y: top,
+                  z: pz,
+                  label: `${id}:solid(${px.toFixed(1)},${top.toFixed(1)},${pz.toFixed(1)})`,
+                });
+              }
+            }
           }
         }
       }
