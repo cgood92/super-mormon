@@ -119,7 +119,7 @@ export function buildJaredBarges(scene: T.Scene): WorldData {
   for (let i = 0; i < 3; i++) {
     const at = jaredBargesRoute.sockets[i];
     decor(
-      { x: at.x, y: 1.205, z: at.z, ...dimensions[i], h: 0.03 },
+      { x: at.x, y: 1.2, z: at.z, ...dimensions[i], h: 0.035 },
       colors[i],
       "Matching shape and grain fitting guide",
       "Thin colored shape guide on the work deck; deck owns support.",
@@ -132,7 +132,7 @@ export function buildJaredBarges(scene: T.Scene): WorldData {
     );
   }
   const vent = decor(
-    { x: 20, y: 1.23, z: 0, w: 1.1, h: 0.12, d: 1.1 },
+    { x: 20, y: 1.2, z: 0, w: 1.1, h: 0.06, d: 1.1 },
     0x476f73,
     "Removable air opening cover",
     "Small moving hatch cover; construction deck owns support.",
