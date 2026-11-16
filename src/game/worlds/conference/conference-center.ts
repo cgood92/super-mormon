@@ -852,8 +852,8 @@ function practiceLessons(): NonNullable<WorldData["tutorials"]> {
     ["arch", "Crawl", "Use {crouch} and move beneath the low arch.", -74, -61],
     [
       "ledge",
-      "Jump and climb",
-      "Jump toward the ledge, then {up} or {jump} to pull up. {crouch} lets go.",
+      "Jump onto platforms",
+      "Hold {jump} to leap higher onto the platform, or chain jumps / backflip.",
       -82,
       -45,
     ],

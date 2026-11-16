@@ -124,7 +124,6 @@ const moveNames: Partial<Record<PlayerState["move"], string>> = {
   sideflip: "sideflip",
   wallKick: "wall_kick",
   groundPound: "ground_pound",
-  ledgeHang: "ledge_grab",
   swim: "swim",
   crouch: "crouch",
 };

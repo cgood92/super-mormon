@@ -122,29 +122,43 @@ test("Teancum's night route uses cover, a non-graphic tent event, and a return t
     }
   };
   h.walk(TEANCUM_ROUTE[1]);
-  h.use();
   h.walk({ x: -22, y: 0, z: -130 });
   h.walk(TEANCUM_ROUTE[2]);
+  waitUntil((snap) => snap.sentries[6].headYaw < -1.2);
   h.walk({ x: -12, y: 0, z: -74 });
-  h.walk({ x: -4, y: 0, z: -48 });
+  h.walk({ x: -4, y: 0, z: -74 });
+  waitUntil(
+    (snap, prev) =>
+      snap.sentries[2].headYaw > 0.8 &&
+      snap.sentries[2].headYaw >= prev[2] &&
+      snap.sentries[12].headYaw < -1.5,
+  );
+  h.walk({ x: -4, y: 0, z: -36 });
   h.walk({ x: -4, y: 0, z: 10 });
   waitUntil(
     (snap, prev) =>
-      snap.sentries[4].headYaw > 0.6 && snap.sentries[4].headYaw >= prev[4],
+      snap.sentries[4].headYaw > 0.2 &&
+      snap.sentries[4].headYaw < 0.7 &&
+      snap.sentries[4].headYaw >= prev[4],
   );
+  h.walk({ x: -4, y: 0, z: 38 });
   h.walk({ x: -4, y: 0, z: 70 });
   h.walk({ x: -13, y: 0, z: 76 });
   h.walk({ x: -10, y: 0, z: 87 });
   waitUntil(
     (snap, prev) =>
-      snap.sentries[14].headYaw > 1.35 && snap.sentries[14].headYaw >= prev[14],
+      snap.sentries[14].headYaw > 0.95 &&
+      snap.sentries[14].headYaw < 1.25 &&
+      snap.sentries[14].headYaw >= prev[14],
   );
   h.walk({ x: 0, y: 0, z: 88 });
   h.walk(TEANCUM_ROUTE[4]);
   h.use();
   waitUntil(
     (snap, prev) =>
-      snap.sentries[14].headYaw > 1.35 && snap.sentries[14].headYaw >= prev[14],
+      snap.sentries[14].headYaw > 0.95 &&
+      snap.sentries[14].headYaw < 1.25 &&
+      snap.sentries[14].headYaw >= prev[14],
   );
   h.walk({ x: 0, y: 0, z: 88 });
   h.walk({ x: -10, y: 0, z: 87 });
@@ -153,9 +167,20 @@ test("Teancum's night route uses cover, a non-graphic tent event, and a return t
   h.walk({ x: -4, y: 0, z: 38 });
   waitUntil(
     (snap, prev) =>
-      snap.sentries[4].headYaw > 0.6 && snap.sentries[4].headYaw >= prev[4],
+      snap.sentries[4].headYaw > 0.2 &&
+      snap.sentries[4].headYaw < 0.7 &&
+      snap.sentries[4].headYaw >= prev[4],
   );
-  h.walk({ x: -4, y: 0, z: -48 });
+  h.walk({ x: -4, y: 0, z: 10 });
+  h.walk({ x: -4, y: 0, z: -36 });
+  waitUntil(
+    (snap, prev) =>
+      snap.sentries[2].headYaw > 0.6 &&
+      snap.sentries[2].headYaw < 1.2 &&
+      snap.sentries[2].headYaw >= prev[2],
+  );
+  h.walk({ x: -4, y: 0, z: -54 });
+  h.walk({ x: -4, y: 0, z: -74 });
   h.walk({ x: -12, y: 0, z: -74 });
   h.walk(TEANCUM_ROUTE[2]);
   h.walk({ x: -22, y: 0, z: -130 });
@@ -203,7 +228,7 @@ test("an exposed player in the outer watch triggers Teancum's stealth reset", ()
   );
   h.runtime.update(0.05, h.player, idle);
   const state = h.runtime.snapshot() as { phase: string; detections: number };
-  assert.equal(state.phase, "servant");
+  assert.equal(state.phase, "outer-watch");
   assert.equal(state.detections, 1);
   assert.equal(h.player.z, world.spawn.z);
   world.dispose?.();
@@ -279,6 +304,7 @@ test("all war-story shots keep the player visible through entrance and return", 
                       { x: -13, z: 76 },
                       { x: -4, z: 70 },
                       { x: -4, z: 38 },
+                      { x: -4, z: 10 },
                       { x: -4, z: -10 },
                       { x: -4, z: -36 },
                       { x: -4, z: -74 },
@@ -288,41 +314,57 @@ test("all war-story shots keep the player visible through entrance and return", 
                     ]
                   : []
           : [];
+      const waitSentry = (
+        sentryIndex: number,
+        minYaw: number,
+        maxYaw = Infinity,
+      ) => {
+        let prev = (runtime.snapshot() as { sentries: { headYaw: number }[] })
+          .sentries[sentryIndex].headYaw;
+        for (let i = 0; i < 600; i++) {
+          const yaw = (
+            runtime.snapshot() as { sentries: { headYaw: number }[] }
+          ).sentries[sentryIndex].headYaw;
+          const ok = yaw > minYaw && yaw < maxYaw && yaw >= prev;
+          prev = yaw;
+          if (ok) break;
+          runtime.update(0.05, player, idle);
+        }
+      };
+      const waitBoth = (pred: (yaws: number[], prev: number[]) => boolean) => {
+        let prev = (
+          runtime.snapshot() as { sentries: { headYaw: number }[] }
+        ).sentries.map((s) => s.headYaw);
+        for (let i = 0; i < 600; i++) {
+          const yaws = (
+            runtime.snapshot() as { sentries: { headYaw: number }[] }
+          ).sentries.map((s) => s.headYaw);
+          const ok = pred(yaws, prev);
+          prev = yaws;
+          if (ok) break;
+          runtime.update(0.05, player, idle);
+        }
+      };
       for (const point of detour) {
         if (build === buildTeancumNight) {
-          const waitSentry = (
-            index: number,
-            minYaw: number,
-            maxYaw = Infinity,
-          ) => {
-            let prev = (
-              runtime.snapshot() as { sentries: { headYaw: number }[] }
-            ).sentries[index].headYaw;
-            for (let i = 0; i < 600; i++) {
-              const yaw = (
-                runtime.snapshot() as { sentries: { headYaw: number }[] }
-              ).sentries[index].headYaw;
-              const ok = yaw > minYaw && yaw < maxYaw && yaw >= prev;
-              prev = yaw;
-              if (ok) break;
-              runtime.update(0.05, player, idle);
-            }
-          };
           if (
             (point.x === -4 && point.z === -36) ||
             (point.x === -4 && point.z === -74)
-          )
-            waitSentry(2, 0.6);
+          ) {
+            waitBoth((y, p) => y[2] > 0.8 && y[2] >= p[2] && y[12] < -1.5);
+          }
+          if (point.x === -12 && point.z === -74) waitSentry(6, -2.5, -1.5);
           if (
             (point.x === -4 && point.z === 38) ||
+            (point.x === -4 && point.z === 10 && index === 5) ||
             (point.x === -4 && point.z === -10)
           )
-            waitSentry(4, 0.6);
+            waitSentry(4, 0.2, 0.7);
           if (
             (point.x === 0 && point.z === 88) ||
             (point.x === 0 && point.z === 91)
           )
-            waitSentry(14, 1.05, 1.3);
+            waitSentry(14, 0.95, 1.25);
         }
         Object.assign(player, createPlayer(point.x, 0, point.z));
         for (let i = 0; i < 1500; i++) {
@@ -337,6 +379,8 @@ test("all war-story shots keep the player visible through entrance and return", 
             break;
         }
       }
+      if (build === buildTeancumNight && index === 3)
+        waitSentry(13, -1.2, -0.7);
       Object.assign(
         player,
         createPlayer(route[index].x, route[index].y, route[index].z),

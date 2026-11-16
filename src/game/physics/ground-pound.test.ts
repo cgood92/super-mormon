@@ -71,13 +71,7 @@ test("repeated airborne crouch edges cannot restart the suspended windup", () =>
   assert.ok(p.y < 12);
 });
 
-test("crouch drops from climb and ledge without starting a pound", () => {
-  const p = createPlayer(0, 2, 0);
-  p.ledge = { x: 0, z: 0, top: 3 };
-  p.move = "ledgeHang";
-  tick(p, { ...neutral, crouch: true });
-  assert.equal(p.ledge, undefined);
-  assert.equal(p.move, "jump");
+test("crouch drops from climb without starting a pound", () => {
   const climber = createPlayer(1, 2, 0);
   climber.climbId = "tree";
   climber.move = "climb";

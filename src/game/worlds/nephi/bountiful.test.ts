@@ -222,10 +222,10 @@ test("prayer mountain requires jumps and supports a full ascent and return", () 
   const scene = new T.Scene();
   const world = buildBountiful(scene);
   const p = createPlayer(-36, 0, 10);
-  const move = (forward: number, jump = false) =>
+  const move = (forward: number, jump = false, jumpHeld = jump) =>
     stepPlayer(
       p,
-      { x: 0, y: forward, jump, jumpHeld: jump },
+      { x: 0, y: forward, jump, jumpHeld },
       1 / 60,
       0,
       world.solids,
@@ -240,7 +240,7 @@ test("prayer mountain requires jumps and supports a full ascent and return", () 
     move(1, true);
     let landed = false;
     for (let frame = 0; frame < 100; frame++) {
-      move(p.z < 15 + (tier - 1) * 3.5 ? 1 : 0);
+      move(p.z < 15 + (tier - 1) * 3.5 ? 1 : 0, false, frame < 14);
       if (p.grounded && p.y > startHeight + 0.8) {
         landed = true;
         break;

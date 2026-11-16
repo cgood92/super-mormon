@@ -76,7 +76,11 @@ export class Game {
   private timeScale = this.slowMoDevScale ?? 1.0;
   private slowMoBadge: HTMLElement | null = null;
   private readonly ui = new GameUI(this.app, this.input, this.analytics, {
-    canPause: () => this.started && !this.transition,
+    canPause: () =>
+      this.started &&
+      !this.transition &&
+      !this.presentation.active &&
+      !this.recovery.active,
     restart: () => {
       void this.load(this.session.worldId);
     },
@@ -155,6 +159,7 @@ export class Game {
   private wantsFullscreen = readFullscreenPreference();
   private isFullscreenResumeModalOpen = false;
   private pendingFullscreenResume = false;
+  private pendingStartFullscreenPrompt = false;
   private loadGeneration = 0;
   private completionSceneSeen = false;
   constructor() {
@@ -391,29 +396,21 @@ export class Game {
     el("title-screen").hidden = true;
     this.input.reset();
     const mobileScreen = isMobileScreen(undefined, this.input.device);
-    if (mobileScreen)
-      this.ui.modal(
-        "READY TO EXPLORE",
-        "A bigger adventure.",
-        "Play full screen and sideways for the best view.",
-        [
-          {
-            label: "Enter Full Screen (recommended)",
-            run: () => {
-              this.setWantsFullscreen(true);
-              void this.ui.requestFullScreen();
-            },
-          },
-          {
-            label: "Continue",
-            run: () => {
-              this.setWantsFullscreen(false);
-            },
-            secondary: true,
-          },
-        ],
-      );
-    else if (document.fullscreenElement || navigator.userActivation?.isActive) {
+    if (mobileScreen) {
+      if (
+        this.presentation.active ||
+        this.session.adventure?.movementLocked?.() ||
+        this.ui.paused ||
+        this.recovery.active
+      ) {
+        this.pendingStartFullscreenPrompt = true;
+      } else {
+        this.promptStartFullscreen();
+      }
+    } else if (
+      document.fullscreenElement ||
+      navigator.userActivation?.isActive
+    ) {
       this.setWantsFullscreen(true);
       void this.ui.requestFullScreen();
     }
@@ -461,6 +458,9 @@ export class Game {
     if (generation !== this.loadGeneration) return;
     this.presentation.dispose();
     this.recovery.clear();
+    this.isFullscreenResumeModalOpen = false;
+    this.pendingFullscreenResume = false;
+    this.pendingStartFullscreenPrompt = false;
     this.ui.paused = false;
     el("modal").hidden = true;
     if (this.session.world) this.session.dispose();
@@ -530,11 +530,18 @@ export class Game {
   }
 
   private checkFullscreenResume() {
+    const movieLocked = !!this.session.adventure?.movementLocked?.();
+    const otherModalOpen =
+      this.recovery.active ||
+      this.ui.controllerSetup !== null ||
+      (this.ui.paused && !this.ui.isPauseMenuOpen);
     if (
       shouldPromptFullscreenResume({
         started: this.started,
         transition: this.transition,
         cinematic: this.presentation.active,
+        movieLocked,
+        paused: otherModalOpen,
         promptOpen: this.isFullscreenResumeModalOpen,
         wantsFullscreen: this.wantsFullscreen,
         isFullscreen: document.fullscreenElement !== null,
@@ -545,7 +552,7 @@ export class Game {
     } else if (
       this.started &&
       !this.transition &&
-      this.presentation.active &&
+      (this.presentation.active || movieLocked || otherModalOpen) &&
       this.wantsFullscreen &&
       !document.fullscreenElement &&
       isMobileScreen(undefined, this.input.device)
@@ -554,17 +561,20 @@ export class Game {
     }
   }
 
-  private promptFullscreenResume() {
-    this.isFullscreenResumeModalOpen = true;
+  private promptFullscreenChoice(
+    title: string,
+    enterLabel: string,
+    onDismiss?: () => void,
+  ) {
     this.ui.modal(
       "READY TO EXPLORE",
-      "Return to full screen?",
+      title,
       "Play full screen and sideways for the best view.",
       [
         {
-          label: "Resume Full Screen (recommended)",
+          label: enterLabel,
           run: () => {
-            this.isFullscreenResumeModalOpen = false;
+            onDismiss?.();
             this.setWantsFullscreen(true);
             void this.ui.requestFullScreen();
           },
@@ -572,12 +582,30 @@ export class Game {
         {
           label: "Continue",
           run: () => {
-            this.isFullscreenResumeModalOpen = false;
+            onDismiss?.();
             this.setWantsFullscreen(false);
           },
           secondary: true,
         },
       ],
+    );
+  }
+
+  private promptStartFullscreen() {
+    this.promptFullscreenChoice(
+      "A bigger adventure.",
+      "Enter Full Screen (recommended)",
+    );
+  }
+
+  private promptFullscreenResume() {
+    this.isFullscreenResumeModalOpen = true;
+    this.promptFullscreenChoice(
+      "Return to full screen?",
+      "Resume Full Screen (recommended)",
+      () => {
+        this.isFullscreenResumeModalOpen = false;
+      },
     );
   }
 
@@ -627,13 +655,23 @@ export class Game {
       this.presentation.update(dt, state);
       return;
     }
-    if (this.pendingFullscreenResume) {
-      this.pendingFullscreenResume = false;
-      this.checkFullscreenResume();
-    }
     if (this.ui.paused) {
       this.ui.navigateMenu(state, dt);
       return;
+    }
+    if (
+      (this.pendingStartFullscreenPrompt || this.pendingFullscreenResume) &&
+      !this.session.adventure?.movementLocked?.()
+    ) {
+      if (this.pendingStartFullscreenPrompt) {
+        this.pendingStartFullscreenPrompt = false;
+        this.pendingFullscreenResume = false;
+        this.promptStartFullscreen();
+        return;
+      }
+      this.pendingFullscreenResume = false;
+      this.checkFullscreenResume();
+      if (this.ui.paused) return;
     }
     const effectiveDt = dt * this.timeScale;
     const effectiveElapsed = activeElapsed * this.timeScale;

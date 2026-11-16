@@ -282,17 +282,5 @@ test("SM64 rig poses articulate turnSkid, slideRollout, dive, bellySlide, and sl
     "legs straight up in handstand",
   );
 
-  // Ledge hang
-  driver.update(1 / 60, {
-    ...baseState,
-    move: "ledgeHang",
-    runSpeed: 0,
-    moveTime: 0.1,
-  });
-  assert.ok(
-    leftArm.rotation.x < -2.6 && rightArm.rotation.x < -2.6,
-    "hands reaching up to ledge rim",
-  );
-
   driver.dispose();
 });

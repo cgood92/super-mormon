@@ -92,6 +92,15 @@ test("shouldPromptFullscreenResume only triggers when all mobile resumption crit
     false,
   );
 
+  // If currently playing a locked story opening/ending movie
+  assert.equal(
+    shouldPromptFullscreenResume({ ...base, movieLocked: true }),
+    false,
+  );
+
+  // If another non-auto-pause modal is already open
+  assert.equal(shouldPromptFullscreenResume({ ...base, paused: true }), false);
+
   // If resume prompt is already open
   assert.equal(
     shouldPromptFullscreenResume({ ...base, promptOpen: true }),

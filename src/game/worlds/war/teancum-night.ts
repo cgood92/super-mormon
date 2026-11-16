@@ -115,12 +115,8 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
     [10, 83, 4, 3],
   ])
     solid({ x, y: 0, z, w, d, h: 1.5 }, 0x4e5c59, "Solid night cover");
-  const servant = actor("guard", TEANCUM_ROUTE[1], "Teancum's servant");
-  const captain = actor(
-    "guard",
-    { x: 2, y: 0, z: -144, yaw: 0 },
-    "Nephite guard captain",
-  );
+  const servantSpawn = { x: -1.4, y: 0, z: TEANCUM_ROUTE[0].z, yaw: 0 };
+  const servant = actor("guard", servantSpawn, "Teancum's servant");
   const king = actor(
     "amalickiah",
     { x: 0, y: 0, z: 98, yaw: 0 },
@@ -204,7 +200,7 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
   for (const [x, z, base, phase, label] of [
     [-7, -41, -Math.PI * 0.45, 1.1, "Western pass southern sentry"],
     [-7, 32, -Math.PI * 0.55, 2.6, "Western pass northern sentry"],
-    [-6, 81, Math.PI * 0.25, 0.9, "Royal tent approach sentry"],
+    [-6.6, 81, Math.PI * 0.25, 0.9, "Royal tent approach sentry"],
   ] as const) {
     sentries.push({
       x,
@@ -379,13 +375,13 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
     "return",
     "done",
   ] as const;
-  let stage = 0,
+  let stage = 1,
     pending = false,
     finished = false,
     time = 0,
     detections = 0,
-    servantX = TEANCUM_ROUTE[1].x,
-    servantZ = TEANCUM_ROUTE[1].z;
+    servantX = servantSpawn.x,
+    servantZ = servantSpawn.z;
   return {
     name: "Teancum's Night Mission",
     subtitle: "A silent return · Alma 51:32–37",
@@ -394,9 +390,9 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
     actorParent: root,
     bounds: { minX: -24, maxX: 24, minZ: -180, maxZ: 150 },
     goal: { ...TEANCUM_ROUTE[4], radius: 3 },
-    initialObjective: objectives[0],
+    initialObjective: objectives[1],
     landmarks: [
-      { name: "Nephite camp", ...TEANCUM_ROUTE[1] },
+      { name: "Nephite camp", ...TEANCUM_ROUTE[5] },
       { name: "Outer watch", ...TEANCUM_ROUTE[2] },
       { name: "Royal tent", ...TEANCUM_ROUTE[4] },
     ],
@@ -410,7 +406,6 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
       const cameraObstacles = new StoryMeshObstacles(root, [
         { group: king.group },
         { group: servant.group },
-        { group: captain.group },
         ...sentries.map((s) => ({ group: s.rig.group })),
       ]);
       let companion = createPlayer(servantX, 0, servantZ);
@@ -420,13 +415,13 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
       let companionStallTime = 0;
       const reset = (player: PlayerState) => {
         detections++;
-        stage = 0;
+        stage = 1;
         pending = false;
         time = 0;
         lastJumpTarget = null;
         companionStallTime = 0;
-        servantX = TEANCUM_ROUTE[1].x;
-        servantZ = TEANCUM_ROUTE[1].z;
+        servantX = servantSpawn.x;
+        servantZ = servantSpawn.z;
         king.group.visible = true;
         companion = createPlayer(servantX, 0, servantZ);
         trail = [];
@@ -447,9 +442,9 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
             introTime < 4
               ? "sleeping-king"
               : introTime < 8
-                ? "teancum-plan"
+                ? "watchful-guards"
                 : introTime < 12
-                  ? "watchful-guards"
+                  ? "teancum-plan"
                   : undefined,
           servant: { x: companion.x, y: companion.y, z: companion.z },
           time,
@@ -470,30 +465,20 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
             updateSentriesVisuals(dt, time);
             const beat = introTime < 4 ? 0 : introTime < 8 ? 1 : 2;
             const aspect = hooks.viewAspect?.() ?? 16 / 9;
-            if (beat !== plannedBeat || aspect !== plannedAspect) {
-              plannedBeat = beat;
-              plannedAspect = aspect;
-              if (beat === 0) {
+            if (beat === 0) {
+              if (beat !== plannedBeat || aspect !== plannedAspect) {
+                plannedBeat = beat;
+                plannedAspect = aspect;
                 cinematicCamera = {
                   position: new T.Vector3(1.5, 1.9, 92.2),
                   focus: new T.Vector3(bedCenter.x, 0.45, bedCenter.z),
                   cut: true,
                 };
-              } else if (beat === 1) {
-                const fx = Math.sin(player.yaw);
-                const fz = Math.cos(player.yaw);
-                const sx = Math.cos(player.yaw);
-                const sz = -Math.sin(player.yaw);
-                cinematicCamera = {
-                  position: new T.Vector3(
-                    player.x + fx * 3.6 + sx * 0.4,
-                    player.y + 1.38,
-                    player.z + fz * 3.6 + sz * 0.4,
-                  ),
-                  focus: new T.Vector3(player.x, player.y + 1.0, player.z),
-                  cut: true,
-                };
-              } else {
+              }
+            } else if (beat === 1) {
+              if (beat !== plannedBeat || aspect !== plannedAspect) {
+                plannedBeat = beat;
+                plannedAspect = aspect;
                 const anchor = sentries[0].rig.group;
                 const camera = new T.PerspectiveCamera(58, aspect, 0.08, 320);
                 camera.position
@@ -516,6 +501,46 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
                   cut: true,
                 };
               }
+            } else {
+              // Start close enough to frame Teancum and his servant from the front,
+              // push in toward Teancum's face, then sweep past him to end behind him facing forward (+Z).
+              const smooth = (t: number) => {
+                const c = T.MathUtils.clamp(t, 0, 1);
+                return c * c * (3 - 2 * c);
+              };
+              const u = T.MathUtils.clamp((introTime - 8) / 4, 0, 1);
+              const sx = TEANCUM_ROUTE[0].x;
+              const sz = TEANCUM_ROUTE[0].z;
+              let position: T.Vector3;
+              let focus: T.Vector3;
+              if (u < 0.45) {
+                const p = smooth(u / 0.45);
+                position = new T.Vector3(sx + 0.4, 1.75, sz + 6.0).lerp(
+                  new T.Vector3(sx + 0.75, 1.55, sz + 2.5),
+                  p,
+                );
+                focus = new T.Vector3(sx - 0.35, 1.2, sz).lerp(
+                  new T.Vector3(sx, 1.38, sz),
+                  p,
+                );
+              } else {
+                const p = smooth((u - 0.45) / 0.55);
+                const q = 1 - p;
+                const p0 = new T.Vector3(sx + 0.75, 1.55, sz + 2.5);
+                const p1 = new T.Vector3(sx + 2.925, 1.5525, sz + 1.38);
+                const p2 = new T.Vector3(sx, 1.945, sz - 5.26);
+                position = p0
+                  .multiplyScalar(q * q)
+                  .addScaledVector(p1, 2 * q * p)
+                  .addScaledVector(p2, p * p);
+                focus = new T.Vector3(sx, 1.38, sz).lerp(
+                  new T.Vector3(sx, 1.15, sz),
+                  p,
+                );
+              }
+              plannedBeat = beat;
+              plannedAspect = aspect;
+              cinematicCamera = { position, focus, cut: true };
             }
             if (introTime >= 12) cinematicCamera = undefined;
             return {
@@ -523,8 +548,8 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
                 beat === 0
                   ? "Amalickiah is sleeping in his tent after a hard day of battle."
                   : beat === 1
-                    ? "Teancum has a secret plan to kill Amalickiah in the dead of the night."
-                    : "Avoid being seen by guards along the way.",
+                    ? "Avoid being seen by guards along the way."
+                    : "Teancum has a secret plan to kill Amalickiah in the dead of the night.",
               prompt: "",
             };
           }
@@ -660,64 +685,60 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
                 Math.abs(player.x - royalTent.x) < royalTent.width / 2 - 0.4 &&
                 Math.abs(player.z - royalTent.z) < royalTent.depth / 2 - 0.4
               : nearWarPoint(player, target, 3));
-          const actionable = stage === 0 || stage === 3 || stage === 4;
+          const actionable = stage === 3 || stage === 4;
           if (!pending && !finished && actionable && close && input.interact) {
-            if (stage === 0) {
-              stage = 1;
-            } else {
-              pending = true;
-              const next = () => {
-                pending = false;
-                stage++;
-                if (stage === 4) {
-                  king.group.visible = false;
-                }
-                if (stage === 5) {
-                  finished = true;
-                  hooks.complete();
-                }
-              };
-              const dialog = [
-                [],
-                [
-                  "Alma 51:33",
-                  "Past the outer watch",
-                  "Use the stone and trees as cover. A few imagined sentries still scan the approach; the tents ahead are quiet.",
-                ],
-                [
-                  "Alma 51:33",
-                  "The camp sleeps",
-                  "You and your servant reach the silent camp. Amalickiah's tent stands ahead; stay unseen.",
-                ],
-                [
-                  "Alma 51:34–35",
-                  "In the king's tent",
-                  "Teancum enters privately and strikes Amalickiah with a javelin. He and his servant turn back toward their own camp.",
-                ],
-                [
-                  "Alma 51:35–36",
-                  "Stand in readiness",
-                  "Teancum wakes his own men, tells them what happened to Amalickiah, and commands the guards to stand in readiness in case the Lamanites attack.",
-                ],
-              ][stage];
-              hooks.dialog(dialog[0], dialog[1], dialog[2], next, {
-                focus: { x: target.x, y: 1.1, z: target.z },
-                wide: 5,
-                playerGesture: stage === 4 ? "point" : "talk",
-                actors:
-                  stage === 3
-                    ? [{ group: king.group }]
-                    : stage === 4
-                      ? [{ group: captain.group, gesture: "talk" }]
-                      : [],
-              });
-            }
+            pending = true;
+            const next = () => {
+              pending = false;
+              stage++;
+              if (stage === 4) {
+                king.group.visible = false;
+              }
+              if (stage === 5) {
+                finished = true;
+                hooks.complete();
+              }
+            };
+            const dialog = [
+              [],
+              [
+                "Alma 51:33",
+                "Past the outer watch",
+                "Use the stone and trees as cover. A few imagined sentries still scan the approach; the tents ahead are quiet.",
+              ],
+              [
+                "Alma 51:33",
+                "The camp sleeps",
+                "You and your servant reach the silent camp. Amalickiah's tent stands ahead; stay unseen.",
+              ],
+              [
+                "Alma 51:34–35",
+                "In the king's tent",
+                "Teancum enters privately and strikes Amalickiah with a javelin. He and his servant turn back toward their own camp.",
+              ],
+              [
+                "Alma 51:35–36",
+                "Stand in readiness",
+                "Teancum wakes his own men, tells them what happened to Amalickiah, and commands the guards to stand in readiness in case the Lamanites attack.",
+              ],
+            ][stage];
+            hooks.dialog(dialog[0], dialog[1], dialog[2], next, {
+              focus: { x: target.x, y: 1.1, z: target.z },
+              wide: 5,
+              playerGesture: stage === 4 ? "point" : "talk",
+              actors:
+                stage === 3
+                  ? [{ group: king.group }]
+                  : stage === 4
+                    ? [{ group: servant.group, gesture: "talk" }]
+                    : [],
+            });
           }
           return {
             objective: objectives[stage],
             prompt:
               actionable && close && !pending && !finished
-                ? `{action} · ${stage === 0 ? "Take servant with you" : stage === 3 ? "Use javelin · Amalickiah" : objectives[stage]}`
+                ? `{action} · ${stage === 3 ? "Use javelin · Amalickiah" : objectives[stage]}`
                 : "",
           };
         },

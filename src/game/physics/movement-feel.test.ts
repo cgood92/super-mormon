@@ -59,10 +59,10 @@ test("a shallow descent beside a cabinet lands instead of grabbing its upper edg
   ];
   for (let frame = 0; frame < 10; frame++) {
     stepPlayer(p, { ...idle, y: 1 }, 1 / 60, 0, solids);
-    assert.equal(
-      p.ledge,
-      undefined,
-      "ordinary descent must not become a ledge hang",
+    assert.notEqual(
+      p.move,
+      "climb",
+      "ordinary descent must not attach to non-climbable solids",
     );
   }
   assert.equal(p.grounded, true);
