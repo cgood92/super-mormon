@@ -48,6 +48,7 @@ export type CameraAnomalyKind =
   | "sudden-yaw-snap"
   | "sudden-zoom-snap"
   | "vertical-camera-jitter"
+  | "player-out-of-frame"
   | "wall-steering-drift"
   | "reversal-flip-180"
   | "idle-camera-motion"
@@ -394,6 +395,30 @@ export class CameraTelemetry {
       }
     } else {
       this.backwardWalkYaw = null;
+    }
+
+    // 9. Character viewport framing check (catches multi-jump out-of-frame issues)
+    if (
+      !manualOrbit &&
+      planarDistance >= 2.8 &&
+      Math.abs(player.y - prev.player.y) < 1.5 &&
+      follow.camera.fov >= 50
+    ) {
+      follow.camera.updateMatrixWorld(true);
+      const topY = player.y + (player.crouching ? 0.95 : 1.65);
+      const headNdc = new T.Vector3(player.x, topY, player.z).project(
+        follow.camera,
+      );
+      const footNdc = new T.Vector3(player.x, player.y, player.z).project(
+        follow.camera,
+      );
+      if (headNdc.z < 1 && (headNdc.y > 0.97 || footNdc.y < -0.97)) {
+        this.flag(
+          "player-out-of-frame",
+          sample,
+          `Character left vertical viewport during motion (headNdcY=${headNdc.y.toFixed(2)}, footNdcY=${footNdc.y.toFixed(2)})`,
+        );
+      }
     }
   }
 

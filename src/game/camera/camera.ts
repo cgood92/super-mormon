@@ -500,7 +500,6 @@ export class FollowCamera {
   private baseFloorY = 0;
   /** Vertical eye velocity for the critically damped height spring. */
   private eyeVy = 0;
-  private targetHeightOffset = MODES.hub.targetHeight;
   private initialized = false;
   private firstUpdate = true;
 
@@ -523,8 +522,7 @@ export class FollowCamera {
     this.idealDistance = this.boomDistance =
       preset.distance * ZOOM_DISTANCES[this.zoomLevel];
     this.baseFloorY = player.y;
-    this.targetHeightOffset = focusHeight(player, preset);
-    this.focus.set(player.x, player.y + this.targetHeightOffset, player.z);
+    this.focus.set(player.x, player.y + focusHeight(player, preset), player.z);
     this.lead.set(0, 0, 0);
     this.eyeVy = 0;
     this.place(this.eyeAt(this.boomDistance));
@@ -605,22 +603,26 @@ export class FollowCamera {
     const moved = Math.hypot(moveDx, moveDz);
     this.focus.x += moveDx;
     this.focus.z += moveDz;
-    if (player.grounded !== false || player.y < this.baseFloorY) {
+    if (player.y < this.baseFloorY) {
+      this.baseFloorY = player.y;
+    } else if (player.grounded !== false) {
       this.baseFloorY += (player.y - this.baseFloorY) * ease(14, dt);
       if (Math.abs(player.y - this.baseFloorY) > 2.5)
         this.baseFloorY = player.y;
     }
-    this.targetHeightOffset +=
-      (focusHeight(player, preset) - this.targetHeightOffset) * ease(12, dt);
     const airHeight = Math.max(0, player.y - this.baseFloorY);
-    const wantY = this.baseFloorY + this.targetHeightOffset + airHeight * 0.24;
-    const diffY = wantY - this.focus.y;
-    // SM64 calc_y_to_curr_floor: anchor vertical focus to the underlying floor
-    // with gentle airborne lift so the horizon never lags and snaps on landing.
+    // Keep horizon steady for tiny hops while keeping single/double/triple jumps
+    // framed cleanly inside the viewport (even when a wall shortens the boom).
+    const lagCap = 0.48 * clamp(this.boomDistance / 5.2, 0.35, 1);
+    const airOffset =
+      airHeight - lagCap * (1 - Math.exp(-airHeight / Math.max(0.15, lagCap)));
+    const wantY = this.baseFloorY + focusHeight(player, preset) + airOffset;
     const prevFocusY = this.focus.y;
-    const focusYRate =
-      diffY >= 0 ? 10 : 10 + 10 * clamp((-diffY - 0.35) / 1.2, 0, 1) ** 2;
-    this.focus.y += diffY * ease(focusYRate, dt);
+    const focusRate =
+      wantY < this.focus.y
+        ? 12 + 12 * clamp((this.focus.y - wantY - 0.4) / 0.8, 0, 1)
+        : 12;
+    this.focus.y += (wantY - this.focus.y) * ease(focusRate, dt);
     if (Math.abs(wantY - this.focus.y) > 2.5) this.focus.y = wantY;
 
     // 2. Yaw ---------------------------------------------------------------

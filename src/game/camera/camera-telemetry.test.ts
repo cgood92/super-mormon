@@ -398,7 +398,7 @@ test("running and diagonal jumps in Conference Center and Teancum descend and la
                 `${id} (${fps}fps, side=${sideX}) mid-air camera vertical velocity kink at f=${f}: ddEy=${ddEy.toFixed(4)}`,
               );
               assert.ok(
-                dNdcY < -0.012 * (60 / fps),
+                dNdcY < -0.004 * (60 / fps),
                 `${id} (${fps}fps, side=${sideX}) character screen-space descent stalled in mid-air at f=${f} (y=${player.y.toFixed(2)}): dNdcY=${dNdcY.toFixed(4)}`,
               );
             }
@@ -430,6 +430,94 @@ test("running and diagonal jumps in Conference Center and Teancum descend and la
       }
     } finally {
       world.dispose?.();
+    }
+  }
+});
+
+test("single, double, and triple jump sequences keep full character framed cleanly on desktop and mobile", () => {
+  const floor = { x: 0, y: -0.5, z: 0, w: 200, h: 0.5, d: 200 };
+  for (const mode of ["conference", "hub", "night", "streets"] as const) {
+    for (const aspect of [16 / 9, 9 / 16] as const) {
+      for (const closeZoom of [false, true] as const) {
+        const player = createPlayer(0, 0, 0);
+        const camera = new T.PerspectiveCamera(58, aspect, 0.08, 200);
+        const follow = new FollowCamera(camera);
+        follow.reset(player, 0, mode);
+        const telemetry = new CameraTelemetry();
+
+        if (closeZoom) {
+          for (let i = 0; i < 12; i++) {
+            follow.update(
+              1 / 60,
+              player,
+              [floor],
+              { orbitX: 0, orbitY: 0, recenter: false, zoom: i === 0 ? -1 : 0 },
+              mode,
+            );
+          }
+          telemetry.reset();
+        }
+
+        const stagesSeen = new Set<number>();
+        let maxStage = 0;
+        let maxHeadNdcY = -Infinity;
+        let minFootNdcY = Infinity;
+
+        for (let f = 1; f <= 280; f++) {
+          const triggerJump =
+            f === 20 || (player.grounded && f > 25 && maxStage < 3);
+          if (triggerJump) maxStage++;
+          const input = {
+            x: 0.25,
+            y: 0.9,
+            jump: triggerJump,
+            jumpHeld: triggerJump || !player.grounded,
+          };
+          stepPlayer(player, input, 1 / 60, follow.yaw, [floor]);
+          follow.update(
+            1 / 60,
+            player,
+            [floor],
+            { orbitX: 0, orbitY: 0, recenter: false, movementIntent: true },
+            mode,
+          );
+          telemetry.record({
+            dt: 1 / 60,
+            input,
+            player,
+            follow,
+            solids: [floor],
+          });
+          if (player.jumpStage > 0) stagesSeen.add(player.jumpStage);
+
+          camera.updateMatrixWorld(true);
+          const footNdc = new T.Vector3(player.x, player.y, player.z).project(
+            camera,
+          );
+          const headNdc = new T.Vector3(
+            player.x,
+            player.y + 1.65,
+            player.z,
+          ).project(camera);
+          maxHeadNdcY = Math.max(maxHeadNdcY, headNdc.y);
+          minFootNdcY = Math.min(minFootNdcY, footNdc.y);
+        }
+
+        assert.ok(
+          stagesSeen.has(1) && stagesSeen.has(2) && stagesSeen.has(3),
+          `${mode} did not exercise full 1-2-3 jump sequence`,
+        );
+        const limit = closeZoom ? 0.93 : 0.78;
+        assert.ok(
+          maxHeadNdcY <= limit && minFootNdcY >= -limit,
+          `${mode} (aspect=${aspect.toFixed(2)}, closeZoom=${closeZoom}) went near/out of viewport on multi-jump: headNdcY=${maxHeadNdcY.toFixed(3)}, footNdcY=${minFootNdcY.toFixed(3)}`,
+        );
+        assert.deepEqual(
+          telemetry.anomalies.map((a) => `${a.kind}@f${a.frame}: ${a.message}`),
+          [],
+          `${mode} multi-jump produced telemetry anomalies`,
+        );
+      }
     }
   }
 });
