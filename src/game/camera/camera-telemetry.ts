@@ -47,6 +47,7 @@ export type CameraAnomalyKind =
   | "sudden-eye-jump"
   | "sudden-yaw-snap"
   | "sudden-zoom-snap"
+  | "vertical-camera-jitter"
   | "wall-steering-drift"
   | "reversal-flip-180"
   | "idle-camera-motion"
@@ -270,6 +271,48 @@ export class CameraTelemetry {
         sample,
         `Camera boom collapsed inward by ${zoomCollapse.toFixed(2)}m in one frame`,
       );
+    }
+
+    // 5b. 2nd-order vertical camera velocity-step / jitter check during jumps & running
+    const prev2 =
+      this.samples.length >= 3
+        ? this.samples[this.samples.length - 3]
+        : undefined;
+    const eyeNearSurface = (pt: T.Vector3) =>
+      !cameraSegmentClear(pt, pt, solids, 0.4) ||
+      solids.some(
+        (s) =>
+          pt.x + 0.4 >= s.x - s.w / 2 &&
+          pt.x - 0.4 <= s.x + s.w / 2 &&
+          pt.z + 0.4 >= s.z - s.d / 2 &&
+          pt.z - 0.4 <= s.z + s.d / 2 &&
+          s.y + s.h <= pt.y &&
+          pt.y - (s.y + s.h) < 0.35,
+      );
+    if (
+      prev2 &&
+      prev2.roomId === prev.roomId &&
+      !manualOrbit &&
+      !sample.obstructed &&
+      !prev.obstructed &&
+      playerDrop < 2.3 &&
+      Math.abs(player.y - prev.player.y) < 0.35 &&
+      Math.abs(prev.player.y - prev2.player.y) < 0.35
+    ) {
+      const prevEyeVec = new T.Vector3(prev.eye.x, prev.eye.y, prev.eye.z);
+      if (!eyeNearSurface(eye) && !eyeNearSurface(prevEyeVec)) {
+        const prevDy = prev.eye.y - prev2.eye.y;
+        const currDy = eye.y - prev.eye.y;
+        const ddEy = Math.abs(currDy - prevDy);
+        const maxDdEy = Math.max(0.048, 2.8 * dt);
+        if (Math.abs(prevDy) < 0.35 && ddEy > maxDdEy) {
+          this.flag(
+            "vertical-camera-jitter",
+            sample,
+            `Camera vertical velocity jumped by ${ddEy.toFixed(3)}m/frame (prev dEy=${prevDy.toFixed(3)}, curr dEy=${currDy.toFixed(3)})`,
+          );
+        }
+      }
     }
 
     // 6. Stop-and-go idle zoom/spin check

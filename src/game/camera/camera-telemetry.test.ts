@@ -309,6 +309,131 @@ test("hiding behind Teancum's 1.5m stealth cover stones preserves a wide overvie
   }
 });
 
+test("running and diagonal jumps in Conference Center and Teancum descend and land without mid-air camera stall or landing bounce", async () => {
+  const { prepareWorld } = await import("../runtime/world-loading");
+  const { cameraModeForWorld } = await import("../runtime/scene-entry");
+  const { createMotionDriver } = await import("../characters/character-motion");
+
+  for (const id of ["hub", "teancum"] as const) {
+    const scene = new T.Scene();
+    const prep = await prepareWorld(id);
+    const world = prep.buildWorld(id, scene);
+    try {
+      const mode = cameraModeForWorld(id);
+      for (const fps of [60, 30] as const) {
+        for (const sideX of [0, 0.35, -0.35] as const) {
+          const dt = 1 / fps;
+          const player = createPlayer(
+            world.spawn.x,
+            world.spawn.y,
+            world.spawn.z,
+          );
+          player.yaw = world.spawn.yaw ?? 0;
+          const camera = new T.PerspectiveCamera(58, 9 / 16, 0.08, 200);
+          const follow = new FollowCamera(camera);
+          follow.reset(player, player.yaw, mode);
+          const motion = createMotionDriver("elder");
+          const telemetry = new CameraTelemetry();
+
+          let prevEy = camera.position.y;
+          let prevDEy = 0;
+          let prevNdcY = 0;
+          let wasAirborne = false;
+          let postLandFrames = 0;
+
+          const totalFrames = Math.round(1.5 * fps);
+          const jumpFrame = Math.round(0.32 * fps);
+          const jumpHoldEnd = Math.round(0.52 * fps);
+
+          for (let f = 1; f <= totalFrames; f++) {
+            const jump = f === jumpFrame;
+            const jumpHeld = f >= jumpFrame && f <= jumpHoldEnd;
+            const input = { x: sideX, y: 0.9, jump, jumpHeld };
+            stepPlayer(
+              player,
+              input,
+              dt,
+              follow.yaw,
+              world.solids,
+              world.climbables,
+              world.water,
+            );
+            motion.update(dt, player);
+            follow.update(
+              dt,
+              player,
+              world.solids,
+              { orbitX: 0, orbitY: 0, recenter: false, movementIntent: true },
+              mode,
+            );
+            telemetry.record({
+              dt,
+              input,
+              player,
+              follow,
+              solids: world.solids,
+            });
+
+            camera.updateMatrixWorld(true);
+            motion.group.updateMatrixWorld(true);
+            const body = motion.group.getObjectByName("body")!;
+            const bw = new T.Vector3();
+            body.getWorldPosition(bw);
+            const ndc = bw.project(camera);
+
+            const dEy = camera.position.y - prevEy;
+            const ddEy = Math.abs(dEy - prevDEy);
+            const dNdcY = ndc.y - prevNdcY;
+
+            // During lower half of airborne descent (0.18m <= player.y <= 1.25m, vy < -2),
+            // camera vertical acceleration must not kink and screen-space descent must not stall.
+            if (
+              !player.grounded &&
+              player.vy < -2 &&
+              player.y >= 0.18 &&
+              player.y <= 1.25
+            ) {
+              assert.ok(
+                ddEy < 0.025 * (60 / fps),
+                `${id} (${fps}fps, side=${sideX}) mid-air camera vertical velocity kink at f=${f}: ddEy=${ddEy.toFixed(4)}`,
+              );
+              assert.ok(
+                dNdcY < -0.012 * (60 / fps),
+                `${id} (${fps}fps, side=${sideX}) character screen-space descent stalled in mid-air at f=${f} (y=${player.y.toFixed(2)}): dNdcY=${dNdcY.toFixed(4)}`,
+              );
+            }
+
+            if (!player.grounded) {
+              wasAirborne = true;
+            } else if (wasAirborne && postLandFrames < 8) {
+              postLandFrames++;
+              assert.ok(
+                dNdcY < 0.022 * (60 / fps),
+                `${id} (${fps}fps, side=${sideX}) post-landing upward screen bounce at f=${f}: dNdcY=${dNdcY.toFixed(4)}`,
+              );
+            }
+
+            prevEy = camera.position.y;
+            prevDEy = dEy;
+            prevNdcY = ndc.y;
+          }
+
+          assert.deepEqual(
+            telemetry.anomalies.map(
+              (a) => `${a.kind}@f${a.frame}: ${a.message}`,
+            ),
+            [],
+            `${id} (${fps}fps, side=${sideX}) jump produced camera telemetry anomalies`,
+          );
+          motion.dispose();
+        }
+      }
+    } finally {
+      world.dispose?.();
+    }
+  }
+});
+
 test("multi-persona exploration bots traverse all 32 distinct worlds without camera jerks, flips, or wall-pinning", async () => {
   const { prepareWorld } = await import("../runtime/world-loading");
   const { cameraModeForWorld } = await import("../runtime/scene-entry");
@@ -351,9 +476,9 @@ test("multi-persona exploration bots traverse all 32 distinct worlds without cam
   ] as const;
 
   const segments = [
-    { x: 0, y: 1, frames: 65 },
+    { x: 0, y: 1, frames: 65, jumpAt: 10 },
     { x: 0, y: 0, frames: 25 },
-    { x: -0.45, y: 0.85, frames: 45 },
+    { x: -0.45, y: 0.85, frames: 55, jumpAt: 5 },
     { x: 0, y: 0, frames: 20 },
     { x: 0, y: 1, frames: 55 },
     { x: 0, y: 0, frames: 25 },
@@ -454,11 +579,12 @@ test("multi-persona exploration bots traverse all 32 distinct worlds without cam
 
         for (const seg of segments) {
           for (let i = 0; i < seg.frames; i++) {
+            const jumpAt = "jumpAt" in seg ? seg.jumpAt : undefined;
             const input = {
               x: seg.x,
               y: seg.y,
-              jump: false,
-              jumpHeld: false,
+              jump: jumpAt !== undefined && i === jumpAt,
+              jumpHeld: jumpAt !== undefined && i >= jumpAt && i <= jumpAt + 12,
             };
             const prevRoom = follow.roomId;
             const prevPos = { x: player.x, y: player.y, z: player.z };
