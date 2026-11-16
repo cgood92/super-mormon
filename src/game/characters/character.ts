@@ -11,5 +11,7 @@ export function createCharacter(
   role: CharacterRole,
   options: CharacterOptions = {},
 ) {
-  return createSculptedCharacterRig(role, options);
+  const rig = createSculptedCharacterRig(role, options);
+  rig.group.userData.isCharacterRig = true;
+  return rig;
 }

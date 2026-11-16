@@ -20,6 +20,7 @@ test("quiet exploration areas have location hints without story entry prompts", 
     "Movement Studio",
   );
   assert.equal(conferenceLocation({ x: 0, y: 0, z: 36 }).name, "Story Gallery");
+  assert.equal(conferenceLocation({ x: 0, y: 0, z: -30 }).hint, "");
   assert.doesNotMatch(
     conferenceLocation({ x: 0, y: 12, z: -30 }).hint,
     /painting|coin|jump/i,

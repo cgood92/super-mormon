@@ -20,6 +20,11 @@ import {
 } from "../camera/adventure-camera";
 import { selectCameraRoom } from "../camera/camera-rooms";
 import { CameraRelativeInput } from "../camera/camera-relative-input";
+import {
+  CameraTelemetry,
+  collectCharacterActors,
+  updateActorCameraClearance,
+} from "../camera/camera-telemetry";
 import { cameraModeForWorld } from "./scene-entry";
 import { conferenceLocation } from "../worlds/conference/conference-location";
 import { canJumpIntoPainting } from "../worlds/conference/gallery-entry";
@@ -63,6 +68,7 @@ export class Gameplay {
   caughtGrace = 0;
   organSeated = false;
   hubLocation = "";
+  readonly cameraTelemetry = new CameraTelemetry();
   private readonly cameraRelativeInput = new CameraRelativeInput();
   private movementYaw = 0;
   private avatarGazeYaw = 0;
@@ -79,13 +85,17 @@ export class Gameplay {
     private readonly analytics: GameplayAnalytics,
     private readonly completed: Set<StoryId>,
     private readonly hooks: GameplayHooks,
-  ) {}
+  ) {
+    (globalThis as { __cameraTelemetry?: CameraTelemetry }).__cameraTelemetry =
+      this.cameraTelemetry;
+  }
   reset(id: WorldId) {
     this.levelTime = 0;
     this.guardsActive = id === "streets";
     this.caughtGrace = 3;
     this.organSeated = false;
     this.hubLocation = "";
+    this.cameraTelemetry.reset();
     this.cameraRelativeInput.reset();
     this.avatarGazeYaw = this.session.player.yaw;
     this.avatarGazePitch = 0;
@@ -310,6 +320,8 @@ export class Gameplay {
     let pointing = false;
     let adventureAiming = false;
     let holdingBow = false;
+    let holdingSword = false;
+    let adventureSwordSlash: number | undefined;
     let adventureDraw = 0;
     let treePrompt = "";
     if (this.session.adventure) {
@@ -328,6 +340,8 @@ export class Gameplay {
       pointing = !!result.pointing;
       adventureAiming = !!result.aiming;
       holdingBow = !!result.holdingBow;
+      holdingSword = !!result.holdingSword;
+      adventureSwordSlash = result.swordSlash;
       adventureDraw = result.draw ?? 0;
       this.updateStoryObjective(result.objective, this.session.adventure);
       if (this.ui.paused || this.hooks.isTransitioning()) return null;
@@ -458,6 +472,8 @@ export class Gameplay {
       lookPitch: adventureAiming ? undefined : this.avatarGazePitch,
       crouching: this.organSeated || this.session.player.crouching,
       holdingBow,
+      holdingSword,
+      swordSlash: adventureSwordSlash,
       holdingBanner,
       wave: wavingBanner,
       pointing,
@@ -571,6 +587,28 @@ export class Gameplay {
       ),
     );
     this.session.avatar.group.visible = distCam > 0.7;
+    const actors = collectCharacterActors(
+      this.session.scene,
+      this.session.avatar.group,
+    );
+    const cut = !!adventureCamera || this.organSeated;
+    updateActorCameraClearance(this.view.camera.position, actors, cut);
+    this.cameraTelemetry.record({
+      dt,
+      input: {
+        x: state.x,
+        y: state.y,
+        cameraX: state.cameraX,
+        cameraY: state.cameraY,
+        recenter: state.recenter,
+        cameraZoom: state.cameraZoom,
+      },
+      player: this.session.player,
+      follow: this.view.follow,
+      solids: this.session.world.solids,
+      actors,
+      cut,
+    });
   }
 
   private updateWorldInteractions(

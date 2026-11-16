@@ -66,11 +66,10 @@ export function buildGidRescue(scene: T.Scene): WorldData {
       0xa99b80,
       "Solid Gid inner house",
     );
-    decor(
+    solid(
       { x, y: 3, z: 42, w: 6.6, d: 5.6, h: 0.2 },
       0x76614e,
       "Gid house roof cap",
-      "Raised cap rests above the solid building; the building owns its support.",
     );
   }
   const wine = decor(

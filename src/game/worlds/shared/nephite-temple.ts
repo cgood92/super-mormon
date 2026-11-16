@@ -220,11 +220,10 @@ export function buildNephiteTemple(parent: T.Group, solids: Solid[]) {
     bronze,
     "Interpretive courtyard laver base",
   );
-  decor(
+  box(
     { x: 4.2, y: 0.85, z: -31.5, w: 1.9, h: 0.32, d: 1.9 },
     bronze,
     "Courtyard laver basin",
-    "Basin sits over its solid pedestal; no separate floor support.",
   );
   box(
     { x: -3.4, y: 0.6, z: -55, w: 2.3, h: 0.8, d: 1.25 },
