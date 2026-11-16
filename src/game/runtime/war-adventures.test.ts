@@ -154,7 +154,7 @@ test("an exposed player in the outer watch triggers Teancum's stealth reset", ()
   );
   h.runtime.update(0.05, h.player, idle);
   const state = h.runtime.snapshot() as { phase: string; detections: number };
-  assert.equal(state.phase, "servant");
+  assert.equal(state.phase, "outer-watch");
   assert.equal(state.detections, 1);
   assert.equal(h.player.z, world.spawn.z);
   world.dispose?.();
@@ -252,11 +252,14 @@ test("all war-story shots keep the player visible through entrance and return", 
         }
       }
       runtime.update(1 / 60, player, { ...idle, interact: true });
-      if (build === buildTeancumNight && (index === 2 || index === 3)) {
+      if (
+        build === buildTeancumNight &&
+        (index === 1 || index === 2 || index === 3)
+      ) {
         assert.equal(
           shot,
           undefined,
-          "watch lines should advance through travel, without stopping for dialogue",
+          "camp departure and watch lines should advance through travel, without stopping for dialogue",
         );
         continue;
       }

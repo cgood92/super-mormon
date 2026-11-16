@@ -1212,7 +1212,6 @@ export function createTreeOfLifeScene(
       vz: 0,
       grounded: true,
       runSpeed: 0,
-      ledge: undefined,
       climbId: undefined,
       airMoveLock: 0,
       jumpBufferTime: 0,

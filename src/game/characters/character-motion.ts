@@ -662,27 +662,6 @@ export function createMotionDriver(role: CharacterRole): {
         arms[1].rotation.x = -0.75;
         legs[0].rotation.x = -0.85;
         legs[1].rotation.x = 0.7;
-      } else if (move === "ledgeHang") {
-        // SM64 ledge hang & shimmy: hands gripping rim, pendular body sway,
-        // lateral hand reach when shimmying
-        const shimmying = (state.runSpeed ?? 0) > 0.1;
-        const sway = Math.sin(moveTime * 3.2) * 0.08;
-        body.position.y = 0;
-        body.rotation.x = -0.04 + sway;
-        if (shimmying) {
-          const shimmyCycle = Math.sin(moveTime * 9);
-          arms[0].rotation.set(-2.8 + shimmyCycle * 0.25, 0, 0.15);
-          arms[1].rotation.set(-2.8 - shimmyCycle * 0.25, 0, -0.15);
-          legs[0].rotation.set(0.15 + shimmyCycle * 0.2, 0, 0.1);
-          legs[1].rotation.set(0.15 - shimmyCycle * 0.2, 0, -0.1);
-        } else {
-          arms[0].rotation.set(-2.8, 0, 0.1);
-          arms[1].rotation.set(-2.8, 0, -0.1);
-          legs[0].rotation.set(0.12 + sway * 1.4, 0, 0);
-          legs[1].rotation.set(0.12 + sway * 1.4, 0, 0);
-        }
-        knees[0].rotation.set(0.25, 0, 0);
-        knees[1].rotation.set(0.25, 0, 0);
       } else if (move === "climb") {
         // SM64 pole climbing: arms wrapped around trunk, knees and inner feet clasping bark,
         // alternating reach and knee-hitch when ascending/sliding
@@ -740,7 +719,6 @@ export function createMotionDriver(role: CharacterRole): {
         state.carrying &&
         !state.holdingBanner &&
         move !== "crawl" &&
-        move !== "ledgeHang" &&
         move !== "climb"
       ) {
         arms[0].rotation.x = -1.1;
@@ -751,7 +729,7 @@ export function createMotionDriver(role: CharacterRole): {
       if (state.holdingBanner) {
         // Keep the shield at his side; the free right hand bears the pole.
         arms[0].rotation.set(-0.08, 0, 0.08);
-        if (move !== "crawl" && move !== "ledgeHang" && move !== "climb") {
+        if (move !== "crawl" && move !== "climb") {
           const flourish = state.wave ? Math.sin(idlePhase * 5) * 0.1 : 0;
           arms[1].rotation.set(-1.95 + flourish, 0, -0.16);
         }

@@ -322,7 +322,6 @@ export function buildMormonRecords(scene: T.Scene): WorldData {
                 ...createPlayer(checkpoint.x, checkpoint.y, checkpoint.z),
                 climbId: undefined,
                 climbAway: undefined,
-                ledge: undefined,
               });
               recoveries++;
               hooks.toast(
@@ -334,7 +333,6 @@ export function buildMormonRecords(scene: T.Scene): WorldData {
                 ...createPlayer(checkpoint.x, checkpoint.y, checkpoint.z),
                 climbId: undefined,
                 climbAway: undefined,
-                ledge: undefined,
               });
               recoveries++;
               hooks.toast(

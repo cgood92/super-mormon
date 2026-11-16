@@ -56,7 +56,6 @@ export type CharacterMove =
   | "groundPound"
   | "poundLand"
   | "wallKick"
-  | "ledgeHang"
   | "climb"
   | "handstand"
   | "turnSkid"

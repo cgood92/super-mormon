@@ -125,7 +125,6 @@ export class Discoveries {
       doubleJump: "Double jump",
       tripleJump: "Triple jump",
       wallKick: "Wall kick",
-      ledgeHang: "Ledge grab",
       climb: "Climbing",
     };
     const held = this.carryObjects.some((object) => object.held);

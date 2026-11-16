@@ -59,9 +59,8 @@ test("the bedside action works after bypassing the invisible watch checkpoints",
   });
   for (let i = 0; i < 121; i++)
     runtime.update(0.1, createPlayer(0, 0, -165), idle);
-  const servant = TEANCUM_ROUTE[1];
-  const player = createPlayer(servant.x, 0, servant.z);
-  runtime.update(0, player, { ...idle, interact: true });
+  const player = createPlayer(0, 0, -165);
+  assert.equal((runtime.snapshot() as { phase: string }).phase, "outer-watch");
   const king = scene.getObjectByName("Sleeping Amalickiah")!;
   const position = king.getWorldPosition(new T.Vector3());
   Object.assign(player, createPlayer(position.x, 0, position.z - 1.5));
@@ -76,7 +75,10 @@ test("the bedside action works after bypassing the invisible watch checkpoints",
   runtime.update(0, player, { ...idle, interact: true });
   assert.equal((runtime.snapshot() as { phase: string }).phase, "return");
   assert.equal(completed, 0);
-  Object.assign(player, createPlayer(servant.x, 0, servant.z));
+  Object.assign(
+    player,
+    createPlayer(TEANCUM_ROUTE[5].x, 0, TEANCUM_ROUTE[5].z),
+  );
   runtime.update(0, player, { ...idle, interact: true });
   assert.equal(completed, 0, "both companions must return to camp");
   escort(runtime, player, toCamp);
@@ -96,8 +98,30 @@ test("the royal sleeper rests on bedding instead of standing or floating", () =>
   const size = box.getSize(new T.Vector3());
   assert.ok(size.y < size.z, "sleeping body must lie along the bed");
   assert.ok(box.min.y >= 0 && box.min.y < 0.4, `sleeper base ${box.min.y}`);
-  for (const name of ["Sleeping camp guard one", "Sleeping camp guard two"])
+  for (const name of [
+    "Sleeping camp guard one",
+    "Sleeping camp guard two",
+    "Nephite guard captain",
+  ])
     assert.equal(scene.getObjectByName(name), undefined);
+  world.dispose?.();
+});
+
+test("servant starts next to Teancum already attached and camp edge sentry shifts 2 feet right", () => {
+  const scene = new T.Scene();
+  const world = buildTeancumNight(scene);
+  const servantObj = scene.getObjectByName("Teancum's servant")!;
+  assert.ok(servantObj, "Teancum's servant exists");
+  assert.ok(
+    Math.hypot(
+      servantObj.position.x - world.spawn.x,
+      servantObj.position.z - world.spawn.z,
+    ) < 2,
+    `servant must start beside Teancum: ${servantObj.position.x},${servantObj.position.z}`,
+  );
+  const campSentry = scene.getObjectByName("Camp edge sentry")!;
+  assert.ok(Math.abs(campSentry.position.x - 6.4) < 0.01);
+  assert.equal(campSentry.position.z, 75);
   world.dispose?.();
 });
 
@@ -207,12 +231,35 @@ test("opening movie shows the sleeper and guards while freezing the mission cloc
   assert.ok(runtime.camera?.());
   assert.equal((runtime.snapshot() as any).time, 0);
   const beats = new Set<string>();
+  const companionFrames: { position: T.Vector3; focus: T.Vector3 }[] = [];
   for (let i = 0; i < 130; i++) {
     runtime.update(0.1, player, idle);
-    beats.add((runtime.snapshot() as any).movieBeat);
+    const snap = runtime.snapshot() as any;
+    beats.add(snap.movieBeat);
+    const cam = runtime.camera?.();
+    if (snap.movieBeat === "companions" && cam) {
+      companionFrames.push({
+        position: new T.Vector3(cam.position.x, cam.position.y, cam.position.z),
+        focus: new T.Vector3(cam.focus.x, cam.focus.y, cam.focus.z),
+      });
+    }
   }
   assert.ok(beats.has("sleeping-king"));
   assert.ok(beats.has("watchful-guards"));
+  assert.ok(beats.has("companions"));
+  assert.ok(companionFrames.length > 5);
+  // Starts closer in front of Teancum (~6m ahead, not 16m+), sweeps past his face,
+  // and ends behind him facing forward (+Z).
+  const first = companionFrames[0];
+  const last = companionFrames[companionFrames.length - 1];
+  assert.ok(
+    first.position.z > player.z && first.position.z - player.z <= 6.5,
+    `companions beat started too far back: z=${first.position.z}`,
+  );
+  assert.ok(
+    last.position.z < player.z - 4 && last.focus.z > last.position.z,
+    `companions beat should end behind Teancum facing forward: cam.z=${last.position.z}, focus.z=${last.focus.z}`,
+  );
   assert.equal(runtime.movementLocked?.(), false);
   assert.equal(runtime.camera?.(), undefined);
   world.dispose?.();
@@ -234,9 +281,8 @@ test("a servant alone in a guard's sight resets both companions and the mission"
       resetCaught = reset;
     },
   });
-  const player = createPlayer(-2, 0, -144);
+  const player = createPlayer(world.spawn.x, 0, world.spawn.z);
   for (let i = 0; i < 121; i++) runtime.update(0.1, player, idle);
-  runtime.update(0, player, { ...idle, interact: true });
   // Beyond the outer sentry's range and behind the next watch line. The
   // companion crosses the outer sentry's view while following this route.
   Object.assign(player, createPlayer(1, 0, -74));
@@ -253,10 +299,10 @@ test("a servant alone in a guard's sight resets both companions and the mission"
   assert.equal(catches, 1, "capture only opens once while waiting for retry");
   resetCaught!();
   const after = runtime.snapshot() as any;
-  assert.equal(after.phase, "servant");
+  assert.equal(after.phase, "outer-watch");
   assert.equal(after.detections, 1);
   assert.equal(after.time, 0);
-  assert.deepEqual(after.servant, { x: -2, y: 0, z: -144 });
+  assert.deepEqual(after.servant, { x: -1.4, y: 0, z: -165 });
   assert.equal(player.x, 0);
   assert.equal(player.z, -165);
   world.dispose?.();
@@ -272,9 +318,8 @@ test("the companion cannot cut through solid cover to catch up", () => {
       next();
     },
   });
-  const player = createPlayer(-2, 0, -144);
+  const player = createPlayer(world.spawn.x, 0, world.spawn.z);
   for (let i = 0; i < 121; i++) runtime.update(0.1, player, idle);
-  runtime.update(0, player, { ...idle, interact: true });
   Object.assign(player, createPlayer(-8, 0, -100));
   for (let i = 0; i < 150; i++) runtime.update(0.1, player, idle);
   const companion = (runtime.snapshot() as any).servant;
@@ -298,7 +343,6 @@ test("the companion replays a player's real jump over cover", () => {
   });
   const player = createPlayer(-2, 0, -144);
   for (let i = 0; i < 121; i++) runtime.update(0.1, player, idle);
-  runtime.update(0, player, { ...idle, interact: true });
   const walk = (x: number, z: number, jump = false, frames = 1) => {
     for (let i = 0; i < frames; i++) {
       stepPlayer(
@@ -340,9 +384,8 @@ test("the companion jumps to match the player without getting trapped in an infi
       next();
     },
   });
-  const player = createPlayer(-2, 0, -144);
+  const player = createPlayer(world.spawn.x, 0, world.spawn.z);
   for (let i = 0; i < 121; i++) runtime.update(0.1, player, idle);
-  runtime.update(0, player, { ...idle, interact: true });
 
   for (let i = 0; i < 60; i++) {
     stepPlayer(
@@ -538,9 +581,8 @@ test("a standing companion outside the cone edge or beyond its range stays unsee
       catches++;
     },
   });
-  const player = createPlayer(-2, 0, -144);
+  const player = createPlayer(world.spawn.x, 0, world.spawn.z);
   for (let i = 0; i < 121; i++) runtime.update(0.1, player, idle);
-  runtime.update(0, player, { ...idle, interact: true });
   for (const point of [
     { x: 5, z: -81 },
     { x: 1, z: -74.5 },

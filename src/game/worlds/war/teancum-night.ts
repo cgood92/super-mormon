@@ -115,12 +115,8 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
     [10, 83, 4, 3],
   ])
     solid({ x, y: 0, z, w, d, h: 1.5 }, 0x4e5c59, "Solid night cover");
-  const servant = actor("guard", TEANCUM_ROUTE[1], "Teancum's servant");
-  const captain = actor(
-    "guard",
-    { x: 2, y: 0, z: -144, yaw: 0 },
-    "Nephite guard captain",
-  );
+  const servantSpawn = { x: -1.4, y: 0, z: TEANCUM_ROUTE[0].z, yaw: 0 };
+  const servant = actor("guard", servantSpawn, "Teancum's servant");
   const king = actor(
     "amalickiah",
     { x: 0, y: 0, z: 98, yaw: 0 },
@@ -163,11 +159,11 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
       rig: actor("spy", { x: 1, y: 0, z: -95 }, "Outer sentry"),
     },
     {
-      x: 7,
+      x: 6.4,
       z: 75,
       base: Math.PI * 0.7,
       phase: 2.1,
-      rig: actor("spy", { x: 7, y: 0, z: 75 }, "Camp edge sentry"),
+      rig: actor("spy", { x: 6.4, y: 0, z: 75 }, "Camp edge sentry"),
     },
     ...[-59, -23, 15, 51].map((z, i) => ({
       x: i % 2 ? 3 : -1,
@@ -247,13 +243,13 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
     "return",
     "done",
   ] as const;
-  let stage = 0,
+  let stage = 1,
     pending = false,
     finished = false,
     time = 0,
     detections = 0,
-    servantX = TEANCUM_ROUTE[1].x,
-    servantZ = TEANCUM_ROUTE[1].z;
+    servantX = servantSpawn.x,
+    servantZ = servantSpawn.z;
   return {
     name: "Teancum's Night Mission",
     subtitle: "A silent return · Alma 51:32–37",
@@ -262,9 +258,9 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
     actorParent: root,
     bounds: { minX: -24, maxX: 24, minZ: -180, maxZ: 150 },
     goal: { ...TEANCUM_ROUTE[4], radius: 3 },
-    initialObjective: objectives[0],
+    initialObjective: objectives[1],
     landmarks: [
-      { name: "Nephite camp", ...TEANCUM_ROUTE[1] },
+      { name: "Nephite camp", ...TEANCUM_ROUTE[5] },
       { name: "Outer watch", ...TEANCUM_ROUTE[2] },
       { name: "Royal tent", ...TEANCUM_ROUTE[4] },
     ],
@@ -281,7 +277,6 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
       const cameraObstacles = new StoryMeshObstacles(root, [
         { group: king.group },
         { group: servant.group },
-        { group: captain.group },
         ...sentries.map((s) => ({ group: s.rig.group })),
       ]);
       let companion = createPlayer(servantX, 0, servantZ);
@@ -290,12 +285,12 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
       let lastJumpTarget: Point | null = null;
       const reset = (player: PlayerState) => {
         detections++;
-        stage = 0;
+        stage = 1;
         pending = false;
         time = 0;
         lastJumpTarget = null;
-        servantX = TEANCUM_ROUTE[1].x;
-        servantZ = TEANCUM_ROUTE[1].z;
+        servantX = servantSpawn.x;
+        servantZ = servantSpawn.z;
         king.group.visible = true;
         companion = createPlayer(servantX, 0, servantZ);
         trail = [];
@@ -337,36 +332,73 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
           if (introTime < 12) {
             introTime = Math.min(12, introTime + dt);
             const beat = introTime < 4 ? 0 : introTime < 8 ? 1 : 2;
-            const anchor =
-              beat === 0
-                ? king.group
-                : beat === 1
-                  ? sentries[0].rig.group
-                  : servant.group;
             const aspect = hooks.viewAspect?.() ?? 16 / 9;
-            if (beat !== plannedBeat || aspect !== plannedAspect) {
+            if (beat < 2) {
+              const anchor = beat === 0 ? king.group : sentries[0].rig.group;
+              if (beat !== plannedBeat || aspect !== plannedAspect) {
+                plannedBeat = beat;
+                plannedAspect = aspect;
+                const camera = new T.PerspectiveCamera(58, aspect, 0.08, 320);
+                camera.position
+                  .copy(anchor.position)
+                  .add(new T.Vector3(4, 3, -5));
+                camera.lookAt(anchor.position);
+                const plan = planStoryCamera(
+                  camera,
+                  {
+                    cutaway: true,
+                    actors: [{ group: anchor }],
+                    wide: beat === 0 ? 3 : 5,
+                  },
+                  solids,
+                  cameraObstacles,
+                );
+                cinematicCamera = {
+                  position: plan.wide,
+                  focus: plan.focus,
+                  cut: true,
+                };
+              }
+            } else {
+              // Start close enough to frame Teancum and his servant from the front,
+              // push in toward Teancum's face, then sweep past him to end behind him facing forward (+Z).
+              const smooth = (t: number) => {
+                const c = T.MathUtils.clamp(t, 0, 1);
+                return c * c * (3 - 2 * c);
+              };
+              const u = T.MathUtils.clamp((introTime - 8) / 4, 0, 1);
+              const sx = TEANCUM_ROUTE[0].x;
+              const sz = TEANCUM_ROUTE[0].z;
+              let position: T.Vector3;
+              let focus: T.Vector3;
+              if (u < 0.45) {
+                const p = smooth(u / 0.45);
+                position = new T.Vector3(sx + 0.4, 1.75, sz + 6.0).lerp(
+                  new T.Vector3(sx + 0.75, 1.55, sz + 2.5),
+                  p,
+                );
+                focus = new T.Vector3(sx - 0.35, 1.2, sz).lerp(
+                  new T.Vector3(sx, 1.38, sz),
+                  p,
+                );
+              } else {
+                const p = smooth((u - 0.45) / 0.55);
+                const q = 1 - p;
+                const p0 = new T.Vector3(sx + 0.75, 1.55, sz + 2.5);
+                const p1 = new T.Vector3(sx + 2.925, 1.5525, sz + 1.38);
+                const p2 = new T.Vector3(sx, 1.945, sz - 5.26);
+                position = p0
+                  .multiplyScalar(q * q)
+                  .addScaledVector(p1, 2 * q * p)
+                  .addScaledVector(p2, p * p);
+                focus = new T.Vector3(sx, 1.38, sz).lerp(
+                  new T.Vector3(sx, 1.15, sz),
+                  p,
+                );
+              }
               plannedBeat = beat;
               plannedAspect = aspect;
-              const camera = new T.PerspectiveCamera(58, aspect, 0.08, 320);
-              camera.position
-                .copy(anchor.position)
-                .add(new T.Vector3(4, 3, -5));
-              camera.lookAt(anchor.position);
-              const plan = planStoryCamera(
-                camera,
-                {
-                  cutaway: true,
-                  actors: [{ group: anchor }],
-                  wide: beat === 0 ? 3 : 5,
-                },
-                solids,
-                cameraObstacles,
-              );
-              cinematicCamera = {
-                position: plan.wide,
-                focus: plan.focus,
-                cut: true,
-              };
+              cinematicCamera = { position, focus, cut: true };
             }
             if (introTime >= 12) cinematicCamera = undefined;
             return {
@@ -501,7 +533,7 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
                 Math.abs(player.x - royalTent.x) < royalTent.width / 2 - 0.4 &&
                 Math.abs(player.z - royalTent.z) < royalTent.depth / 2 - 0.4
               : nearWarPoint(player, target, 3));
-          const actionable = stage === 0 || stage === 3 || stage === 4;
+          const actionable = stage === 3 || stage === 4;
           if (!pending && !finished && actionable && close && input.interact) {
             pending = true;
             const next = () => {
@@ -547,13 +579,11 @@ export function buildTeancumNight(scene: T.Scene): WorldData {
               wide: 5,
               playerGesture: stage === 4 ? "point" : "talk",
               actors:
-                stage === 0
-                  ? [{ group: servant.group, gesture: "talk" }]
-                  : stage === 3
-                    ? [{ group: king.group }]
-                    : stage === 4
-                      ? [{ group: captain.group, gesture: "talk" }]
-                      : [],
+                stage === 3
+                  ? [{ group: king.group }]
+                  : stage === 4
+                    ? [{ group: servant.group, gesture: "talk" }]
+                    : [],
             });
           }
           return {

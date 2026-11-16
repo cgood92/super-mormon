@@ -51,7 +51,7 @@ function harness() {
         {
           x: d > 0.2 ? (-dx / d) * Math.min(1, d * 1.8) : 0,
           y: d > 0.2 ? (dz / d) * Math.min(1, d * 1.8) : 0,
-          jump: jump && (player.grounded || !!player.ledge) && frame % 20 === 0,
+          jump: jump && player.grounded && frame % 20 === 0,
           jumpHeld: jump,
         },
         1 / 60,

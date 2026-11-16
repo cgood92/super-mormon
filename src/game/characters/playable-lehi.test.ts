@@ -69,7 +69,6 @@ test("the playable coat covers its inner layers during turns and traversal", () 
     "backflip",
     "longJump",
     "climb",
-    "ledgeHang",
   ] as const) {
     for (let frame = 0; frame < 20; frame++)
       actor.update(1 / 60, {
@@ -151,7 +150,6 @@ test("playable Lehi responds to traversal poses and keeps crouch under a low cei
     "backflip",
     "sideflip",
     "wallKick",
-    "ledgeHang",
     "climb",
   ] as const) {
     actor.update(1 / 60, {

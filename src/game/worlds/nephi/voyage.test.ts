@@ -372,7 +372,6 @@ test("running naturally off the stair bottom never grabs the overhead upper deck
     false,
     "stair run-out has open headroom through z12",
   );
-  let grabbed = false;
   for (let i = 0; i < 160; i++) {
     stepPlayer(
       p,
@@ -382,13 +381,12 @@ test("running naturally off the stair bottom never grabs the overhead upper deck
       world.solids,
       world.climbables,
     );
-    grabbed ||= !!p.ledge;
+    assert.equal(
+      p.climbId,
+      undefined,
+      "normal stair descent should not catch any climbable",
+    );
   }
-  assert.equal(
-    grabbed,
-    false,
-    "normal stair descent should not catch the overhead deck",
-  );
   assert.ok(p.y < 0.5, `did not arrive below deck: ${p.x},${p.y},${p.z}`);
   world.dispose!();
 });

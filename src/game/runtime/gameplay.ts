@@ -875,8 +875,6 @@ export class Gameplay {
       )
         this.ui.message("{action} throws · {crouch} + {action} sets down", 2.5);
     }
-    if (!prompt && this.session.player.move === "ledgeHang")
-      prompt = "{up} or {jump} to pull up · {crouch} to drop";
     if (!prompt && this.session.player.move === "climb")
       prompt = "{up} / {down} to climb · {jump} away · {crouch} to drop";
     this.discoveries.updatePracticeLesson();
