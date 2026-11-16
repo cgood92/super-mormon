@@ -171,8 +171,10 @@ export function createMotionDriver(role: CharacterRole): {
           (Math.min(traveled, state.runSpeed * dt * 1.5) * Math.PI) /
           (2 * halfStep);
         idlePhase += dt;
-        if (!wasGrounded)
-          landing = Math.min(1, 0.28 + Math.abs(lastAirVy) * 0.075);
+        if (!wasGrounded) {
+          const runSquash = 1 - 0.5 * speed;
+          landing = Math.min(1, 0.28 + Math.abs(lastAirVy) * 0.075) * runSquash;
+        }
         airTime = 0;
       } else {
         airTime += dt;
