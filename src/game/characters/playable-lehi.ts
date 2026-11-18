@@ -355,7 +355,12 @@ export function createSculptedCharacterRig(
         (state.move === "crawl" ||
           (!state.move && !!state.crouching && state.runSpeed > 0.25));
       const crouchScale =
-        state.crouching && !crawling
+        state.crouching &&
+        !crawling &&
+        state.move !== "climb" &&
+        state.move !== "handstand" &&
+        state.move !== "ledgeHang" &&
+        state.move !== "swim"
           ? Math.min(
               state.move === "crawl" ? 0.49 : 0.525,
               driverBody.scale.y / 0.84,

@@ -421,3 +421,30 @@ test("mid-trunk crouch drops straight down without outward velocity", () => {
   assert.equal(p.vz, 0);
   assert.ok(p.vy < 0);
 });
+
+test("detaching from a climbable with a wide trunk solid clears the trunk without forcing crouch", () => {
+  const tree: Climbable = {
+    id: "palm",
+    x: 0,
+    z: 0,
+    y: 0,
+    height: 4.5,
+    radius: 0.25,
+  };
+  const trunk: Solid = { x: 0, y: 0, z: 0, w: 0.72, h: 4.7, d: 0.42 };
+  const p = createPlayer(0, 1.5, 0.55);
+  p.vy = -1;
+  frames(p, { ...idle, y: -1 }, 2, [trunk], [tree]);
+  assert.equal(p.move, "climb");
+  stepPlayer(
+    p,
+    { ...idle, jump: true, jumpHeld: true },
+    1 / 60,
+    0,
+    [trunk],
+    [tree],
+  );
+  assert.notEqual(p.move, "climb");
+  assert.equal(p.crouching, false);
+  assert.ok(p.vx !== 0 || p.vz !== 0, "kick-off retains outward velocity");
+});

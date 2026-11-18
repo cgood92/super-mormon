@@ -268,7 +268,13 @@ export function createMotionDriver(role: CharacterRole): {
       head.rotation.z = 0;
 
       const move =
-        state.crouching && !state.grounded && state.move !== "groundPound"
+        state.crouching &&
+        !state.grounded &&
+        state.move !== "groundPound" &&
+        state.move !== "climb" &&
+        state.move !== "handstand" &&
+        state.move !== "ledgeHang" &&
+        state.move !== "swim"
           ? "crouch"
           : (state.move ??
             (state.crouching

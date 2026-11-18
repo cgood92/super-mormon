@@ -96,3 +96,28 @@ test("standing beside a higher tread keeps support from the tread beneath the fe
   assert.equal(player.y, 1);
   assert.equal(player.grounded, true);
 });
+
+test("staggered overlapping solids stop at the nearest face without forcing crouch or pinning", () => {
+  const solids: Solid[] = [
+    { x: 4, y: 0.05, z: 15.61, w: 6, h: 0.4, d: 0.18 },
+    { x: 4, y: 0.59, z: 15.58, w: 3.36, h: 4.36, d: 0.2 },
+  ];
+  const player = createPlayer(4, 0, 20);
+  tick(player, { ...still, y: -1 }, solids, 90);
+  assert.ok(player.z >= 16.02 - 1e-4, `stopped before ledge at z=${player.z}`);
+  assert.equal(player.crouching, false);
+  assert.notEqual(player.move, "crouch");
+  // Walking back out must remain free.
+  tick(player, { ...still, y: 1 }, solids, 30);
+  assert.ok(player.z > 17);
+  assert.equal(player.crouching, false);
+});
+
+test("a player slightly overlapping a solid can walk away instead of getting pinned", () => {
+  const wall: Solid = { x: 0, y: 0, z: 0, w: 2, h: 2, d: 2 };
+  // Start 0.02m inside the +Z face (edge is 1.32).
+  const player = createPlayer(0, 0, 1.3);
+  tick(player, { ...still, y: 1 }, [wall], 20);
+  assert.ok(player.z > 1.5, `escaped wall to z=${player.z}`);
+  assert.equal(player.crouching, false);
+});

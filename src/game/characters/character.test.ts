@@ -410,3 +410,19 @@ test("Super Mario 64 style jump poses articulate limbs, feet, and somersault pro
 
   actor.dispose();
 });
+
+test("climb and traversal hold poses are not squashed into crouch when crouching is flagged", () => {
+  const actor = createCharacter("nephi");
+  for (const move of ["climb", "ledgeHang", "swim"] as const) {
+    actor.update(1 / 60, {
+      ...standing,
+      grounded: false,
+      crouching: true,
+      move,
+      moveTime: 0.2,
+    });
+    const box = bounds(actor);
+    assert.ok(box.max.y > 1.1, `${move} was squashed to height ${box.max.y}`);
+  }
+  actor.dispose();
+});
