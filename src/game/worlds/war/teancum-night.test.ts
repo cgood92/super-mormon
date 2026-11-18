@@ -12,7 +12,29 @@ function escort(
   player: ReturnType<typeof createPlayer>,
   points: { x: number; z: number }[],
 ) {
+  const waitSentry = (index: number, minYaw: number, maxYaw = Infinity) => {
+    let prev = (runtime.snapshot() as { sentries: { headYaw: number }[] })
+      .sentries[index].headYaw;
+    for (let i = 0; i < 600; i++) {
+      const yaw = (runtime.snapshot() as { sentries: { headYaw: number }[] })
+        .sentries[index].headYaw;
+      const ok = yaw > minYaw && yaw < maxYaw && yaw >= prev;
+      prev = yaw;
+      if (ok) break;
+      runtime.update(0.05, player, idle);
+    }
+  };
   for (const point of points) {
+    if (point.x === -12 && point.z === -74) waitSentry(6, -2.5, -1.5);
+    if (point.x === -4 && point.z === -36) {
+      waitSentry(2, 0.6);
+      waitSentry(12, -2.5, -1.5);
+    }
+    if (point.x === -4 && point.z === -74) waitSentry(2, 0.6);
+    if (point.x === -4 && point.z === 38) waitSentry(4, 0.6);
+    if (point.x === -4 && point.z === -10) waitSentry(4, 0.6);
+    if (point.x === 0 && point.z === 88) waitSentry(14, 1.15, 1.5);
+    if (point.x === 0 && point.z === 91) waitSentry(14, 1.15, 1.5);
     Object.assign(player, createPlayer(point.x, 0, point.z));
     for (let i = 0; i < 800; i++) {
       runtime.update(0.1, player, idle);
@@ -24,21 +46,27 @@ function escort(
 const toTent = [
   { x: -22, z: -130 },
   { x: -22, z: -78 },
-  { x: -22, z: -48 },
-  { x: -12, z: -48 },
-  { x: -12, z: 5 },
-  { x: -22, z: 5 },
-  { x: -22, z: 21 },
-  { x: 0, z: 87 },
+  { x: -12, z: -74 },
+  { x: -4, z: -74 },
+  { x: -4, z: -36 },
+  { x: -4, z: 10 },
+  { x: -4, z: 38 },
+  { x: -4, z: 70 },
+  { x: -13, z: 76 },
+  { x: -10, z: 87 },
+  { x: 0, z: 88 },
   { x: 0, z: 94 },
 ];
 const toCamp = [
-  { x: 0, z: 87 },
-  { x: -22, z: 68 },
-  { x: -22, z: 5 },
-  { x: -12, z: 5 },
-  { x: -12, z: -48 },
-  { x: -22, z: -48 },
+  { x: -10, z: 87 },
+  { x: -13, z: 76 },
+  { x: -4, z: 70 },
+  { x: -4, z: 38 },
+  { x: -4, z: -10 },
+  { x: -4, z: -36 },
+  { x: -4, z: -74 },
+  { x: -12, z: -74 },
+  { x: -22, z: -78 },
   { x: -22, z: -130 },
   { x: -2, z: -144 },
 ];
@@ -59,9 +87,8 @@ test("the bedside action works after bypassing the invisible watch checkpoints",
   });
   for (let i = 0; i < 121; i++)
     runtime.update(0.1, createPlayer(0, 0, -165), idle);
-  const servant = TEANCUM_ROUTE[1];
-  const player = createPlayer(servant.x, 0, servant.z);
-  runtime.update(0, player, { ...idle, interact: true });
+  const player = createPlayer(0, 0, -165);
+  assert.equal((runtime.snapshot() as { phase: string }).phase, "outer-watch");
   const king = scene.getObjectByName("Sleeping Amalickiah")!;
   const position = king.getWorldPosition(new T.Vector3());
   Object.assign(player, createPlayer(position.x, 0, position.z - 1.5));
@@ -76,10 +103,14 @@ test("the bedside action works after bypassing the invisible watch checkpoints",
   runtime.update(0, player, { ...idle, interact: true });
   assert.equal((runtime.snapshot() as { phase: string }).phase, "return");
   assert.equal(completed, 0);
-  Object.assign(player, createPlayer(servant.x, 0, servant.z));
+  Object.assign(
+    player,
+    createPlayer(TEANCUM_ROUTE[5].x, 0, TEANCUM_ROUTE[5].z),
+  );
   runtime.update(0, player, { ...idle, interact: true });
   assert.equal(completed, 0, "both companions must return to camp");
-  escort(runtime, player, toCamp);
+  Object.assign(player, createPlayer(0, 0, 94));
+  escort(runtime, player, [{ x: 0, z: 91 }, ...toCamp]);
   runtime.update(0, player, { ...idle, interact: true });
   assert.equal(completed, 1);
   runtime.update(0, player, { ...idle, interact: true });
@@ -96,8 +127,30 @@ test("the royal sleeper rests on bedding instead of standing or floating", () =>
   const size = box.getSize(new T.Vector3());
   assert.ok(size.y < size.z, "sleeping body must lie along the bed");
   assert.ok(box.min.y >= 0 && box.min.y < 0.4, `sleeper base ${box.min.y}`);
-  for (const name of ["Sleeping camp guard one", "Sleeping camp guard two"])
+  for (const name of [
+    "Sleeping camp guard one",
+    "Sleeping camp guard two",
+    "Nephite guard captain",
+  ])
     assert.equal(scene.getObjectByName(name), undefined);
+  world.dispose?.();
+});
+
+test("servant starts next to Teancum already attached and camp edge sentry shifts 2 feet right", () => {
+  const scene = new T.Scene();
+  const world = buildTeancumNight(scene);
+  const servantObj = scene.getObjectByName("Teancum's servant")!;
+  assert.ok(servantObj, "Teancum's servant exists");
+  assert.ok(
+    Math.hypot(
+      servantObj.position.x - world.spawn.x,
+      servantObj.position.z - world.spawn.z,
+    ) < 2,
+    `servant must start beside Teancum: ${servantObj.position.x},${servantObj.position.z}`,
+  );
+  const campSentry = scene.getObjectByName("Royal tent approach sentry")!;
+  assert.ok(Math.abs(campSentry.position.x - -6.6) < 0.01);
+  assert.equal(campSentry.position.z, 81);
   world.dispose?.();
 });
 
@@ -113,8 +166,7 @@ test("the bedside action reaches both ends of the bed but never passes through c
   });
   for (let i = 0; i < 121; i++)
     runtime.update(0.1, createPlayer(0, 0, -165), idle);
-  const player = createPlayer(-2, 0, -144);
-  runtime.update(0, player, { ...idle, interact: true });
+  const player = createPlayer(0, 0, -165);
   escort(runtime, player, toTent);
   Object.assign(player, createPlayer(4.9, 0, 94));
   assert.equal(
@@ -191,7 +243,7 @@ test("the extended approach and far camp have one floor with physical landing su
   world.dispose?.();
 });
 
-test("opening movie shows the sleeper and guards while freezing the mission clock", () => {
+test("opening movie shows Amalickiah, Teancum from the front, and guards while freezing the mission clock", () => {
   const world = buildTeancumNight(new T.Scene());
   const runtime = world.adventure!({
     setAvatar() {},
@@ -203,16 +255,60 @@ test("opening movie shows the sleeper and guards while freezing the mission cloc
   });
   const player = createPlayer(0, 0, -165);
   assert.equal(runtime.movementLocked?.(), true);
-  runtime.update(0.1, player, idle);
-  assert.ok(runtime.camera?.());
+  const first = runtime.update(0.1, player, idle);
+  const cam0 = runtime.camera?.();
+  assert.ok(cam0);
+  assert.ok(
+    Math.abs(cam0.position.x) < 4.5 &&
+      cam0.position.z > 90 &&
+      cam0.position.z < 102,
+  );
+  assert.equal(
+    first.objective,
+    "Amalickiah is sleeping in his tent after a hard day of battle.",
+  );
   assert.equal((runtime.snapshot() as any).time, 0);
   const beats = new Set<string>();
+  const objectives = new Set<string>([first.objective]);
+  const planFrames: { position: T.Vector3; focus: T.Vector3 }[] = [];
   for (let i = 0; i < 130; i++) {
-    runtime.update(0.1, player, idle);
-    beats.add((runtime.snapshot() as any).movieBeat);
+    const res = runtime.update(0.1, player, idle);
+    const beat = (runtime.snapshot() as any).movieBeat;
+    if (beat) {
+      beats.add(beat);
+      objectives.add(res.objective);
+    }
+    const cam = runtime.camera?.();
+    if (beat === "teancum-plan" && cam) {
+      planFrames.push({
+        position: new T.Vector3(cam.position.x, cam.position.y, cam.position.z),
+        focus: new T.Vector3(cam.focus.x, cam.focus.y, cam.focus.z),
+      });
+    }
   }
   assert.ok(beats.has("sleeping-king"));
+  assert.ok(beats.has("teancum-plan"));
   assert.ok(beats.has("watchful-guards"));
+  assert.ok(planFrames.length > 5);
+  // Starts closer in front of Teancum (~6m ahead, not 16m+), sweeps past his face,
+  // and ends behind him facing forward (+Z).
+  const firstPlan = planFrames[0];
+  const lastPlan = planFrames[planFrames.length - 1];
+  assert.ok(
+    firstPlan.position.z > player.z && firstPlan.position.z - player.z <= 6.5,
+    `teancum-plan beat started too far back: z=${firstPlan.position.z}`,
+  );
+  assert.ok(
+    lastPlan.position.z < player.z - 4 &&
+      lastPlan.focus.z > lastPlan.position.z,
+    `teancum-plan beat should end behind Teancum facing forward: cam.z=${lastPlan.position.z}, focus.z=${lastPlan.focus.z}`,
+  );
+  assert.ok(
+    objectives.has(
+      "Teancum has a secret plan to kill Amalickiah in the dead of the night.",
+    ),
+  );
+  assert.ok(objectives.has("Avoid being seen by guards along the way."));
   assert.equal(runtime.movementLocked?.(), false);
   assert.equal(runtime.camera?.(), undefined);
   world.dispose?.();
@@ -234,9 +330,8 @@ test("a servant alone in a guard's sight resets both companions and the mission"
       resetCaught = reset;
     },
   });
-  const player = createPlayer(-2, 0, -144);
+  const player = createPlayer(world.spawn.x, 0, world.spawn.z);
   for (let i = 0; i < 121; i++) runtime.update(0.1, player, idle);
-  runtime.update(0, player, { ...idle, interact: true });
   // Beyond the outer sentry's range and behind the next watch line. The
   // companion crosses the outer sentry's view while following this route.
   Object.assign(player, createPlayer(1, 0, -74));
@@ -253,10 +348,10 @@ test("a servant alone in a guard's sight resets both companions and the mission"
   assert.equal(catches, 1, "capture only opens once while waiting for retry");
   resetCaught!();
   const after = runtime.snapshot() as any;
-  assert.equal(after.phase, "servant");
+  assert.equal(after.phase, "outer-watch");
   assert.equal(after.detections, 1);
   assert.equal(after.time, 0);
-  assert.deepEqual(after.servant, { x: -2, y: 0, z: -144 });
+  assert.deepEqual(after.servant, { x: -1.4, y: 0, z: -165 });
   assert.equal(player.x, 0);
   assert.equal(player.z, -165);
   world.dispose?.();
@@ -272,9 +367,8 @@ test("the companion cannot cut through solid cover to catch up", () => {
       next();
     },
   });
-  const player = createPlayer(-2, 0, -144);
+  const player = createPlayer(world.spawn.x, 0, world.spawn.z);
   for (let i = 0; i < 121; i++) runtime.update(0.1, player, idle);
-  runtime.update(0, player, { ...idle, interact: true });
   Object.assign(player, createPlayer(-8, 0, -100));
   for (let i = 0; i < 150; i++) runtime.update(0.1, player, idle);
   const companion = (runtime.snapshot() as any).servant;
@@ -298,7 +392,6 @@ test("the companion replays a player's real jump over cover", () => {
   });
   const player = createPlayer(-2, 0, -144);
   for (let i = 0; i < 121; i++) runtime.update(0.1, player, idle);
-  runtime.update(0, player, { ...idle, interact: true });
   const walk = (x: number, z: number, jump = false, frames = 1) => {
     for (let i = 0; i < frames; i++) {
       stepPlayer(
@@ -340,9 +433,8 @@ test("the companion jumps to match the player without getting trapped in an infi
       next();
     },
   });
-  const player = createPlayer(-2, 0, -144);
+  const player = createPlayer(world.spawn.x, 0, world.spawn.z);
   for (let i = 0; i < 121; i++) runtime.update(0.1, player, idle);
-  runtime.update(0, player, { ...idle, interact: true });
 
   for (let i = 0; i < 60; i++) {
     stepPlayer(
@@ -538,9 +630,8 @@ test("a standing companion outside the cone edge or beyond its range stays unsee
       catches++;
     },
   });
-  const player = createPlayer(-2, 0, -144);
+  const player = createPlayer(world.spawn.x, 0, world.spawn.z);
   for (let i = 0; i < 121; i++) runtime.update(0.1, player, idle);
-  runtime.update(0, player, { ...idle, interact: true });
   for (const point of [
     { x: 5, z: -81 },
     { x: 1, z: -74.5 },
@@ -584,5 +675,113 @@ test("mountain terrace tops have one visible surface and matching landing suppor
       assert.equal(hits.length, 1, `duplicate mountain surface at ${x},${z}`);
     }
   }
+  world.dispose?.();
+});
+
+test("servant starts attached without a camp interaction prompt or extra dialog", () => {
+  const world = buildTeancumNight(new T.Scene());
+  let dialogs = 0;
+  const runtime = world.adventure!({
+    setAvatar() {},
+    toast() {},
+    complete() {},
+    dialog(_r, _t, _b, next) {
+      dialogs++;
+      next();
+    },
+  });
+  const player = createPlayer(world.spawn.x, 0, world.spawn.z);
+  for (let i = 0; i < 121; i++) runtime.update(0.1, player, idle);
+  const res = runtime.update(0, player, idle);
+  assert.equal(
+    res.objective,
+    "Cross the outer watch · use stone screens and watch both flanks",
+  );
+  assert.equal(res.prompt, "");
+  assert.equal(dialogs, 0, "redundant departure dialog must not appear");
+  assert.equal((runtime.snapshot() as { phase: string }).phase, "outer-watch");
+  world.dispose?.();
+});
+
+test("guard sight cones stop at stone walls and do not penetrate behind them", () => {
+  const scene = new T.Scene();
+  const world = buildTeancumNight(scene);
+  const runtime = world.adventure!({
+    setAvatar() {},
+    toast() {},
+    complete() {},
+    dialog(_r, _t, _b, next) {
+      next();
+    },
+  });
+  const player = createPlayer(0, 0, -165);
+  for (let i = 0; i < 121; i++) runtime.update(0.1, player, idle);
+  // Step until the western flank sentry at (-14.5, -95) faces directly into the x=-20 stone screen
+  for (let i = 0; i < 30; i++) runtime.update(0.1, player, idle);
+  scene.updateMatrixWorld(true);
+  const cones: T.Object3D[] = [];
+  scene.traverse((o) => {
+    if (o.name === "Sentry sight direction cue") cones.push(o);
+  });
+  // Directly behind the (-20, -95) stone screen at (-22.5, -95), no cone mesh may penetrate through the wall.
+  const ray = new T.Raycaster(
+    new T.Vector3(-22.5, 0.2, -95),
+    new T.Vector3(0, -1, 0),
+  );
+  assert.equal(
+    ray.intersectObjects(cones).length,
+    0,
+    "sight cone penetrated through the stone screen",
+  );
+  world.dispose?.();
+});
+
+test("the servant follows Teancum onto a stone without getting stuck ledge-hanging", () => {
+  const world = buildTeancumNight(new T.Scene());
+  const runtime = world.adventure!({
+    setAvatar() {},
+    toast() {},
+    complete() {},
+    dialog(_r, _t, _b, next) {
+      next();
+    },
+    caught() {},
+  });
+  const player = createPlayer(world.spawn.x, 0, world.spawn.z);
+  for (let i = 0; i < 121; i++) runtime.update(0.1, player, idle);
+  const walk = (
+    x: number,
+    z: number,
+    jump = false,
+    frames = 1,
+    crouch = false,
+  ) => {
+    for (let i = 0; i < frames; i++) {
+      stepPlayer(
+        player,
+        { x, y: z, jump: jump && i === 0, jumpHeld: jump, crouch },
+        1 / 60,
+        0,
+        world.solids,
+      );
+      runtime.update(1 / 60, player, idle);
+    }
+  };
+  // Approach [-8, -106, 7, 3] (h = 1.5) and jump onto its top, then crouch on top.
+  walk(1, 0, false, 74);
+  walk(0, 1, false, 515);
+  walk(0, 1, true, 35);
+  walk(0, 0, false, 30);
+  assert.ok(player.y >= 1.49, `player did not land on stone: y=${player.y}`);
+  walk(0, 0, false, 180, false);
+  walk(0, 0, false, 60, true);
+  const servant = (
+    runtime.snapshot() as { servant: { x: number; y: number; z: number } }
+  ).servant;
+  assert.ok(
+    servant.y >= 1.49,
+    `servant stuck below or on stone edge: y=${servant.y}, z=${servant.z}`,
+  );
+  assert.ok(Math.hypot(servant.x - player.x, servant.z - player.z) < 2.5);
   world.dispose?.();
 });

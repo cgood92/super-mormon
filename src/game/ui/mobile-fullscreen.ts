@@ -52,6 +52,8 @@ export interface FullscreenResumeState {
   started: boolean;
   transition: boolean;
   cinematic: boolean;
+  movieLocked?: boolean;
+  paused?: boolean;
   wantsFullscreen: boolean;
   isFullscreen: boolean;
   isMobile: boolean;
@@ -69,6 +71,8 @@ export function shouldPromptFullscreenResume(
     state.started &&
     !state.transition &&
     !state.cinematic &&
+    !state.movieLocked &&
+    !state.paused &&
     !state.promptOpen &&
     state.wantsFullscreen &&
     !state.isFullscreen &&

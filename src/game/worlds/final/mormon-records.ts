@@ -242,7 +242,7 @@ export function buildMormonRecords(scene: T.Scene): WorldData {
     bundle.add(strap);
   }
   const spray = decor(
-    { x: 30, y: 0, z: 26, w: 9, h: 0.18, d: 8 },
+    { x: 30, y: 0, z: 26, w: 9, h: 0.04, d: 8 },
     0xa1d8d5,
     "Seasonal spillway warning",
     "Shallow timed spillway visualization; recovery is handled by the adventure.",
@@ -322,7 +322,6 @@ export function buildMormonRecords(scene: T.Scene): WorldData {
                 ...createPlayer(checkpoint.x, checkpoint.y, checkpoint.z),
                 climbId: undefined,
                 climbAway: undefined,
-                ledge: undefined,
               });
               recoveries++;
               hooks.toast(
@@ -334,7 +333,6 @@ export function buildMormonRecords(scene: T.Scene): WorldData {
                 ...createPlayer(checkpoint.x, checkpoint.y, checkpoint.z),
                 climbId: undefined,
                 climbAway: undefined,
-                ledge: undefined,
               });
               recoveries++;
               hooks.toast(

@@ -28,6 +28,9 @@ export class GameUI {
   paused = false;
   modalSince = 0;
   private pauseMenuOpen = false;
+  get isPauseMenuOpen(): boolean {
+    return this.pauseMenuOpen;
+  }
   controllerSetup: ReturnType<typeof createControllerSetup> | null = null;
   private waitForControllerRelease = false;
   private readonly offeredControllers = new Set<string>();
@@ -162,11 +165,11 @@ export class GameUI {
       return;
     }
     this.modal(
-      "TAKE YOUR TIME",
-      "A little pause.",
+      "SUPER MORMON",
+      "Paused",
       "Move with {move}. Use {camera} to look around. Hold {jump} to leap higher.",
       [
-        { label: "Keep exploring", run: () => {} },
+        { label: "Continue", run: () => {} },
         {
           label: "Moves & practice",
           run: () => this.showMoves(),
@@ -315,7 +318,7 @@ export class GameUI {
       [
         "CLIMB & EXPLORE",
         "Find another route.",
-        "Jump toward a ledge to catch it. Move toward it or press {jump} to pull up; {crouch} drops. Jump toward a tree or pole, then use {up} / {down} to climb. Press {jump} to jump away or {crouch} to let go.",
+        "Jump toward a tree or pole, then use {up} / {down} to climb. Press {jump} to jump away or {crouch} to let go.",
       ],
       [
         "CARRY & DISCOVER",
@@ -334,16 +337,22 @@ export class GameUI {
   }
 
   async requestFullScreen() {
-    this.callbacks.setFullscreenPreference?.(true);
     try {
       if (!document.fullscreenElement) await this.app.requestFullscreen();
+    } catch {
+      /* Browser chrome remains under device control. */
+    }
+    this.callbacks.setFullscreenPreference?.(
+      document.fullscreenElement !== null,
+    );
+    try {
       await (
         window.screen.orientation as ScreenOrientation & {
           lock?: (s: string) => Promise<void>;
         }
       ).lock?.("landscape");
     } catch {
-      /* Browser chrome/orientation remains under device control. */
+      /* Orientation remains under device control. */
     }
   }
   setPrompt(text: string) {

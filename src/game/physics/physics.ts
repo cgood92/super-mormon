@@ -36,7 +36,6 @@ export type PlayerMove =
   | "groundPound"
   | "poundLand"
   | "wallKick"
-  | "ledgeHang"
   | "climb"
   | "handstand"
   | "turnSkid"
@@ -74,7 +73,6 @@ export type PlayerState = {
   comboTime: number;
   wallKickCooldown: number;
   climbCooldown: number;
-  ledge?: { x: number; z: number; top: number };
   climbId?: string;
   climbAway?: { x: number; z: number };
   airMoveLock: number;
@@ -360,73 +358,6 @@ function nearbyWall(
   }
 }
 
-function possibleLedge(
-  player: PlayerState,
-  solids: Solid[],
-  towardX: number,
-  towardZ: number,
-): PlayerState["ledge"] {
-  for (const solid of solids) {
-    const top = solid.y + solid.h;
-    if (top < player.y + STEP_HEIGHT + 0.05 || top > player.y + HEIGHT + 0.08)
-      continue;
-    const nearestX = Math.max(
-      solid.x - solid.w / 2,
-      Math.min(player.x, solid.x + solid.w / 2),
-    );
-    const nearestZ = Math.max(
-      solid.z - solid.d / 2,
-      Math.min(player.z, solid.z + solid.d / 2),
-    );
-    const dx = nearestX - player.x,
-      dz = nearestZ - player.z;
-    const d = Math.hypot(dx, dz);
-    if (d < EPS || d > RADIUS + 0.18 || dx * towardX + dz * towardZ <= 0.05)
-      continue;
-    const intoX = player.x + (dx / d) * (d + RADIUS + 0.08);
-    const intoZ = player.z + (dz / d) * (d + RADIUS + 0.08);
-    if (clearAt(intoX, top, intoZ, solids, HEIGHT))
-      return { x: intoX, z: intoZ, top };
-  }
-}
-
-function clearLedgePull(
-  player: PlayerState,
-  ledge: NonNullable<PlayerState["ledge"]>,
-  solids: Solid[],
-): boolean {
-  const rise = ledge.top - player.y;
-  const verticalSteps = Math.ceil(Math.abs(rise) / 0.05);
-  for (let i = 1; i <= verticalSteps; i++) {
-    if (
-      !clearAt(
-        player.x,
-        player.y + (rise * i) / verticalSteps,
-        player.z,
-        solids,
-        HEIGHT,
-      )
-    )
-      return false;
-  }
-  const dx = ledge.x - player.x;
-  const dz = ledge.z - player.z;
-  const horizontalSteps = Math.ceil(Math.hypot(dx, dz) / 0.05);
-  for (let i = 1; i <= horizontalSteps; i++) {
-    if (
-      !clearAt(
-        player.x + (dx * i) / horizontalSteps,
-        ledge.top,
-        player.z + (dz * i) / horizontalSteps,
-        solids,
-        HEIGHT,
-      )
-    )
-      return false;
-  }
-  return true;
-}
-
 export function stepPlayer(
   player: PlayerState,
   input: MoveInput,
@@ -488,8 +419,7 @@ export function stepPlayer(
     water &&
     !drySupport &&
     player.y < water.surfaceY + 0.8 &&
-    !player.climbId &&
-    !player.ledge
+    !player.climbId
   ) {
     player.crouching = false;
     player.grounded = false;
@@ -544,7 +474,6 @@ export function stepPlayer(
   if (
     crouchPressed &&
     !player.grounded &&
-    !player.ledge &&
     !player.climbId &&
     player.move !== "groundPound" &&
     player.move !== "poundLand"
@@ -559,7 +488,6 @@ export function stepPlayer(
   if (
     divePressed &&
     !player.grounded &&
-    !player.ledge &&
     !player.climbId &&
     player.move !== "groundPound" &&
     player.move !== "poundLand" &&
@@ -577,7 +505,6 @@ export function stepPlayer(
   if (
     divePressed &&
     player.grounded &&
-    !player.ledge &&
     !player.climbId &&
     player.move !== "bellySlide" &&
     player.move !== "slideKick"
@@ -610,55 +537,6 @@ export function stepPlayer(
     player.airMoveLock = Math.max(0, player.airMoveLock - subdt);
     player.jumpBufferTime = Math.max(0, player.jumpBufferTime - subdt);
     player.coyoteTime = Math.max(0, player.coyoteTime - subdt);
-
-    if (player.ledge) {
-      player.vx = player.vy = player.vz = 0;
-      if (input.crouch) {
-        player.ledge = undefined;
-        player.climbCooldown = 0.25;
-        player.runSpeed = 0;
-        setMove(player, "jump");
-      } else if (
-        (input.jump || (input.y > 0.4 && player.moveTime >= 0.16)) &&
-        clearLedgePull(player, player.ledge, solids)
-      ) {
-        player.x = player.ledge.x;
-        player.z = player.ledge.z;
-        player.y = player.ledge.top;
-        player.ledge = undefined;
-        player.grounded = true;
-        player.crouching = false;
-        player.jumpBufferTime = 0;
-        player.runSpeed = 0;
-        setMove(player, "idle");
-      } else {
-        // Shimmying laterally along the ledge face
-        if (Math.abs(input.x) > 0.1) {
-          const tangentX = Math.cos(player.yaw);
-          const tangentZ = -Math.sin(player.yaw);
-          const shimmyStep = input.x * 1.5 * subdt;
-          const candX = player.x + tangentX * shimmyStep;
-          const candZ = player.z + tangentZ * shimmyStep;
-          const candLedgeX = player.ledge.x + tangentX * shimmyStep;
-          const candLedgeZ = player.ledge.z + tangentZ * shimmyStep;
-          if (
-            clearAt(candX, player.y, candZ, solids, HEIGHT) &&
-            clearAt(candLedgeX, player.ledge.top, candLedgeZ, solids, HEIGHT)
-          ) {
-            player.x = candX;
-            player.z = candZ;
-            player.ledge.x = candLedgeX;
-            player.ledge.z = candLedgeZ;
-            player.runSpeed = Math.abs(input.x) * 1.5;
-          } else {
-            player.runSpeed = 0;
-          }
-        } else {
-          player.runSpeed = 0;
-        }
-        continue;
-      }
-    }
 
     if (player.climbId) {
       const climb = climbables.find((item) => item.id === player.climbId);
@@ -775,7 +653,6 @@ export function stepPlayer(
 
     if (
       !player.grounded &&
-      !player.ledge &&
       !player.climbId &&
       player.move !== "groundPound" &&
       input.traversal !== false &&
@@ -1081,26 +958,6 @@ export function stepPlayer(
         player.airMoveLock = 0.2;
         setMove(player, "wallKick");
         events.jumped = true;
-      }
-    }
-    if (
-      !player.grounded &&
-      player.vy < -0.4 &&
-      // Small stair/roof descents should land, not grab nearby furniture.
-      player.y - supportHeight(player, solids) > STEP_HEIGHT &&
-      !player.ledge &&
-      player.move !== "groundPound" &&
-      input.traversal !== false &&
-      length > 0.1 &&
-      player.climbCooldown <= 0
-    ) {
-      const ledge = possibleLedge(player, solids, worldX, worldZ);
-      if (ledge) {
-        player.ledge = ledge;
-        player.vx = player.vy = player.vz = 0;
-        player.runSpeed = 0;
-        setMove(player, "ledgeHang");
-        continue;
       }
     }
 

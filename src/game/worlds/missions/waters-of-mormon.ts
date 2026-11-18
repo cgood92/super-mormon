@@ -198,7 +198,7 @@ export function buildWatersOfMormon(scene: T.Scene): WorldData {
         );
       }
     }
-    decor(x, h, z, w, 0.16, d, 0xe6cf9e, "roof coping");
+    solid(x, z, w, d, 0.16, 0xe6cf9e, "roof coping", h);
     decor(
       x,
       1,

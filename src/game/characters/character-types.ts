@@ -56,7 +56,6 @@ export type CharacterMove =
   | "groundPound"
   | "poundLand"
   | "wallKick"
-  | "ledgeHang"
   | "climb"
   | "handstand"
   | "turnSkid"
@@ -81,6 +80,8 @@ export type CharacterState = {
   carrying?: boolean;
   holdingBanner?: boolean;
   holdingBow?: boolean;
+  holdingSword?: boolean;
+  swordSlash?: number;
   wave?: boolean;
   pointing?: boolean;
   aiming?: boolean;

@@ -176,54 +176,40 @@ test("wall kick pushes away from wall and repeat requires cooldown", () => {
   assert.equal(repeat.jumped, false);
 });
 
-test("descending into an edge grabs it and jumping pulls onto a clear top", () => {
+test("descending into a solid edge or doorway opening never grabs a ledge", () => {
   const ledge: Solid = { x: 1, y: 0, z: 0, w: 1, h: 2, d: 3 };
   const p = createPlayer(0.1, 1.3, 0);
   p.vy = -2;
-  frames(p, { ...idle, x: -1 }, 12, [ledge]);
-  assert.equal(p.move, "ledgeHang");
-  stepPlayer(p, { ...idle, jump: true, jumpHeld: true }, 1 / 60, 0, [ledge]);
-  assert.ok(p.y >= 2);
-  assert.ok(p.x > 0.4);
+  frames(p, { ...idle, x: -1 }, 24, [ledge]);
+  assert.notEqual(p.move, "climb");
+  assert.equal(p.y, 0);
   assert.equal(p.grounded, true);
-});
 
-test("held forward keeps a newly grabbed ledge visible before pulling up", () => {
-  const ledge: Solid = { x: 0, y: 0, z: 1, w: 3, h: 2, d: 1 };
-  const p = createPlayer(0, 1.3, 0.1);
-  p.vy = -2;
-  frames(p, { ...idle, y: 1 }, 2, [ledge]);
-  assert.equal(p.move, "ledgeHang");
-  frames(p, { ...idle, y: 1 }, 6, [ledge]);
-  assert.equal(p.move, "ledgeHang");
-  frames(p, { ...idle, y: 1 }, 8, [ledge]);
-  assert.equal(p.grounded, true);
-  assert.ok(p.z > 0.4);
-});
-
-test("traversal disabled prevents an airborne NPC from hanging on a ledge", () => {
-  const ledge: Solid = { x: 1, y: 0, z: 0, w: 1, h: 2, d: 3 };
-  const p = createPlayer(0.1, 1.3, 0);
-  p.vy = -2;
-  frames(p, { ...idle, x: -1, traversal: false }, 12, [ledge]);
-  assert.notEqual(p.move, "ledgeHang");
-  assert.equal(p.ledge, undefined);
-});
-
-test("ledge pull stays hanging when an overhead slab blocks the vertical path", () => {
-  const ledge: Solid = { x: 1, y: 0, z: 0, w: 1, h: 2, d: 3 };
-  const overhead: Solid = { x: 0.1, y: 3.05, z: 0, w: 0.45, h: 0.2, d: 1 };
-  const p = createPlayer(0.1, 1.3, 0);
-  p.vy = -2;
-  frames(p, { ...idle, x: -1 }, 12, [ledge, overhead]);
-  assert.equal(p.move, "ledgeHang");
-  const startY = p.y;
-  stepPlayer(p, { ...idle, jump: true, jumpHeld: true }, 1 / 60, 0, [
-    ledge,
-    overhead,
+  // Jumping through a tent-like opening passes through cleanly without catching the rim.
+  const lintel: Solid = { x: 0, y: 2.4, z: 1.5, w: 3, h: 0.4, d: 0.4 };
+  const runner = createPlayer(0, 0, 0);
+  stepPlayer(runner, { ...idle, y: 1, jump: true, jumpHeld: true }, 1 / 60, 0, [
+    lintel,
   ]);
-  assert.equal(p.move, "ledgeHang");
-  assert.equal(p.y, startY);
+  frames(runner, { ...idle, y: 1, jumpHeld: true }, 75, [lintel]);
+  assert.ok(runner.z > 2.2, `runner snagged at tent opening: z=${runner.z}`);
+  assert.equal(runner.grounded, true);
+});
+
+test("traversal disabled prevents an airborne NPC from climbing a climbable", () => {
+  const tree: Climbable = {
+    id: "tree",
+    x: 0,
+    z: 0,
+    y: 0,
+    height: 4,
+    radius: 0.25,
+  };
+  const p = createPlayer(0, 1, 0.55);
+  p.vy = -1;
+  frames(p, { ...idle, y: -1, traversal: false }, 12, [], [tree]);
+  assert.notEqual(p.move, "climb");
+  assert.equal(p.climbId, undefined);
 });
 
 test("a climbable attaches in air, climbs, and jump detaches outward", () => {
@@ -328,21 +314,6 @@ test("jump chain heights increase progressively and triple jump commits to full 
   assert.ok(maxHeights[0] < 1.0, `single jump cut height ${maxHeights[0]}`);
   // Triple jump commits to full arc even with jumpHeld: false
   assert.ok(maxHeights[2] > 2.5, `triple jump commit height ${maxHeights[2]}`);
-});
-
-test("ledge hang allows shimmying laterally along the ledge face", () => {
-  const ledge: Solid = { x: 0, y: 0, z: 2, w: 4, h: 2, d: 1 };
-  const p = createPlayer(0, 1.3, 1.1);
-  p.vy = -2;
-  frames(p, { ...idle, y: 1 }, 2, [ledge]);
-  assert.equal(p.move, "ledgeHang");
-  const startX = p.x;
-  frames(p, { ...idle, x: 1 }, 10, [ledge]);
-  assert.equal(p.move, "ledgeHang");
-  assert.ok(
-    Math.abs(p.x - startX) > 0.1,
-    `player shimmied along ledge: x=${p.x}`,
-  );
 });
 
 test("reaching the top of a climbable transitions into handstand with launch leap", () => {

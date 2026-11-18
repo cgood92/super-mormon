@@ -234,6 +234,7 @@ function recoverCameraEye(
 ): T.Vector3 {
   if (cameraSegmentClear(eye, eye, solids, radius)) return eye.clone();
   let nearest: T.Vector3 | undefined;
+  let bestDistance = Infinity;
   for (const axis of [0, 1, 2]) {
     for (const direction of [-1, 1]) {
       const trial = eye.clone();
@@ -255,12 +256,13 @@ function recoverCameraEye(
           center + direction * (size / 2 + radius + 0.001),
         );
       }
-      if (
-        cameraSegmentClear(trial, trial, solids, radius) &&
-        (!nearest ||
-          trial.distanceToSquared(eye) < nearest.distanceToSquared(eye))
-      )
-        nearest = trial;
+      if (cameraSegmentClear(trial, trial, solids, radius)) {
+        const distance = trial.distanceToSquared(eye);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          nearest = trial;
+        }
+      }
     }
   }
   return nearest ?? eye.clone();
@@ -283,7 +285,7 @@ function floorUnderPoint(
       z - radius <= s.z + s.d / 2
     ) {
       const top = s.y + s.h;
-      if (top <= y + 0.35) highest = Math.max(highest, top);
+      if (top <= y - radius + 0.06) highest = Math.max(highest, top);
     }
   }
   return highest;
@@ -355,15 +357,19 @@ function moveCameraEye(
   }
 
   // Resolve vertical position at safe horizontal location
-  const floor = floorUnderPoint(safeH.x, currentY, safeH.z, solids, radius);
+  const floor = floorUnderPoint(
+    safeH.x,
+    Math.min(currentY, requested.y + 0.65),
+    safeH.z,
+    solids,
+    radius,
+  );
   const ceil = ceilingUnderPoint(safeH.x, currentY, safeH.z, solids, radius);
   let resY = requested.y;
   if (floor > -Infinity) resY = Math.max(resY, floor + radius);
   if (ceil < Infinity) resY = Math.min(resY, ceil - radius);
-  // Smooth descent over step risers (prevent instant 30cm drops)
-  if (resY < currentY && floor > -Infinity) {
-    resY = Math.max(resY, currentY - 0.12);
-  }
+  // Vertical smoothing is handled by the follow camera's height spring;
+  // this function only resolves collision.
 
   const safeEye = new T.Vector3(safeH.x, resY, safeH.z);
   return recoverCameraEye(safeEye, solids, radius);
@@ -385,8 +391,9 @@ function ceilingAbovePath(
   const maxY = Math.max(target.y, eye.y) + radius;
   for (const s of solids) {
     if (s.y < minY || s.y > maxY || s.y >= ceiling) continue;
-    // Thin rails/treads are not ceilings.
-    if (s.h <= 0.35 && (s.d < 1 || s.w < 1)) continue;
+    // Thin narrow rails/treads are not ceilings, but wide deck planks (maxDim > 3.2) are.
+    if (s.h <= 0.35 && (s.d < 1 || s.w < 1) && Math.max(s.w, s.d) <= 3.2)
+      continue;
     if (s.w < 0.5 && s.h < 0.5) continue;
     const flat = { ...s, y: -1e6, h: 2e6 };
     const a = new T.Vector3(target.x, 0, target.z);
@@ -416,11 +423,18 @@ function ceilingAbovePath(
  * Solids that block the camera boom. Slender posts and low props are skipped,
  * as SM64 lets poles and trees pass between Lakitu and Mario without zooming.
  */
-function isBoomBlocker(s: Solid, focusY: number): boolean {
+function isBoomBlocker(
+  s: Solid,
+  focusY: number,
+  playerY = focusY - 1.15,
+): boolean {
   const maxDim = Math.max(s.w, s.d);
   const minDim = Math.min(s.w, s.d);
-  if (maxDim <= 1.8 && minDim >= 0.5 * maxDim) return false; // column / trunk
+  if (maxDim <= 1.55 && minDim >= 0.75 * maxDim) return false; // column / trunk
+  if (maxDim <= 1.55 && minDim <= 0.75 && s.h <= 1.8) return false; // narrow low pedestal / helm stand
   if (s.h <= 0.8 && maxDim <= 2.5) return false; // bench / crate
+  if (s.y + s.h <= playerY + 1.55 && maxDim <= 8) return false; // waist/chest-high stealth cover
+  if (s.y >= playerY + 1.4 && s.h <= 0.65 && maxDim <= 4.5) return false; // elevated jumping platform
   return s.y < focusY + 3; // ignore geometry far overhead
 }
 
@@ -483,6 +497,9 @@ export class FollowCamera {
   private manualIdleView = false;
   private recenterTime = 0;
   private lastEye = new T.Vector3();
+  private baseFloorY = 0;
+  /** Vertical eye velocity for the critically damped height spring. */
+  private eyeVy = 0;
   private initialized = false;
   private firstUpdate = true;
 
@@ -504,8 +521,10 @@ export class FollowCamera {
     this.obstructionAmount = 0;
     this.idealDistance = this.boomDistance =
       preset.distance * ZOOM_DISTANCES[this.zoomLevel];
+    this.baseFloorY = player.y;
     this.focus.set(player.x, player.y + focusHeight(player, preset), player.z);
     this.lead.set(0, 0, 0);
+    this.eyeVy = 0;
     this.place(this.eyeAt(this.boomDistance));
     this.initialized = true;
     this.firstUpdate = true;
@@ -554,31 +573,83 @@ export class FollowCamera {
     if (this.firstUpdate) {
       this.firstUpdate = false;
       if (!cameraSegmentClear(this.lastEye, this.lastEye, solids, EYE_RADIUS)) {
-        const initialLimit = this.springArmLimit(solids, room);
+        const initialLimit = this.springArmLimit(
+          solids,
+          room,
+          this.yaw,
+          player.y,
+        );
         if (initialLimit < this.boomDistance) {
           this.boomDistance = initialLimit;
-          this.place(this.eyeAt(this.boomDistance));
+          this.place(
+            recoverCameraEye(this.eyeAt(this.boomDistance), solids, EYE_RADIUS),
+          );
         }
       }
     }
 
     // 1. Focus -------------------------------------------------------------
     const idealEyeBefore = this.eyeAt(this.idealDistance);
-    const moved = Math.hypot(player.x - this.focus.x, player.z - this.focus.z);
-    this.focus.x = player.x;
-    this.focus.z = player.z;
-    const wantY = player.y + focusHeight(player, preset);
-    const rising = player.grounded === false && wantY > this.focus.y;
-    // Hang back during jumps (SM64 keeps the horizon steady), keep up otherwise.
-    this.focus.y += (wantY - this.focus.y) * ease(rising ? 3 : 10, dt);
+    const rawMoveDx = player.x - this.focus.x;
+    const rawMoveDz = player.z - this.focus.z;
+    const rawMoved = Math.hypot(rawMoveDx, rawMoveDz);
+    // Smooth single-frame horizontal snaps (such as ledge-mantle completion)
+    // while keeping normal running/jumping exact across all frame rates.
+    const maxFocusStep = Math.max(0.24, 11 * dt);
+    const focusStepScale =
+      rawMoved > maxFocusStep && rawMoved < 2.5 ? maxFocusStep / rawMoved : 1;
+    const moveDx = rawMoveDx * focusStepScale;
+    const moveDz = rawMoveDz * focusStepScale;
+    const moved = Math.hypot(moveDx, moveDz);
+    this.focus.x += moveDx;
+    this.focus.z += moveDz;
+    if (player.y < this.baseFloorY) {
+      this.baseFloorY = player.y;
+    } else if (player.grounded !== false) {
+      this.baseFloorY += (player.y - this.baseFloorY) * ease(14, dt);
+      if (Math.abs(player.y - this.baseFloorY) > 2.5)
+        this.baseFloorY = player.y;
+    }
+    const airHeight = Math.max(0, player.y - this.baseFloorY);
+    // Keep horizon steady for tiny hops while keeping single/double/triple jumps
+    // framed cleanly inside the viewport (even when a wall shortens the boom).
+    const lagCap = 0.48 * clamp(this.boomDistance / 5.2, 0.35, 1);
+    const airOffset =
+      airHeight - lagCap * (1 - Math.exp(-airHeight / Math.max(0.15, lagCap)));
+    const wantY = this.baseFloorY + focusHeight(player, preset) + airOffset;
+    const prevFocusY = this.focus.y;
+    const focusRate =
+      wantY < this.focus.y
+        ? 12 + 12 * clamp((this.focus.y - wantY - 0.4) / 0.8, 0, 1)
+        : 12;
+    this.focus.y += (wantY - this.focus.y) * ease(focusRate, dt);
     if (Math.abs(wantY - this.focus.y) > 2.5) this.focus.y = wantY;
 
     // 2. Yaw ---------------------------------------------------------------
-    // Trailing: keep the previous ideal eye where it was and re-aim at the
-    // player. Forward input pulls the camera along; sideways input arcs.
-    const dx = this.focus.x - idealEyeBefore.x;
-    const dz = this.focus.z - idealEyeBefore.z;
-    if (Math.hypot(dx, dz) > 0.1) this.yaw = Math.atan2(dx, dz);
+    // Project horizontal player travel onto the current camera look frame.
+    const lookX = Math.sin(this.yaw);
+    const lookZ = Math.cos(this.yaw);
+    const alongLook = moveDx * lookX + moveDz * lookZ;
+    const acrossLook = moveDx * lookZ - moveDz * lookX;
+
+    if (alongLook >= -1e-5) {
+      // Forward or lateral motion: keep the previous ideal eye where it was
+      // and re-aim at the player. Forward input pulls the camera along; sideways arcs.
+      const dx = this.focus.x - idealEyeBefore.x;
+      const dz = this.focus.z - idealEyeBefore.z;
+      if (Math.hypot(dx, dz) > 0.1) this.yaw = Math.atan2(dx, dz);
+    } else if (moved > 1e-5) {
+      // Walking toward the camera (e.g. backing out of a tent or doorway):
+      // Retreat the ideal eye with the player so the boom never jackknifes or
+      // flips 180°. Only pivot gently when motion is predominantly lateral.
+      const lateralRatio = Math.abs(acrossLook) / moved;
+      if (lateralRatio > 0.35) {
+        const effectiveCross =
+          Math.sign(acrossLook) * (Math.abs(acrossLook) - 0.35 * moved);
+        const planar = Math.max(1.0, Math.cos(this.pitch) * this.idealDistance);
+        this.yaw += Math.atan2(effectiveCross, planar);
+      }
+    }
 
     const speed = player.runSpeed ?? 0;
     if (speed > 0.2) this.manualIdleView = false;
@@ -588,7 +659,14 @@ export class FollowCamera {
       !this.manualIdleView &&
       this.orbitTarget === null &&
       this.recenterTime === 0;
-    if (automatic && player.grounded !== false) {
+    const headingDiff = angleDiff(player.yaw, this.yaw);
+    const facingAwayFromCamera = Math.abs(headingDiff) < Math.PI * 0.65;
+    if (
+      automatic &&
+      (player.grounded !== false || speed >= 0.05) &&
+      alongLook >= -1e-5 &&
+      facingAwayFromCamera
+    ) {
       const dps =
         speed >= 0.05
           ? RUN_CENTER_DPS * clamp(speed / RUN_SPEED, 0.35, 1)
@@ -596,17 +674,23 @@ export class FollowCamera {
             ? IDLE_PUSHING_DPS
             : IDLE_CENTER_DPS;
       const step = ((dps * Math.PI) / 180) * dt;
-      this.yaw += clamp(angleDiff(player.yaw, this.yaw), -step, step);
+      const deltaYaw = clamp(headingDiff, -step, step);
+      if (
+        speed >= 0.05 ||
+        orbit.movementIntent ||
+        this.springArmLimit(solids, room, this.yaw + deltaYaw, player.y) >=
+          this.boomDistance - 0.05
+      ) {
+        this.yaw += deltaYaw;
+      }
     }
-    if (automatic && (moved > 0.0001 || speed > 0.1))
-      this.avoidWalls(solids, dt);
+    if (automatic && (moved > 0.0001 || speed > 0.1) && alongLook >= -1e-5)
+      this.avoidWalls(solids, player.yaw, player.y, dt);
 
     // 3. Pitch -------------------------------------------------------------
-    this.speedPullback +=
-      (Math.min(1, speed / RUN_SPEED) * 0.7 - this.speedPullback) * ease(2, dt);
+    this.speedPullback = 0;
     this.idealDistance +=
-      ((preset.distance + this.speedPullback) * ZOOM_DISTANCES[this.zoomLevel] -
-        this.idealDistance) *
+      (preset.distance * ZOOM_DISTANCES[this.zoomLevel] - this.idealDistance) *
       ease(11, dt);
     const maxPitch = this.ceilingPitch(player, preset, solids);
     if (this.pitch > maxPitch) {
@@ -621,8 +705,10 @@ export class FollowCamera {
     }
 
     // 4–5. Distance and spring arm ----------------------------------------
-    const blockers = solids.filter((s) => isBoomBlocker(s, this.focus.y));
-    const limit = this.springArmLimit(solids, room);
+    const blockers = solids.filter((s) =>
+      isBoomBlocker(s, this.focus.y, player.y),
+    );
+    const limit = this.springArmLimit(solids, room, this.yaw, player.y);
     const moving = moved > 0.0001 || speed >= 0.05;
     const orbiting =
       Math.abs(orbit.orbitX) + Math.abs(orbit.orbitY) > 0.0001 ||
@@ -641,12 +727,21 @@ export class FollowCamera {
     // Shortening inward occurs when moving, orbiting, or when the eye is trapped.
     // A stationary sightline obstruction does not collapse chosen zoom.
     if (expanding || moving || orbiting || !eyeClear) {
-      if (limit < this.boomDistance) this.boomDistance = limit;
-      else this.boomDistance += (limit - this.boomDistance) * ease(8, dt);
+      if (limit < this.boomDistance) {
+        const maxInward = Math.max(0.32, 14 * dt);
+        this.boomDistance = Math.max(limit, this.boomDistance - maxInward);
+      } else {
+        const maxOutward = Math.max(0.35, 16 * dt);
+        this.boomDistance += Math.min(
+          maxOutward,
+          (limit - this.boomDistance) * ease(8, dt),
+        );
+      }
     }
 
+    const minFloorEyeY = Math.min(player.y, this.baseFloorY) + 0.22;
     const eye = this.eyeAt(this.boomDistance);
-    eye.y = Math.max(eye.y, player.y + 0.22);
+    eye.y = Math.max(eye.y, minFloorEyeY);
 
     const sightlineObstructed =
       (blockers.length > 0 || room !== undefined) &&
@@ -661,7 +756,31 @@ export class FollowCamera {
         )
       : 0;
 
-    const safeEye = moveCameraEye(this.lastEye, eye, solids, blockers, 0.22);
+    // Critically damped height spring applied to desired eye height before
+    // collision resolution so terrain/cover collisions stay smooth and continuous.
+    const omega = 18;
+    const decay = Math.exp(-omega * dt);
+    const e0 = this.lastEye.y - eye.y;
+    const sprungY =
+      dt > 0 ? eye.y + (e0 + (this.eyeVy + omega * e0) * dt) * decay : eye.y;
+    const sprungVy = clamp(
+      dt > 0
+        ? (this.eyeVy - omega * (this.eyeVy + omega * e0) * dt) * decay
+        : 0,
+      -10,
+      10,
+    );
+    const desiredEye = eye.clone();
+    desiredEye.y = Math.max(sprungY, minFloorEyeY);
+
+    const verticalSeparation = this.lastEye.y - player.y;
+    const safeEye = moveCameraEye(
+      this.lastEye,
+      desiredEye,
+      solids,
+      blockers,
+      0.22,
+    );
     if (room) {
       const b = room.viewBounds ?? room.bounds;
       safeEye.x = clamp(safeEye.x, b.minX + 0.55, b.maxX - 0.55);
@@ -670,7 +789,7 @@ export class FollowCamera {
         safeEye.y = clamp(safeEye.y, b.minY + 0.25, b.maxY - 0.28);
       }
     }
-    safeEye.y = Math.max(safeEye.y, player.y + 0.22);
+    safeEye.y = Math.max(safeEye.y, minFloorEyeY);
 
     // SM64 Lakitu occlusion recovery:
     // If safeEye cannot see the player (e.g. trapped behind a corner, wall,
@@ -684,25 +803,63 @@ export class FollowCamera {
       blockers,
       0.05,
     );
-    const verticalSeparation = this.lastEye.y - player.y;
 
+    const instantFloorDrop = Math.abs(wantY - prevFocusY) > 2.5;
+    const floorDropRecovery =
+      instantFloorDrop ||
+      (verticalSeparation > 5.0 &&
+        safeEye.y - player.y > 4.0 &&
+        (!safeEyeSeesPlayer || safeEye.y - eye.y > 4.0));
     const stranded =
       eyeSeesPlayer &&
       (!safeEyeSeesPlayer ||
-        (verticalSeparation > 3.0 && safeEye.y - player.y > 2.0) ||
+        floorDropRecovery ||
         this.focus.distanceTo(safeEye) > this.boomDistance + 1.8);
 
     if (stranded) {
-      safeEye.copy(recoverCameraEye(eye, solids, 0.22));
-      if (room) {
-        const b = room.viewBounds ?? room.bounds;
-        safeEye.x = clamp(safeEye.x, b.minX + 0.55, b.maxX - 0.55);
-        safeEye.z = clamp(safeEye.z, b.minZ + 0.55, b.maxZ - 0.55);
-        if (b.minY !== undefined && b.maxY !== undefined) {
-          safeEye.y = clamp(safeEye.y, b.minY + 0.25, b.maxY - 0.28);
-        }
+      const recoveredGoal = recoverCameraEye(
+        floorDropRecovery ? eye : desiredEye,
+        solids,
+        0.22,
+      );
+      safeEye.copy(recoveredGoal);
+    }
+
+    const finalStep = this.lastEye.distanceTo(safeEye);
+    const maxSafeStep = Math.max(0.34, 14 * dt);
+    if (!orbiting && finalStep > maxSafeStep && verticalSeparation <= 2.2) {
+      const stepped = this.lastEye
+        .clone()
+        .lerp(safeEye, maxSafeStep / finalStep);
+      const recoveredStep = recoverCameraEye(stepped, solids, EYE_RADIUS);
+      const stepMade = recoveredStep.distanceTo(this.lastEye);
+      if (
+        cameraSegmentClear(recoveredStep, recoveredStep, solids, EYE_RADIUS) &&
+        stepMade >= 0.04 &&
+        stepMade <= Math.max(0.48, 16 * dt) &&
+        recoveredStep.distanceTo(safeEye) < finalStep - 0.015
+      ) {
+        safeEye.copy(recoveredStep);
       }
-      safeEye.y = Math.max(safeEye.y, player.y + 0.22);
+    }
+
+    if (room) {
+      const b = room.viewBounds ?? room.bounds;
+      safeEye.x = clamp(safeEye.x, b.minX + 0.55, b.maxX - 0.55);
+      safeEye.z = clamp(safeEye.z, b.minZ + 0.55, b.maxZ - 0.55);
+      if (b.minY !== undefined && b.maxY !== undefined) {
+        safeEye.y = clamp(safeEye.y, b.minY + 0.25, b.maxY - 0.28);
+      }
+    }
+    safeEye.y = Math.max(safeEye.y, minFloorEyeY);
+    if (dt > 0) {
+      this.eyeVy =
+        (stranded && floorDropRecovery) ||
+        Math.abs(safeEye.y - desiredEye.y) > 0.02
+          ? 0
+          : sprungVy;
+    } else {
+      this.eyeVy = 0;
     }
 
     const leadLength = Math.min(1, speed / RUN_SPEED) * 0.29;
@@ -764,8 +921,15 @@ export class FollowCamera {
    * side. This swings the camera around building corners *before* the main
    * boom has to tuck in, which is what keeps corner turns smooth.
    */
-  private avoidWalls(solids: readonly Solid[], dt: number): void {
-    const blockers = solids.filter((s) => isBoomBlocker(s, this.focus.y));
+  private avoidWalls(
+    solids: readonly Solid[],
+    playerYaw: number,
+    playerY: number,
+    dt: number,
+  ): void {
+    const blockers = solids.filter((s) =>
+      isBoomBlocker(s, this.focus.y, playerY),
+    );
     const reach = (yaw: number) =>
       boomFraction(
         this.focus,
@@ -773,11 +937,18 @@ export class FollowCamera {
         blockers,
         EYE_RADIUS,
       );
+    if (reach(this.yaw) >= 0.96) return;
     const left = reach(this.yaw - WHISKER_ANGLE);
     const right = reach(this.yaw + WHISKER_ANGLE);
     const imbalance = right - left; // >0: right side is more open
     if (Math.abs(imbalance) < 0.05) return;
-    this.yaw += imbalance * WALL_AVOID_RATE * dt;
+    const turn = imbalance * WALL_AVOID_RATE * dt;
+    if (
+      Math.abs(angleDiff(playerYaw, this.yaw + turn)) >=
+      Math.abs(angleDiff(playerYaw, this.yaw)) - 1e-6
+    )
+      return;
+    this.yaw += turn;
   }
 
   /** Highest pitch that keeps the eye under any low ceiling on the boom. */
@@ -788,7 +959,7 @@ export class FollowCamera {
   ): number {
     const natural = this.eyeAt(this.idealDistance, this.yaw, preset.elevation);
     const headY =
-      player.y + (player.crouching || player.role === "child" ? 0.9 : 1.75);
+      player.y + (player.crouching || player.role === "child" ? 0.9 : 1.55);
     const ceiling = ceilingAbovePath(this.focus, natural, solids, headY);
     if (ceiling === Infinity) return MAX_PITCH;
     return Math.asin(
@@ -804,9 +975,13 @@ export class FollowCamera {
   private springArmLimit(
     solids: readonly Solid[],
     room: CameraRoom | undefined,
+    yaw = this.yaw,
+    playerY = this.focus.y - 1.15,
   ): number {
-    const ideal = this.eyeAt(this.idealDistance);
-    const blockers = solids.filter((s) => isBoomBlocker(s, this.focus.y));
+    const ideal = this.eyeAt(this.idealDistance, yaw);
+    const blockers = solids.filter((s) =>
+      isBoomBlocker(s, this.focus.y, playerY),
+    );
     let fraction = boomFraction(this.focus, ideal, blockers, 0.08);
     const bounds = room?.viewBounds ?? room?.bounds;
     if (bounds)
@@ -814,10 +989,22 @@ export class FollowCamera {
     let distance =
       fraction < 1 ? this.idealDistance * fraction - 0.05 : this.idealDistance;
     // A skipped post/prop may still sit exactly where the eye lands: keep the
-    // lens physically outside it.
-    const eye = this.eyeAt(Math.max(distance, 0));
-    if (!cameraSegmentClear(eye, eye, solids, EYE_RADIUS)) {
-      const solidFraction = boomFraction(this.focus, ideal, solids, EYE_RADIUS);
+    // lens physically outside tall props while only raycasting against the
+    // specific prop(s) the eye actually touches (never unrelated columns).
+    const eye = this.eyeAt(Math.max(distance, 0), yaw);
+    const touched = solids.filter(
+      (s) =>
+        Math.max(s.w, s.d) > 0.75 &&
+        (s.y + s.h > playerY + 1.55 || Math.max(s.w, s.d) > 8) &&
+        !cameraSegmentClear(eye, eye, [s], EYE_RADIUS),
+    );
+    if (touched.length > 0) {
+      const solidFraction = boomFraction(
+        this.focus,
+        ideal,
+        touched,
+        EYE_RADIUS,
+      );
       if (solidFraction < 1) {
         distance = Math.min(
           distance,
@@ -842,6 +1029,7 @@ export class FollowCamera {
     this.room = room;
     this.orbitTarget = null;
     this.lead.set(0, 0, 0);
+    this.eyeVy = 0;
     const focus = new T.Vector3(
       player.x,
       player.y + focusHeight(player, preset),
@@ -942,6 +1130,7 @@ export class FollowCamera {
     );
     this.orbitTarget = null;
     this.lead.set(0, 0, 0);
+    this.eyeVy = 0;
   }
 
   private eyeAt(
