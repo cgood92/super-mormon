@@ -175,6 +175,17 @@ test("playable Lehi responds to traversal poses and keeps crouch under a low cei
     assert.ok(box.max.y <= 0.9, `${move} reaches ${box.max.y}`);
     assert.ok(box.min.y >= -0.025, `${move} feet sink to ${box.min.y}`);
   }
+  for (const move of ["climb", "swim"] as const) {
+    actor.update(1 / 60, {
+      ...standing,
+      grounded: false,
+      crouching: true,
+      move,
+      moveTime: 0.2,
+    });
+    const box = bounds(actor.group);
+    assert.ok(box.max.y > 1.1, `${move} squashed to ${box.max.y}`);
+  }
   actor.dispose();
 });
 

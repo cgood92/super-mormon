@@ -225,42 +225,99 @@ function moveHorizontal(
     }
   }
   // Preserve sliding along the other axis by resolving each axis independently.
-  let safe = player[axis];
+  // Clamp to the nearest blocking edge so staggered/overlapping solids never
+  // push the player inside an earlier solid.
+  const dir = Math.sign(amount);
+  const start = player[axis];
+  const target = start + amount;
+  const bodyHeight = height(player);
+  let safe = target;
+  let blocked = false;
   for (const solid of solids) {
     const cross =
       axis === "x"
-        ? player.z + RADIUS > solid.z - solid.d / 2 &&
-          player.z - RADIUS < solid.z + solid.d / 2
-        : player.x + RADIUS > solid.x - solid.w / 2 &&
-          player.x - RADIUS < solid.x + solid.w / 2;
+        ? player.z + RADIUS > solid.z - solid.d / 2 + EPS &&
+          player.z - RADIUS < solid.z + solid.d / 2 - EPS
+        : player.x + RADIUS > solid.x - solid.w / 2 + EPS &&
+          player.x - RADIUS < solid.x + solid.w / 2 - EPS;
     if (
       !cross ||
       player.y >= solid.y + solid.h - EPS ||
-      player.y + height(player) <= solid.y + EPS
+      player.y + bodyHeight <= solid.y + EPS
     )
       continue;
-    const edge =
-      (axis === "x" ? solid.x : solid.z) +
-      (Math.sign(amount) * -(axis === "x" ? solid.w : solid.d)) / 2 -
-      Math.sign(amount) * RADIUS;
-    if (
-      Math.sign(amount) * (edge - safe) >= 0 &&
-      Math.sign(amount) *
-        (edge -
-          targetX * (axis === "x" ? 1 : 0) -
-          targetZ * (axis === "z" ? 1 : 0)) <=
-        0
-    )
-      safe = edge;
+    const center = axis === "x" ? solid.x : solid.z;
+    const half = (axis === "x" ? solid.w : solid.d) / 2;
+    const edge = center - dir * (half + RADIUS);
+    const farEdge = center + dir * (half + RADIUS);
+    if (dir * (start - edge) > EPS && dir * (farEdge - start) > EPS) {
+      // Already overlapping along this axis: block deeper entry, allow exit.
+      if (dir * (start - center) <= 0) {
+        if (dir * (start - safe) < 0) safe = start;
+        blocked = true;
+      }
+      continue;
+    }
+    if (dir * (edge - start) >= -EPS && dir * (edge - safe) <= 0) {
+      safe = dir * (edge - start) >= 0 ? edge : start;
+      blocked = true;
+    }
   }
   player[axis] = safe;
-  player[axis === "x" ? "vx" : "vz"] = 0;
+  if (blocked) player[axis === "x" ? "vx" : "vz"] = 0;
 }
 
 function setMove(player: PlayerState, move: PlayerMove): void {
   if (player.move !== move) {
     player.move = move;
     player.moveTime = 0;
+  }
+}
+
+function isClimbSolid(s: Solid, climb: Climbable): boolean {
+  return (
+    Math.abs(s.x - climb.x) <= 0.25 &&
+    Math.abs(s.z - climb.z) <= 0.25 &&
+    (s.w <= climb.radius * 2 + 0.35 || s.y >= climb.y + climb.height - 0.6)
+  );
+}
+
+/** Push a detaching climber just clear of the trunk/mast collider so they never snag inside it. */
+function clearClimbTrunk(
+  player: PlayerState,
+  climb: Climbable,
+  solids: Solid[],
+): void {
+  const ax = player.climbAway?.x ?? 0;
+  const az = player.climbAway?.z ?? 1;
+  let push = 0;
+  for (const s of solids) {
+    if (
+      Math.abs(s.x - climb.x) > 0.25 ||
+      Math.abs(s.z - climb.z) > 0.25 ||
+      s.w > climb.radius * 2 + 0.35 ||
+      s.d > climb.radius * 2 + 0.35 ||
+      !bodyOverlap(player.x, player.y, player.z, s, HEIGHT)
+    )
+      continue;
+    const tx =
+      Math.abs(ax) > EPS
+        ? (s.x + Math.sign(ax) * (s.w / 2 + RADIUS + EPS) - player.x) / ax
+        : Infinity;
+    const tz =
+      Math.abs(az) > EPS
+        ? (s.z + Math.sign(az) * (s.d / 2 + RADIUS + EPS) - player.z) / az
+        : Infinity;
+    const need = Math.min(tx >= 0 ? tx : Infinity, tz >= 0 ? tz : Infinity);
+    if (Number.isFinite(need)) push = Math.max(push, need);
+  }
+  if (push <= 0) return;
+  const candX = player.x + ax * push;
+  const candZ = player.z + az * push;
+  const obstacles = solids.filter((s) => !isClimbSolid(s, climb));
+  if (clearAt(candX, player.y, candZ, obstacles, CROUCH_HEIGHT)) {
+    player.x = candX;
+    player.z = candZ;
   }
 }
 
@@ -503,6 +560,8 @@ export function stepPlayer(
           // Handstand launch leap: super high vertical leap (vy = 62f flat ~ JUMP * 1.48)
           player.climbId = undefined;
           player.climbCooldown = 0.35;
+          player.crouching = false;
+          clearClimbTrunk(player, climb, solids);
           player.vx = 0;
           player.vz = 0;
           player.vy = JUMP * 1.48;
@@ -515,6 +574,8 @@ export function stepPlayer(
       } else if (player.climbCooldown <= 0 && (input.crouch || input.jump)) {
         player.climbId = undefined;
         player.climbCooldown = 0.35;
+        player.crouching = false;
+        clearClimbTrunk(player, climb, solids);
         if (input.jump) {
           // Mid-trunk kick-off: back-deflection impulse (v_away = 18f, v_y = 36f)
           player.vx = (player.climbAway?.x ?? 0) * 5.5;
@@ -535,15 +596,11 @@ export function stepPlayer(
         const topOfPoleY = climb.y + climb.height - 0.6;
         if (player.y >= topOfPoleY - 0.08 && input.y > 0.2) {
           player.y = climb.y + climb.height;
+          player.crouching = false;
           setMove(player, "handstand");
           continue;
         }
-        const isClimbSolid = (s: Solid) =>
-          Math.abs(s.x - climb.x) <= 0.25 &&
-          Math.abs(s.z - climb.z) <= 0.25 &&
-          (s.w <= climb.radius * 2 + 0.35 ||
-            s.y >= climb.y + climb.height - 0.6);
-        const obstacleSolids = solids.filter((s) => !isClimbSolid(s));
+        const obstacleSolids = solids.filter((s) => !isClimbSolid(s, climb));
 
         const targetY = Math.max(
           climb.y + 0.25,
@@ -561,7 +618,7 @@ export function stepPlayer(
         )
           ? HEIGHT
           : CROUCH_HEIGHT;
-        player.crouching = bodyHeight === CROUCH_HEIGHT;
+        player.crouching = false;
         const startY = player.y;
         const steps = Math.ceil(Math.abs(targetY - startY) / 0.05);
         for (let step = 1; step <= steps; step++) {
