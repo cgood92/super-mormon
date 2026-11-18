@@ -359,7 +359,6 @@ export function createSculptedCharacterRig(
         !crawling &&
         state.move !== "climb" &&
         state.move !== "handstand" &&
-        state.move !== "ledgeHang" &&
         state.move !== "swim"
           ? Math.min(
               state.move === "crawl" ? 0.49 : 0.525,

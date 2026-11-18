@@ -275,7 +275,6 @@ export function createMotionDriver(role: CharacterRole): {
         state.move !== "groundPound" &&
         state.move !== "climb" &&
         state.move !== "handstand" &&
-        state.move !== "ledgeHang" &&
         state.move !== "swim"
           ? "crouch"
           : (state.move ??
